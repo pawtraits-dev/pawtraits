@@ -225,6 +225,57 @@ if (!profile || profile.user_type !== 'admin') {
 - Metadata-driven prompt construction using breed, theme, style combinations
 - Export functionality for batch generation workflows
 
+## Stripe Payment Integration
+
+### Setup and Configuration
+The application integrates with Stripe for secure payment processing:
+
+**Environment Variables:**
+- `STRIPE_SECRET_KEY`: Server-side Stripe secret key for API calls
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`: Client-side publishable key for Stripe Elements
+- `STRIPE_WEBHOOK_SECRET`: Webhook endpoint verification secret
+
+**Core Files:**
+- `/lib/stripe-server.ts`: Server-side Stripe service wrapper with helper functions
+- `/lib/stripe-client.ts`: Client-side Stripe setup and utilities
+- `/app/api/payments/create-intent/route.ts`: PaymentIntent creation endpoint
+- `/app/api/webhooks/stripe/route.ts`: Webhook handler for Stripe events
+- `/components/StripePaymentForm.tsx`: React component for payment processing
+
+### Payment Flow
+1. **Cart to Checkout**: User proceeds from cart to checkout page
+2. **Shipping Information**: User enters shipping details on step 1
+3. **PaymentIntent Creation**: Moving to step 2 creates a PaymentIntent via API
+4. **Payment Form**: Stripe Elements renders secure payment form
+5. **Payment Confirmation**: Stripe processes payment and confirms via webhook
+6. **Order Creation**: Webhook creates order record in database
+7. **Confirmation Page**: User sees order confirmation with payment status
+
+### Webhook Handling
+The webhook handler processes these Stripe events:
+- `payment_intent.succeeded`: Creates order, handles referrals, updates inventory
+- `payment_intent.payment_failed`: Logs failed payments for analytics
+- `payment_intent.canceled`: Tracks cancellation events
+- `charge.dispute.created`: Handles payment disputes
+
+### Integration with Existing Systems
+- **Referral System**: Stripe payments integrate with partner referrals and commission tracking
+- **Order Management**: Creates orders compatible with existing order structure
+- **Cart System**: Works with existing server-side cart context
+- **User Authentication**: Respects existing user authentication and profile system
+
+### Testing
+Use Stripe test mode with test API keys. Test cards:
+- `4242424242424242`: Successful payment
+- `4000000000000002`: Declined payment
+- `4000000000009995`: Insufficient funds
+
+### Security
+- All payment data handled by Stripe (PCI compliant)
+- PaymentIntents include metadata for order tracking
+- Webhook signature verification prevents tampering
+- Client-side validation with server-side confirmation
+
 ### User Interaction Tracking
 - Client-side interaction tracking via `UserInteractionsService`
 - Tracks likes, shares, and purchases with offline support

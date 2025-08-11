@@ -366,9 +366,10 @@ export async function GET(request: NextRequest) {
     const email = searchParams.get('email');
     const orderNumber = searchParams.get('orderNumber');
     const orderId = searchParams.get('orderId');
+    const paymentIntent = searchParams.get('paymentIntent');
 
-    // If searching by order number or ID (for confirmation page)
-    if (orderNumber || orderId) {
+    // If searching by order number, ID, or payment intent (for confirmation page)
+    if (orderNumber || orderId || paymentIntent) {
       let query = supabase
         .from('orders')
         .select(`
@@ -382,6 +383,8 @@ export async function GET(request: NextRequest) {
         query = query.eq('order_number', orderNumber);
       } else if (orderId) {
         query = query.eq('id', orderId);
+      } else if (paymentIntent) {
+        query = query.eq('payment_intent_id', paymentIntent);
       }
 
       const { data: orders, error } = await query.single();

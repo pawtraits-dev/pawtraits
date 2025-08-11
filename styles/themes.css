@@ -1,0 +1,89 @@
+/* Global theme system for different user types */
+
+/* Default theme (public/unauthenticated) - Purple */
+:root {
+  --theme-primary: 147 51 234; /* purple-600 */
+  --theme-primary-foreground: 255 255 255;
+  --theme-secondary: 243 244 246; /* gray-100 */
+  --theme-secondary-foreground: 17 24 39; /* gray-900 */
+  --theme-accent: 236 72 153; /* pink-500 */
+  --theme-accent-foreground: 255 255 255;
+  --theme-background-from: 250 245 255; /* purple-50 */
+  --theme-background-to: 239 246 255; /* blue-50 */
+  --theme-gradient-from: 147 51 234; /* purple-600 */
+  --theme-gradient-to: 236 72 153; /* pink-500 */
+}
+
+/* Admin theme - Yellow */
+.theme-admin {
+  --theme-primary: 251 191 36; /* yellow-500 */
+  --theme-primary-foreground: 17 24 39; /* gray-900 */
+  --theme-secondary: 254 249 195; /* yellow-100 */
+  --theme-secondary-foreground: 120 113 108; /* stone-500 */
+  --theme-accent: 245 158 11; /* amber-500 */
+  --theme-accent-foreground: 255 255 255;
+  --theme-background-from: 254 252 232; /* yellow-50 */
+  --theme-background-to: 255 251 235; /* amber-50 */
+  --theme-gradient-from: 251 191 36; /* yellow-500 */
+  --theme-gradient-to: 245 158 11; /* amber-500 */
+}
+
+/* Partner theme - Green */
+.theme-partner {
+  --theme-primary: 34 197 94; /* green-500 */
+  --theme-primary-foreground: 255 255 255;
+  --theme-secondary: 220 252 231; /* green-100 */
+  --theme-secondary-foreground: 22 101 52; /* green-800 */
+  --theme-accent: 16 185 129; /* emerald-500 */
+  --theme-accent-foreground: 255 255 255;
+  --theme-background-from: 240 253 244; /* green-50 */
+  --theme-background-to: 236 253 245; /* emerald-50 */
+  --theme-gradient-from: 34 197 94; /* green-500 */
+  --theme-gradient-to: 16 185 129; /* emerald-500 */
+}
+
+/* Customer theme - Purple (same as default) */
+.theme-customer {
+  --theme-primary: 147 51 234; /* purple-600 */
+  --theme-primary-foreground: 255 255 255;
+  --theme-secondary: 243 244 246; /* gray-100 */
+  --theme-secondary-foreground: 17 24 39; /* gray-900 */
+  --theme-accent: 236 72 153; /* pink-500 */
+  --theme-accent-foreground: 255 255 255;
+  --theme-background-from: 250 245 255; /* purple-50 */
+  --theme-background-to: 239 246 255; /* blue-50 */
+  --theme-gradient-from: 147 51 234; /* purple-600 */
+  --theme-gradient-to: 236 72 153; /* pink-500 */
+}
+
+/* Theme utility classes */
+.bg-theme-primary {
+  background-color: rgb(var(--theme-primary));
+  color: rgb(var(--theme-primary-foreground));
+}
+
+.bg-theme-secondary {
+  background-color: rgb(var(--theme-secondary));
+  color: rgb(var(--theme-secondary-foreground));
+}
+
+.bg-theme-gradient {
+  background: linear-gradient(135deg, rgb(var(--theme-gradient-from)), rgb(var(--theme-gradient-to)));
+}
+
+.bg-theme-background {
+  background: linear-gradient(135deg, rgb(var(--theme-background-from)), rgb(var(--theme-background-to)));
+}
+
+.text-theme-primary {
+  color: rgb(var(--theme-primary));
+}
+
+.border-theme-primary {
+  border-color: rgb(var(--theme-primary));
+}
+
+.hover\:bg-theme-primary:hover {
+  background-color: rgb(var(--theme-primary));
+  color: rgb(var(--theme-primary-foreground));
+}

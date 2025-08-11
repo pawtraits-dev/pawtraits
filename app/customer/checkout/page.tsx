@@ -14,6 +14,9 @@ import Link from "next/link"
 import { useServerCart } from "@/lib/server-cart-context"
 import { useRouter } from "next/navigation"
 import { getSupabaseClient } from '@/lib/supabase-client'
+import { Elements } from '@stripe/react-stripe-js'
+import { getStripe } from '@/lib/stripe-client'
+import StripePaymentForm from '@/components/StripePaymentForm'
 
 export default function CustomerCheckoutPage() {
   const [currentStep, setCurrentStep] = useState(1)
@@ -33,9 +36,12 @@ export default function CustomerCheckoutPage() {
   const [referralValidation, setReferralValidation] = useState<any>(null)
   const [validatingReferral, setValidatingReferral] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
   const { cart, getShippingCost, getCartTotal, clearCart } = useServerCart()
   const router = useRouter()
   const supabase = getSupabaseClient()
+  const stripePromise = getStripe()
 
   // Load user profile and customer data
   useEffect(() => {
@@ -193,60 +199,96 @@ export default function CustomerCheckoutPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleShippingSubmit = (e: React.FormEvent) => {
+  const handleShippingSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (validateShipping()) {
-      setCurrentStep(2)
+      setIsProcessing(true)
+      try {
+        await createPaymentIntent()
+        setCurrentStep(2)
+      } finally {
+        setIsProcessing(false)
+      }
     }
   }
 
-  const handlePayment = async () => {
-    setIsProcessing(true)
-
+  // Create PaymentIntent when moving to payment step
+  const createPaymentIntent = async () => {
     try {
-      // Create order data
-      const orderData = {
-        items: cart.items.map(item => ({
-          productId: item.productId,
-          imageId: item.imageId,
-          imageUrl: item.imageUrl,
-          imageTitle: item.imageTitle,
-          quantity: item.quantity,
-          unitPrice: item.pricing.sale_price, // in pence
-          totalPrice: item.pricing.sale_price * item.quantity // in pence
-        })),
-        shippingAddress: shippingData,
-        totalAmount: getCartTotal(), // in pence
-        shippingCost: getShippingCost(), // in pence
-        currency: 'GBP',
-        referralCode: referralCode || undefined
-      }
-
-      // Create order via API
-      const response = await fetch('/api/shop/orders', {
+      const response = await fetch('/api/payments/create-intent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(orderData)
-      })
+        body: JSON.stringify({
+          amount: getCartTotal(), // in pence
+          currency: 'gbp',
+          customerEmail: shippingData.email,
+          customerName: `${shippingData.firstName} ${shippingData.lastName}`,
+          shippingAddress: shippingData,
+          cartItems: cart.items.map(item => ({
+            productId: item.productId,
+            imageId: item.imageId,
+            imageTitle: item.imageTitle,
+            quantity: item.quantity,
+            unitPrice: item.pricing.sale_price,
+          })),
+          referralCode: referralCode || undefined,
+        }),
+      });
 
       if (!response.ok) {
-        throw new Error('Failed to create order')
+        throw new Error('Failed to create payment intent');
       }
 
-      const result = await response.json()
+      const data = await response.json();
+      setClientSecret(data.clientSecret);
+      setPaymentIntentId(data.paymentIntentId);
       
-      // Clear cart and redirect to confirmation with order details
-      clearCart()
-      router.push(`/customer/order-confirmation?orderId=${result.order.id}&orderNumber=${result.order.orderNumber}`)
+      console.log('PaymentIntent created:', {
+        id: data.paymentIntentId,
+        amount: data.amount,
+        currency: data.currency,
+      });
+    } catch (error) {
+      console.error('Error creating PaymentIntent:', error);
+      alert('Failed to set up payment. Please try again.');
+      setCurrentStep(1); // Go back to shipping step
+    }
+  };
+
+  // Handle successful payment completion
+  const handlePaymentSuccess = async (paymentIntent: any) => {
+    try {
+      console.log('Payment succeeded:', paymentIntent.id);
+      
+      // Clear cart
+      await clearCart();
+      
+      // Redirect to order confirmation
+      router.push(`/customer/order-confirmation?payment_intent=${paymentIntent.id}`);
       
     } catch (error) {
-      console.error('Error creating order:', error)
-      alert('There was an error processing your order. Please try again.')
-      setIsProcessing(false)
+      console.error('Error handling payment success:', error);
+      // Still redirect to confirmation since payment succeeded
+      router.push(`/customer/order-confirmation?payment_intent=${paymentIntent.id}`);
     }
-  }
+  };
+
+  // Handle payment errors
+  const handlePaymentError = (error: any) => {
+    console.error('Payment failed:', error);
+    setIsProcessing(false);
+    
+    // Show user-friendly error message
+    let errorMessage = 'Payment failed. Please try again.';
+    
+    if (error.type === 'card_error' || error.type === 'validation_error') {
+      errorMessage = error.message;
+    }
+    
+    alert(errorMessage);
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setShippingData((prev) => ({ ...prev, [field]: value }))
@@ -407,9 +449,22 @@ export default function CustomerCheckoutPage() {
                       </div>
                     </div>
 
-                    <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3">
-                      Continue to Payment
-                      <ArrowRight className="w-4 h-4 ml-2" />
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3"
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Setting up payment...
+                        </>
+                      ) : (
+                        <>
+                          Continue to Payment
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </>
+                      )}
                     </Button>
                   </form>
                 </CardContent>
@@ -454,19 +509,60 @@ export default function CustomerCheckoutPage() {
                     </Button>
                   </div>
 
-                  {isProcessing ? (
+                  {/* Stripe Payment Form */}
+                  {clientSecret && stripePromise ? (
+                    <Elements
+                      stripe={stripePromise}
+                      options={{
+                        clientSecret,
+                        appearance: {
+                          theme: 'stripe',
+                          variables: {
+                            colorPrimary: '#7c3aed',
+                            colorBackground: '#ffffff',
+                            colorText: '#1f2937',
+                            colorDanger: '#dc2626',
+                            fontFamily: 'system-ui, sans-serif',
+                            spacingUnit: '4px',
+                            borderRadius: '8px',
+                          },
+                          rules: {
+                            '.Input': {
+                              border: '1px solid #d1d5db',
+                              boxShadow: 'none',
+                            },
+                            '.Input:focus': {
+                              border: '1px solid #7c3aed',
+                              boxShadow: '0 0 0 2px rgba(124, 58, 237, 0.1)',
+                            },
+                          },
+                        },
+                      }}
+                    >
+                      <StripePaymentForm
+                        orderSummary={orderSummary}
+                        customerDetails={{
+                          email: shippingData.email,
+                          name: `${shippingData.firstName} ${shippingData.lastName}`,
+                          address: {
+                            line1: shippingData.address,
+                            city: shippingData.city,
+                            postal_code: shippingData.postcode,
+                            country: shippingData.country,
+                          },
+                        }}
+                        onSuccess={handlePaymentSuccess}
+                        onError={handlePaymentError}
+                        isProcessing={isProcessing}
+                        setIsProcessing={setIsProcessing}
+                      />
+                    </Elements>
+                  ) : (
                     <div className="text-center py-8">
                       <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-purple-600" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Processing your order...</h3>
-                      <p className="text-gray-600">Please don't close this page</p>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Setting up secure payment...</h3>
+                      <p className="text-gray-600">Please wait</p>
                     </div>
-                  ) : (
-                    <Button
-                      onClick={handlePayment}
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 text-lg font-semibold"
-                    >
-                      Complete Order - £{orderSummary.total.toFixed(2)}
-                    </Button>
                   )}
                 </CardContent>
               </Card>
