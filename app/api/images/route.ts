@@ -1,0 +1,219 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { SupabaseService } from '@/lib/supabase';
+import { generateImageMetadata, extractColorTags } from '@/lib/metadata-generator';
+import type { ImageCatalogCreate } from '@/lib/types';
+
+const supabaseService = new SupabaseService();
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const breedId = searchParams.get('breed_id');
+    const themeId = searchParams.get('theme_id');
+    const styleId = searchParams.get('style_id');
+    const formatId = searchParams.get('format_id');
+    const tags = searchParams.get('tags');
+    const featured = searchParams.get('featured');
+    const publicOnly = searchParams.get('public') !== 'false'; // Default to public only
+
+    const images = await supabaseService.getImages({
+      page,
+      limit,
+      breedId,
+      themeId,
+      styleId,
+      formatId,
+      tags: tags?.split(','),
+      featured: featured === 'true',
+      publicOnly
+    });
+
+    return NextResponse.json(images);
+  } catch (error) {
+    console.error('Error fetching images:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch images' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    const promptText = formData.get('prompt_text') as string;
+    const description = formData.get('description') as string || '';
+    const tags = JSON.parse(formData.get('tags') as string || '[]');
+    const breedId = formData.get('breed_id') as string || '';
+    const themeId = formData.get('theme_id') as string || '';
+    const styleId = formData.get('style_id') as string || '';
+    const formatId = formData.get('format_id') as string || '';
+    const coatId = formData.get('coat_id') as string || '';
+    const aiModel = formData.get('ai_model') as string || '';
+    const generationParameters = formData.get('generation_parameters') as string || '{}';
+    const rating = parseInt(formData.get('rating') as string || '0');
+    const isFeatured = formData.get('is_featured') === 'true';
+    const isPublic = formData.get('is_public') !== 'false'; // Default to public
+
+    if (!file) {
+      return NextResponse.json(
+        { error: 'No file provided' },
+        { status: 400 }
+      );
+    }
+
+    if (!promptText) {
+      return NextResponse.json(
+        { error: 'Prompt text is required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json(
+        { error: 'Invalid file type. Only JPEG, PNG, and WebP are allowed.' },
+        { status: 400 }
+      );
+    }
+
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      return NextResponse.json(
+        { error: 'File size too large. Maximum 10MB allowed.' },
+        { status: 400 }
+      );
+    }
+
+    // Get entity data for metadata generation and validate existence
+    let breed = null, theme = null, style = null, format = null, coat = null;
+    let validBreedId = null, validThemeId = null, validStyleId = null, validFormatId = null, validCoatId = null;
+    
+    // Validate and fetch entities, only keep IDs if entities exist
+    if (breedId && breedId.trim() !== '') {
+      try {
+        breed = await supabaseService.getBreed(breedId);
+        validBreedId = breedId; // Only set if fetch succeeded
+      } catch (error) {
+        console.warn('Breed not found:', breedId);
+      }
+    }
+    
+    if (themeId && themeId.trim() !== '') {
+      try {
+        theme = await supabaseService.getTheme(themeId);
+        validThemeId = themeId;
+      } catch (error) {
+        console.warn('Theme not found:', themeId);
+      }
+    }
+    
+    if (styleId && styleId.trim() !== '') {
+      try {
+        style = await supabaseService.getStyle(styleId);
+        validStyleId = styleId;
+      } catch (error) {
+        console.warn('Style not found:', styleId);
+      }
+    }
+    
+    if (formatId && formatId.trim() !== '') {
+      try {
+        format = await supabaseService.getFormat(formatId);
+        validFormatId = formatId;
+      } catch (error) {
+        console.warn('Format not found:', formatId);
+      }
+    }
+    
+    if (coatId && coatId.trim() !== '') {
+      try {
+        coat = await supabaseService.getCoat(coatId);
+        validCoatId = coatId;
+      } catch (error) {
+        console.warn('Coat not found:', coatId);
+      }
+    }
+
+    // Generate metadata if not provided
+    let finalDescription = description;
+    let finalTags = tags;
+    
+    if (!description || tags.length === 0) {
+      const generated = generateImageMetadata({
+        promptText,
+        breed: breed || undefined,
+        theme: theme || undefined,
+        style: style || undefined,
+        format: format || undefined,
+        coat: coat ? {
+          name: coat.name,
+          pattern_type: coat.pattern_type,
+          rarity: coat.rarity
+        } : undefined
+      });
+      
+      if (!description) finalDescription = generated.description;
+      if (tags.length === 0) {
+        finalTags = generated.tags;
+        
+        // Add color tags if coat has color info
+        if (coat?.hex_color) {
+          const colorTags = extractColorTags(coat.hex_color);
+          finalTags = [...finalTags, ...colorTags];
+        }
+        
+        // Remove duplicates
+        finalTags = Array.from(new Set(finalTags));
+      }
+    }
+
+    // Upload to Supabase Storage
+    const uploadResult = await supabaseService.uploadImage(file);
+    
+    if (!uploadResult.success) {
+      return NextResponse.json(
+        { error: uploadResult.error },
+        { status: 500 }
+      );
+    }
+
+    // Create image catalog entry with auto-generated metadata
+    const imageData: ImageCatalogCreate = {
+      filename: uploadResult.filename!,
+      original_filename: file.name,
+      file_size: file.size,
+      mime_type: file.type,
+      storage_path: uploadResult.path!,
+      public_url: uploadResult.publicUrl!,
+      prompt_text: promptText,
+      description: finalDescription,
+      tags: finalTags,
+      breed_id: validBreedId || undefined,
+      theme_id: validThemeId || undefined,
+      style_id: validStyleId || undefined,
+      format_id: validFormatId || undefined,
+      coat_id: validCoatId || undefined,
+      ai_model: aiModel || undefined,
+      generation_parameters: JSON.parse(generationParameters),
+      rating: rating > 0 ? rating : undefined,
+      is_featured: isFeatured,
+      is_public: isPublic
+    };
+
+    const savedImage = await supabaseService.createImage(imageData);
+
+    return NextResponse.json(savedImage);
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    return NextResponse.json(
+      { error: 'Failed to upload image' },
+      { status: 500 }
+    );
+  }
+}

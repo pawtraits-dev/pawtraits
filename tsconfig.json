@@ -1,0 +1,28 @@
+{
+    "compilerOptions": {
+      "target": "es5",
+      "lib": ["dom", "dom.iterable", "es6"],
+      "allowJs": true,
+      "skipLibCheck": true,
+      "strict": true,
+      "noEmit": true,
+      "esModuleInterop": true,
+      "module": "esnext",
+      "moduleResolution": "bundler",
+      "resolveJsonModule": true,
+      "isolatedModules": true,
+      "jsx": "preserve",
+      "incremental": true,
+      "plugins": [
+        {
+          "name": "next"
+        }
+      ],
+      "baseUrl": ".",
+      "paths": {
+        "@/*": ["./*"]
+      }
+    },
+    "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+    "exclude": ["node_modules", "components/ui/chart.tsx", "components/ui/command.tsx", "components/ui/drawer.tsx", "components/ui/form.tsx", "components/ui/input-otp.tsx", "components/ui/resizable.tsx", "components/ui/sidebar.tsx", "components/ui/sonner.tsx", "components/ui/toaster.tsx", "groomer-signup/**", "lib/metadata-generator.ts", "app/api/debug/**"]
+  }

@@ -1,0 +1,403 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { 
+  Search, 
+  Package, 
+  Clock, 
+  Truck, 
+  CheckCircle, 
+  Eye, 
+  Filter,
+  Download,
+  Calendar,
+  User,
+  Mail,
+  Loader2,
+  X
+} from 'lucide-react';
+
+interface OrderItem {
+  id: string;
+  product_id: string;
+  image_id: string;
+  image_url: string;
+  image_title: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  status: string;
+  customer_email: string;
+  shipping_first_name: string;
+  shipping_last_name: string;
+  shipping_address: string;
+  shipping_city: string;
+  shipping_postcode: string;
+  shipping_country: string;
+  subtotal_amount: number;
+  shipping_amount: number;
+  total_amount: number;
+  currency: string;
+  estimated_delivery: string;
+  created_at: string;
+  order_items: OrderItem[];
+}
+
+export default function AdminOrdersPage() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchEmail, setSearchEmail] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    loadAllOrders();
+  }, []);
+
+  useEffect(() => {
+    filterOrders();
+  }, [orders, searchEmail, statusFilter, dateFilter]);
+
+  const loadAllOrders = async () => {
+    setLoading(true);
+    try {
+      // Load all orders by getting unique emails first, then loading all orders
+      // For now, we'll use a different approach - load by empty email to get all
+      const response = await fetch('/api/admin/orders');
+      if (response.ok) {
+        const orderData = await response.json();
+        setOrders(orderData);
+      } else {
+        console.error('Failed to load orders');
+        setOrders([]);
+      }
+    } catch (error) {
+      console.error('Error loading orders:', error);
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterOrders = () => {
+    let filtered = [...orders];
+
+    // Email filter
+    if (searchEmail.trim()) {
+      const emailQuery = searchEmail.toLowerCase();
+      filtered = filtered.filter(order => 
+        order.customer_email.toLowerCase().includes(emailQuery) ||
+        order.shipping_first_name.toLowerCase().includes(emailQuery) ||
+        order.shipping_last_name.toLowerCase().includes(emailQuery) ||
+        order.order_number.toLowerCase().includes(emailQuery)
+      );
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(order => order.status === statusFilter);
+    }
+
+    // Date filter
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const filterDate = new Date();
+      
+      switch (dateFilter) {
+        case 'today':
+          filterDate.setHours(0, 0, 0, 0);
+          break;
+        case 'week':
+          filterDate.setDate(now.getDate() - 7);
+          break;
+        case 'month':
+          filterDate.setMonth(now.getMonth() - 1);
+          break;
+      }
+      
+      if (dateFilter !== 'all') {
+        filtered = filtered.filter(order => 
+          new Date(order.created_at) >= filterDate
+        );
+      }
+    }
+
+    // Sort by creation date (newest first)
+    filtered.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    setFilteredOrders(filtered);
+  };
+
+  const formatPrice = (priceInPence: number) => {
+    return `£${(priceInPence / 100).toFixed(2)}`;
+  };
+
+  const formatDate = (isoDate: string) => {
+    return new Date(isoDate).toLocaleDateString('en-GB', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return <Clock className="w-4 h-4 text-yellow-600" />;
+      case 'processing':
+        return <Package className="w-4 h-4 text-blue-600" />;
+      case 'shipped':
+        return <Truck className="w-4 h-4 text-purple-600" />;
+      case 'delivered':
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
+      default:
+        return <Clock className="w-4 h-4 text-gray-600" />;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, string> = {
+      confirmed: "bg-yellow-100 text-yellow-800",
+      processing: "bg-blue-100 text-blue-800",
+      shipped: "bg-purple-100 text-purple-800",
+      delivered: "bg-green-100 text-green-800",
+    };
+    return variants[status.toLowerCase()] || "bg-gray-100 text-gray-800";
+  };
+
+  const clearFilters = () => {
+    setSearchEmail('');
+    setStatusFilter('all');
+    setDateFilter('all');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-purple-600" />
+          <p className="text-gray-600">Loading orders...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Orders Management</h1>
+          <p className="text-gray-600 mt-2">
+            Manage all customer orders - {filteredOrders.length} of {orders.length} orders shown
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm">
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </Button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Search & Filter Orders</CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              {showFilters ? 'Hide' : 'Show'} Filters
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search by email, name, or order number..."
+              value={searchEmail}
+              onChange={(e) => setSearchEmail(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {/* Advanced Filters */}
+          {showFilters && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                    <SelectItem value="processing">Processing</SelectItem>
+                    <SelectItem value="shipped">Shipped</SelectItem>
+                    <SelectItem value="delivered">Delivered</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="date">Date Range</Label>
+                <Select value={dateFilter} onValueChange={setDateFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">Last 7 Days</SelectItem>
+                    <SelectItem value="month">Last 30 Days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-end space-x-2">
+                {(searchEmail || statusFilter !== 'all' || dateFilter !== 'all') && (
+                  <Button variant="outline" onClick={clearFilters} size="sm">
+                    <X className="w-4 h-4 mr-2" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Orders List */}
+      {filteredOrders.length === 0 ? (
+        <Card className="text-center py-16">
+          <CardContent>
+            <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
+            <p className="text-gray-600 mb-4">
+              {orders.length === 0 
+                ? 'No orders have been placed yet.'
+                : 'Try adjusting your search or filter criteria.'
+              }
+            </p>
+            {(searchEmail || statusFilter !== 'all' || dateFilter !== 'all') && (
+              <Button onClick={clearFilters} variant="outline">
+                Clear Filters
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {filteredOrders.map((order) => (
+            <Card key={order.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+                  {/* Order Info */}
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center space-x-4">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        #{order.order_number}
+                      </h3>
+                      <Badge className={getStatusBadge(order.status)}>
+                        <div className="flex items-center space-x-1">
+                          {getStatusIcon(order.status)}
+                          <span className="capitalize">{order.status}</span>
+                        </div>
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <User className="w-4 h-4" />
+                          <span>{order.shipping_first_name} {order.shipping_last_name}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Mail className="w-4 h-4" />
+                          <span>{order.customer_email}</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-4 h-4" />
+                          <span>{formatDate(order.created_at)}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Package className="w-4 h-4" />
+                          <span>{order.order_items?.length || 0} item{(order.order_items?.length || 0) !== 1 ? 's' : ''}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Order Items Preview */}
+                    <div className="flex items-center space-x-2">
+                      {order.order_items && order.order_items.slice(0, 3).map((item) => (
+                        <img
+                          key={item.id}
+                          src={item.image_url}
+                          alt={item.image_title}
+                          className="w-10 h-10 rounded-lg object-cover border"
+                        />
+                      ))}
+                      {order.order_items && order.order_items.length > 3 && (
+                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
+                          +{order.order_items.length - 3}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Order Total & Actions */}
+                  <div className="flex flex-col items-end space-y-3">
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-gray-900">
+                        {formatPrice(order.total_amount)}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Subtotal: {formatPrice(order.subtotal_amount)}
+                        {order.shipping_amount > 0 && (
+                          <span> + Shipping: {formatPrice(order.shipping_amount)}</span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm">
+                        <Eye className="w-4 h-4 mr-2" />
+                        View Details
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
