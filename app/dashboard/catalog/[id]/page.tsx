@@ -12,7 +12,11 @@ import Link from "next/link"
 import DashboardLayout from "@/components/dashboard-layout"
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+  const { id } = await params
+  return <ProductDetailPageClient id={id} />
+}
+
+function ProductDetailPageClient({ id }: { id: string }) {
   const [selectedSize, setSelectedSize] = useState("medium")
   const [selectedFormat, setSelectedFormat] = useState("canvas")
   const [isAddedToCart, setIsAddedToCart] = useState(false)
