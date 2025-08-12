@@ -109,7 +109,7 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
 
   // Load cart from server on mount and when user changes
   useEffect(() => {
-    if (hasError || !supabase) {
+    if (hasError) {
       dispatch({ type: 'SET_INITIALIZED', payload: true });
       return;
     }
