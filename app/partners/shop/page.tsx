@@ -63,10 +63,14 @@ export default function PartnerShopPage() {
   const supabase = getSupabaseClient();
 
   useEffect(() => {
-    loadData();
-    loadLikedImages();
-    loadSharedImages();
-    loadPurchasedImages();
+    const initializeData = async () => {
+      await loadData(); // Wait for products/pricing to load first
+      loadLikedImages();
+      loadSharedImages();
+      loadPurchasedImages();
+      loadImages(); // Then load images
+    };
+    initializeData();
   }, []);
 
   // Watch for URL parameter changes and update filters accordingly
@@ -203,8 +207,11 @@ export default function PartnerShopPage() {
   };
 
   useEffect(() => {
-    loadImages();
-  }, [page, animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm]);
+    // Only load images if products and pricing are already loaded
+    if (products.length > 0 && pricing.length > 0) {
+      loadImages();
+    }
+  }, [page, animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm, products, pricing]);
 
   const loadData = async () => {
     try {
@@ -553,7 +560,10 @@ export default function PartnerShopPage() {
                   Clear Filters
                 </Button>
                 <p className="text-sm text-gray-600">
-                  Showing {images.length} images
+                  Showing {images.filter((image) => {
+                    const productInfo = getImageProductInfo(image.id);
+                    return productInfo.productCount > 0;
+                  }).length} images
                 </p>
               </div>
             </div>
@@ -737,8 +747,10 @@ export default function PartnerShopPage() {
 
         {/* Images Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {images.map((image) => {
-            // Temporarily show all images while debugging product filtering issue
+          {images.filter((image) => {
+            const productInfo = getImageProductInfo(image.id);
+            return productInfo.productCount > 0;
+          }).map((image) => {
             const productInfo = getImageProductInfo(image.id);
             const isLiked = likedImages.has(image.id);
             const isShared = sharedImages.has(image.id);
