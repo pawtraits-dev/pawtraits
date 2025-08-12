@@ -392,25 +392,15 @@ export class SupabaseService {
     }
   }
 
-  // Public methods using security definer view (bypass RLS for shop pages)
+  // Public methods using API endpoints (bypass RLS for shop pages)
   async getPublicProducts(): Promise<Product[]> {
     try {
-      const { data, error } = await this.supabase
-        .from('image_catalog_with_details')
-        .select('products(*)')
-        .not('products', 'is', null);
-      
-      if (error) throw error;
-      
-      // Extract unique products and filter active ones
-      const productsMap = new Map();
-      data?.forEach((row: any) => {
-        if (row.products && row.products.is_active) {
-          productsMap.set(row.products.id, row.products);
-        }
-      });
-      
-      return Array.from(productsMap.values());
+      const response = await fetch('/api/public/products');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      const data = await response.json();
+      return data || [];
     } catch (error) {
       console.error('Error getting public products:', error);
       return [];
@@ -419,22 +409,12 @@ export class SupabaseService {
 
   async getPublicProductPricing(): Promise<ProductPricing[]> {
     try {
-      const { data, error } = await this.supabase
-        .from('image_catalog_with_details')
-        .select('product_pricing(*)')
-        .not('product_pricing', 'is', null);
-      
-      if (error) throw error;
-      
-      // Extract unique pricing records
-      const pricingMap = new Map();
-      data?.forEach((row: any) => {
-        if (row.product_pricing) {
-          pricingMap.set(row.product_pricing.id, row.product_pricing);
-        }
-      });
-      
-      return Array.from(pricingMap.values());
+      const response = await fetch('/api/public/pricing');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      const data = await response.json();
+      return data || [];
     } catch (error) {
       console.error('Error getting public product pricing:', error);
       return [];
