@@ -684,24 +684,39 @@ export default function CustomerShopPage() {
   const getImageProductInfo = (imageId: string) => {
     const image = images.find(img => img.id === imageId);
     
+    // Debug logging
+    console.log(`[DEBUG] getImageProductInfo called for image: ${imageId}`);
+    console.log(`[DEBUG] Image found:`, image);
+    console.log(`[DEBUG] Products array length:`, products?.length || 'undefined');
+    console.log(`[DEBUG] Pricing array length:`, pricing?.length || 'undefined');
+    
     if (!image || !image.format_id) {
+      console.log(`[DEBUG] No image or format_id found, returning 0`);
       return { productCount: 0, lowestPrice: null, currency: null };
     }
 
-    const availableProducts = products.filter(p => 
+    // Add null safety like debug endpoint
+    const availableProducts = (products || []).filter(p => 
       p.is_active && p.format_id === image.format_id
     );
     
+    console.log(`[DEBUG] Image format_id: ${image.format_id}`);
+    console.log(`[DEBUG] Available products for format:`, availableProducts);
+    
     if (availableProducts.length === 0) {
+      console.log(`[DEBUG] No available products found, returning 0`);
       return { productCount: 0, lowestPrice: null, currency: null };
     }
 
-    const gbPricing = pricing.filter(p => 
+    const gbPricing = (pricing || []).filter(p => 
       p.country_code === 'GB' && 
       availableProducts.some(product => product.id === p.product_id)
     );
 
+    console.log(`[DEBUG] GB pricing found:`, gbPricing);
+
     if (gbPricing.length === 0) {
+      console.log(`[DEBUG] No GB pricing found, returning productCount but no price`);
       return { productCount: availableProducts.length, lowestPrice: null, currency: null };
     }
 
@@ -709,12 +724,15 @@ export default function CustomerShopPage() {
       current.sale_price < lowest.sale_price ? current : lowest
     );
 
-    return {
+    const result = {
       productCount: availableProducts.length,
       lowestPrice: lowestPricing.sale_price,
       currency: lowestPricing.currency_code,
       currencySymbol: lowestPricing.currency_symbol
     };
+    
+    console.log(`[DEBUG] Final result for image ${imageId}:`, result);
+    return result;
   };
 
   const handleBuyClick = (image: ImageCatalogWithDetails) => {
