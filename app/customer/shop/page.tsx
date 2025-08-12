@@ -69,7 +69,6 @@ export default function CustomerShopPage() {
       loadLikedImages();
       loadSharedImages();
       loadPurchasedImages();
-      loadImages(); // Then load images
       console.log('[INIT] Initialization complete');
     };
     initializeData();
@@ -575,9 +574,19 @@ export default function CustomerShopPage() {
     window.history.replaceState(null, '', newUrl);
   };
 
+  // Load images only after products and pricing are loaded  
   useEffect(() => {
-    // Load images when filters change, regardless of products status for now
-    loadImages();
+    if (products.length > 0 && pricing.length > 0) {
+      console.log('[INIT] Products and pricing loaded, now loading images...');
+      loadImages();
+    }
+  }, [products, pricing]);
+
+  useEffect(() => {
+    // Load images when filters change, but only if products and pricing are already loaded
+    if (products.length > 0 && pricing.length > 0) {
+      loadImages();
+    }
   }, [page, animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm]);
 
   const loadData = async () => {
@@ -591,27 +600,16 @@ export default function CustomerShopPage() {
         supabaseService.getAllProductPricing()
       ]);
 
-      console.log('[LOAD_DATA] Raw data loaded:');
-      console.log('  - Breeds:', breedsData?.length || 'undefined');
-      console.log('  - Coats:', coatsData?.length || 'undefined');  
-      console.log('  - Themes:', themesData?.length || 'undefined');
-      console.log('  - Products:', productsData?.length || 'undefined');
-      console.log('  - Pricing:', pricingData?.length || 'undefined');
-
       const filteredProducts = productsData?.filter((p: any) => p.is_active) || [];
       const filteredPricing = pricingData || [];
       
-      console.log('[LOAD_DATA] After filtering:');
-      console.log('  - Active Products:', filteredProducts.length);
-      console.log('  - Pricing:', filteredPricing.length);
+      console.log('[LOAD_DATA] Data loaded: Products:', filteredProducts.length, 'Pricing:', filteredPricing.length);
 
       setBreeds(breedsData?.filter((b: any) => b.is_active) || []);
       setCoats(coatsData?.filter((c: any) => c.is_active) || []);
       setThemes(themesData?.filter((t: any) => t.is_active) || []);
       setProducts(filteredProducts);
       setPricing(filteredPricing);
-      
-      console.log('[LOAD_DATA] State set, loading initial filters...');
       
       // Load initial filters after reference data is loaded
       loadInitialFilters();
@@ -704,27 +702,16 @@ export default function CustomerShopPage() {
   const getImageProductInfo = (imageId: string) => {
     const image = images.find(img => img.id === imageId);
     
-    // Debug logging
-    console.log(`[DEBUG] getImageProductInfo called for image: ${imageId}`);
-    console.log(`[DEBUG] Image found:`, image);
-    console.log(`[DEBUG] Products array length:`, products?.length || 'undefined');
-    console.log(`[DEBUG] Pricing array length:`, pricing?.length || 'undefined');
-    
     if (!image || !image.format_id) {
-      console.log(`[DEBUG] No image or format_id found, returning 0`);
       return { productCount: 0, lowestPrice: null, currency: null };
     }
 
-    // Add null safety like debug endpoint
+    // Add null safety for products and pricing arrays
     const availableProducts = (products || []).filter(p => 
       p.is_active && p.format_id === image.format_id
     );
     
-    console.log(`[DEBUG] Image format_id: ${image.format_id}`);
-    console.log(`[DEBUG] Available products for format:`, availableProducts);
-    
     if (availableProducts.length === 0) {
-      console.log(`[DEBUG] No available products found, returning 0`);
       return { productCount: 0, lowestPrice: null, currency: null };
     }
 
@@ -733,10 +720,7 @@ export default function CustomerShopPage() {
       availableProducts.some(product => product.id === p.product_id)
     );
 
-    console.log(`[DEBUG] GB pricing found:`, gbPricing);
-
     if (gbPricing.length === 0) {
-      console.log(`[DEBUG] No GB pricing found, returning productCount but no price`);
       return { productCount: availableProducts.length, lowestPrice: null, currency: null };
     }
 
@@ -744,15 +728,12 @@ export default function CustomerShopPage() {
       current.sale_price < lowest.sale_price ? current : lowest
     );
 
-    const result = {
+    return {
       productCount: availableProducts.length,
       lowestPrice: lowestPricing.sale_price,
       currency: lowestPricing.currency_code,
       currencySymbol: lowestPricing.currency_symbol
     };
-    
-    console.log(`[DEBUG] Final result for image ${imageId}:`, result);
-    return result;
   };
 
   const handleBuyClick = (image: ImageCatalogWithDetails) => {
