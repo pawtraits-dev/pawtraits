@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Filter, Star, ShoppingCart, Heart, Share2, ShoppingBag } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { SupabaseService } from '@/lib/supabase';
-import { AdminSupabaseService } from '@/lib/admin-supabase';
+// Removed AdminSupabaseService - will use regular service with public access
 import type { ImageCatalogWithDetails, Breed, Theme, AnimalType, Coat } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
@@ -58,7 +58,6 @@ export default function CustomerShopPage() {
   const [scrollHistory, setScrollHistory] = useState<{position: number, timestamp: number}[]>([]);
 
   const supabaseService = new SupabaseService();
-  const adminSupabaseService = new AdminSupabaseService();
   const { addToCart } = useServerCart();
   const supabase = getSupabaseClient();
 
@@ -579,8 +578,8 @@ export default function CustomerShopPage() {
         supabaseService.getBreeds(),
         supabaseService.getCoats(),
         supabaseService.getThemes(),
-        adminSupabaseService.getProducts(),
-        adminSupabaseService.getAllProductPricing()
+        supabaseService.getProducts(),
+        supabaseService.getAllProductPricing()
       ]);
 
       setBreeds(breedsData?.filter((b: any) => b.is_active) || []);

@@ -1,20 +1,18 @@
 import { SupabaseService } from '@/lib/supabase';
-import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
     const supabaseService = new SupabaseService();
-    const adminSupabaseService = new AdminSupabaseService();
     
     // Get formats
     const formats = await supabaseService.getFormats();
     
-    // Get products  
-    const products = await adminSupabaseService.getProducts();
+    // Get products using regular service (should have public read access)
+    const products = await supabaseService.getProducts();
     
-    // Get pricing
-    const pricing = await adminSupabaseService.getAllProductPricing();
+    // Get pricing using regular service
+    const pricing = await supabaseService.getAllProductPricing();
     
     // Check specific format from the images
     const portraitFormatId = "9c601643-9788-4558-b38d-b17e9a22a6cb";
