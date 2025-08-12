@@ -118,7 +118,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   }
 
   // For marketing pages (non-authenticated users on /customer route), render children without any layout constraints
-  if (!user && pathname === '/customer') {
+  if (!user && !loading && pathname === '/customer') {
     return (
       <div style={{ margin: 0, padding: 0, width: '100%', minHeight: '100vh' }}>
         {children}
@@ -126,9 +126,18 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
     );
   }
 
-  // For other routes, don't render anything if no user
-  if (!user) {
+  // For other routes, don't render anything if no user (and not loading)
+  if (!user && !loading) {
     return null;
+  }
+
+  // If we have a user but no profile yet, show loading
+  if (user && !profile && loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
 
   return (

@@ -296,7 +296,6 @@ export default function CustomerDashboard() {
   const { cart } = useServerCart();
 
   const supabaseService = new SupabaseService();
-  const supabase = getSupabaseClient();
 
   useEffect(() => {
     checkAuthAndLoadStats();
@@ -304,7 +303,7 @@ export default function CustomerDashboard() {
 
   const checkAuthAndLoadStats = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await supabaseService.getClient().auth.getUser();
       
       if (!user) {
         setIsAuthenticated(false);
