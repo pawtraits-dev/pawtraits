@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Loader2 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { getSupabaseClient } from '@/lib/supabase-client'
+import { SupabaseService } from '@/lib/supabase'
 
 interface OrderItem {
   id: string;
@@ -47,7 +47,7 @@ export default function CustomerOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const supabase = getSupabaseClient()
+  const supabaseService = new SupabaseService()
 
   useEffect(() => {
     loadOrders()
@@ -58,7 +58,7 @@ export default function CustomerOrdersPage() {
       setError(null)
       
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await supabaseService.getClient().auth.getUser()
       if (!user?.email) {
         setError('No user found. Please log in.')
         setLoading(false)
