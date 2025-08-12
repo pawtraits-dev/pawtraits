@@ -53,7 +53,6 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
   const [searchTerm, setSearchTerm] = useState('');
   
   const supabaseService = new SupabaseService();
-  const supabase = getSupabaseClient();
 
   useEffect(() => {
     checkPartnerAccess();
@@ -61,7 +60,7 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
 
   const checkPartnerAccess = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await supabaseService.getClient().auth.getUser();
       
       if (!user) {
         // Allow marketing pages to show on root /partners route
@@ -103,7 +102,7 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await supabaseService.getClient().auth.signOut();
     router.push('/');
   };
 
