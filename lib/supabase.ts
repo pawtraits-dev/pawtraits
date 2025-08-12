@@ -28,7 +28,7 @@ export const createClient = () => createClientComponentClient();
 
 // Utility functions for common database operations
 export class SupabaseService {
-  private supabase = getSupabaseClient();
+  private supabase = createClientComponentClient();
 
   // Public method to access the client for RPC calls
   public getClient() {
