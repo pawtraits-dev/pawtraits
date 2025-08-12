@@ -573,11 +573,9 @@ export default function CustomerShopPage() {
   };
 
   useEffect(() => {
-    // Only load images if products and pricing are already loaded
-    if (products.length > 0 && pricing.length > 0) {
-      loadImages();
-    }
-  }, [page, animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm, products, pricing]);
+    // Load images when filters change, regardless of products status for now
+    loadImages();
+  }, [page, animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm]);
 
   const loadData = async () => {
     try {
@@ -1086,10 +1084,8 @@ export default function CustomerShopPage() {
 
         {/* Images Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {images.filter((image) => {
-            const productInfo = getImageProductInfo(image.id);
-            return productInfo.productCount > 0;
-          }).map((image) => {
+          {images.map((image) => {
+            // Show all images temporarily - debugging sequential loading
             const productInfo = getImageProductInfo(image.id);
             const isLiked = likedImages.has(image.id);
             const isShared = sharedImages.has(image.id);
