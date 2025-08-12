@@ -18,7 +18,6 @@ import { useServerCart } from '@/lib/server-cart-context';
 import UserInteractionsService from '@/lib/user-interactions';
 import ShareModal from '@/components/share-modal';
 import PartnerQRModal from '@/components/PartnerQRModal';
-import { getSupabaseClient } from '@/lib/supabase-client';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
@@ -60,7 +59,6 @@ export default function PartnerShopPage() {
   const supabaseService = new SupabaseService();
   // Using SupabaseService for partner access
   const { addToCart } = useServerCart();
-  const supabase = getSupabaseClient();
 
   useEffect(() => {
     const initializeData = async () => {
@@ -129,7 +127,7 @@ export default function PartnerShopPage() {
   const loadPurchasedImages = async () => {
     try {
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await supabaseService.getClient().auth.getUser();
       if (!user?.email) {
         return;
       }

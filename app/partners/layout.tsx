@@ -27,7 +27,6 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
-import { getSupabaseClient } from '@/lib/supabase-client';
 
 interface PartnerLayoutProps {
   children: React.ReactNode;

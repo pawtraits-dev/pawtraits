@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Users, Percent, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getSupabaseClient } from '@/lib/supabase-client';
+import { SupabaseService } from '@/lib/supabase';
 
 interface OrderItem {
   id: string;
@@ -55,7 +55,7 @@ function PartnerOrdersContent() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const supabase = getSupabaseClient();
+  const supabaseService = new SupabaseService();
 
   useEffect(() => {
     loadOrders();
@@ -66,7 +66,7 @@ function PartnerOrdersContent() {
       setLoading(true);
       setError(null);
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabaseService.getClient().auth.getSession();
       
       if (!session?.access_token) {
         setError('Authentication required');

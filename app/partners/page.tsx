@@ -34,7 +34,6 @@ import {
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
 import { useServerCart } from '@/lib/server-cart-context';
-import { getSupabaseClient } from '@/lib/supabase-client';
 
 interface PartnerStats {
   totalReferrals: number;
@@ -419,7 +418,6 @@ export default function PartnerDashboard() {
   const { cart } = useServerCart();
 
   const supabaseService = new SupabaseService();
-  const supabase = getSupabaseClient();
 
   useEffect(() => {
     checkAuthAndLoadStats();
@@ -427,7 +425,7 @@ export default function PartnerDashboard() {
 
   const checkAuthAndLoadStats = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await supabaseService.getClient().auth.getUser();
       
       if (!user) {
         setIsAuthenticated(false);
