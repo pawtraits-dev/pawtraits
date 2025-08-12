@@ -66,10 +66,19 @@ function PartnerOrdersContent() {
       setLoading(true);
       setError(null);
 
+      // Get current user (matching customer pattern that works)
+      const { data: { user } } = await supabaseService.getClient().auth.getUser();
+      if (!user) {
+        setError('Authentication required - please log in');
+        setLoading(false);
+        return;
+      }
+
+      // Get session for API call
       const { data: { session } } = await supabaseService.getClient().auth.getSession();
-      
       if (!session?.access_token) {
-        setError('Authentication required');
+        setError('Session expired - please log in again');
+        setLoading(false);
         return;
       }
 
