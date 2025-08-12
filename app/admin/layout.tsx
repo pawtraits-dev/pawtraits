@@ -33,7 +33,6 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
-import { getSupabaseClient } from '@/lib/supabase-client';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -112,7 +111,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
   const supabaseService = new SupabaseService();
-  const supabase = getSupabaseClient();
+  // Using SupabaseService for consistent authentication
 
   useEffect(() => {
     checkAdminAccess();
@@ -120,7 +119,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const checkAdminAccess = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await supabaseService.getClient().auth.getUser();
       
       if (!user) {
         router.push('/auth/login');
@@ -144,7 +143,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await supabaseService.getClient().auth.signOut();
     router.push('/');
   };
 

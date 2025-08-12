@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Search, Filter, Star, ShoppingCart, Heart, Share2, Users, ShoppingBag } from 'lucide-react';
 import { SupabaseService } from '@/lib/supabase';
-import { AdminSupabaseService } from '@/lib/admin-supabase';
+// Removed AdminSupabaseService - using SupabaseService for partner access
 import type { ImageCatalogWithDetails, Breed, Theme, AnimalType, Coat } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
@@ -58,7 +58,7 @@ export default function PartnerShopPage() {
   const [modalImage, setModalImage] = useState<ImageCatalogWithDetails | null>(null);
 
   const supabaseService = new SupabaseService();
-  const adminSupabaseService = new AdminSupabaseService();
+  // Using SupabaseService for partner access
   const { addToCart } = useServerCart();
   const supabase = getSupabaseClient();
 
@@ -212,8 +212,8 @@ export default function PartnerShopPage() {
         supabaseService.getBreeds(),
         supabaseService.getCoats(),
         supabaseService.getThemes(),
-        adminSupabaseService.getProducts(),
-        adminSupabaseService.getAllProductPricing(),
+        supabaseService.getProducts(),
+        supabaseService.getAllProductPricing(),
         supabaseService.getCurrentUser(),
         supabaseService.getCurrentPartner()
       ]);

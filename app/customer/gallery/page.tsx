@@ -9,7 +9,7 @@ import { Heart, Share2, ShoppingCart, Download, Star, Filter, Search } from 'luc
 import { Input } from '@/components/ui/input';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
-import { AdminSupabaseService } from '@/lib/admin-supabase';
+// Removed AdminSupabaseService - using SupabaseService for customer access
 import type { UserProfile } from '@/lib/user-types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
@@ -67,7 +67,7 @@ export default function MyPawtraitsGallery() {
   const [modalImage, setModalImage] = useState<GalleryImage | null>(null);
 
   const supabaseService = new SupabaseService();
-  const adminSupabaseService = new AdminSupabaseService();
+  // Using SupabaseService for customer access
   const { cart } = useServerCart();
 
   useEffect(() => {
@@ -97,8 +97,8 @@ export default function MyPawtraitsGallery() {
   const loadProductData = async () => {
     try {
       const [productsData, pricingData] = await Promise.all([
-        adminSupabaseService.getProducts(),
-        adminSupabaseService.getAllProductPricing()
+        supabaseService.getProducts(),
+        supabaseService.getAllProductPricing()
       ]);
       
       setProducts(productsData?.filter((p: any) => p.is_active) || []);
