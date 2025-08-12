@@ -201,15 +201,22 @@ async function validateImageRequest(
   
   const allowedDomains = [
     process.env.NEXT_PUBLIC_SITE_URL,
+    'pawtraits-nu.vercel.app',  // Production domain
+    'vercel.app'                // All Vercel domains
   ].filter(Boolean);
 
   if (referer && !isLocalhost) {
     const refererUrl = new URL(referer);
-    const isAllowedDomain = allowedDomains.some(domain => 
-      refererUrl.hostname.includes(domain.replace('https://', '').replace('http://', ''))
-    );
+    const isAllowedDomain = allowedDomains.some(domain => {
+      const cleanDomain = domain.replace('https://', '').replace('http://', '');
+      return refererUrl.hostname === cleanDomain || 
+             refererUrl.hostname.endsWith('.' + cleanDomain) ||
+             refererUrl.hostname.includes('pawtraits') ||
+             refererUrl.hostname.endsWith('.vercel.app');
+    });
     
     if (!isAllowedDomain) {
+      console.log(`🚫 Referer validation failed. Referer: ${referer}, Hostname: ${refererUrl.hostname}`);
       return {
         allowed: false,
         reason: 'Invalid referer',

@@ -237,10 +237,15 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
 
   const addToCart = async (item: Omit<CartItem, 'id' | 'addedAt'>) => {
     try {
+      console.log('[CART] Adding item to cart:', item);
+      
       const token = await getAuthToken();
       if (!token) {
+        console.error('[CART] No auth token available');
         throw new Error('Authentication required');
       }
+      
+      console.log('[CART] Auth token obtained, making request...');
 
       const response = await fetch('/api/cart', {
         method: 'POST',
@@ -261,13 +266,19 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
         })
       });
 
+      console.log('[CART] Response status:', response.status);
+
       if (response.ok) {
+        console.log('[CART] Item added successfully, refreshing cart...');
         await refreshCart();
+        console.log('[CART] Cart refreshed');
       } else {
-        throw new Error('Failed to add item to cart');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[CART] Failed to add item:', errorData);
+        throw new Error(`Failed to add item to cart: ${response.status}`);
       }
     } catch (error) {
-      console.error('Error adding to cart:', error);
+      console.error('[CART] Error adding to cart:', error);
       throw error;
     }
   };
