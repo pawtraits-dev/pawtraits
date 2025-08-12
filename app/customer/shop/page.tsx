@@ -1079,10 +1079,8 @@ export default function CustomerShopPage() {
 
         {/* Images Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {images.filter((image) => {
-            const productInfo = getImageProductInfo(image.id);
-            return productInfo.productCount > 0;
-          }).map((image) => {
+          {images.map((image) => {
+            // Temporarily show all images while debugging product filtering issue
             const productInfo = getImageProductInfo(image.id);
             const isLiked = likedImages.has(image.id);
             const isShared = sharedImages.has(image.id);
