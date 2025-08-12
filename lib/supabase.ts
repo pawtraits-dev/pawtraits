@@ -392,6 +392,55 @@ export class SupabaseService {
     }
   }
 
+  // Public methods using security definer view (bypass RLS for shop pages)
+  async getPublicProducts(): Promise<Product[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('image_catalog_with_details')
+        .select('products(*)')
+        .not('products', 'is', null);
+      
+      if (error) throw error;
+      
+      // Extract unique products and filter active ones
+      const productsMap = new Map();
+      data?.forEach((row: any) => {
+        if (row.products && row.products.is_active) {
+          productsMap.set(row.products.id, row.products);
+        }
+      });
+      
+      return Array.from(productsMap.values());
+    } catch (error) {
+      console.error('Error getting public products:', error);
+      return [];
+    }
+  }
+
+  async getPublicProductPricing(): Promise<ProductPricing[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('image_catalog_with_details')
+        .select('product_pricing(*)')
+        .not('product_pricing', 'is', null);
+      
+      if (error) throw error;
+      
+      // Extract unique pricing records
+      const pricingMap = new Map();
+      data?.forEach((row: any) => {
+        if (row.product_pricing) {
+          pricingMap.set(row.product_pricing.id, row.product_pricing);
+        }
+      });
+      
+      return Array.from(pricingMap.values());
+    } catch (error) {
+      console.error('Error getting public product pricing:', error);
+      return [];
+    }
+  }
+
   // Country methods
   async getCountries(supportedOnly: boolean = true): Promise<Country[]> {
     try {

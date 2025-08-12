@@ -217,8 +217,8 @@ export default function PartnerShopPage() {
         supabaseService.getBreeds(),
         supabaseService.getCoats(),
         supabaseService.getThemes(),
-        supabaseService.getProducts(),
-        supabaseService.getAllProductPricing(),
+        supabaseService.getPublicProducts(),  // Use public method to bypass RLS
+        supabaseService.getPublicProductPricing(),  // Use public method to bypass RLS
         supabaseService.getCurrentUser(),
         supabaseService.getCurrentPartner()
       ]);

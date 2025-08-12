@@ -596,8 +596,8 @@ export default function CustomerShopPage() {
         supabaseService.getBreeds(),
         supabaseService.getCoats(),
         supabaseService.getThemes(),
-        supabaseService.getProducts(),
-        supabaseService.getAllProductPricing()
+        supabaseService.getPublicProducts(),  // Use public method to bypass RLS
+        supabaseService.getPublicProductPricing()  // Use public method to bypass RLS
       ]);
 
       const filteredProducts = productsData?.filter((p: any) => p.is_active) || [];
