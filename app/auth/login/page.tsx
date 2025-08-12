@@ -61,45 +61,50 @@ export default function LoginPage() {
       // Clear any previous errors
       setErrors({})
       
-      // Wait for session to be established
+      // Wait for session to be established and verify it's working
       console.log("Login - Waiting for session to be established...");
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      let profile = null;
+      let attempts = 0;
+      const maxAttempts = 5;
       
-      // Get user profile to determine redirect destination
-      try {
-        const profile = await supabaseService.getCurrentUserProfile();
-        console.log("Login - Profile found:", profile);
+      while (!profile && attempts < maxAttempts) {
+        attempts++;
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        let redirectUrl = "/partners"; // default for partners
-        
-        if (profile) {
-          console.log("Login - Profile user_type:", profile.user_type);
-          switch (profile.user_type) {
-            case 'admin':
-              redirectUrl = "/admin";
-              break;
-            case 'partner':
-              redirectUrl = "/partners";
-              break;
-            case 'customer':
-              redirectUrl = "/customer";
-              break;
-            default:
-              redirectUrl = "/partners";
-          }
-        } else {
-          console.log("Login - No profile found, using default redirect");
+        try {
+          console.log(`Login - Attempt ${attempts} to get profile...`);
+          profile = await supabaseService.getCurrentUserProfile();
+          console.log(`Login - Attempt ${attempts} result:`, profile);
+        } catch (error) {
+          console.log(`Login - Attempt ${attempts} error:`, error);
         }
-        
-        console.log("Login - Final redirect URL:", redirectUrl);
-        
-        // Use Next.js router to preserve session
-        console.log("Login - About to redirect with router.push");
-        router.push(redirectUrl);
-      } catch (profileError) {
-        console.warn("Could not get user profile, using default redirect:", profileError);
-        router.push("/dashboard");
       }
+      
+      let redirectUrl = "/customer"; // default for customers
+      
+      if (profile) {
+        console.log("Login - Profile user_type:", profile.user_type);
+        switch (profile.user_type) {
+          case 'admin':
+            redirectUrl = "/admin";
+            break;
+          case 'partner':
+            redirectUrl = "/partners";
+            break;
+          case 'customer':
+            redirectUrl = "/customer";
+            break;
+          default:
+            redirectUrl = "/customer";
+        }
+      } else {
+        console.log("Login - No profile found after all attempts, using default redirect");
+      }
+      
+      console.log("Login - Final redirect URL:", redirectUrl);
+      
+      // Force a page reload to ensure fresh session state
+      window.location.href = redirectUrl;
     } catch (error: any) {
       console.error("Login error:", error)
       

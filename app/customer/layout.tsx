@@ -51,7 +51,6 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   const [searchTerm, setSearchTerm] = useState('');
   
   const supabaseService = new SupabaseService();
-  const supabase = getSupabaseClient();
 
   useEffect(() => {
     checkCustomerAccess();
@@ -59,7 +58,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
 
   const checkCustomerAccess = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await supabaseService.getClient().auth.getUser();
       
       if (!user) {
         // Allow marketing pages to show on root /customer route
@@ -99,7 +98,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await supabaseService.getClient().auth.signOut();
     router.push('/');
   };
 
