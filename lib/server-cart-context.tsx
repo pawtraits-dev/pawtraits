@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useState } from 'react';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { getSupabaseClient } from '@/lib/supabase-client';
+import { SupabaseService } from '@/lib/supabase';
 
 export interface CartItem {
   id: string; // Server-side cart item ID
@@ -87,28 +88,21 @@ const initialState: CartState = {
 export function ServerCartProvider({ children }: { children: React.ReactNode }) {
   const [cart, dispatch] = useReducer(cartReducer, initialState);
   const [hasError, setHasError] = useState(false);
-  const [supabase, setSupabase] = useState<any>(null);
-
-  // Initialize Supabase client safely
-  useEffect(() => {
-    try {
-      const client = getSupabaseClient();
-      setSupabase(client);
-    } catch (error) {
-      console.error('Failed to initialize Supabase client:', error);
-      setHasError(true);
-    }
-  }, []);
+  const supabaseService = new SupabaseService();
 
   // Get auth token for API calls
   const getAuthToken = async () => {
-    if (!supabase) return null;
-    
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      return session?.access_token;
+      const { data: { session } } = await supabaseService.getClient().auth.getSession();
+      console.log('[CART AUTH] Session check:', { 
+        hasSession: !!session, 
+        hasUser: !!session?.user,
+        hasAccessToken: !!session?.access_token
+      });
+      
+      return session?.access_token || null;
     } catch (error) {
-      console.warn('Failed to get auth session:', error);
+      console.error('[CART AUTH] Failed to get auth session:', error);
       return null;
     }
   };
@@ -191,7 +185,7 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
     return () => {
       mounted = false;
     };
-  }, [hasError, supabase]);
+  }, [hasError]);
 
   const refreshCart = async () => {
     try {
