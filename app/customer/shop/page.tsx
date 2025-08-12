@@ -63,11 +63,14 @@ export default function CustomerShopPage() {
 
   useEffect(() => {
     const initializeData = async () => {
+      console.log('[INIT] Starting initialization...');
       await loadData(); // Wait for products/pricing to load first
+      console.log('[INIT] loadData completed, loading user interactions...');
       loadLikedImages();
       loadSharedImages();
       loadPurchasedImages();
       loadImages(); // Then load images
+      console.log('[INIT] Initialization complete');
     };
     initializeData();
   }, []);
@@ -579,6 +582,7 @@ export default function CustomerShopPage() {
 
   const loadData = async () => {
     try {
+      console.log('[LOAD_DATA] Starting data load...');
       const [breedsData, coatsData, themesData, productsData, pricingData] = await Promise.all([
         supabaseService.getBreeds(),
         supabaseService.getCoats(),
@@ -587,16 +591,32 @@ export default function CustomerShopPage() {
         supabaseService.getAllProductPricing()
       ]);
 
+      console.log('[LOAD_DATA] Raw data loaded:');
+      console.log('  - Breeds:', breedsData?.length || 'undefined');
+      console.log('  - Coats:', coatsData?.length || 'undefined');  
+      console.log('  - Themes:', themesData?.length || 'undefined');
+      console.log('  - Products:', productsData?.length || 'undefined');
+      console.log('  - Pricing:', pricingData?.length || 'undefined');
+
+      const filteredProducts = productsData?.filter((p: any) => p.is_active) || [];
+      const filteredPricing = pricingData || [];
+      
+      console.log('[LOAD_DATA] After filtering:');
+      console.log('  - Active Products:', filteredProducts.length);
+      console.log('  - Pricing:', filteredPricing.length);
+
       setBreeds(breedsData?.filter((b: any) => b.is_active) || []);
       setCoats(coatsData?.filter((c: any) => c.is_active) || []);
       setThemes(themesData?.filter((t: any) => t.is_active) || []);
-      setProducts(productsData?.filter((p: any) => p.is_active) || []);
-      setPricing(pricingData || []);
+      setProducts(filteredProducts);
+      setPricing(filteredPricing);
+      
+      console.log('[LOAD_DATA] State set, loading initial filters...');
       
       // Load initial filters after reference data is loaded
       loadInitialFilters();
     } catch (error) {
-      console.error('Error loading filter data:', error);
+      console.error('[LOAD_DATA] Error loading filter data:', error);
     }
   };
 
