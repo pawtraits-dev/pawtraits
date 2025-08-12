@@ -17,15 +17,21 @@ npm start
 # Run linting
 npm run lint
 
-# Utility testing scripts
-npm run test-cloudinary     # Test Cloudinary integration
-npm run test-watermark      # Test watermark functionality  
-npm run test-api            # Test API route structure
-npm run validate-api        # Validate API structure
-npm run upload-watermark    # Upload watermark assets
-npm run migrate-cloudinary  # Migrate to Cloudinary storage
-npm run check-storage       # Check storage structure
-npm run test-components     # Test component updates
+# Type checking
+npm run type-check
+
+# Install dependencies (required for React 19 compatibility)
+npm install --legacy-peer-deps
+
+# Utility testing scripts (run with tsx from scripts/ directory)
+tsx scripts/test-cloudinary.ts          # Test Cloudinary integration
+tsx scripts/test-watermark.ts           # Test watermark functionality  
+tsx scripts/test-api-routes.ts          # Test API route structure
+tsx scripts/validate-api-structure.ts   # Validate API structure
+tsx scripts/upload-watermark.ts         # Upload watermark assets
+tsx scripts/migrate-to-cloudinary.ts    # Migrate to Cloudinary storage
+tsx scripts/check-storage-structure.ts  # Check storage structure
+tsx scripts/test-component-updates.ts   # Test component updates
 ```
 
 ## Architecture Overview
