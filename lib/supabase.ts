@@ -1239,12 +1239,15 @@ export class SupabaseService {
   async signUp(email: string, password: string, metadata?: any) {
     console.log('SupabaseService.signUp called with:', { email, hasPassword: !!password, metadata });
     
+    // Get origin safely
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    
     const signUpData = {
       email,
       password,
       options: {
         data: metadata,
-        emailRedirectTo: `${window.location.origin}/auth/callback`
+        emailRedirectTo: `${origin}/auth/callback`
       }
     };
     
