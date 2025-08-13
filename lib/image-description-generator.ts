@@ -84,8 +84,72 @@ Now write a fun description for this image in exactly that style, incorporating 
   private async imageToBase64(imageUrl: string): Promise<string> {
     try {
       const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status}`);
+      }
+      
       const arrayBuffer = await response.arrayBuffer();
-      const base64 = Buffer.from(arrayBuffer).toString('base64');
+      const inputBuffer = Buffer.from(arrayBuffer);
+      
+      // Check original size
+      const originalSize = inputBuffer.length;
+      console.log(`Original image size: ${(originalSize / 1024 / 1024).toFixed(2)}MB`);
+      
+      // Compress and resize image to stay within Claude's limits (~5MB base64)
+      // Target ~3MB compressed to leave room for base64 encoding overhead
+      const targetSizeBytes = 3 * 1024 * 1024; // 3MB
+      let compressedBuffer = inputBuffer;
+      
+      if (originalSize > targetSizeBytes) {
+        console.log('Compressing image for Claude API...');
+        
+        // Start with reasonable dimensions and high quality
+        let width = 1024;
+        let quality = 85;
+        
+        compressedBuffer = await sharp(inputBuffer)
+          .resize(width, null, { 
+            withoutEnlargement: true, 
+            fit: 'inside' 
+          })
+          .jpeg({ quality })
+          .toBuffer();
+          
+        // If still too large, reduce quality iteratively
+        while (compressedBuffer.length > targetSizeBytes && quality > 30) {
+          quality -= 15;
+          console.log(`Reducing quality to ${quality}%...`);
+          
+          compressedBuffer = await sharp(inputBuffer)
+            .resize(width, null, { 
+              withoutEnlargement: true, 
+              fit: 'inside' 
+            })
+            .jpeg({ quality })
+            .toBuffer();
+        }
+        
+        // If still too large, reduce dimensions
+        while (compressedBuffer.length > targetSizeBytes && width > 512) {
+          width = Math.floor(width * 0.8);
+          console.log(`Reducing width to ${width}px...`);
+          
+          compressedBuffer = await sharp(inputBuffer)
+            .resize(width, null, { 
+              withoutEnlargement: true, 
+              fit: 'inside' 
+            })
+            .jpeg({ quality })
+            .toBuffer();
+        }
+        
+        console.log(`Compressed image size: ${(compressedBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+      }
+      
+      const base64 = compressedBuffer.toString('base64');
+      const finalSizeMB = (base64.length / 1024 / 1024).toFixed(2);
+      console.log(`Final base64 size: ${finalSizeMB}MB`);
+      
       return base64;
     } catch (error) {
       console.error('Error converting image to base64:', error);
