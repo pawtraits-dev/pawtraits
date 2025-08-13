@@ -188,11 +188,11 @@ export async function POST(request: NextRequest) {
     const { folder = 'pawtraits/originals' } = await request.json();
     const timestamp = Math.round(Date.now() / 1000);
     
-    // Create the exact same signature as our signed-upload endpoint
+    // Create the exact same signature as our signed-upload endpoint (FIXED VERSION)
     const uploadParams = {
       timestamp,
-      folder,
-      resource_type: 'image'
+      folder
+      // resource_type removed - not included in Cloudinary's signature validation
     };
     
     // Remove undefined values (same as our endpoint)
@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
       api_key: process.env.CLOUDINARY_API_KEY!,
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
       folder,
-      resource_type: 'image',
+      resource_type: 'image', // Client needs this but NOT part of signature
       // Diagnostic info
       string_to_sign: Object.keys(cleanParams)
         .sort()
