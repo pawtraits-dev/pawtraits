@@ -221,6 +221,12 @@ export async function POST(request: NextRequest) {
       image_variants: imageVariants
     };
 
+    console.log('📝 Attempting to save image data:', {
+      filename: imageData.filename,
+      cloudinary_public_id: imageData.cloudinary_public_id,
+      hasRequiredFields: !!(imageData.filename && imageData.storage_path && imageData.public_url && imageData.prompt_text)
+    });
+    
     const savedImage = await supabaseService.createImage(imageData);
     
     console.log(`✅ Image catalog entry created: ID ${savedImage.id}`);
@@ -242,6 +248,11 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Error saving Cloudinary image metadata:', error);
+    console.error('   Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack?.split('\n')[0] : 'No stack'
+    });
     return NextResponse.json(
       { error: `Failed to save image metadata: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
