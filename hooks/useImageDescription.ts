@@ -1,5 +1,66 @@
 import { useState } from 'react';
 
+// Client-side image compression to stay under Vercel's 4.5MB request limit
+async function compressImageIfNeeded(file: File): Promise<File> {
+  const maxSizeBytes = 4 * 1024 * 1024; // 4MB to be safe
+  
+  if (file.size <= maxSizeBytes) {
+    return file; // No compression needed
+  }
+
+  console.log(`Compressing large file: ${file.size} bytes`);
+
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    img.onload = () => {
+      // Calculate new dimensions (max 1024px on longest side)
+      const maxDimension = 1024;
+      let { width, height } = img;
+      
+      if (width > height) {
+        if (width > maxDimension) {
+          height = (height * maxDimension) / width;
+          width = maxDimension;
+        }
+      } else {
+        if (height > maxDimension) {
+          width = (width * maxDimension) / height;
+          height = maxDimension;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      // Draw and compress
+      ctx?.drawImage(img, 0, 0, width, height);
+      
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            console.log(`Compressed to: ${compressedFile.size} bytes`);
+            resolve(compressedFile);
+          } else {
+            resolve(file); // Fallback to original if compression fails
+          }
+        },
+        'image/jpeg',
+        0.8 // 80% quality
+      );
+    };
+
+    img.onerror = () => resolve(file); // Fallback to original if load fails
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 interface DescriptionResult {
   description: string;
   breed?: string;
@@ -54,8 +115,12 @@ export function useImageDescription() {
     setError(null);
 
     try {
+      // Compress image client-side if it's too large for Vercel's 4.5MB limit
+      const compressedFile = await compressImageIfNeeded(file);
+      console.log(`File compression: ${file.size} bytes -> ${compressedFile.size} bytes`);
+
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('image', compressedFile);
       if (breed) formData.append('breed', breed);
       if (breedSlug) formData.append('breedSlug', breedSlug);
 
