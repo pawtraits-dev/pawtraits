@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Copy, Wand2, RefreshCw, Download, Upload, Image, X, Star, Eye, Sparkles, Brain } from 'lucide-react';
 import { generateImageMetadata } from '@/lib/metadata-generator';
 import { useImageDescription } from '@/hooks/useImageDescription';
+import { uploadImagesDirectBatch } from '@/lib/cloudinary-client';
 import type { Breed, Theme, Style, Format, Coat, Outfit, BreedCoatDetail } from '@/lib/types';
 
 export default function GeneratePromptsPage() {
@@ -446,48 +447,115 @@ export default function GeneratePromptsPage() {
     const results = [];
     
     try {
-      for (const file of uploadedImages) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('prompt_text', generatedPrompt);
-        formData.append('description', imageDescription);
-        formData.append('tags', JSON.stringify(imageTags.split(',').map(t => t.trim()).filter(Boolean)));
-        formData.append('breed_id', selectedBreed || '');
-        formData.append('theme_id', selectedTheme || '');
-        formData.append('style_id', selectedStyle || '');
-        formData.append('format_id', selectedFormat || '');
-        formData.append('coat_id', selectedCoat || '');
-        formData.append('rating', imageRating.toString());
-        formData.append('is_featured', isImageFeatured.toString());
-        formData.append('is_public', isImagePublic.toString());
+      console.log('🚀 Starting direct Cloudinary upload for print quality preservation');
+      
+      // Get breed/theme/style names for Cloudinary metadata
+      const breed = breeds.find(b => b.id === selectedBreed);
+      const theme = themes.find(t => t.id === selectedTheme);
+      const style = styles.find(s => s.id === selectedStyle);
+      
+      // Upload directly to Cloudinary (bypasses Vercel size limits)
+      const cloudinaryResults = await uploadImagesDirectBatch(
+        uploadedImages,
+        {
+          breed: breed?.name,
+          theme: theme?.name,
+          style: style?.name,
+          tags: ['admin-upload', 'print-quality', breed?.animal_type || 'dog'].filter(Boolean)
+        },
+        (uploaded, total, current) => {
+          console.log(`📤 Upload progress: ${uploaded}/${total} - ${current}`);
+          // You could update a progress indicator here
+        }
+      );
+      
+      console.log('✅ All images uploaded to Cloudinary successfully');
+      
+      // Now save metadata to our database for each uploaded image
+      for (let i = 0; i < cloudinaryResults.length; i++) {
+        const cloudinaryResult = cloudinaryResults[i];
+        const originalFile = uploadedImages[i];
         
-        const response = await fetch('/api/images', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (response.ok) {
-          const result = await response.json();
-          results.push({ success: true, filename: file.name, data: result });
-        } else {
-          const error = await response.json();
-          results.push({ success: false, filename: file.name, error: error.error });
+        try {
+          // Create database record with Cloudinary data
+          const response = await fetch('/api/images/cloudinary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cloudinary_public_id: cloudinaryResult.public_id,
+              cloudinary_secure_url: cloudinaryResult.secure_url,
+              cloudinary_signature: cloudinaryResult.signature,
+              original_filename: originalFile.name,
+              file_size: cloudinaryResult.bytes,
+              mime_type: originalFile.type,
+              width: cloudinaryResult.width,
+              height: cloudinaryResult.height,
+              prompt_text: generatedPrompt,
+              description: imageDescription,
+              tags: imageTags.split(',').map(t => t.trim()).filter(Boolean),
+              breed_id: selectedBreed || null,
+              theme_id: selectedTheme || null,
+              style_id: selectedStyle || null,
+              format_id: selectedFormat || null,
+              coat_id: selectedCoat || null,
+              rating: imageRating > 0 ? imageRating : null,
+              is_featured: isImageFeatured,
+              is_public: isImagePublic
+            })
+          });
+          
+          if (response.ok) {
+            const dbResult = await response.json();
+            results.push({ 
+              success: true, 
+              filename: originalFile.name, 
+              data: dbResult,
+              cloudinary_public_id: cloudinaryResult.public_id,
+              print_dimensions: `${cloudinaryResult.width}×${cloudinaryResult.height}px`
+            });
+            console.log(`✅ Database record created for: ${cloudinaryResult.public_id}`);
+          } else {
+            const error = await response.json();
+            results.push({ 
+              success: false, 
+              filename: originalFile.name, 
+              error: `Database save failed: ${error.error}`,
+              cloudinary_public_id: cloudinaryResult.public_id // Still uploaded to Cloudinary
+            });
+          }
+        } catch (dbError) {
+          console.error('Database save error:', dbError);
+          results.push({ 
+            success: false, 
+            filename: originalFile.name, 
+            error: `Database save failed: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`,
+            cloudinary_public_id: cloudinaryResult.public_id // Still uploaded to Cloudinary
+          });
         }
       }
       
       setUploadResults(results);
       
-      // Clear uploaded files if all were successful
+      // Clear uploaded files if all database saves were successful
       if (results.every(r => r.success)) {
         setUploadedImages([]);
         setImageDescription('');
         setImageTags('');
         setImageRating(0);
         setIsImageFeatured(false);
+        console.log('🎉 All images uploaded and cataloged successfully!');
+      } else {
+        console.warn('⚠️ Some images may have uploaded to Cloudinary but failed to save to database');
       }
+      
     } catch (error) {
-      console.error('Upload error:', error);
-      alert('Failed to upload images');
+      console.error('❌ Upload error:', error);
+      results.push({ 
+        success: false, 
+        filename: 'batch', 
+        error: error instanceof Error ? error.message : 'Unknown upload error'
+      });
+      setUploadResults(results);
     } finally {
       setUploading(false);
     }
