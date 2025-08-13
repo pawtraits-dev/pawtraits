@@ -18,33 +18,88 @@ function PartnerOrderConfirmationContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('orderId')
   const orderNumber = searchParams.get('orderNumber')
+  const paymentIntentId = searchParams.get('payment_intent')
 
   useEffect(() => {
-    if (orderId) {
+    if (orderId || paymentIntentId) {
       fetchOrderData()
     } else {
-      setError("No order ID provided")
+      setError("No order ID or payment intent provided")
       setLoading(false)
     }
-  }, [orderId])
+  }, [orderId, paymentIntentId])
 
   const fetchOrderData = async () => {
     try {
-      // In a real app, you'd fetch order details from your API
-      // For now, we'll create mock data based on the order info
-      setOrderData({
-        id: orderId,
-        orderNumber: orderNumber || `ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-        status: 'confirmed',
-        total: 0, // Would be fetched from API
-        items: [], // Would be fetched from API
-        shippingAddress: {}, // Would be fetched from API
-        estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        isPartnerOrder: true,
-        partnerDiscount: 15
-      })
+      let response;
+      
+      if (paymentIntentId) {
+        // Handle Stripe payment confirmation - fetch order by payment intent
+        console.log('Fetching partner order for payment intent:', paymentIntentId);
+        
+        // First check if order was created by webhook (may take a moment)
+        // If not found, show payment success with minimal details
+        try {
+          response = await fetch(`/api/shop/orders?paymentIntent=${paymentIntentId}`);
+        } catch (err) {
+          console.log('Partner order not yet created by webhook, showing payment success');
+        }
+        
+        if (response && response.ok) {
+          const orderData = await response.json();
+          setOrderData({
+            ...orderData,
+            isPartnerOrder: true,
+            partnerDiscount: 15
+          });
+        } else {
+          // Payment succeeded but order not yet in database (webhook may be delayed)
+          setOrderData({
+            id: paymentIntentId,
+            orderNumber: `PW-${Date.now()}-${paymentIntentId.slice(-6)}`,
+            status: 'confirmed',
+            paymentStatus: 'paid',
+            total: 0, // Will be updated when webhook processes
+            items: [],
+            shippingAddress: {},
+            estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+            isPartnerOrder: true,
+            partnerDiscount: 15,
+            isStripeOrder: true,
+            processingNote: 'Your payment was successful. Order details will be updated shortly.'
+          });
+        }
+      } else if (orderId) {
+        // Handle legacy order confirmation
+        console.log('Fetching legacy partner order:', orderId);
+        response = await fetch(`/api/shop/orders?orderId=${orderId}`);
+        
+        if (response.ok) {
+          const orderData = await response.json();
+          setOrderData({
+            ...orderData,
+            isPartnerOrder: true,
+            partnerDiscount: 15
+          });
+        } else {
+          throw new Error('Order not found');
+        }
+      } else {
+        // Fallback mock data
+        setOrderData({
+          id: orderId || paymentIntentId,
+          orderNumber: orderNumber || `ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+          status: 'confirmed',
+          total: 0,
+          items: [],
+          shippingAddress: {},
+          estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+          isPartnerOrder: true,
+          partnerDiscount: 15
+        });
+      }
     } catch (error) {
-      console.error('Error fetching order data:', error)
+      console.error('Error fetching partner order data:', error)
       setError("Failed to load order details")
     } finally {
       setLoading(false)
