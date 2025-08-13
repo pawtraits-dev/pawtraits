@@ -30,6 +30,7 @@ export default function AdminCatalogPage() {
   const [selectedStyle, setSelectedStyle] = useState('');
   const [selectedFormat, setSelectedFormat] = useState('');
   const [featuredOnly, setFeaturedOnly] = useState(false);
+  const [visibleOnly, setVisibleOnly] = useState(false);
   const [visibilityFilter, setVisibilityFilter] = useState(''); // 'all', 'public', 'hidden'
   const [ratingFilter, setRatingFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -56,11 +57,11 @@ export default function AdminCatalogPage() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, visibilityFilter, ratingFilter, debouncedSearchTerm]);
+  }, [animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, visibleOnly, visibilityFilter, ratingFilter, debouncedSearchTerm]);
 
   useEffect(() => {
     loadImages();
-  }, [page, animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, visibilityFilter, ratingFilter, debouncedSearchTerm]);
+  }, [page, animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, visibleOnly, visibilityFilter, ratingFilter, debouncedSearchTerm]);
 
   const loadData = async () => {
     try {
@@ -107,13 +108,19 @@ export default function AdminCatalogPage() {
         filteredImages = filteredImages.filter(img => img.breed_animal_type === animalType);
       }
 
+      // Admin visibility filtering (for customer/partner visibility control)
+      if (visibleOnly) {
+        filteredImages = filteredImages.filter(img => img.is_public);
+      }
+
+      // Additional visibility filter for specific states
       if (visibilityFilter) {
         if (visibilityFilter === 'public') {
           filteredImages = filteredImages.filter(img => img.is_public);
         } else if (visibilityFilter === 'hidden') {
           filteredImages = filteredImages.filter(img => !img.is_public);
         }
-        // 'all' shows both public and hidden images
+        // 'all' shows both public and hidden images (default admin behavior)
       }
 
       setImages(filteredImages);
@@ -132,6 +139,7 @@ export default function AdminCatalogPage() {
     setSelectedStyle('');
     setSelectedFormat('');
     setFeaturedOnly(false);
+    setVisibleOnly(false);
     setVisibilityFilter('');
     setRatingFilter('');
     setPage(1);
@@ -360,17 +368,31 @@ export default function AdminCatalogPage() {
                   <option value="1">1+ Star</option>
                 </select>
 
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="featured"
-                    checked={featuredOnly}
-                    onChange={(e) => setFeaturedOnly(e.target.checked)}
-                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                  />
-                  <label htmlFor="featured" className="text-sm text-gray-700">
-                    Featured only
-                  </label>
+                <div className="flex flex-col space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="featured"
+                      checked={featuredOnly}
+                      onChange={(e) => setFeaturedOnly(e.target.checked)}
+                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    />
+                    <label htmlFor="featured" className="text-sm text-gray-700">
+                      Featured only
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="visible"
+                      checked={visibleOnly}
+                      onChange={(e) => setVisibleOnly(e.target.checked)}
+                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    />
+                    <label htmlFor="visible" className="text-sm text-gray-700">
+                      Visible only
+                    </label>
+                  </div>
                 </div>
               </div>
 
