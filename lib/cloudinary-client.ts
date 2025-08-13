@@ -129,7 +129,6 @@ async function getSignedUploadParams(options: DirectUploadOptions = {}): Promise
   api_key: string;
   cloud_name: string;
   folder: string;
-  tags: string;
   resource_type: string;
 }> {
   const response = await fetch('/api/cloudinary/signed-upload', {
@@ -168,14 +167,9 @@ export async function uploadImageDirect(
   formData.append('folder', uploadParams.folder);
   formData.append('resource_type', uploadParams.resource_type);
   
-  // Only add tags if they were part of the signed parameters from server
-  if (uploadParams.tags && uploadParams.tags.trim() !== '') {
-    formData.append('tags', uploadParams.tags);
-  }
-  
-  console.log('📤 Uploading with parameters:', {
+  console.log('📤 Uploading with minimal signed parameters:', {
     folder: uploadParams.folder,
-    tags: uploadParams.tags,
+    resource_type: uploadParams.resource_type,
     timestamp: uploadParams.timestamp,
     hasSignature: !!uploadParams.signature
   });

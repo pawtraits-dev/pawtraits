@@ -18,22 +18,17 @@ export async function POST(request: NextRequest) {
     // Use the specified flat folder structure
     const uploadFolder = folder || 'home/pawtraits/originals';
     
-    // Create safe tags array (no special characters that break signature)
-    const safeTags = tags ? tags.map(tag => tag.replace(/[^a-zA-Z0-9-]/g, '_')) : [];
+    // Create safe tags array (only alphanumeric characters to prevent signature issues)
+    const safeTags = tags ? tags.map(tag => tag.replace(/[^a-zA-Z0-9]/g, '_')) : [];
     
-    // Build upload parameters that will be signed (only include essential params for signature)
+    // Build upload parameters that will be signed (minimal params to avoid signature issues)
     const uploadParams = {
       timestamp,
       folder: uploadFolder,
-      resource_type: 'image',
-      // Remove problematic parameters that might break signature
-      // quality and format will be applied after upload via transformations
+      resource_type: 'image'
+      // Temporarily remove tags from signature to isolate signature issues
+      // Tags will be added after successful upload via Cloudinary admin API
     };
-    
-    // Add tags only if they exist and are safe
-    if (safeTags.length > 0) {
-      uploadParams.tags = safeTags.join(',');
-    }
     
     // Remove undefined values
     const cleanParams = Object.fromEntries(
@@ -62,8 +57,8 @@ export async function POST(request: NextRequest) {
       api_key: process.env.CLOUDINARY_API_KEY!,
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
       folder: uploadFolder,
-      tags: safeTags.join(','),
       resource_type: 'image'
+      // Tags removed from direct upload - will be added via metadata in database
     });
     
   } catch (error) {
