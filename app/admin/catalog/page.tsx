@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Search, Filter, Star, Eye, Download, Tag, Calendar, User, Trash2, X } from 'lucide-react';
+import { Search, Filter, Star, Eye, Download, Tag, Calendar, User, Trash2, X, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
@@ -28,6 +28,7 @@ export default function AdminCatalogPage() {
   const [selectedStyle, setSelectedStyle] = useState('');
   const [selectedFormat, setSelectedFormat] = useState('');
   const [featuredOnly, setFeaturedOnly] = useState(false);
+  const [visibilityFilter, setVisibilityFilter] = useState(''); // 'all', 'public', 'hidden'
   const [ratingFilter, setRatingFilter] = useState('');
   const [page, setPage] = useState(1);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
@@ -51,11 +52,11 @@ export default function AdminCatalogPage() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, ratingFilter, debouncedSearchTerm]);
+  }, [animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, visibilityFilter, ratingFilter, debouncedSearchTerm]);
 
   useEffect(() => {
     loadImages();
-  }, [page, animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, ratingFilter, debouncedSearchTerm]);
+  }, [page, animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, visibilityFilter, ratingFilter, debouncedSearchTerm]);
 
   const loadData = async () => {
     try {
@@ -92,7 +93,7 @@ export default function AdminCatalogPage() {
 
       let filteredImages = imageData;
 
-      // Client-side filtering for rating and animal type
+      // Client-side filtering for rating, animal type, and visibility
       if (ratingFilter && ratingFilter !== 'all') {
         const minRating = parseInt(ratingFilter);
         filteredImages = filteredImages.filter(img => (img.rating || 0) >= minRating);
@@ -100,6 +101,15 @@ export default function AdminCatalogPage() {
 
       if (animalType) {
         filteredImages = filteredImages.filter(img => img.breed_animal_type === animalType);
+      }
+
+      if (visibilityFilter) {
+        if (visibilityFilter === 'public') {
+          filteredImages = filteredImages.filter(img => img.is_public);
+        } else if (visibilityFilter === 'hidden') {
+          filteredImages = filteredImages.filter(img => !img.is_public);
+        }
+        // 'all' shows both public and hidden images
       }
 
       setImages(filteredImages);
@@ -118,6 +128,7 @@ export default function AdminCatalogPage() {
     setSelectedStyle('');
     setSelectedFormat('');
     setFeaturedOnly(false);
+    setVisibilityFilter('');
     setRatingFilter('');
     setPage(1);
   };
@@ -167,6 +178,31 @@ export default function AdminCatalogPage() {
     } catch (error) {
       console.error('Error updating featured status:', error);
       alert('Failed to update featured status. Please try again.');
+    }
+  };
+
+  const handleToggleVisibility = async (imageId: string, currentPublic: boolean) => {
+    try {
+      const response = await fetch(`/api/images/${imageId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_public: !currentPublic }),
+      });
+
+      if (response.ok) {
+        // Update image in local state
+        setImages(prev => prev.map(img => 
+          img.id === imageId 
+            ? { ...img, is_public: !currentPublic }
+            : img
+        ));
+      } else {
+        const error = await response.json();
+        alert(`Failed to update visibility: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error updating visibility:', error);
+      alert('Failed to update visibility. Please try again.');
     }
   };
 
@@ -229,7 +265,7 @@ export default function AdminCatalogPage() {
               </div>
 
               {/* Filter Row */}
-              <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-8 gap-4">
                 <select
                   value={animalType}
                   onChange={(e) => setAnimalType(e.target.value as AnimalType | '')}
@@ -290,6 +326,16 @@ export default function AdminCatalogPage() {
                       {format.name}
                     </option>
                   ))}
+                </select>
+
+                <select
+                  value={visibilityFilter}
+                  onChange={(e) => setVisibilityFilter(e.target.value)}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                >
+                  <option value="">All Images</option>
+                  <option value="public">👁️ Public Only</option>
+                  <option value="hidden">👁️‍🗨️ Hidden Only</option>
                 </select>
 
                 <select
@@ -364,6 +410,11 @@ export default function AdminCatalogPage() {
                   {image.is_featured && (
                     <div className="bg-yellow-500 text-white p-1 rounded-full">
                       <Star className="w-3 h-3 fill-current" />
+                    </div>
+                  )}
+                  {!image.is_public && (
+                    <div className="bg-gray-600 text-white p-1 rounded-full" title="Hidden from public">
+                      <EyeOff className="w-3 h-3" />
                     </div>
                   )}
                 </div>
@@ -441,18 +492,42 @@ export default function AdminCatalogPage() {
 
                 {/* Admin Actions */}
                 <div className="pt-3 border-t space-y-2">
-                  <Button
-                    onClick={() => handleToggleFeatured(image.id, image.is_featured)}
-                    variant={image.is_featured ? "default" : "outline"}
-                    className={`w-full ${
-                      image.is_featured 
-                        ? 'bg-yellow-500 hover:bg-yellow-600 text-white' 
-                        : 'hover:bg-yellow-50 hover:border-yellow-300'
-                    }`}
-                  >
-                    <Star className={`w-4 h-4 mr-2 ${image.is_featured ? 'fill-current' : ''}`} />
-                    {image.is_featured ? 'Remove Featured' : 'Make Featured'}
-                  </Button>
+                  <div className="grid grid-cols-1 gap-2">
+                    <Button
+                      onClick={() => handleToggleFeatured(image.id, image.is_featured)}
+                      variant={image.is_featured ? "default" : "outline"}
+                      className={`w-full ${
+                        image.is_featured 
+                          ? 'bg-yellow-500 hover:bg-yellow-600 text-white' 
+                          : 'hover:bg-yellow-50 hover:border-yellow-300'
+                      }`}
+                    >
+                      <Star className={`w-4 h-4 mr-2 ${image.is_featured ? 'fill-current' : ''}`} />
+                      {image.is_featured ? 'Remove Featured' : 'Make Featured'}
+                    </Button>
+                    
+                    <Button
+                      onClick={() => handleToggleVisibility(image.id, image.is_public)}
+                      variant={image.is_public ? "outline" : "default"}
+                      className={`w-full ${
+                        !image.is_public 
+                          ? 'bg-gray-600 hover:bg-gray-700 text-white' 
+                          : 'hover:bg-gray-50 hover:border-gray-300'
+                      }`}
+                    >
+                      {image.is_public ? (
+                        <>
+                          <EyeOff className="w-4 h-4 mr-2" />
+                          Hide from Public
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-4 h-4 mr-2" />
+                          Make Public
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   
                   {/* View Variants Button - only show for Cloudinary images */}
                   {image.cloudinary_public_id && (
