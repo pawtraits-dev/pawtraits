@@ -15,8 +15,8 @@ export async function POST(request: NextRequest) {
     // Generate timestamp for the signature
     const timestamp = Math.round(Date.now() / 1000);
     
-    // Use the specified flat folder structure
-    const uploadFolder = folder || 'home/pawtraits/originals';
+    // Use the existing Cloudinary folder structure from lib/cloudinary.ts
+    const uploadFolder = folder || 'pawtraits/originals';
     
     // Create safe tags array (only alphanumeric characters to prevent signature issues)
     const safeTags = tags ? tags.map(tag => tag.replace(/[^a-zA-Z0-9]/g, '_')) : [];
