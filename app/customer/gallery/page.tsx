@@ -364,18 +364,40 @@ export default function MyPawtraitsGallery() {
 
   const handleDownload = async (image: GalleryImage) => {
     try {
-      const response = await fetch(image.public_url);
-      const blob = await response.blob();
+      console.log(`🔄 Starting download for image ${image.id}`);
+      
+      // Get the purchased variant download URL from our API
+      const downloadResponse = await fetch(`/api/images/${image.id}/download`);
+      
+      if (!downloadResponse.ok) {
+        const errorData = await downloadResponse.json();
+        console.error('Download API error:', errorData);
+        alert(errorData.error || 'Failed to generate download link');
+        return;
+      }
+      
+      const { download_url, filename, variant } = await downloadResponse.json();
+      console.log(`📥 Got download URL (${variant}): ${download_url}`);
+      
+      // Download the image
+      const imageResponse = await fetch(download_url);
+      const blob = await imageResponse.blob();
       const url = window.URL.createObjectURL(blob);
+      
       const a = document.createElement('a');
       a.href = url;
-      a.download = `pawtraits-${image.filename}`;
+      a.download = `pawtraits-${filename}`;
       document.body.appendChild(a);
       a.click();
+      
+      // Cleanup
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      
+      console.log(`✅ Download completed for ${filename}`);
     } catch (error) {
       console.error('Error downloading image:', error);
+      alert('Failed to download image. Please try again.');
     }
   };
 

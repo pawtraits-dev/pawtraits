@@ -5,7 +5,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 
 interface CloudinaryImageDisplayProps {
   imageId: string;
-  variant?: 'catalog_watermarked' | 'social' | 'print_quality' | 'qr_overlay' | 'full_size' | 'thumbnail' | 'mid_size';
+  variant?: 'catalog_watermarked' | 'social' | 'print_quality' | 'qr_overlay' | 'full_size' | 'thumbnail' | 'mid_size' | 'purchased';
   userId?: string;
   orderId?: string;
   className?: string;
