@@ -20,6 +20,7 @@ import ShareModal from '@/components/share-modal';
 import PartnerQRModal from '@/components/PartnerQRModal';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
+import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import { extractDescriptionTitle } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
@@ -754,8 +755,8 @@ export default function PartnerShopPage() {
                 className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
                 onClick={() => handleImageClick(image)}
               >
-                <img
-                  src={image.public_url}
+                <CatalogImage
+                  imageId={image.id}
                   alt={image.description || 'Generated image'}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
