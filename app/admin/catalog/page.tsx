@@ -396,27 +396,46 @@ export default function AdminCatalogPage() {
                   </div>
                 )}
                 
-                {/* Top right buttons */}
-                <div className="absolute top-2 right-2 flex space-x-1">
+                {/* Admin control icons */}
+                <div className="absolute top-2 right-2 flex flex-col space-y-1">
                   {/* Delete button - appears on hover */}
                   <button
                     onClick={() => handleDeleteImage(image.id, image.original_filename)}
-                    className="bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                    className="bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-md"
                     title="Delete image"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
                   
-                  {image.is_featured && (
-                    <div className="bg-yellow-500 text-white p-1 rounded-full">
-                      <Star className="w-3 h-3 fill-current" />
-                    </div>
-                  )}
-                  {!image.is_public && (
-                    <div className="bg-gray-600 text-white p-1 rounded-full" title="Hidden from public">
+                  {/* Featured toggle - always visible if featured, appears on hover if not */}
+                  <button
+                    onClick={() => handleToggleFeatured(image.id, image.is_featured)}
+                    className={`p-1 rounded-full shadow-md transition-opacity ${
+                      image.is_featured 
+                        ? 'bg-yellow-500 text-white opacity-100' 
+                        : 'bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-yellow-50'
+                    }`}
+                    title={image.is_featured ? 'Remove from featured' : 'Add to featured'}
+                  >
+                    <Star className={`w-3 h-3 ${image.is_featured ? 'fill-current' : ''}`} />
+                  </button>
+                  
+                  {/* Visibility toggle - always visible if hidden, appears on hover if public */}
+                  <button
+                    onClick={() => handleToggleVisibility(image.id, image.is_public)}
+                    className={`p-1 rounded-full shadow-md transition-opacity ${
+                      !image.is_public 
+                        ? 'bg-gray-600 text-white opacity-100' 
+                        : 'bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-gray-50'
+                    }`}
+                    title={image.is_public ? 'Hide from public' : 'Make public'}
+                  >
+                    {image.is_public ? (
                       <EyeOff className="w-3 h-3" />
-                    </div>
-                  )}
+                    ) : (
+                      <Eye className="w-3 h-3" />
+                    )}
+                  </button>
                 </div>
               </div>
 
@@ -490,53 +509,15 @@ export default function AdminCatalogPage() {
                   )}
                 </div>
 
-                {/* Admin Actions */}
-                <div className="pt-3 border-t space-y-2">
-                  <div className="grid grid-cols-1 gap-2">
-                    <Button
-                      onClick={() => handleToggleFeatured(image.id, image.is_featured)}
-                      variant={image.is_featured ? "default" : "outline"}
-                      className={`w-full ${
-                        image.is_featured 
-                          ? 'bg-yellow-500 hover:bg-yellow-600 text-white' 
-                          : 'hover:bg-yellow-50 hover:border-yellow-300'
-                      }`}
-                    >
-                      <Star className={`w-4 h-4 mr-2 ${image.is_featured ? 'fill-current' : ''}`} />
-                      {image.is_featured ? 'Remove Featured' : 'Make Featured'}
-                    </Button>
-                    
-                    <Button
-                      onClick={() => handleToggleVisibility(image.id, image.is_public)}
-                      variant={image.is_public ? "outline" : "default"}
-                      className={`w-full ${
-                        !image.is_public 
-                          ? 'bg-gray-600 hover:bg-gray-700 text-white' 
-                          : 'hover:bg-gray-50 hover:border-gray-300'
-                      }`}
-                    >
-                      {image.is_public ? (
-                        <>
-                          <EyeOff className="w-4 h-4 mr-2" />
-                          Hide from Public
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="w-4 h-4 mr-2" />
-                          Make Public
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  
-                  {/* View Variants Button - only show for Cloudinary images */}
-                  {image.cloudinary_public_id && (
+                {/* View Variants Button - only show for Cloudinary images */}
+                {image.cloudinary_public_id && (
+                  <div className="pt-3 border-t">
                     <CloudinaryVariantsTest
                       publicId={image.cloudinary_public_id}
                       filename={image.original_filename}
                     />
-                  )}
-                </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

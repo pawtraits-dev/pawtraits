@@ -2,8 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SupabaseService } from '@/lib/supabase';
 import { CloudinaryImageService, cloudinaryService } from '@/lib/cloudinary';
 import type { ImageCatalogUpdate } from '@/lib/types';
+import { createClient } from '@supabase/supabase-js';
 
 const supabaseService = new SupabaseService();
+
+// Service role client for admin operations
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { autoRefreshToken: false, persistSession: false } }
+);
 const cloudinaryImageService = new CloudinaryImageService();
 
 interface RouteParams {
@@ -276,7 +284,21 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       generation_parameters: body.generation_parameters
     };
 
-    const updatedImage = await supabaseService.updateImage(id, updateData);
+    // Use service role client for admin operations to bypass RLS
+    const { data: updatedImage, error } = await supabaseAdmin
+      .from('image_catalog')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating image:', error);
+      return NextResponse.json(
+        { error: 'Failed to update image', details: error.message },
+        { status: 500 }
+      );
+    }
 
     if (!updatedImage) {
       return NextResponse.json(
@@ -314,12 +336,16 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       console.warn('Failed to delete image file from storage:', deleteResult.error);
     }
 
-    // Delete from database
-    const success = await supabaseService.deleteImage(id);
+    // Delete from database using service role client
+    const { error: deleteError } = await supabaseAdmin
+      .from('image_catalog')
+      .delete()
+      .eq('id', id);
     
-    if (!success) {
+    if (deleteError) {
+      console.error('Error deleting image from database:', deleteError);
       return NextResponse.json(
-        { error: 'Failed to delete image' },
+        { error: 'Failed to delete image from database', details: deleteError.message },
         { status: 500 }
       );
     }
