@@ -443,6 +443,12 @@ export default function GeneratePromptsPage() {
   const uploadImages = async () => {
     if (!uploadedImages.length || !generatedPrompt) return;
     
+    // Validate required fields
+    if (!selectedBreed) {
+      alert('Please select a breed before uploading images');
+      return;
+    }
+    
     setUploading(true);
     const results = [];
     
@@ -477,6 +483,19 @@ export default function GeneratePromptsPage() {
         const originalFile = uploadedImages[i];
         
         try {
+          console.log('📝 Selected values for database save:', {
+            selectedBreed,
+            selectedTheme,
+            selectedStyle,
+            selectedFormat,
+            selectedCoat,
+            breedName: breeds.find(b => b.id === selectedBreed)?.name,
+            themeName: themes.find(t => t.id === selectedTheme)?.name,
+            styleName: styles.find(s => s.id === selectedStyle)?.name,
+            formatName: formats.find(f => f.id === selectedFormat)?.name,
+            coatName: availableCoats.find(c => c.id === selectedCoat)?.coat_name
+          });
+          
           // Create database record with Cloudinary data
           const response = await fetch('/api/images/cloudinary', {
             method: 'POST',
@@ -493,12 +512,12 @@ export default function GeneratePromptsPage() {
               prompt_text: generatedPrompt,
               description: imageDescription,
               tags: imageTags.split(',').map(t => t.trim()).filter(Boolean),
-              breed_id: selectedBreed && selectedBreed.trim() !== '' ? selectedBreed : null,
-              theme_id: selectedTheme && selectedTheme.trim() !== '' ? selectedTheme : null,
-              style_id: selectedStyle && selectedStyle.trim() !== '' ? selectedStyle : null,
-              format_id: selectedFormat && selectedFormat.trim() !== '' ? selectedFormat : null,
-              coat_id: selectedCoat && selectedCoat.trim() !== '' ? selectedCoat : null,
-              rating: imageRating > 0 ? imageRating : null,
+              breed_id: selectedBreed || undefined,
+              theme_id: selectedTheme || undefined,
+              style_id: selectedStyle || undefined,
+              format_id: selectedFormat || undefined,
+              coat_id: selectedCoat || undefined,
+              rating: imageRating > 0 ? imageRating : undefined,
               is_featured: isImageFeatured,
               is_public: isImagePublic
             })
