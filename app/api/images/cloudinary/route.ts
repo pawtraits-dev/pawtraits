@@ -224,8 +224,71 @@ export async function POST(request: NextRequest) {
     console.log('📝 Attempting to save image data:', {
       filename: imageData.filename,
       cloudinary_public_id: imageData.cloudinary_public_id,
-      hasRequiredFields: !!(imageData.filename && imageData.storage_path && imageData.public_url && imageData.prompt_text)
+      hasRequiredFields: !!(imageData.filename && imageData.storage_path && imageData.public_url && imageData.prompt_text),
+      foreign_keys: {
+        breed_id: breed_id,
+        theme_id: theme_id,
+        style_id: style_id,
+        format_id: format_id,
+        coat_id: coat_id
+      }
     });
+
+    // Validate foreign key references exist before inserting
+    if (breed_id) {
+      const { data: breedExists } = await supabaseService.getClient()
+        .from('breeds')
+        .select('id')
+        .eq('id', breed_id)
+        .single();
+      if (!breedExists) {
+        throw new Error(`Breed ID ${breed_id} not found in database`);
+      }
+    }
+
+    if (coat_id) {
+      const { data: coatExists } = await supabaseService.getClient()
+        .from('coats')
+        .select('id')
+        .eq('id', coat_id)
+        .single();
+      if (!coatExists) {
+        throw new Error(`Coat ID ${coat_id} not found in database`);
+      }
+    }
+
+    if (theme_id) {
+      const { data: themeExists } = await supabaseService.getClient()
+        .from('themes')
+        .select('id')
+        .eq('id', theme_id)
+        .single();
+      if (!themeExists) {
+        throw new Error(`Theme ID ${theme_id} not found in database`);
+      }
+    }
+
+    if (style_id) {
+      const { data: styleExists } = await supabaseService.getClient()
+        .from('styles')
+        .select('id')
+        .eq('id', style_id)
+        .single();
+      if (!styleExists) {
+        throw new Error(`Style ID ${style_id} not found in database`);
+      }
+    }
+
+    if (format_id) {
+      const { data: formatExists } = await supabaseService.getClient()
+        .from('formats')
+        .select('id')
+        .eq('id', format_id)
+        .single();
+      if (!formatExists) {
+        throw new Error(`Format ID ${format_id} not found in database`);
+      }
+    }
     
     const savedImage = await supabaseService.createImage(imageData);
     
