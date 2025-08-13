@@ -129,6 +129,8 @@ async function getSignedUploadParams(options: DirectUploadOptions = {}): Promise
   api_key: string;
   cloud_name: string;
   folder: string;
+  tags: string;
+  resource_type: string;
 }> {
   const response = await fetch('/api/cloudinary/signed-upload', {
     method: 'POST',
@@ -157,18 +159,26 @@ export async function uploadImageDirect(
   // Get signed upload parameters from our API
   const uploadParams = await getSignedUploadParams(options);
   
-  // Prepare form data for Cloudinary
+  // Prepare form data for Cloudinary using ONLY the signed parameters
   const formData = new FormData();
   formData.append('file', file);
   formData.append('signature', uploadParams.signature);
   formData.append('timestamp', uploadParams.timestamp.toString());
   formData.append('api_key', uploadParams.api_key);
   formData.append('folder', uploadParams.folder);
+  formData.append('resource_type', uploadParams.resource_type);
   
-  // Add tags if provided
-  if (options.tags && options.tags.length > 0) {
-    formData.append('tags', options.tags.join(','));
+  // Only add tags if they were part of the signed parameters from server
+  if (uploadParams.tags && uploadParams.tags.trim() !== '') {
+    formData.append('tags', uploadParams.tags);
   }
+  
+  console.log('📤 Uploading with parameters:', {
+    folder: uploadParams.folder,
+    tags: uploadParams.tags,
+    timestamp: uploadParams.timestamp,
+    hasSignature: !!uploadParams.signature
+  });
   
   // Upload directly to Cloudinary (no size limits)
   const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${uploadParams.cloud_name}/image/upload`;
