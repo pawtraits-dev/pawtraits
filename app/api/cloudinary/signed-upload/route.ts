@@ -21,13 +21,12 @@ export async function POST(request: NextRequest) {
     // Create safe tags array (only alphanumeric characters to prevent signature issues)
     const safeTags = tags ? tags.map(tag => tag.replace(/[^a-zA-Z0-9]/g, '_')) : [];
     
-    // Build upload parameters that will be signed (minimal params to avoid signature issues)
+    // Build upload parameters that will be signed (only params Cloudinary validates)
     const uploadParams = {
       timestamp,
-      folder: uploadFolder,
-      resource_type: 'image'
-      // Temporarily remove tags from signature to isolate signature issues
-      // Tags will be added after successful upload via Cloudinary admin API
+      folder: uploadFolder
+      // resource_type is NOT included in Cloudinary's signature validation
+      // Only include parameters that Cloudinary actually validates in signatures
     };
     
     // Remove undefined values
@@ -57,8 +56,7 @@ export async function POST(request: NextRequest) {
       api_key: process.env.CLOUDINARY_API_KEY!,
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
       folder: uploadFolder,
-      resource_type: 'image'
-      // Tags removed from direct upload - will be added via metadata in database
+      resource_type: 'image' // Client needs this but it's NOT part of signature
     });
     
   } catch (error) {
