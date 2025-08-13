@@ -578,6 +578,8 @@ export class CloudinaryImageService {
     try {
       ensureCloudinaryConfig();
       
+      console.log(`🔄 Generating Cloudinary URL for publicId: "${publicId}", variant: ${variant}`);
+      
       const watermarkId = process.env.CLOUDINARY_WATERMARK_PUBLIC_ID || 'pawtraits_watermark_logo';
       const watermarkOpacity = parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '60');
 
@@ -588,44 +590,49 @@ export class CloudinaryImageService {
         // Use simple signing instead of auth_token for now
       };
 
+      let generatedUrl: string;
+      
       switch (variant) {
         case 'full_size':
-          return cloudinary.url(publicId, {
+          generatedUrl = cloudinary.url(publicId, {
             ...baseConfig,
             width: 1200,
             crop: 'limit', // Maintain aspect ratio, don't crop
             quality: 85,
-            format: 'auto',
             overlay: watermarkId,
             opacity: watermarkOpacity,
             gravity: 'center'
           });
+          break;
         
         case 'thumbnail':
-          return cloudinary.url(publicId, {
+          generatedUrl = cloudinary.url(publicId, {
             ...baseConfig,
             width: 150,
             height: 150,
             crop: 'fill',
-            quality: 80,
-            format: 'auto'
+            quality: 80
           });
+          break;
           
         case 'mid_size':
-          return cloudinary.url(publicId, {
+          generatedUrl = cloudinary.url(publicId, {
             ...baseConfig,
             width: 400,
             crop: 'limit', // Maintain aspect ratio, don't crop
-            quality: 85,
-            format: 'auto'
+            quality: 85
           });
+          break;
           
         default:
           throw new Error(`Unknown public variant: ${variant}`);
       }
-
+      
+      console.log(`✅ Generated Cloudinary URL: ${generatedUrl}`);
+      return generatedUrl;
+      
     } catch (error) {
-      console.error(`❌ Public variant URL generation failed for ${variant}:`, error);
+      console.error(`❌ Public variant URL generation failed for "${publicId}", variant: ${variant}:`, error);
       throw new Error(`Public variant URL generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
