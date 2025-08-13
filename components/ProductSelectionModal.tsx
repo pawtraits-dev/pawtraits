@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ShoppingCart, Plus, Minus, X } from 'lucide-react';
 import type { ImageCatalogWithDetails } from '@/lib/types';
+import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 
 // Generic image interface that works with both catalog and customer page images
 interface GenericImage {
@@ -154,8 +155,8 @@ export default function ProductSelectionModal({
           {/* Left side - Image */}
           <div className="space-y-4">
             <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
-              <img
-                src={image.public_url}
+              <CatalogImage
+                imageId={image.id}
                 alt={image.description || 'Generated image'}
                 className="w-full h-full object-cover"
               />

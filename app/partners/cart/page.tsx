@@ -10,6 +10,7 @@ import Image from "next/image"
 import { useServerCart } from "@/lib/server-cart-context"
 import { formatPrice } from "@/lib/product-types"
 import { extractDescriptionTitle } from '@/lib/utils'
+import { CatalogImage } from '@/components/CloudinaryImageDisplay'
 
 export default function PartnerCartPage() {
   const { cart, updateQuantity, removeFromCart, getShippingCost, getCartTotal } = useServerCart();
@@ -100,13 +101,13 @@ export default function PartnerCartPage() {
                   <div className="flex items-start space-x-4">
                     {/* Product Image */}
                     <div className="flex-shrink-0">
-                      <Image
-                        src={item.imageUrl || "/placeholder.svg"}
-                        alt={item.imageTitle}
-                        width={120}
-                        height={120}
-                        className="rounded-lg object-cover"
-                      />
+                      <div className="w-[120px] h-[120px] rounded-lg overflow-hidden bg-gray-100">
+                        <CatalogImage
+                          imageId={item.imageId}
+                          alt={item.imageTitle}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                     </div>
 
                     {/* Product Details */}

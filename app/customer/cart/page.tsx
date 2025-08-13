@@ -6,11 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Minus, Plus, Trash2, ShoppingCart, ArrowLeft } from "lucide-react"
 import Link from "next/link"
-import Image from "next/image"
 import { useServerCart } from "@/lib/server-cart-context"
 import { formatPrice } from "@/lib/product-types"
 import { getSupabaseClient } from '@/lib/supabase-client'
 import { extractDescriptionTitle } from '@/lib/utils'
+import { CatalogImage } from '@/components/CloudinaryImageDisplay'
 
 export default function CustomerCartPage() {
   const { cart, updateQuantity, removeFromCart, getShippingCost, getCartTotal } = useServerCart();
@@ -159,13 +159,13 @@ export default function CustomerCartPage() {
                   <div className="flex items-start space-x-4">
                     {/* Product Image */}
                     <div className="flex-shrink-0">
-                      <Image
-                        src={item.imageUrl || "/placeholder.svg"}
-                        alt={item.imageTitle}
-                        width={120}
-                        height={120}
-                        className="rounded-lg object-cover"
-                      />
+                      <div className="w-[120px] h-[120px] rounded-lg overflow-hidden bg-gray-100">
+                        <CatalogImage
+                          imageId={item.imageId}
+                          alt={item.imageTitle}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                     </div>
 
                     {/* Product Details */}
