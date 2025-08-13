@@ -14,6 +14,7 @@ import Link from "next/link"
 import { useServerCart } from "@/lib/server-cart-context"
 import { useRouter } from "next/navigation"
 import { getSupabaseClient } from '@/lib/supabase-client'
+import { SupabaseService } from '@/lib/supabase'
 import { Elements } from '@stripe/react-stripe-js'
 import { getStripe } from '@/lib/stripe-client'
 import StripePaymentForm from '@/components/StripePaymentForm'
@@ -41,85 +42,52 @@ export default function CustomerCheckoutPage() {
   const { cart, getShippingCost, getCartTotal, clearCart } = useServerCart()
   const router = useRouter()
   const supabase = getSupabaseClient()
+  const supabaseService = new SupabaseService()
   const stripePromise = getStripe()
 
-  // Load user profile and customer data
+  // Load user profile and customer data - using same pattern as customer/account page
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
-        // First get auth user
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user?.email) {
-          setLoading(false);
-          return;
-        }
-
-        // Use the debug API to get full customer profile and customer data
-        console.log('Checkout: Loading user profile for email:', user.email);
-        const response = await fetch(`/api/debug/check-user-no-auth?email=${encodeURIComponent(user.email)}`);
-        const result = await response.json();
+        console.log('🔧 Loading customer data using SupabaseService (same as account page)...');
         
-        console.log('Checkout: Debug API response:', {
-          hasUserProfile: !!result.userProfile,
-          hasCustomer: !!result.customer,
-          userType: result.userProfile?.user_type,
-          error: result.error
-        });
+        // Use EXACT same approach as customer account page
+        const customerData = await supabaseService.getCurrentUserProfile();
+        console.log('🔧 Customer data received via SupabaseService:', customerData);
         
-        if (result.userProfile || result.customer) {
-          if (result.userProfile) {
-            setUserProfile(result.userProfile);
-          }
+        if (customerData) {
+          setUserProfile(customerData);
           
-          console.log('Checkout: Pre-populating with data:', {
-            firstName: result.userProfile?.first_name || result.customer?.first_name,
-            lastName: result.userProfile?.last_name || result.customer?.last_name,
-            email: result.userProfile?.email || user.email
-          });
+          // Pre-populate shipping data using same pattern as account page
+          const profileData = {
+            firstName: customerData.first_name || '',
+            lastName: customerData.last_name || '',
+            email: customerData.email || '',
+          };
           
-          // Pre-populate shipping data from customer profile and customer record
-          const customerEmail = result.userProfile?.email || result.customer?.email || user.email;
-          console.log('Checkout: Email resolution:', {
-            profileEmail: result.userProfile?.email,
-            customerEmail: result.customer?.email,
-            authUserEmail: user.email,
-            finalEmail: customerEmail
-          });
-          
+          console.log('Checkout: Setting profile data to:', profileData);
           setShippingData(prev => ({
             ...prev,
-            email: customerEmail, // Always ensure we have an email
-            firstName: result.userProfile?.first_name || result.customer?.first_name || prev.firstName,
-            lastName: result.userProfile?.last_name || result.customer?.last_name || prev.lastName,
-            // Note: We don't have address data in the current customer schema
-            // In a real app, you'd store address in the customer record or separate addresses table
-            address: prev.address, // Keep empty for now - user will need to enter
+            email: profileData.email,
+            firstName: profileData.firstName,
+            lastName: profileData.lastName,
+            // Keep address fields empty for user to enter
+            address: prev.address,
             city: prev.city,
             postcode: prev.postcode,
             country: "United Kingdom",
           }));
 
-          // Always prioritize server-side referral code from customer record
-          if (result.customer?.referral_code) {
-            setReferralCode(result.customer.referral_code);
-            // Update localStorage to match server data
-            localStorage.setItem('referralCode', result.customer.referral_code);
+          // Check for referral code (keeping existing logic)
+          const storedReferralCode = localStorage.getItem('referralCode')
+          if (storedReferralCode) {
+            setReferralCode(storedReferralCode);
           }
         } else {
-          console.log('Checkout: No user profile or customer data found');
-          // Still set the email from auth user as fallback
-          setShippingData(prev => ({
-            ...prev,
-            email: user.email,
-          }));
+          console.log('Checkout: No customer data found');
         }
       } catch (error) {
-        console.error('Error loading user profile:', error);
-        // Ensure we always have the email from auth user even if profile loading fails
-        setShippingData(prev => ({
-          ...prev,
-          email: user.email,
-        }));
+        console.error('Error loading customer data:', error);
       } finally {
         setLoading(false);
       }
@@ -210,6 +178,11 @@ export default function CustomerCheckoutPage() {
 
     if (!shippingData.firstName.trim()) newErrors.firstName = "First name is required"
     if (!shippingData.lastName.trim()) newErrors.lastName = "Last name is required"
+    if (!shippingData.email.trim()) {
+      newErrors.email = "Email address is required"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shippingData.email.trim())) {
+      newErrors.email = "Please enter a valid email address"
+    }
     if (!shippingData.address.trim()) newErrors.address = "Address is required"
     if (!shippingData.city.trim()) newErrors.city = "City is required"
     if (!shippingData.postcode.trim()) newErrors.postcode = "Postcode is required"
@@ -451,16 +424,17 @@ export default function CustomerCheckoutPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="email">Email Address</Label>
+                      <Label htmlFor="email">Email Address *</Label>
                       <Input
                         id="email"
                         type="email"
                         value={shippingData.email}
-                        readOnly
-                        className="bg-gray-50 text-gray-700 cursor-not-allowed"
-                        placeholder="Loading from your account..."
+                        onChange={(e) => handleInputChange("email", e.target.value)}
+                        className={`${errors.email ? "border-red-500" : ""} ${shippingData.email && !errors.email ? "bg-blue-50" : ""}`}
+                        placeholder="Enter your email address"
                       />
-                      <p className="text-xs text-gray-500">Using email from your account</p>
+                      {shippingData.email && !errors.email && <p className="text-xs text-blue-600">Email address confirmed</p>}
+                      {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
                     </div>
 
                     <div className="space-y-2">
