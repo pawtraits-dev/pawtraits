@@ -15,10 +15,8 @@ export async function POST(request: NextRequest) {
     // Generate timestamp for the signature
     const timestamp = Math.round(Date.now() / 1000);
     
-    // Create URL-safe folder name (replace spaces with underscores, remove special chars)
-    const safeBreed = (breed || 'unknown').replace(/[^a-zA-Z0-9-]/g, '_');
-    const safeTheme = (theme || 'portrait').replace(/[^a-zA-Z0-9-]/g, '_');
-    const uploadFolder = folder || `pawtraits/${safeBreed}/${safeTheme}`;
+    // Use the specified flat folder structure
+    const uploadFolder = folder || 'home/pawtraits/originals';
     
     // Create safe tags array (no special characters that break signature)
     const safeTags = tags ? tags.map(tag => tag.replace(/[^a-zA-Z0-9-]/g, '_')) : [];
@@ -53,8 +51,9 @@ export async function POST(request: NextRequest) {
       timestamp,
       tags: safeTags.join(','),
       hasSignature: !!signature,
-      originalBreed: breed,
-      safeBreed: safeBreed
+      breed,
+      theme,
+      style
     });
     
     return NextResponse.json({
