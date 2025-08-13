@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SupabaseService } from '@/lib/supabase';
 import { generateImageMetadata, extractColorTags } from '@/lib/metadata-generator';
+import { cloudinaryService } from '@/lib/cloudinary';
 import type { ImageCatalogCreate } from '@/lib/types';
 
 const supabaseService = new SupabaseService();
@@ -81,11 +82,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (10MB limit)
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    // Validate file size (50MB limit - Cloudinary can handle larger files than Supabase)
+    const maxSize = 50 * 1024 * 1024; // 50MB
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: 'File size too large. Maximum 10MB allowed.' },
+        { error: 'File size too large. Maximum 50MB allowed.' },
         { status: 400 }
       );
     }
@@ -173,24 +174,44 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Upload to Supabase Storage
-    const uploadResult = await supabaseService.uploadImage(file);
+    // Upload to Cloudinary with full resolution (no compression)
+    console.log(`🔄 Uploading ${file.name} to Cloudinary (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
     
-    if (!uploadResult.success) {
+    const imageBuffer = Buffer.from(await file.arrayBuffer());
+    
+    // Prepare metadata for Cloudinary
+    const cloudinaryMetadata = {
+      breed: breed?.name || 'unknown',
+      theme: theme?.name || 'portrait', 
+      style: style?.name || 'professional',
+      partnerId: undefined, // This is admin upload, not partner
+      imageId: undefined
+    };
+    
+    let cloudinaryResult;
+    try {
+      cloudinaryResult = await cloudinaryService.uploadAndProcessImage(
+        imageBuffer,
+        file.name,
+        cloudinaryMetadata
+      );
+      console.log(`✅ Cloudinary upload successful: ${cloudinaryResult.public_id}`);
+    } catch (error) {
+      console.error('❌ Cloudinary upload failed:', error);
       return NextResponse.json(
-        { error: uploadResult.error },
+        { error: `Failed to upload image to Cloudinary: ${error instanceof Error ? error.message : 'Unknown error'}` },
         { status: 500 }
       );
     }
 
-    // Create image catalog entry with auto-generated metadata
+    // Create image catalog entry with Cloudinary data
     const imageData: ImageCatalogCreate = {
-      filename: uploadResult.filename!,
+      filename: `${cloudinaryResult.public_id}.${file.name.split('.').pop()}`, // Use Cloudinary public_id as filename
       original_filename: file.name,
       file_size: file.size,
       mime_type: file.type,
-      storage_path: uploadResult.path!,
-      public_url: uploadResult.publicUrl!,
+      storage_path: `cloudinary:${cloudinaryResult.public_id}`, // Mark as Cloudinary storage
+      public_url: cloudinaryResult.variants.mid_size.url, // Use mid_size variant for public display
       prompt_text: promptText,
       description: finalDescription,
       tags: finalTags,
@@ -203,7 +224,9 @@ export async function POST(request: NextRequest) {
       generation_parameters: JSON.parse(generationParameters),
       rating: rating > 0 ? rating : undefined,
       is_featured: isFeatured,
-      is_public: isPublic
+      is_public: isPublic,
+      cloudinary_public_id: cloudinaryResult.public_id,
+      image_variants: cloudinaryResult.variants
     };
 
     const savedImage = await supabaseService.createImage(imageData);
