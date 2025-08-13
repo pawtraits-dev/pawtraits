@@ -6,12 +6,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
     const productUid = searchParams.get('uid');
+    
+    // Create service instance once for all cases
+    const gelatoService = createGelatoService();
 
     switch (action) {
       case 'search':
         // Get all available products from Gelato
         console.log('Fetching Gelato product catalog...');
-        const gelatoService = createGelatoService();
         const products = await gelatoService.getProducts();
         
         // Filter for print products only (canvas, posters, etc.)
@@ -43,7 +45,6 @@ export async function GET(request: NextRequest) {
         }
 
         console.log('Fetching Gelato product details for:', productUid);
-        const gelatoService = createGelatoService();
         const productDetails = await gelatoService.getProduct(productUid);
         
         if (!productDetails) {
@@ -111,7 +112,6 @@ export async function GET(request: NextRequest) {
         }
 
         console.log('Fetching pricing for:', productUid, variantUid, country);
-        const gelatoService = createGelatoService();
         const pricing = await gelatoService.getProductPricing(productUid, variantUid, country);
 
         return NextResponse.json({
