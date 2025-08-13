@@ -12,6 +12,7 @@ import { AdminSupabaseService } from '@/lib/admin-supabase';
 import type { ImageCatalogWithDetails, Breed, Theme, Style, Format, AnimalType } from '@/lib/types';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import { extractDescriptionTitle } from '@/lib/utils';
+import CloudinaryVariantsTest from '@/components/CloudinaryVariantsTest';
 
 export default function AdminCatalogPage() {
   const [images, setImages] = useState<ImageCatalogWithDetails[]>([]);
@@ -439,7 +440,7 @@ export default function AdminCatalogPage() {
                 </div>
 
                 {/* Admin Actions */}
-                <div className="pt-3 border-t">
+                <div className="pt-3 border-t space-y-2">
                   <Button
                     onClick={() => handleToggleFeatured(image.id, image.is_featured)}
                     variant={image.is_featured ? "default" : "outline"}
@@ -452,6 +453,14 @@ export default function AdminCatalogPage() {
                     <Star className={`w-4 h-4 mr-2 ${image.is_featured ? 'fill-current' : ''}`} />
                     {image.is_featured ? 'Remove Featured' : 'Make Featured'}
                   </Button>
+                  
+                  {/* View Variants Button - only show for Cloudinary images */}
+                  {image.cloudinary_public_id && (
+                    <CloudinaryVariantsTest
+                      publicId={image.cloudinary_public_id}
+                      filename={image.original_filename}
+                    />
+                  )}
                 </div>
               </CardContent>
             </Card>
