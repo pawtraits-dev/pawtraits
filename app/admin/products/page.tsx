@@ -40,6 +40,30 @@ interface ProductFormData {
   stock_status: 'in_stock' | 'low_stock' | 'out_of_stock' | 'discontinued';
 }
 
+interface GelatoProduct {
+  uid: string;
+  name: string;
+  description: string;
+  category: string;
+  variants: GelatoVariant[];
+}
+
+interface GelatoVariant {
+  uid: string;
+  name?: string;
+  size?: {
+    width: number;
+    height: number;
+    unit: string;
+  };
+  pricing?: Array<{
+    country: string;
+    currency: string;
+    price: number;
+    formattedPrice: string;
+  }>;
+}
+
 interface PricingFormData {
   country_code: string;
   product_cost: string;
@@ -66,6 +90,12 @@ export default function ProductManagementPage() {
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [productPricing, setProductPricing] = useState<{[key: string]: any}>({});
+  const [showGelatoSearch, setShowGelatoSearch] = useState(false);
+  const [gelatoProducts, setGelatoProducts] = useState<GelatoProduct[]>([]);
+  const [searchingGelato, setSearchingGelato] = useState(false);
+  const [selectedGelatoProduct, setSelectedGelatoProduct] = useState<GelatoProduct | null>(null);
+  const [selectedGelatoVariant, setSelectedGelatoVariant] = useState<GelatoVariant | null>(null);
+  const [gelatoSearchTerm, setGelatoSearchTerm] = useState('');
   
   const [formData, setFormData] = useState<ProductFormData>({
     medium_id: '',
@@ -160,6 +190,11 @@ export default function ProductManagementPage() {
     });
     setPricingEntries([]);
     setShowPricingSection(false);
+    setShowGelatoSearch(false);
+    setSelectedGelatoProduct(null);
+    setSelectedGelatoVariant(null);
+    setGelatoProducts([]);
+    setGelatoSearchTerm('');
   };
 
   const addPricingEntry = () => {
@@ -335,6 +370,89 @@ export default function ProductManagementPage() {
     
     return generateProductSku(medium.slug, format.name);
   };
+
+  // Gelato integration functions
+  const searchGelatoProducts = async () => {
+    try {
+      setSearchingGelato(true);
+      const response = await fetch('/api/admin/gelato-products?action=search');
+      const result = await response.json();
+      
+      if (result.success) {
+        setGelatoProducts(result.products);
+      } else {
+        alert('Failed to fetch Gelato products: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error searching Gelato products:', error);
+      alert('Failed to search Gelato products');
+    } finally {
+      setSearchingGelato(false);
+    }
+  };
+
+  const selectGelatoProduct = async (product: GelatoProduct) => {
+    try {
+      setSelectedGelatoProduct(product);
+      
+      // Fetch detailed product info with pricing
+      const response = await fetch(`/api/admin/gelato-products?action=details&uid=${product.uid}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setSelectedGelatoProduct(result.product);
+        setSelectedGelatoVariant(null);
+        
+        // Auto-populate form with Gelato product name
+        setFormData(prev => ({
+          ...prev,
+          gelato_sku: product.uid,
+          description: result.product.description || prev.description
+        }));
+      } else {
+        alert('Failed to fetch product details: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error selecting Gelato product:', error);
+      alert('Failed to load product details');
+    }
+  };
+
+  const selectGelatoVariant = (variant: GelatoVariant) => {
+    setSelectedGelatoVariant(variant);
+    
+    // Auto-populate form with variant data
+    if (variant.size) {
+      setFormData(prev => ({
+        ...prev,
+        size_name: `${variant.size?.width}x${variant.size?.height}${variant.size?.unit}`,
+        width_cm: variant.size?.unit === 'cm' ? variant.size?.width.toString() : (variant.size?.width * 2.54).toString(),
+        height_cm: variant.size?.unit === 'cm' ? variant.size?.height.toString() : (variant.size?.height * 2.54).toString(),
+        width_inches: variant.size?.unit === 'inches' ? variant.size?.width.toString() : (variant.size?.width / 2.54).toString(),
+        height_inches: variant.size?.unit === 'inches' ? variant.size?.height.toString() : (variant.size?.height / 2.54).toString(),
+      }));
+    }
+    
+    // Auto-populate pricing if available
+    if (variant.pricing && variant.pricing.length > 0) {
+      const newPricingEntries = variant.pricing.map(price => ({
+        country_code: price.country,
+        product_cost: (price.price * 0.8).toFixed(2), // Estimate cost as 80% of Gelato price
+        shipping_cost: '3.99', // Default shipping
+        sale_price: (price.price * 1.5).toFixed(2) // 50% markup
+      }));
+      
+      setPricingEntries(newPricingEntries);
+      setShowPricingSection(true);
+    }
+  };
+
+  const filteredGelatoProducts = gelatoProducts.filter(product => 
+    !gelatoSearchTerm || 
+    product.name.toLowerCase().includes(gelatoSearchTerm.toLowerCase()) ||
+    product.uid.toLowerCase().includes(gelatoSearchTerm.toLowerCase()) ||
+    product.category.toLowerCase().includes(gelatoSearchTerm.toLowerCase())
+  );
 
   // Filter and sort products
   const filteredProducts = (() => {
@@ -785,13 +903,44 @@ export default function ProductManagementPage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Gelato SKU
+                      Gelato Integration
                     </label>
-                    <Input
-                      value={formData.gelato_sku}
-                      onChange={(e) => setFormData(prev => ({ ...prev, gelato_sku: e.target.value }))}
-                      placeholder="gelato_sku_12345"
-                    />
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          value={formData.gelato_sku}
+                          onChange={(e) => setFormData(prev => ({ ...prev, gelato_sku: e.target.value }))}
+                          placeholder="gelato_sku_12345"
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setShowGelatoSearch(true)}
+                          size="sm"
+                        >
+                          Browse Gelato
+                        </Button>
+                      </div>
+                      
+                      {selectedGelatoProduct && (
+                        <div className="bg-blue-50 p-3 rounded-lg">
+                          <p className="text-sm font-medium text-blue-800 mb-1">Selected Gelato Product:</p>
+                          <p className="text-sm text-blue-700">
+                            <strong>{selectedGelatoProduct.name}</strong>
+                          </p>
+                          <p className="text-xs text-blue-600">{selectedGelatoProduct.uid}</p>
+                          {selectedGelatoVariant && (
+                            <p className="text-xs text-blue-600 mt-1">
+                              Variant: {selectedGelatoVariant.uid}
+                              {selectedGelatoVariant.size && (
+                                ` (${selectedGelatoVariant.size.width}x${selectedGelatoVariant.size.height}${selectedGelatoVariant.size.unit})`
+                              )}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -921,6 +1070,137 @@ export default function ProductManagementPage() {
             </form>
           </CardContent>
         </Card>
+      )}
+
+      {/* Gelato Product Search Modal */}
+      {showGelatoSearch && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold">Browse Gelato Products</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowGelatoSearch(false)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="flex space-x-4">
+                <Input
+                  placeholder="Search products..."
+                  value={gelatoSearchTerm}
+                  onChange={(e) => setGelatoSearchTerm(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={searchGelatoProducts}
+                  disabled={searchingGelato}
+                  className="bg-gradient-to-r from-purple-600 to-blue-600"
+                >
+                  {searchingGelato ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  ) : (
+                    <Search className="w-4 h-4 mr-2" />
+                  )}
+                  {searchingGelato ? 'Searching...' : 'Search Gelato'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Product List */}
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                <h3 className="font-semibold text-gray-900">Products ({filteredGelatoProducts.length})</h3>
+                {filteredGelatoProducts.map((product) => (
+                  <div
+                    key={product.uid}
+                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                      selectedGelatoProduct?.uid === product.uid
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => selectGelatoProduct(product)}
+                  >
+                    <div className="font-medium text-gray-900">{product.name}</div>
+                    <div className="text-sm text-gray-600">{product.category}</div>
+                    <div className="text-xs text-gray-500 mt-1">{product.uid}</div>
+                    {product.description && (
+                      <div className="text-xs text-gray-500 mt-1">{product.description.slice(0, 100)}...</div>
+                    )}
+                  </div>
+                ))}
+                {filteredGelatoProducts.length === 0 && !searchingGelato && (
+                  <div className="text-center py-8 text-gray-500">
+                    {gelatoProducts.length === 0 
+                      ? 'Click "Search Gelato" to load products'
+                      : 'No products match your search'
+                    }
+                  </div>
+                )}
+              </div>
+
+              {/* Variant Selection */}
+              <div className="space-y-4">
+                {selectedGelatoProduct && (
+                  <>
+                    <h3 className="font-semibold text-gray-900">
+                      Variants ({selectedGelatoProduct.variants?.length || 0})
+                    </h3>
+                    <div className="max-h-96 overflow-y-auto space-y-2">
+                      {selectedGelatoProduct.variants?.map((variant) => (
+                        <div
+                          key={variant.uid}
+                          className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                            selectedGelatoVariant?.uid === variant.uid
+                              ? 'border-green-500 bg-green-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                          onClick={() => selectGelatoVariant(variant)}
+                        >
+                          <div className="font-medium text-gray-900">{variant.uid}</div>
+                          {variant.size && (
+                            <div className="text-sm text-gray-600">
+                              {variant.size.width}x{variant.size.height}{variant.size.unit}
+                            </div>
+                          )}
+                          {variant.pricing && variant.pricing.length > 0 && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Pricing: {variant.pricing.map(p => `${p.country}: ${p.formattedPrice}`).join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {(!selectedGelatoProduct.variants || selectedGelatoProduct.variants.length === 0) && (
+                        <div className="text-center py-4 text-gray-500">
+                          No variants available
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-4 mt-6 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowGelatoSearch(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => setShowGelatoSearch(false)}
+                disabled={!selectedGelatoProduct}
+                className="bg-gradient-to-r from-purple-600 to-blue-600"
+              >
+                Use Selected Product
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Products Table */}

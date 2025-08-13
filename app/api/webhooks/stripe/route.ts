@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { constructWebhookEvent } from '@/lib/stripe-server';
 import { createClient } from '@supabase/supabase-js';
+import { gelatoService } from '@/lib/gelato-service';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -153,6 +154,9 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       await handleReferralFromPayment(metadata.referralCode, customerEmail, paymentIntent.amount, order.id, supabase);
     }
 
+    // Create Gelato order for fulfillment
+    await createGelatoOrder(order, paymentIntent, supabase);
+
     // TODO: Send confirmation email to customer
     // TODO: Notify admin of new order
     // TODO: Update inventory if applicable
@@ -294,5 +298,127 @@ async function handleReferralFromPayment(
 
   } catch (error) {
     console.error('Error handling referral from payment:', error);
+  }
+}
+
+// Create Gelato order for print fulfillment
+async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) {
+  try {
+    console.log('Creating Gelato order for:', order.order_number);
+
+    // Get order items from payment intent metadata
+    const metadata = paymentIntent.metadata || {};
+    const cartItems: any[] = [];
+    
+    // Reconstruct cart items from metadata
+    for (let i = 1; i <= 10; i++) {
+      const itemId = metadata[`item${i}_id`];
+      const itemTitle = metadata[`item${i}_title`];
+      const itemQty = metadata[`item${i}_qty`];
+      
+      if (itemId) {
+        cartItems.push({
+          image_id: itemId,
+          image_title: itemTitle,
+          quantity: parseInt(itemQty) || 1,
+          product_data: {
+            // Default product data - in production, this would come from your database
+            medium: { name: 'Canvas' },
+            format: { name: 'Portrait' },
+            width_cm: 30,
+            height_cm: 30
+          }
+        });
+      }
+    }
+
+    if (cartItems.length === 0) {
+      console.log('No cart items found in payment intent metadata, skipping Gelato order');
+      return;
+    }
+
+    // Generate print-ready image URLs
+    const imageUrls: Record<string, string> = {};
+    for (const item of cartItems) {
+      const { width_cm, height_cm } = item.product_data;
+      imageUrls[item.image_id] = gelatoService.generatePrintImageUrl(
+        item.image_id,
+        width_cm || 30,
+        height_cm || 30
+      );
+    }
+
+    // Convert order to Gelato format
+    const gelatoOrderData = gelatoService.mapOrderToGelato(order, cartItems, imageUrls);
+
+    // Add partner order information if applicable
+    if (metadata.isPartnerOrder === 'true') {
+      gelatoOrderData.metadata = {
+        ...gelatoOrderData.metadata,
+        isPartnerOrder: 'true',
+        partnerDiscount: metadata.partnerDiscount || '0',
+        businessName: metadata.businessName || ''
+      };
+      
+      if (metadata.isForClient === 'true') {
+        gelatoOrderData.metadata.clientName = metadata.clientName || '';
+        gelatoOrderData.metadata.clientEmail = metadata.clientEmail || '';
+      }
+    }
+
+    // Create order with Gelato
+    const gelatoOrder = await gelatoService.createOrder(gelatoOrderData);
+
+    // Update our order record with Gelato order ID
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({
+        gelato_order_id: gelatoOrder.id,
+        gelato_status: gelatoOrder.status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', order.id);
+
+    if (updateError) {
+      console.error('Failed to update order with Gelato ID:', updateError);
+    } else {
+      console.log('Order updated with Gelato order ID:', gelatoOrder.id);
+    }
+
+    // Store detailed cart items for the order
+    for (const item of cartItems) {
+      const { error: itemError } = await supabase
+        .from('order_items')
+        .insert({
+          order_id: order.id,
+          image_id: item.image_id,
+          image_title: item.image_title,
+          quantity: item.quantity,
+          product_data: JSON.stringify(item.product_data),
+          print_image_url: imageUrls[item.image_id],
+          created_at: new Date().toISOString()
+        });
+
+      if (itemError) {
+        console.error('Failed to create order item:', itemError);
+      }
+    }
+
+  } catch (error) {
+    console.error('Error creating Gelato order:', error);
+    
+    // Update order status to indicate fulfillment issue
+    try {
+      await supabase
+        .from('orders')
+        .update({
+          status: 'fulfillment_error',
+          error_message: error instanceof Error ? error.message : 'Failed to create Gelato order',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+    } catch (updateError) {
+      console.error('Failed to update order with error status:', updateError);
+    }
   }
 }
