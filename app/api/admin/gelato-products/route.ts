@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { gelatoService } from '@/lib/gelato-service';
+import { createGelatoService } from '@/lib/gelato-service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
       case 'search':
         // Get all available products from Gelato
         console.log('Fetching Gelato product catalog...');
+        const gelatoService = createGelatoService();
         const products = await gelatoService.getProducts();
         
         // Filter for print products only (canvas, posters, etc.)
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
         }
 
         console.log('Fetching Gelato product details for:', productUid);
+        const gelatoService = createGelatoService();
         const productDetails = await gelatoService.getProduct(productUid);
         
         if (!productDetails) {
@@ -109,6 +111,7 @@ export async function GET(request: NextRequest) {
         }
 
         console.log('Fetching pricing for:', productUid, variantUid, country);
+        const gelatoService = createGelatoService();
         const pricing = await gelatoService.getProductPricing(productUid, variantUid, country);
 
         return NextResponse.json({

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { constructWebhookEvent } from '@/lib/stripe-server';
 import { createClient } from '@supabase/supabase-js';
-import { gelatoService } from '@/lib/gelato-service';
+import { createGelatoService } from '@/lib/gelato-service';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -338,6 +338,7 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
     }
 
     // Generate print-ready image URLs
+    const gelatoService = createGelatoService();
     const imageUrls: Record<string, string> = {};
     for (const item of cartItems) {
       const { width_cm, height_cm } = item.product_data;

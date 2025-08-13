@@ -94,13 +94,16 @@ export class GelatoService {
   constructor() {
     this.baseUrl = process.env.GELATO_API_BASE_URL || 'https://api.gelato.com';
     this.apiKey = process.env.GELATO_API_KEY || '';
-    
+  }
+
+  private validateApiKey(): void {
     if (!this.apiKey) {
       throw new Error('GELATO_API_KEY environment variable is required');
     }
   }
 
   private getHeaders(): HeadersInit {
+    this.validateApiKey();
     return {
       'Content-Type': 'application/json',
       'X-API-KEY': this.apiKey,
@@ -435,5 +438,18 @@ export class GelatoService {
   }
 }
 
-// Default export for convenience
-export const gelatoService = new GelatoService();
+// Factory function to create service instance when needed
+export function createGelatoService(): GelatoService {
+  return new GelatoService();
+}
+
+// Default export for convenience - lazy loaded
+let _gelatoService: GelatoService | null = null;
+export const gelatoService = {
+  get instance(): GelatoService {
+    if (!_gelatoService) {
+      _gelatoService = new GelatoService();
+    }
+    return _gelatoService;
+  }
+};

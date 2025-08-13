@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { gelatoService } from '@/lib/gelato-service';
+import { createGelatoService } from '@/lib/gelato-service';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action') || 'products';
+    const gelatoService = createGelatoService();
 
     switch (action) {
       case 'products':
