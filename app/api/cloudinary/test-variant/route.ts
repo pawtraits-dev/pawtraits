@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
       case 'full_size':
       case 'mid_size':
       case 'thumbnail':
+      case 'purchased':
         url = cloudinaryService.getPublicVariantUrl(publicId, variant);
         break;
         

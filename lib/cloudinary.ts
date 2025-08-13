@@ -574,7 +574,7 @@ export class CloudinaryImageService {
   /**
    * Get public variant URL by type with security (signed URLs)
    */
-  getPublicVariantUrl(publicId: string, variant: 'full_size' | 'thumbnail' | 'mid_size'): string {
+  getPublicVariantUrl(publicId: string, variant: 'full_size' | 'thumbnail' | 'mid_size' | 'purchased'): string {
     try {
       ensureCloudinaryConfig();
       
@@ -621,6 +621,19 @@ export class CloudinaryImageService {
             width: 400,
             crop: 'limit', // Maintain aspect ratio, don't crop
             quality: 85
+          });
+          break;
+          
+        case 'purchased':
+          // Full quality image with brand overlay in lower right corner
+          generatedUrl = cloudinary.url(publicId, {
+            ...baseConfig,
+            quality: 95, // High quality for purchased downloads
+            overlay: watermarkId,
+            opacity: watermarkOpacity,
+            gravity: 'south_east', // Lower right corner
+            x: 20, // 20px from right edge
+            y: 20  // 20px from bottom edge
           });
           break;
           

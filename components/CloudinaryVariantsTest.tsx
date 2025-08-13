@@ -26,9 +26,10 @@ export default function CloudinaryVariantsTest({ publicId, filename }: Cloudinar
 
   const variants = [
     { name: 'original', description: 'Original image (no transformations)', showInGrid: true },
-    { name: 'full_size', description: 'Full size with watermark (1200px)', showInGrid: true },
+    { name: 'full_size', description: 'Full size with watermark center (1200px)', showInGrid: true },
     { name: 'mid_size', description: 'Mid size (400px, no watermark)', showInGrid: true },
-    { name: 'thumbnail', description: 'Thumbnail (150x150px)', showInGrid: true }
+    { name: 'thumbnail', description: 'Thumbnail (150x150px)', showInGrid: true },
+    { name: 'purchased', description: 'Full quality with brand overlay (lower right)', showInGrid: true }
   ];
 
   const testVariant = async (variant: string, publicId: string): Promise<TestResult> => {
@@ -303,9 +304,10 @@ export default function CloudinaryVariantsTest({ publicId, filename }: Cloudinar
             <h4 className="font-semibold text-blue-900 mb-2">Expected Behavior:</h4>
             <ul className="space-y-1 text-sm text-blue-800">
               <li>• <strong>Original:</strong> Unmodified image from Cloudinary</li>
-              <li>• <strong>Full Size:</strong> 1200px max width, watermarked, for detail pages</li>
+              <li>• <strong>Full Size:</strong> 1200px max width, watermark center, for detail pages</li>
               <li>• <strong>Mid Size:</strong> 400px max width, no watermark, for catalog cards</li>
               <li>• <strong>Thumbnail:</strong> 150x150px cropped, for lists and grids</li>
+              <li>• <strong>Purchased:</strong> Full quality, brand overlay lower right, for downloads</li>
             </ul>
           </div>
         </div>
