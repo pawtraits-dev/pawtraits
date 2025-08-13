@@ -78,9 +78,17 @@ export default function CustomerCheckoutPage() {
           });
           
           // Pre-populate shipping data from customer profile and customer record
+          const customerEmail = result.userProfile?.email || result.customer?.email || user.email;
+          console.log('Checkout: Email resolution:', {
+            profileEmail: result.userProfile?.email,
+            customerEmail: result.customer?.email,
+            authUserEmail: user.email,
+            finalEmail: customerEmail
+          });
+          
           setShippingData(prev => ({
             ...prev,
-            email: result.userProfile?.email || user.email,
+            email: customerEmail, // Always ensure we have an email
             firstName: result.userProfile?.first_name || result.customer?.first_name || prev.firstName,
             lastName: result.userProfile?.last_name || result.customer?.last_name || prev.lastName,
             // Note: We don't have address data in the current customer schema
@@ -99,9 +107,19 @@ export default function CustomerCheckoutPage() {
           }
         } else {
           console.log('Checkout: No user profile or customer data found');
+          // Still set the email from auth user as fallback
+          setShippingData(prev => ({
+            ...prev,
+            email: user.email,
+          }));
         }
       } catch (error) {
         console.error('Error loading user profile:', error);
+        // Ensure we always have the email from auth user even if profile loading fails
+        setShippingData(prev => ({
+          ...prev,
+          email: user.email,
+        }));
       } finally {
         setLoading(false);
       }
