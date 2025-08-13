@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { Search, Filter, Star, Eye, Download, Tag, Calendar, User, Trash2, X, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
@@ -32,6 +34,8 @@ export default function AdminCatalogPage() {
   const [ratingFilter, setRatingFilter] = useState('');
   const [page, setPage] = useState(1);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [selectedImageForDetail, setSelectedImageForDetail] = useState<ImageCatalogWithDetails | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   const supabaseService = new SupabaseService();
   const adminSupabaseService = new AdminSupabaseService();
@@ -204,6 +208,11 @@ export default function AdminCatalogPage() {
       console.error('Error updating visibility:', error);
       alert('Failed to update visibility. Please try again.');
     }
+  };
+
+  const handleCardClick = (image: ImageCatalogWithDetails) => {
+    setSelectedImageForDetail(image);
+    setShowDetailModal(true);
   };
 
   const renderStars = (rating: number) => {
@@ -382,7 +391,7 @@ export default function AdminCatalogPage() {
         {/* Images Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {images.map((image) => (
-            <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
+            <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden cursor-pointer" onClick={() => handleCardClick(image)}>
               {/* Image */}
               <div className="relative aspect-square overflow-hidden bg-gray-100">
                 <CatalogImage
@@ -400,7 +409,10 @@ export default function AdminCatalogPage() {
                 <div className="absolute top-2 right-2 flex flex-col space-y-1">
                   {/* Visibility toggle - always visible in selected state (public = green, hidden = gray) */}
                   <button
-                    onClick={() => handleToggleVisibility(image.id, image.is_public)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleVisibility(image.id, image.is_public);
+                    }}
                     className={`p-1 rounded-full shadow-md transition-opacity ${
                       image.is_public 
                         ? 'bg-green-500 text-white opacity-100' 
@@ -417,7 +429,10 @@ export default function AdminCatalogPage() {
                   
                   {/* Featured toggle - always visible if featured, appears on hover if not */}
                   <button
-                    onClick={() => handleToggleFeatured(image.id, image.is_featured)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleFeatured(image.id, image.is_featured);
+                    }}
                     className={`p-1 rounded-full shadow-md transition-opacity ${
                       image.is_featured 
                         ? 'bg-yellow-500 text-white opacity-100' 
@@ -430,7 +445,10 @@ export default function AdminCatalogPage() {
                   
                   {/* Delete button - appears on hover */}
                   <button
-                    onClick={() => handleDeleteImage(image.id, image.original_filename)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteImage(image.id, image.original_filename);
+                    }}
                     className="bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-md"
                     title="Delete image"
                   >
@@ -440,7 +458,7 @@ export default function AdminCatalogPage() {
               </div>
 
               <CardContent className="p-4 space-y-3">
-                {/* Metadata Tags */}
+                {/* Metadata Tags - Visual only */}
                 <div className="flex flex-wrap gap-1">
                   {image.breed_name && (
                     <Badge variant="outline" className="text-xs">
@@ -468,35 +486,14 @@ export default function AdminCatalogPage() {
                   )}
                 </div>
 
-                {/* Description Title */}
+                {/* Description - First line only */}
                 {image.description && (
-                  <p className="text-sm text-gray-900 font-medium line-clamp-2">
+                  <p className="text-sm text-gray-900 font-medium truncate">
                     {extractDescriptionTitle(image.description)}
                   </p>
                 )}
 
-                {/* Tags */}
-                {image.tags && image.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {image.tags.slice(0, 3).map((tag) => (
-                      <Badge key={tag} variant="secondary" className="text-xs">
-                        #{tag}
-                      </Badge>
-                    ))}
-                    {image.tags.length > 3 && (
-                      <Badge variant="secondary" className="text-xs">
-                        +{image.tags.length - 3} more
-                      </Badge>
-                    )}
-                  </div>
-                )}
-
-                {/* Prompt Preview */}
-                <div className="bg-gray-50 p-2 rounded text-xs text-gray-600 font-mono line-clamp-2">
-                  {image.prompt_text}
-                </div>
-
-                {/* Date */}
+                {/* Date and AI Model */}
                 <div className="flex items-center justify-between text-xs text-gray-500">
                   <div className="flex items-center space-x-1">
                     <Calendar className="w-3 h-3" />
@@ -549,7 +546,258 @@ export default function AdminCatalogPage() {
             </Button>
           </div>
         )}
+
+        {/* Detailed View Modal */}
+        <ImageDetailModal 
+          image={selectedImageForDetail}
+          isOpen={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedImageForDetail(null);
+          }}
+          onUpdate={(updatedImage) => {
+            setImages(prev => prev.map(img => 
+              img.id === updatedImage.id ? updatedImage : img
+            ));
+          }}
+        />
       </div>
     </div>
+  );
+}
+
+// Image Detail Modal Component
+function ImageDetailModal({ 
+  image, 
+  isOpen, 
+  onClose, 
+  onUpdate 
+}: {
+  image: ImageCatalogWithDetails | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onUpdate: (image: ImageCatalogWithDetails) => void;
+}) {
+  const [editedDescription, setEditedDescription] = useState('');
+  const [editedTags, setEditedTags] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (image) {
+      setEditedDescription(image.description || '');
+      setEditedTags((image.tags || []).join(', '));
+      setIsEditing(false);
+    }
+  }, [image]);
+
+  if (!image) return null;
+
+  const handleSave = async () => {
+    if (!image) return;
+    
+    setIsSaving(true);
+    try {
+      const tagsArray = editedTags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      
+      const response = await fetch(`/api/images/${image.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: editedDescription,
+          tags: tagsArray
+        })
+      });
+
+      if (response.ok) {
+        const updatedImage = await response.json();
+        onUpdate(updatedImage);
+        setIsEditing(false);
+      } else {
+        const error = await response.json();
+        alert(`Failed to update image: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error updating image:', error);
+      alert('Failed to update image. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between">
+            <span>Image Details</span>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="w-4 h-4" />
+            </Button>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left side - Image */}
+          <div className="space-y-4">
+            <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
+              <CatalogImage
+                imageId={image.id}
+                alt={image.description || 'Generated image'}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            
+            {/* Metadata */}
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                {image.breed_name && (
+                  <Badge variant="outline">
+                    {image.breed_animal_type === 'cat' ? '🐱' : '🐕'} {image.breed_name}
+                  </Badge>
+                )}
+                {image.theme_name && (
+                  <Badge variant="outline">🎨 {image.theme_name}</Badge>
+                )}
+                {image.style_name && (
+                  <Badge variant="outline">✨ {image.style_name}</Badge>
+                )}
+                {image.coat_name && (
+                  <Badge variant="outline" className="flex items-center space-x-1">
+                    <div 
+                      className="w-2 h-2 rounded-full border border-gray-300"
+                      style={{ backgroundColor: image.coat_hex_color }}
+                    />
+                    <span>{image.coat_name}</span>
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right side - Details */}
+          <div className="space-y-4">
+            {/* Status Indicators */}
+            <div className="flex gap-2">
+              <Badge variant={image.is_featured ? 'default' : 'outline'}>
+                <Star className={`w-3 h-3 mr-1 ${image.is_featured ? 'fill-current' : ''}`} />
+                {image.is_featured ? 'Featured' : 'Not Featured'}
+              </Badge>
+              <Badge variant={image.is_public ? 'default' : 'secondary'}>
+                {image.is_public ? (
+                  <>
+                    <Eye className="w-3 h-3 mr-1" />
+                    Public
+                  </>
+                ) : (
+                  <>
+                    <EyeOff className="w-3 h-3 mr-1" />
+                    Hidden
+                  </>
+                )}
+              </Badge>
+            </div>
+
+            {/* Description */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium">Description</label>
+                {!isEditing ? (
+                  <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
+                    Edit
+                  </Button>
+                ) : (
+                  <div className="space-x-2">
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setEditedDescription(image.description || '');
+                      setEditedTags((image.tags || []).join(', '));
+                      setIsEditing(false);
+                    }}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={handleSave} disabled={isSaving}>
+                      {isSaving ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+              {isEditing ? (
+                <Textarea
+                  value={editedDescription}
+                  onChange={(e) => setEditedDescription(e.target.value)}
+                  rows={4}
+                  placeholder="Enter image description..."
+                />
+              ) : (
+                <p className="text-sm bg-gray-50 p-3 rounded border min-h-[100px]">
+                  {image.description || 'No description'}
+                </p>
+              )}
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="text-sm font-medium block mb-2">Tags</label>
+              {isEditing ? (
+                <Input
+                  value={editedTags}
+                  onChange={(e) => setEditedTags(e.target.value)}
+                  placeholder="Enter tags separated by commas"
+                />
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {(image.tags && image.tags.length > 0) ? (
+                    image.tags.map((tag) => (
+                      <Badge key={tag} variant="secondary">
+                        #{tag}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-gray-500">No tags</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Prompt */}
+            <div>
+              <label className="text-sm font-medium block mb-2">AI Prompt</label>
+              <div className="bg-gray-50 p-3 rounded font-mono text-xs text-gray-600 max-h-32 overflow-y-auto">
+                {image.prompt_text}
+              </div>
+            </div>
+
+            {/* Metadata */}
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+              <div>
+                <label className="text-xs font-medium text-gray-500">Created</label>
+                <p className="text-sm">{new Date(image.created_at).toLocaleString()}</p>
+              </div>
+              {image.ai_model && (
+                <div>
+                  <label className="text-xs font-medium text-gray-500">AI Model</label>
+                  <p className="text-sm">{image.ai_model}</p>
+                </div>
+              )}
+              {image.rating && (
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Rating</label>
+                  <div className="flex">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        className={`w-4 h-4 ${
+                          star <= image.rating! ? 'text-yellow-500 fill-current' : 'text-gray-300'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
