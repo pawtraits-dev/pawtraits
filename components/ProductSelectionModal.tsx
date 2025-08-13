@@ -153,8 +153,8 @@ export default function ProductSelectionModal({
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left side - Image */}
-          <div className="space-y-4">
-            <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
+          <div className="space-y-4 min-h-0">
+            <div className="aspect-square overflow-hidden rounded-lg bg-gray-100 flex-shrink-0">
               <CatalogImage
                 imageId={image.id}
                 alt={image.description || 'Generated image'}
@@ -189,7 +189,7 @@ export default function ProductSelectionModal({
           </div>
 
           {/* Right side - Products */}
-          <div className="space-y-4">
+          <div className="space-y-4 min-h-0">
             <h3 className="text-lg font-semibold">Available Products</h3>
             
             <div className="space-y-3">
