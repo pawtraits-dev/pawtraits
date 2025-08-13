@@ -398,13 +398,21 @@ export default function AdminCatalogPage() {
                 
                 {/* Admin control icons */}
                 <div className="absolute top-2 right-2 flex flex-col space-y-1">
-                  {/* Delete button - appears on hover */}
+                  {/* Visibility toggle - always visible in selected state (public = green, hidden = gray) */}
                   <button
-                    onClick={() => handleDeleteImage(image.id, image.original_filename)}
-                    className="bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-md"
-                    title="Delete image"
+                    onClick={() => handleToggleVisibility(image.id, image.is_public)}
+                    className={`p-1 rounded-full shadow-md transition-opacity ${
+                      image.is_public 
+                        ? 'bg-green-500 text-white opacity-100' 
+                        : 'bg-gray-600 text-white opacity-100'
+                    } hover:scale-110`}
+                    title={image.is_public ? 'Hide from public' : 'Make public'}
                   >
-                    <Trash2 className="w-3 h-3" />
+                    {image.is_public ? (
+                      <Eye className="w-3 h-3" />
+                    ) : (
+                      <EyeOff className="w-3 h-3" />
+                    )}
                   </button>
                   
                   {/* Featured toggle - always visible if featured, appears on hover if not */}
@@ -420,21 +428,13 @@ export default function AdminCatalogPage() {
                     <Star className={`w-3 h-3 ${image.is_featured ? 'fill-current' : ''}`} />
                   </button>
                   
-                  {/* Visibility toggle - always visible if hidden, appears on hover if public */}
+                  {/* Delete button - appears on hover */}
                   <button
-                    onClick={() => handleToggleVisibility(image.id, image.is_public)}
-                    className={`p-1 rounded-full shadow-md transition-opacity ${
-                      !image.is_public 
-                        ? 'bg-gray-600 text-white opacity-100' 
-                        : 'bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-gray-50'
-                    }`}
-                    title={image.is_public ? 'Hide from public' : 'Make public'}
+                    onClick={() => handleDeleteImage(image.id, image.original_filename)}
+                    className="bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-md"
+                    title="Delete image"
                   >
-                    {image.is_public ? (
-                      <EyeOff className="w-3 h-3" />
-                    ) : (
-                      <Eye className="w-3 h-3" />
-                    )}
+                    <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
               </div>
