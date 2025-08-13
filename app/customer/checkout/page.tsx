@@ -180,6 +180,7 @@ export default function CustomerCheckoutPage() {
       : 0) + (getShippingCost() / 100),
     items: cart.items.map(item => ({
       title: item.imageTitle,
+      product: `${item.product.format?.name} ${item.product.medium?.name} - ${item.product.size_name}`,
       price: item.pricing.sale_price / 100, // Convert from pence to pounds
       quantity: item.quantity
     })),
@@ -238,7 +239,9 @@ export default function CustomerCheckoutPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create payment intent');
+        const errorData = await response.json();
+        console.error('PaymentIntent creation error:', errorData);
+        throw new Error(errorData.error || errorData.details || 'Failed to create payment intent');
       }
 
       const data = await response.json();
@@ -577,11 +580,16 @@ export default function CustomerCheckoutPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {orderSummary.items.map((item, index) => (
-                  <div key={index} className="flex justify-between text-sm">
-                    <span className="text-gray-600">
-                      {item.title} {item.quantity > 1 && `(×${item.quantity})`}
-                    </span>
-                    <span className="font-medium">£{(item.price * item.quantity).toFixed(2)}</span>
+                  <div key={index} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-900 font-medium">
+                        {item.title} {item.quantity > 1 && `(×${item.quantity})`}
+                      </span>
+                      <span className="font-medium">£{(item.price * item.quantity).toFixed(2)}</span>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {item.product}
+                    </div>
                   </div>
                 ))}
                 <Separator />
