@@ -14,6 +14,10 @@ interface CreatePaymentIntentRequest {
     city: string;
     postcode: string;
     country: string;
+    businessName?: string;
+    isForClient?: boolean;
+    clientName?: string;
+    clientEmail?: string;
   };
   cartItems: Array<{
     productId: string;
@@ -23,6 +27,13 @@ interface CreatePaymentIntentRequest {
     unitPrice: number;
   }>;
   referralCode?: string;
+  // Partner-specific fields
+  isPartnerOrder?: boolean;
+  partnerDiscount?: number; // in pence
+  clientInfo?: {
+    name: string;
+    email: string;
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -90,6 +101,22 @@ export async function POST(request: NextRequest) {
     // Add referral code if provided
     if (body.referralCode) {
       metadata.referralCode = body.referralCode;
+    }
+
+    // Add partner-specific metadata
+    if (body.isPartnerOrder) {
+      metadata.isPartnerOrder = 'true';
+      if (body.partnerDiscount) {
+        metadata.partnerDiscount = body.partnerDiscount.toString();
+      }
+      if (body.shippingAddress.businessName) {
+        metadata.businessName = body.shippingAddress.businessName;
+      }
+      if (body.clientInfo) {
+        metadata.clientName = body.clientInfo.name;
+        metadata.clientEmail = body.clientInfo.email;
+        metadata.isForClient = 'true';
+      }
     }
 
     // Add cart items to metadata (first 3 items only due to Stripe metadata limits)

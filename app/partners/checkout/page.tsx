@@ -13,6 +13,10 @@ import { ArrowLeft, ArrowRight, CreditCard, Shield, Loader2, Users, Percent } fr
 import Link from "next/link"
 import { useServerCart } from "@/lib/server-cart-context"
 import { useRouter } from "next/navigation"
+import { SupabaseService } from '@/lib/supabase'
+import { Elements } from '@stripe/react-stripe-js'
+import { getStripe } from '@/lib/stripe-client'
+import StripePaymentForm from '@/components/StripePaymentForm'
 
 export default function PartnerCheckoutPage() {
   const [currentStep, setCurrentStep] = useState(1)
@@ -33,19 +37,25 @@ export default function PartnerCheckoutPage() {
     clientEmail: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
   const { cart, getShippingCost, getCartTotal, clearCart } = useServerCart()
   const router = useRouter()
+  const supabaseService = new SupabaseService()
+  const stripePromise = getStripe()
 
-  // Load user profile
+  // Load user profile - using same pattern as customer/checkout page
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
-        // Use the supabaseService to get partner profile
-        const supabaseService = new (await import('@/lib/supabase')).SupabaseService();
-        const profile = await supabaseService.getCurrentUserProfile();
+        console.log('🔧 Loading partner data using SupabaseService...');
         
-        if (profile && profile.user_type === 'partner') {
-          setUserProfile(profile);
+        // Use EXACT same approach as customer checkout page
+        const partnerData = await supabaseService.getCurrentUserProfile();
+        console.log('🔧 Partner data received via SupabaseService:', partnerData);
+        
+        if (partnerData && partnerData.user_type === 'partner') {
+          setUserProfile(partnerData);
           
           // Try to get partner details for business info
           let partnerDetails = null;
@@ -55,21 +65,31 @@ export default function PartnerCheckoutPage() {
             console.log('Could not fetch partner details:', error);
           }
           
+          // Pre-populate shipping data using same pattern
+          const profileData = {
+            firstName: partnerData.first_name || '',
+            lastName: partnerData.last_name || '',
+            email: partnerData.email || '',
+          };
+          
+          console.log('Partner checkout: Setting profile data to:', profileData);
           setShippingData(prev => ({
             ...prev,
-            email: profile.email || '',
-            firstName: profile.first_name || prev.firstName,
-            lastName: profile.last_name || prev.lastName,
+            email: profileData.email,
+            firstName: profileData.firstName,
+            lastName: profileData.lastName,
             businessName: partnerDetails?.business_name || prev.businessName,
-            // Address would come from partner record if stored
-            address: prev.address, // User will need to enter
+            // Keep address fields empty for user to enter
+            address: prev.address,
             city: prev.city,
             postcode: prev.postcode,
             country: "United Kingdom",
           }));
+        } else {
+          console.log('Partner checkout: No partner data found or user is not a partner');
         }
       } catch (error) {
-        console.error('Error loading user profile:', error);
+        console.error('Error loading partner data:', error);
       } finally {
         setLoading(false);
       }
@@ -103,78 +123,155 @@ export default function PartnerCheckoutPage() {
 
     if (!shippingData.firstName.trim()) newErrors.firstName = "First name is required"
     if (!shippingData.lastName.trim()) newErrors.lastName = "Last name is required"
+    if (!shippingData.email.trim()) {
+      newErrors.email = "Email address is required"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shippingData.email.trim())) {
+      newErrors.email = "Please enter a valid email address"
+    }
     if (!shippingData.address.trim()) newErrors.address = "Address is required"
     if (!shippingData.city.trim()) newErrors.city = "City is required"
     if (!shippingData.postcode.trim()) newErrors.postcode = "Postcode is required"
     
     if (shippingData.isForClient) {
       if (!shippingData.clientName.trim()) newErrors.clientName = "Client name is required"
-      if (!shippingData.clientEmail.trim()) newErrors.clientEmail = "Client email is required"
+      if (!shippingData.clientEmail.trim()) {
+        newErrors.clientEmail = "Client email is required"
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shippingData.clientEmail.trim())) {
+        newErrors.clientEmail = "Please enter a valid client email address"
+      }
     }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  const handleShippingSubmit = (e: React.FormEvent) => {
+  const handleShippingSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (validateShipping()) {
-      setCurrentStep(2)
+      setIsProcessing(true)
+      try {
+        await createPaymentIntent()
+        setCurrentStep(2)
+      } finally {
+        setIsProcessing(false)
+      }
     }
   }
 
-  const handlePayment = async () => {
-    setIsProcessing(true)
-
+  // Create PaymentIntent when moving to payment step - same pattern as customer checkout
+  const createPaymentIntent = async () => {
     try {
-      // Create order data with partner discount
-      const orderData = {
-        items: cart.items.map(item => ({
+      const partnerTotal = Math.round(total * 100); // Partner total with discount in pence
+      const customerName = `${shippingData.firstName} ${shippingData.lastName}`.trim();
+      
+      // Client-side validation
+      if (partnerTotal <= 0) {
+        throw new Error('Cart is empty - cannot create payment');
+      }
+      
+      if (!shippingData.email || shippingData.email.trim() === '') {
+        throw new Error('Partner email is required');
+      }
+      
+      if (!customerName || customerName === '') {
+        throw new Error('Partner name is required');
+      }
+      
+      const paymentData = {
+        amount: partnerTotal, // Partner discounted total in pence
+        currency: 'gbp',
+        customerEmail: shippingData.email.trim(),
+        customerName: customerName,
+        shippingAddress: shippingData,
+        cartItems: cart.items.map(item => ({
           productId: item.productId,
           imageId: item.imageId,
-          imageUrl: item.imageUrl,
           imageTitle: item.imageTitle,
           quantity: item.quantity,
-          unitPrice: Math.round(item.pricing.sale_price * 0.85), // Partner discount applied, in pence
-          totalPrice: Math.round(item.pricing.sale_price * 0.85) * item.quantity // in pence
+          unitPrice: Math.round(item.pricing.sale_price * 0.85), // Partner discount applied
         })),
-        shippingAddress: shippingData,
-        totalAmount: Math.round(total * 100), // in pence
-        shippingCost: getShippingCost(), // in pence
-        currency: 'GBP',
+        // Partner-specific metadata
         isPartnerOrder: true,
         partnerDiscount: Math.round(partnerDiscount * 100), // in pence
         clientInfo: shippingData.isForClient ? {
           name: shippingData.clientName,
           email: shippingData.clientEmail
-        } : null
-      }
+        } : undefined,
+      };
 
-      // Create order via API
-      const response = await fetch('/api/shop/orders', {
+      // Debug logging
+      console.log('Creating Partner PaymentIntent with data:', {
+        amount: paymentData.amount,
+        customerEmail: paymentData.customerEmail,
+        customerName: paymentData.customerName,
+        cartItemsCount: paymentData.cartItems.length,
+        partnerDiscount: paymentData.partnerDiscount,
+        isPartnerOrder: paymentData.isPartnerOrder,
+        clientInfo: paymentData.clientInfo
+      });
+
+      const response = await fetch('/api/payments/create-intent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(orderData)
-      })
+        body: JSON.stringify(paymentData),
+      });
 
       if (!response.ok) {
-        throw new Error('Failed to create order')
+        const errorData = await response.json();
+        console.error('Partner PaymentIntent creation error:', errorData);
+        throw new Error(errorData.error || errorData.details || 'Failed to create payment intent');
       }
 
-      const result = await response.json()
+      const data = await response.json();
+      setClientSecret(data.clientSecret);
+      setPaymentIntentId(data.paymentIntentId);
       
-      // Clear cart and redirect to confirmation with order details
-      clearCart()
-      router.push(`/partners/order-confirmation?orderId=${result.order.id}&orderNumber=${result.order.orderNumber}`)
+      console.log('Partner PaymentIntent created:', {
+        id: data.paymentIntentId,
+        amount: data.amount,
+        currency: data.currency,
+      });
+    } catch (error) {
+      console.error('Error creating Partner PaymentIntent:', error);
+      alert('Failed to set up payment. Please try again.');
+      setCurrentStep(1); // Go back to shipping step
+    }
+  };
+
+  // Handle successful payment completion
+  const handlePaymentSuccess = async (paymentIntent: any) => {
+    try {
+      console.log('Partner payment succeeded:', paymentIntent.id);
+      
+      // Clear cart
+      await clearCart();
+      
+      // Redirect to order confirmation - use partners route
+      router.push(`/partners/order-confirmation?payment_intent=${paymentIntent.id}`);
       
     } catch (error) {
-      console.error('Error creating order:', error)
-      alert('There was an error processing your order. Please try again.')
-      setIsProcessing(false)
+      console.error('Error handling partner payment success:', error);
+      // Still redirect to confirmation since payment succeeded
+      router.push(`/partners/order-confirmation?payment_intent=${paymentIntent.id}`);
     }
-  }
+  };
+
+  // Handle payment errors
+  const handlePaymentError = (error: any) => {
+    console.error('Partner payment failed:', error);
+    setIsProcessing(false);
+    
+    // Show user-friendly error message
+    let errorMessage = 'Payment failed. Please try again.';
+    
+    if (error.type === 'card_error' || error.type === 'validation_error') {
+      errorMessage = error.message;
+    }
+    
+    alert(errorMessage);
+  };
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setShippingData((prev) => ({ ...prev, [field]: value }))
@@ -348,16 +445,17 @@ export default function PartnerCheckoutPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="email">Email Address</Label>
+                      <Label htmlFor="email">Email Address *</Label>
                       <Input
                         id="email"
                         type="email"
                         value={shippingData.email}
-                        readOnly
-                        className="bg-gray-50 text-gray-700 cursor-not-allowed"
-                        placeholder="Loading from your account..."
+                        onChange={(e) => handleInputChange("email", e.target.value)}
+                        className={`${errors.email ? "border-red-500" : ""} ${shippingData.email && !errors.email ? "bg-green-50" : ""}`}
+                        placeholder="Enter your email address"
                       />
-                      <p className="text-xs text-gray-500">Using email from your partner account</p>
+                      {shippingData.email && !errors.email && <p className="text-xs text-green-600">Email address confirmed</p>}
+                      {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
                     </div>
 
                     {shippingData.businessName && (
@@ -410,9 +508,22 @@ export default function PartnerCheckoutPage() {
                       </div>
                     </div>
 
-                    <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white py-3">
-                      Continue to Payment
-                      <ArrowRight className="w-4 h-4 ml-2" />
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-3"
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Setting up payment...
+                        </>
+                      ) : (
+                        <>
+                          Continue to Payment
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </>
+                      )}
                     </Button>
                   </form>
                 </CardContent>
@@ -463,19 +574,71 @@ export default function PartnerCheckoutPage() {
                     </Button>
                   </div>
 
-                  {isProcessing ? (
+                  {/* Stripe Payment Form */}
+                  {clientSecret && stripePromise ? (
+                    <Elements
+                      stripe={stripePromise}
+                      options={{
+                        clientSecret,
+                        appearance: {
+                          theme: 'stripe',
+                          variables: {
+                            colorPrimary: '#16a34a', // Green theme for partners
+                            colorBackground: '#ffffff',
+                            colorText: '#1f2937',
+                            colorDanger: '#dc2626',
+                            fontFamily: 'system-ui, sans-serif',
+                            spacingUnit: '4px',
+                            borderRadius: '8px',
+                          },
+                          rules: {
+                            '.Input': {
+                              border: '1px solid #d1d5db',
+                              boxShadow: 'none',
+                            },
+                            '.Input:focus': {
+                              border: '1px solid #16a34a',
+                              boxShadow: '0 0 0 2px rgba(22, 163, 74, 0.1)',
+                            },
+                          },
+                        },
+                      }}
+                    >
+                      <StripePaymentForm
+                        orderSummary={{
+                          subtotal: orderSummary.subtotal,
+                          shipping: orderSummary.shipping,
+                          discount: orderSummary.discount,
+                          total: orderSummary.total,
+                          items: orderSummary.items.map(item => ({
+                            title: item.title,
+                            product: `Partner Order - 15% Discount Applied`,
+                            price: item.discountedPrice,
+                            quantity: item.quantity
+                          }))
+                        }}
+                        customerDetails={{
+                          email: shippingData.email,
+                          name: `${shippingData.firstName} ${shippingData.lastName}`,
+                          address: {
+                            line1: shippingData.address,
+                            city: shippingData.city,
+                            postal_code: shippingData.postcode,
+                            country: shippingData.country,
+                          },
+                        }}
+                        onSuccess={handlePaymentSuccess}
+                        onError={handlePaymentError}
+                        isProcessing={isProcessing}
+                        setIsProcessing={setIsProcessing}
+                      />
+                    </Elements>
+                  ) : (
                     <div className="text-center py-8">
                       <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-green-600" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Processing your order...</h3>
-                      <p className="text-gray-600">Please don't close this page</p>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Setting up secure payment...</h3>
+                      <p className="text-gray-600">Please wait</p>
                     </div>
-                  ) : (
-                    <Button
-                      onClick={handlePayment}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg font-semibold"
-                    >
-                      Complete Order - £{orderSummary.total.toFixed(2)}
-                    </Button>
                   )}
                 </CardContent>
               </Card>
