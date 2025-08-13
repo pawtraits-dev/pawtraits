@@ -216,26 +216,56 @@ export default function CustomerCheckoutPage() {
   // Create PaymentIntent when moving to payment step
   const createPaymentIntent = async () => {
     try {
+      const cartTotal = getCartTotal();
+      const customerName = `${shippingData.firstName} ${shippingData.lastName}`.trim();
+      
+      // Client-side validation
+      if (cartTotal <= 0) {
+        throw new Error('Cart is empty - cannot create payment');
+      }
+      
+      if (!shippingData.email || shippingData.email.trim() === '') {
+        throw new Error('Customer email is required');
+      }
+      
+      if (!customerName || customerName === '') {
+        throw new Error('Customer name is required');
+      }
+      
+      const paymentData = {
+        amount: cartTotal, // in pence
+        currency: 'gbp',
+        customerEmail: shippingData.email.trim(),
+        customerName: customerName,
+        shippingAddress: shippingData,
+        cartItems: cart.items.map(item => ({
+          productId: item.productId,
+          imageId: item.imageId,
+          imageTitle: item.imageTitle,
+          quantity: item.quantity,
+          unitPrice: item.pricing.sale_price,
+        })),
+        referralCode: referralCode || undefined,
+      };
+
+      // Debug logging
+      console.log('Creating PaymentIntent with data:', {
+        amount: paymentData.amount,
+        customerEmail: paymentData.customerEmail,
+        customerName: paymentData.customerName,
+        cartItemsCount: paymentData.cartItems.length,
+        cartTotalPrice: cart.totalPrice,
+        shippingCost: getShippingCost(),
+        finalTotal: cartTotal,
+        shippingData: shippingData
+      });
+
       const response = await fetch('/api/payments/create-intent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          amount: getCartTotal(), // in pence
-          currency: 'gbp',
-          customerEmail: shippingData.email,
-          customerName: `${shippingData.firstName} ${shippingData.lastName}`,
-          shippingAddress: shippingData,
-          cartItems: cart.items.map(item => ({
-            productId: item.productId,
-            imageId: item.imageId,
-            imageTitle: item.imageTitle,
-            quantity: item.quantity,
-            unitPrice: item.pricing.sale_price,
-          })),
-          referralCode: referralCode || undefined,
-        }),
+        body: JSON.stringify(paymentData),
       });
 
       if (!response.ok) {

@@ -29,18 +29,43 @@ export async function POST(request: NextRequest) {
   try {
     const body: CreatePaymentIntentRequest = await request.json();
     
-    // Validate required fields
-    if (!body.amount || !body.customerEmail || !body.customerName) {
-      return NextResponse.json(
-        { error: 'Missing required fields: amount, customerEmail, customerName' },
-        { status: 400 }
-      );
+    // Enhanced validation with detailed error messages
+    const validationErrors: string[] = [];
+    
+    if (!body.amount || body.amount <= 0) {
+      validationErrors.push(`amount (${body.amount})`);
     }
-
-    // Validate amount is positive
-    if (body.amount <= 0) {
+    
+    if (!body.customerEmail || body.customerEmail.trim() === '') {
+      validationErrors.push(`customerEmail (${body.customerEmail})`);
+    }
+    
+    if (!body.customerName || body.customerName.trim() === '') {
+      validationErrors.push(`customerName (${body.customerName})`);
+    }
+    
+    if (validationErrors.length > 0) {
+      console.error('PaymentIntent validation failed:', {
+        receivedData: {
+          amount: body.amount,
+          customerEmail: body.customerEmail,
+          customerName: body.customerName,
+          cartItemsLength: body.cartItems?.length,
+          shippingAddress: body.shippingAddress
+        },
+        validationErrors
+      });
+      
       return NextResponse.json(
-        { error: 'Amount must be greater than 0' },
+        { 
+          error: 'Missing or invalid required fields', 
+          details: `Invalid fields: ${validationErrors.join(', ')}`,
+          debug: {
+            amount: body.amount,
+            customerEmail: body.customerEmail || '(empty)',
+            customerName: body.customerName || '(empty)'
+          }
+        },
         { status: 400 }
       );
     }
