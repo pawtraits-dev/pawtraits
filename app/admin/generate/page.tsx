@@ -159,7 +159,8 @@ export default function GeneratePromptsPage() {
       }
       
       const transformedData = data.map((item: any) => ({
-        id: item.id,
+        id: item.coats?.id || item.id, // Use the actual coat ID, not the breed_coats relationship ID
+        breed_coat_id: item.id, // Keep the relationship ID for reference
         breed_name: item.breeds?.name || 'Unknown',
         coat_name: item.coats?.name || 'Unknown',
         coat_slug: item.coats?.slug || '',
@@ -171,6 +172,16 @@ export default function GeneratePromptsPage() {
       }));
       
       setAvailableCoats(transformedData);
+      
+      console.log('🎨 Loaded coat data for breed:', {
+        breedId,
+        coatCount: transformedData.length,
+        sampleCoat: transformedData[0] ? {
+          name: transformedData[0].coat_name,
+          coat_id: transformedData[0].id,
+          breed_coat_id: transformedData[0].breed_coat_id
+        } : null
+      });
     } catch (error) {
       console.error('Error loading coats:', error);
       setAvailableCoats([]);
