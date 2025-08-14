@@ -92,7 +92,7 @@ export class GelatoService {
   private readonly apiKey: string;
 
   constructor() {
-    this.baseUrl = process.env.GELATO_API_BASE_URL || 'https://api.gelato.com';
+    this.baseUrl = process.env.GELATO_API_BASE_URL || 'https://product.gelatoapis.com';
     this.apiKey = process.env.GELATO_API_KEY || '';
   }
 
@@ -116,8 +116,8 @@ export class GelatoService {
    */
   async getProducts(): Promise<GelatoProduct[]> {
     try {
-      // Try the correct Gelato API endpoint for products
-      const response = await fetch(`${this.baseUrl}/v3/products`, {
+      // Get catalogs first, then get products from each catalog
+      const response = await fetch(`${this.baseUrl}/v3/catalogs`, {
         method: 'GET',
         headers: this.getHeaders()
       });
@@ -128,9 +128,25 @@ export class GelatoService {
         throw new Error(`Gelato API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      const data = await response.json();
-      console.log('Gelato products response:', data);
-      return data.products || data || [];
+      const catalogs = await response.json();
+      console.log('Gelato catalogs response:', catalogs);
+      
+      // Filter for print-related catalogs (posters, canvas, etc.)
+      const printCatalogs = catalogs.filter((catalog: any) => 
+        catalog.catalogUid.includes('poster') ||
+        catalog.catalogUid.includes('canvas') ||
+        catalog.catalogUid.includes('print') ||
+        catalog.catalogUid.includes('wall')
+      );
+      
+      // Return simplified catalog list as products for now
+      return printCatalogs.map((catalog: any) => ({
+        uid: catalog.catalogUid,
+        name: catalog.title || catalog.catalogUid,
+        description: `${catalog.title} products`,
+        category: 'Print',
+        variants: []
+      }));
     } catch (error) {
       console.error('Error fetching Gelato products:', error);
       throw error;
@@ -138,11 +154,11 @@ export class GelatoService {
   }
 
   /**
-   * Get specific product details including variants
+   * Get specific catalog details including product attributes (variants)
    */
-  async getProduct(productUid: string): Promise<GelatoProduct> {
+  async getProduct(catalogUid: string): Promise<GelatoProduct> {
     try {
-      const response = await fetch(`${this.baseUrl}/v3/products/${productUid}`, {
+      const response = await fetch(`${this.baseUrl}/v3/catalogs/${catalogUid}`, {
         method: 'GET',
         headers: this.getHeaders()
       });
@@ -154,10 +170,27 @@ export class GelatoService {
       }
 
       const data = await response.json();
-      console.log('Gelato product details response:', data);
-      return data;
+      console.log('Gelato catalog details response:', data);
+      
+      // Convert product attributes to variants format
+      const variants = data.productAttributes?.map((attr: any) => ({
+        uid: attr.productAttributeUid,
+        name: attr.title,
+        values: attr.values?.map((val: any) => ({
+          uid: val.productAttributeValueUid,
+          title: val.title
+        })) || []
+      })) || [];
+
+      return {
+        uid: data.catalogUid,
+        name: data.title,
+        description: `${data.title} catalog with ${variants.length} attributes`,
+        category: 'Print',
+        variants: variants
+      };
     } catch (error) {
-      console.error('Error fetching Gelato product:', error);
+      console.error('Error fetching Gelato catalog:', error);
       throw error;
     }
   }
@@ -173,7 +206,8 @@ export class GelatoService {
         currency: orderData.currency
       });
 
-      const response = await fetch(`${this.baseUrl}/v4/orders`, {
+      // Use the orders API endpoint
+      const response = await fetch('https://order.gelatoapis.com/v4/orders', {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify(orderData)
