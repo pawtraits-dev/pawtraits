@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AdminSupabaseService } from '@/lib/supabase';
+import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { ChevronUp, ChevronDown, Plus, Edit, Trash2, Search, Filter } from 'lucide-react';
 import Link from 'next/link';
 
