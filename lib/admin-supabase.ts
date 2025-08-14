@@ -306,5 +306,26 @@ export class AdminSupabaseService {
       return [];
     }
   }
+
+  async updateCountry(countryCode: string, updates: any): Promise<any> {
+    try {
+      const response = await fetch(`/api/admin/countries/${countryCode}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update country: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating country:', error);
+      throw error;
+    }
+  }
 }
 

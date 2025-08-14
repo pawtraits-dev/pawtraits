@@ -366,10 +366,35 @@ export class GelatoService {
   }
 
   /**
-   * Get pricing for multiple countries at once
+   * Get active countries from database for pricing
    */
-  async getMultiCountryPricing(productUid: string, countries: string[] = ['GB', 'US', 'DE', 'FR']): Promise<Record<string, any[]>> {
+  async getActiveCountries(): Promise<string[]> {
     try {
+      const response = await fetch('/api/admin/countries?supportedOnly=true');
+      if (!response.ok) {
+        console.warn('Failed to get active countries, using defaults');
+        return ['GB', 'US', 'DE', 'FR']; // Fallback
+      }
+      
+      const countries = await response.json();
+      return countries.map((country: any) => country.code);
+    } catch (error) {
+      console.warn('Error fetching active countries:', error);
+      return ['GB', 'US', 'DE', 'FR']; // Fallback
+    }
+  }
+
+  /**
+   * Get pricing for multiple countries at once
+   * Uses active countries from database if no countries specified
+   */
+  async getMultiCountryPricing(productUid: string, countries?: string[]): Promise<Record<string, any[]>> {
+    try {
+      // If no countries specified, get active countries from database
+      if (!countries) {
+        countries = await this.getActiveCountries();
+      }
+      
       console.log(`Fetching multi-country pricing for ${productUid}:`, countries);
       
       const pricingPromises = countries.map(async (country) => {

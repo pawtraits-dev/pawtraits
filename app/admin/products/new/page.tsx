@@ -402,15 +402,31 @@ export default function NewProductPage() {
     }
 
     try {
-      // Fetch pricing for multiple countries/currencies in native currencies
-      const countries = [
-        { code: 'GB', currency: 'GBP', flag: '🇬🇧', name: 'United Kingdom' },
-        { code: 'US', currency: 'USD', flag: '🇺🇸', name: 'United States' },
-        { code: 'DE', currency: 'EUR', flag: '🇩🇪', name: 'Germany' },
-        { code: 'FR', currency: 'EUR', flag: '🇫🇷', name: 'France' },
-        { code: 'CA', currency: 'CAD', flag: '🇨🇦', name: 'Canada' },
-        { code: 'AU', currency: 'AUD', flag: '🇦🇺', name: 'Australia' }
-      ];
+      // Get active countries from database
+      const countryDetailsResponse = await fetch('/api/admin/countries?supportedOnly=true');
+      if (!countryDetailsResponse.ok) {
+        throw new Error('Failed to fetch active countries');
+      }
+      
+      const activeCountries = await countryDetailsResponse.json();
+      console.log('Active countries for pricing:', activeCountries.map(c => `${c.name} (${c.code})`));
+      
+      // Add flag helper function for countries not in the helper
+      const getFlag = (code: string) => {
+        const flags: Record<string, string> = {
+          'GB': '🇬🇧', 'US': '🇺🇸', 'DE': '🇩🇪', 'FR': '🇫🇷', 
+          'CA': '🇨🇦', 'AU': '🇦🇺', 'ES': '🇪🇸', 'IT': '🇮🇹',
+          'NL': '🇳🇱', 'SE': '🇸🇪', 'NO': '🇳🇴', 'DK': '🇩🇰'
+        };
+        return flags[code] || '🏳️';
+      };
+      
+      const countries = activeCountries.map((country: any) => ({
+        code: country.code,
+        currency: country.currency_code,
+        flag: getFlag(country.code),
+        name: country.name
+      }));
 
       const pricingPromises = countries.map(async ({ code, currency, flag, name }) => {
         try {
@@ -447,13 +463,47 @@ export default function NewProductPage() {
       console.log('✅ Successful pricing results:', successfulPricing);
 
       if (successfulPricing.length > 0) {
-        // Filter out USD pricing except for US country
-        const filteredPricing = successfulPricing.filter(pricing => {
-          // Keep all non-USD prices
-          if (pricing.currency !== 'USD') return true;
-          // For USD, only keep if it's from US country
-          return pricing.country === 'US';
-        });
+        // Convert USD pricing to local currencies (Gelato returns all prices in USD)
+        const convertedPricing = await Promise.all(successfulPricing.map(async (pricing) => {
+          // For US, keep USD as-is
+          if (pricing.country === 'US') {
+            return pricing;
+          }
+          
+          // For other countries, convert USD to local currency
+          const country = countries.find(c => c.code === pricing.country);
+          if (!country) return pricing;
+          
+          try {
+            // Simple conversion rate lookup (in production, you'd use a real API)
+            const conversionRates: Record<string, number> = {
+              'GBP': 0.79, // 1 USD = 0.79 GBP
+              'EUR': 0.92, // 1 USD = 0.92 EUR
+              'CAD': 1.35, // 1 USD = 1.35 CAD
+              'AUD': 1.52, // 1 USD = 1.52 AUD
+              'SEK': 10.5, // 1 USD = 10.5 SEK
+              'NOK': 10.8, // 1 USD = 10.8 NOK
+              'DKK': 6.85, // 1 USD = 6.85 DKK
+            };
+            
+            const rate = conversionRates[country.currency];
+            if (rate) {
+              const convertedPrice = pricing.baseCost * rate;
+              return {
+                ...pricing,
+                currency: country.currency,
+                baseCost: Math.round(convertedPrice * 100) / 100, // Round to 2 decimal places
+                originalUsdPrice: pricing.baseCost // Keep original for reference
+              };
+            }
+          } catch (error) {
+            console.warn(`Currency conversion failed for ${country.currency}:`, error);
+          }
+          
+          return pricing; // Return original if conversion fails
+        }));
+        
+        const filteredPricing = convertedPricing;
         
         // Group by currency for better display
         const byCurrency = filteredPricing.reduce((acc, pricing) => {
