@@ -116,17 +116,21 @@ export class GelatoService {
    */
   async getProducts(): Promise<GelatoProduct[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/v4/print-products`, {
+      // Try the correct Gelato API endpoint for products
+      const response = await fetch(`${this.baseUrl}/v3/products`, {
         method: 'GET',
         headers: this.getHeaders()
       });
 
       if (!response.ok) {
-        throw new Error(`Gelato API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('Gelato API error response:', errorText);
+        throw new Error(`Gelato API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
-      return data.printProducts || [];
+      console.log('Gelato products response:', data);
+      return data.products || data || [];
     } catch (error) {
       console.error('Error fetching Gelato products:', error);
       throw error;
@@ -138,16 +142,20 @@ export class GelatoService {
    */
   async getProduct(productUid: string): Promise<GelatoProduct> {
     try {
-      const response = await fetch(`${this.baseUrl}/v4/print-products/${productUid}`, {
+      const response = await fetch(`${this.baseUrl}/v3/products/${productUid}`, {
         method: 'GET',
         headers: this.getHeaders()
       });
 
       if (!response.ok) {
-        throw new Error(`Gelato API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('Gelato API error response:', errorText);
+        throw new Error(`Gelato API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      console.log('Gelato product details response:', data);
+      return data;
     } catch (error) {
       console.error('Error fetching Gelato product:', error);
       throw error;
@@ -238,16 +246,19 @@ export class GelatoService {
    */
   async getProductPricing(productUid: string, variantUid: string, countryCode: string): Promise<any> {
     try {
-      const response = await fetch(`${this.baseUrl}/v4/products/${productUid}/variants/${variantUid}/prices?country=${countryCode}`, {
+      const response = await fetch(`${this.baseUrl}/v3/products/${productUid}/variants/${variantUid}/pricing?country=${countryCode}`, {
         method: 'GET',
         headers: this.getHeaders()
       });
 
       if (!response.ok) {
-        throw new Error(`Gelato API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('Gelato pricing API error response:', errorText);
+        throw new Error(`Gelato API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('Gelato pricing response:', data);
       return {
         productUid,
         variantUid,
