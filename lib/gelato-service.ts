@@ -501,8 +501,12 @@ export class GelatoService {
 
   /**
    * Get the correct Product UID based on selected variant attributes
+   * Returns both the Product UID and detailed product information including dimensions
    */
-  async getProductUidFromAttributes(catalogUid: string, selectedAttributes: Record<string, string>): Promise<string | null> {
+  async getProductUidFromAttributes(catalogUid: string, selectedAttributes: Record<string, string>): Promise<{
+    productUid: string;
+    productDetails: any;
+  } | null> {
     try {
       // Convert selected attributes to filter format
       const attributeFilters: Record<string, string[]> = {};
@@ -523,9 +527,16 @@ export class GelatoService {
         console.warn('Multiple products found, using first one. Products:', products.map(p => p.productUid));
       }
 
-      const productUid = products[0].productUid;
+      const product = products[0];
+      const productUid = product.productUid;
+      
       console.log('✅ Found exact Gelato Product UID:', productUid);
-      return productUid;
+      console.log('Product details:', product);
+      
+      return {
+        productUid,
+        productDetails: product
+      };
     } catch (error) {
       console.error('Error getting Product UID from attributes:', error);
       return null;

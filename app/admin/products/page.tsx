@@ -482,6 +482,27 @@ export default function ProductManagementPage() {
         
         if (result.success && result.productUid) {
           console.log('✅ Received correct Product UID from Gelato API:', result.productUid);
+          
+          // Extract dimensions if available in the response
+          if (result.productDetails && result.productDetails.dimensions) {
+            const dims = result.productDetails.dimensions;
+            console.log('Extracting dimensions from Gelato product:', dims);
+            
+            const widthMm = dims.Width?.value;
+            const heightMm = dims.Height?.value;
+            
+            if (widthMm && heightMm) {
+              // Update form with dimensions
+              setFormData(prev => ({
+                ...prev,
+                width_cm: (widthMm / 10).toString(), // Convert mm to cm
+                height_cm: (heightMm / 10).toString(),
+                width_inches: (widthMm / 25.4).toFixed(1), // Convert mm to inches
+                height_inches: (heightMm / 25.4).toFixed(1)
+              }));
+            }
+          }
+          
           return result.productUid;
         } else {
           console.warn('⚠️ Could not get Product UID from API:', result.error);
@@ -1210,47 +1231,6 @@ export default function ProductManagementPage() {
                                 </div>
                               </div>
                               
-                              {/* Real-time Gelato Pricing */}
-                              {formData.gelato_sku && productPricing[formData.gelato_sku] && (
-                                <div className="mt-2 p-3 bg-yellow-50 rounded border border-yellow-200">
-                                  <p className="text-xs font-semibold text-yellow-800 mb-2">💰 Live Gelato Pricing</p>
-                                  
-                                  {/* Base Cost */}
-                                  {productPricing[formData.gelato_sku].baseCost && (
-                                    <div className="mb-2">
-                                      <span className="text-xs font-medium text-yellow-700">Base Cost: </span>
-                                      <span className="font-mono text-xs text-yellow-800">
-                                        {productPricing[formData.gelato_sku].baseCost.currency} {productPricing[formData.gelato_sku].baseCost.price}
-                                        {productPricing[formData.gelato_sku].baseCost.quantity > 1 && (
-                                          <span className="text-gray-600"> (min qty: {productPricing[formData.gelato_sku].baseCost.quantity})</span>
-                                        )}
-                                      </span>
-                                    </div>
-                                  )}
-                                  
-                                  {/* Multi-Country Pricing */}
-                                  {productPricing[formData.gelato_sku].multiCountry && (
-                                    <div className="space-y-1">
-                                      <div className="text-xs font-medium text-yellow-700">Multi-Country Costs:</div>
-                                      <div className="grid grid-cols-3 gap-2 text-xs">
-                                        {Object.entries(productPricing[formData.gelato_sku].multiCountry).map(([country, prices]) => {
-                                          const priceArray = prices as any[];
-                                          if (!priceArray || priceArray.length === 0) return null;
-                                          const basePrice = priceArray.find(p => p.quantity === 1) || priceArray[0];
-                                          return (
-                                            <div key={country} className="bg-white px-2 py-1 rounded border">
-                                              <div className="font-medium text-yellow-800">{country}</div>
-                                              <div className="font-mono text-yellow-700">
-                                                {basePrice.currency} {basePrice.price}
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
                               {selectedGelatoProduct && (
                                 <div className="mt-3 space-y-1">
                                   <p className="text-xs text-green-700">
@@ -1270,6 +1250,63 @@ export default function ProductManagementPage() {
                               )}
                             </div>
                           </div>
+                        </div>
+                      )}
+                      
+                      {/* Real-time Gelato Pricing - Prominent Display */}
+                      {formData.gelato_sku && (
+                        <div className="mt-4 p-4 bg-yellow-50 rounded-lg border-2 border-yellow-300">
+                          <h4 className="text-sm font-semibold text-yellow-800 mb-3 flex items-center">
+                            💰 Live Gelato Pricing
+                            {productPricing[formData.gelato_sku] ? (
+                              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">✅ Loaded</span>
+                            ) : (
+                              <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">Loading...</span>
+                            )}
+                          </h4>
+                          
+                          {productPricing[formData.gelato_sku] ? (
+                            <>
+                              {/* Base Cost */}
+                              {productPricing[formData.gelato_sku].baseCost && (
+                                <div className="mb-3">
+                                  <span className="text-sm font-medium text-yellow-700">Base Cost: </span>
+                                  <span className="font-mono text-lg font-semibold text-yellow-900">
+                                    {productPricing[formData.gelato_sku].baseCost.currency} {productPricing[formData.gelato_sku].baseCost.price}
+                                  </span>
+                                  {productPricing[formData.gelato_sku].baseCost.quantity > 1 && (
+                                    <span className="text-sm text-gray-600 ml-2">(min qty: {productPricing[formData.gelato_sku].baseCost.quantity})</span>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* Multi-Country Pricing */}
+                              {productPricing[formData.gelato_sku].multiCountry && (
+                                <div className="space-y-2">
+                                  <div className="text-sm font-medium text-yellow-700">Multi-Country Costs:</div>
+                                  <div className="grid grid-cols-3 gap-3">
+                                    {Object.entries(productPricing[formData.gelato_sku].multiCountry).map(([country, prices]) => {
+                                      const priceArray = prices as any[];
+                                      if (!priceArray || priceArray.length === 0) return null;
+                                      const basePrice = priceArray.find(p => p.quantity === 1) || priceArray[0];
+                                      return (
+                                        <div key={country} className="bg-white p-2 rounded border border-yellow-200">
+                                          <div className="font-semibold text-yellow-800">{country}</div>
+                                          <div className="font-mono text-yellow-700 text-sm">
+                                            {basePrice.currency} {basePrice.price}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-sm text-yellow-700">
+                              Fetching live pricing from Gelato API...
+                            </div>
+                          )}
                         </div>
                       )}
                       

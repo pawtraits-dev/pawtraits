@@ -217,12 +217,13 @@ export async function POST(request: NextRequest) {
         }
 
         console.log('Getting Product UID for:', catalogUid, attributes);
-        const productUid = await gelatoService.getProductUidFromAttributes(catalogUid, attributes);
+        const result = await gelatoService.getProductUidFromAttributes(catalogUid, attributes);
 
-        if (productUid) {
+        if (result) {
           return NextResponse.json({
             success: true,
-            productUid,
+            productUid: result.productUid,
+            productDetails: result.productDetails,
             catalogUid,
             attributes
           });
