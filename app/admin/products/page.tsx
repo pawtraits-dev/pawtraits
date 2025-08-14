@@ -443,87 +443,75 @@ export default function ProductManagementPage() {
       return parts.join(' - ');
     };
 
-    // Build the complete Gelato product UID from selected attributes
-    const buildGelatoProductUID = () => {
+    // Get the correct Gelato Product UID using Gelato's Product Search API
+    const fetchCorrectGelatoProductUID = async () => {
       if (!selectedGelatoProduct) return '';
-      
-      // Start with the catalog UID
-      const parts = [selectedGelatoProduct.uid];
       
       // Get current variants including the new selection
       const currentVariants = {...selectedVariantValues};
       currentVariants[variantUid] = selectedValue;
       
-      console.log('🔍 Building Gelato Product UID:');
+      console.log('🔍 Fetching correct Gelato Product UID via API:');
       console.log('  Catalog UID:', selectedGelatoProduct.uid);
-      console.log('  All variants:', currentVariants);
+      console.log('  Selected variants:', currentVariants);
       
-      // Process variants in Gelato's expected order and format
-      // Based on actual Gelato format: canvas_300x450-mm-12x18-inch_canvas_wood-fsc-slim_4-0_ver
+      try {
+        // Convert variants to the format expected by Gelato's search API
+        const selectedAttributes: Record<string, string> = {};
+        Object.entries(currentVariants).forEach(([key, value]) => {
+          if (value.uid) {
+            selectedAttributes[key] = value.uid;
+          }
+        });
+        
+        console.log('  Calling Gelato Product Search API with attributes:', selectedAttributes);
+        
+        // Call our API endpoint to get the correct Product UID
+        const response = await fetch('/api/admin/gelato-products?action=search-product-uid', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            catalogUid: selectedGelatoProduct.uid,
+            attributes: selectedAttributes
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.productUid) {
+          console.log('✅ Received correct Product UID from Gelato API:', result.productUid);
+          return result.productUid;
+        } else {
+          console.warn('⚠️ Could not get Product UID from API:', result.error);
+          // Fallback to manual construction if API fails
+          return buildManualGelatoProductUID();
+        }
+      } catch (error) {
+        console.error('❌ Error calling Gelato Product Search API:', error);
+        // Fallback to manual construction if API fails
+        return buildManualGelatoProductUID();
+      }
+    };
+    
+    // Fallback manual UID construction (kept for backup)
+    const buildManualGelatoProductUID = () => {
+      const currentVariants = {...selectedVariantValues};
+      currentVariants[variantUid] = selectedValue;
       
-      // 1. Format/Size (should include both mm and inch if available)
-      const formatVariants = Object.entries(currentVariants).filter(([key]) => 
-        key.toLowerCase().includes('format') || key.toLowerCase().includes('size')
-      );
+      const parts = [selectedGelatoProduct.uid];
       
-      // 2. Material/Medium attributes
-      const materialVariants = Object.entries(currentVariants).filter(([key]) => 
-        key.toLowerCase().includes('material') || 
-        key.toLowerCase().includes('wood') ||
-        key.toLowerCase().includes('canvas') ||
-        key.toLowerCase().includes('metal')
-      );
-      
-      // 3. Thickness/Edge attributes
-      const thicknessVariants = Object.entries(currentVariants).filter(([key]) => 
-        key.toLowerCase().includes('thickness') || 
-        key.toLowerCase().includes('edge') ||
-        key.toLowerCase().includes('depth')
-      );
-      
-      // 4. Orientation
-      const orientationVariants = Object.entries(currentVariants).filter(([key]) => 
-        key.toLowerCase().includes('orientation')
-      );
-      
-      // 5. Other attributes
-      const otherVariants = Object.entries(currentVariants).filter(([key]) => {
-        const keyLower = key.toLowerCase();
-        return !keyLower.includes('format') && 
-               !keyLower.includes('size') &&
-               !keyLower.includes('material') && 
-               !keyLower.includes('wood') &&
-               !keyLower.includes('canvas') &&
-               !keyLower.includes('metal') &&
-               !keyLower.includes('thickness') && 
-               !keyLower.includes('edge') &&
-               !keyLower.includes('depth') &&
-               !keyLower.includes('orientation');
-      });
-      
-      // Combine in proper order
-      const orderedVariants = [
-        ...formatVariants,
-        ...materialVariants, 
-        ...thicknessVariants,
-        ...otherVariants,
-        ...orientationVariants
-      ];
-      
-      console.log('  Ordered variants:', orderedVariants);
-      
-      orderedVariants.forEach(([variantKey, value]) => {
+      // Simple concatenation as fallback
+      Object.entries(currentVariants).forEach(([, value]) => {
         if (value.uid) {
           parts.push(value.uid);
-          console.log(`  Added variant: ${variantKey} -> ${value.uid} (${value.title})`);
         }
       });
       
-      const finalUID = parts.join('_');
-      console.log('  Final Gelato Product UID:', finalUID);
-      console.log('  Expected format example: canvas_300x450-mm-12x18-inch_canvas_wood-fsc-slim_4-0_ver');
-      
-      return finalUID;
+      const fallbackUID = parts.join('_');
+      console.log('  Fallback manual Product UID:', fallbackUID);
+      return fallbackUID;
     };
 
     // Try to extract dimensions from format/size variants
@@ -575,7 +563,15 @@ export default function ProductManagementPage() {
     };
 
     const dimensions = extractDimensions(selectedValue.title);
-    const gelatoProductUID = buildGelatoProductUID();
+    
+    // Fetch the correct Product UID asynchronously
+    fetchCorrectGelatoProductUID().then(gelatoProductUID => {
+      // Update the form data with the correct UID
+      setFormData(prev => ({
+        ...prev,
+        gelato_sku: gelatoProductUID
+      }));
+    });
     
     // Auto-populate Medium Type and Format based on Gelato catalog
     const mapGelatoToMediumAndFormat = (catalogUid: string) => {
@@ -623,10 +619,10 @@ export default function ProductManagementPage() {
     const mediumMapping = mapGelatoToMediumAndFormat(selectedGelatoProduct.uid);
     const formatMapping = mapToFormat();
     
+    // Update form data with other attributes (UID will be set separately by the async call)
     setFormData(prev => ({
       ...prev,
       description: buildDescription(),
-      gelato_sku: gelatoProductUID,
       size_name: selectedValue.title.includes('cm') || selectedValue.title.includes('inch') || selectedValue.title.includes('A') 
         ? selectedValue.title 
         : prev.size_name,
@@ -1126,9 +1122,12 @@ export default function ProductManagementPage() {
                                 {formData.gelato_sku}
                               </div>
                               <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
-                                <p className="text-xs font-medium text-blue-800 mb-1">Expected Gelato Format Example:</p>
-                                <div className="font-mono text-xs text-blue-600 break-all">
-                                  canvas_300x450-mm-12x18-inch_canvas_wood-fsc-slim_4-0_ver
+                                <p className="text-xs font-medium text-blue-800 mb-1">✅ Using Gelato Product Search API</p>
+                                <div className="text-xs text-blue-600">
+                                  Product UID retrieved directly from Gelato's catalog using selected attributes
+                                </div>
+                                <div className="font-mono text-xs text-gray-500 mt-1">
+                                  Example format: canvas_300x450-mm-12x18-inch_canvas_wood-fsc-slim_4-0_ver
                                 </div>
                               </div>
                               {selectedGelatoProduct && (

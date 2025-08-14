@@ -340,6 +340,71 @@ export class GelatoService {
   }
 
   /**
+   * Search for products in a catalog with specific attribute filters
+   * Returns the exact Product UID for the attribute combination
+   */
+  async searchProducts(catalogUid: string, attributeFilters: Record<string, string[]>): Promise<any[]> {
+    try {
+      console.log(`Searching products in catalog ${catalogUid} with filters:`, attributeFilters);
+      
+      const response = await fetch(`${this.baseUrl}/v3/catalogs/${catalogUid}/products:search`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          attributeFilters,
+          limit: 10  // Limit results since we're looking for exact matches
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Gelato product search API error:', errorText);
+        throw new Error(`Gelato API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('Gelato product search response:', data);
+      return data.products || [];
+    } catch (error) {
+      console.error('Error searching Gelato products:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the correct Product UID based on selected variant attributes
+   */
+  async getProductUidFromAttributes(catalogUid: string, selectedAttributes: Record<string, string>): Promise<string | null> {
+    try {
+      // Convert selected attributes to filter format
+      const attributeFilters: Record<string, string[]> = {};
+      Object.entries(selectedAttributes).forEach(([key, value]) => {
+        if (value) {
+          attributeFilters[key] = [value];
+        }
+      });
+
+      const products = await this.searchProducts(catalogUid, attributeFilters);
+      
+      if (products.length === 0) {
+        console.warn('No products found for attribute combination:', selectedAttributes);
+        return null;
+      }
+      
+      if (products.length > 1) {
+        console.warn('Multiple products found, using first one. Products:', products.map(p => p.productUid));
+      }
+
+      const productUid = products[0].productUid;
+      console.log('✅ Found exact Gelato Product UID:', productUid);
+      return productUid;
+    } catch (error) {
+      console.error('Error getting Product UID from attributes:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get bulk pricing for multiple product variants
    */
   async getBulkPricing(requests: Array<{productUid: string, variantUid: string, countryCode: string}>): Promise<any[]> {

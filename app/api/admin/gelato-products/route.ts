@@ -115,15 +115,23 @@ export async function GET(request: NextRequest) {
           }
         });
 
+      case 'search-product-uid':
+        // This will be handled by POST method below
+        return NextResponse.json({
+          success: false,
+          error: 'Use POST method for product UID search'
+        }, { status: 405 });
+
       default:
         return NextResponse.json({
           success: false,
           error: 'Invalid action',
-          availableActions: ['search', 'details', 'pricing'],
+          availableActions: ['search', 'details', 'pricing', 'search-product-uid (POST)'],
           examples: [
             '/api/admin/gelato-products?action=search',
             '/api/admin/gelato-products?action=details&uid=premium-canvas-prints_premium-canvas-portrait-210gsm',
-            '/api/admin/gelato-products?action=pricing&uid=premium-canvas-prints_premium-canvas-portrait-210gsm&variant=30x30-cm&country=GB'
+            '/api/admin/gelato-products?action=pricing&uid=premium-canvas-prints_premium-canvas-portrait-210gsm&variant=30x30-cm&country=GB',
+            'POST /api/admin/gelato-products?action=search-product-uid with body: {catalogUid, attributes}'
           ]
         });
     }
@@ -146,44 +154,81 @@ export async function GET(request: NextRequest) {
 // POST endpoint for batch operations
 export async function POST(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const action = searchParams.get('action');
     const body = await request.json();
-    const { action, products } = body;
+    const gelatoService = createGelatoService();
 
-    if (action === 'bulk-pricing') {
-      // Get pricing for multiple products at once
-      const results = await Promise.all(
-        products.map(async (item: any) => {
-          try {
-            const pricing = await gelatoService.getProductPricing(
-              item.productUid, 
-              item.variantUid, 
-              item.country || 'GB'
-            );
-            return {
-              ...item,
-              success: true,
-              pricing
-            };
-          } catch (error) {
-            return {
-              ...item,
-              success: false,
-              error: error instanceof Error ? error.message : 'Unknown error'
-            };
-          }
-        })
-      );
+    switch (action) {
+      case 'search-product-uid':
+        // Get the correct Product UID from Gelato's Product Search API
+        const { catalogUid, attributes } = body;
+        
+        if (!catalogUid || !attributes) {
+          return NextResponse.json({
+            success: false,
+            error: 'catalogUid and attributes are required'
+          }, { status: 400 });
+        }
 
-      return NextResponse.json({
-        success: true,
-        results
-      });
+        console.log('Getting Product UID for:', catalogUid, attributes);
+        const productUid = await gelatoService.getProductUidFromAttributes(catalogUid, attributes);
+
+        if (productUid) {
+          return NextResponse.json({
+            success: true,
+            productUid,
+            catalogUid,
+            attributes
+          });
+        } else {
+          return NextResponse.json({
+            success: false,
+            error: 'No product found for the selected attributes'
+          }, { status: 404 });
+        }
+
+      case 'bulk-pricing':
+      default:
+        // Handle legacy bulk-pricing action
+        const { products } = body;
+        
+        if (!products) {
+          return NextResponse.json({
+            success: false,
+            error: 'Invalid action or missing data'
+          }, { status: 400 });
+        }
+
+        // Get pricing for multiple products at once
+        const results = await Promise.all(
+          products.map(async (item: any) => {
+            try {
+              const pricing = await gelatoService.getProductPricing(
+                item.productUid, 
+                item.variantUid, 
+                item.country || 'GB'
+              );
+              return {
+                ...item,
+                success: true,
+                pricing
+              };
+            } catch (error) {
+              return {
+                ...item,
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+              };
+            }
+          })
+        );
+
+        return NextResponse.json({
+          success: true,
+          results
+        });
     }
-
-    return NextResponse.json({
-      success: false,
-      error: 'Invalid action'
-    }, { status: 400 });
 
   } catch (error) {
     console.error('Gelato products POST error:', error);
