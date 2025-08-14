@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { createGelatoService } from '@/lib/gelato-service';
+import { PawSpinner } from '@/components/ui/paw-spinner';
 import type { Product, ProductPricing, ProductPricingCreate, Country } from '@/lib/product-types';
 import { formatPrice, calculateProfitMargin, calculateMarkup } from '@/lib/product-types';
 
@@ -312,7 +313,7 @@ export default function PricingManagementPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <PawSpinner size="xl" />
       </div>
     );
   }
@@ -473,7 +474,7 @@ export default function PricingManagementPage() {
                     </p>
                     {loadingGelatoPricing && (
                       <p className="text-sm text-blue-600 mt-2 flex items-center">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                        <PawSpinner size="sm" className="mr-2" />
                         Fetching Gelato pricing...
                       </p>
                     )}

@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
+import { PawSpinner } from '@/components/ui/paw-spinner';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -152,7 +153,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <PawSpinner size="xl" />
       </div>
     );
   }

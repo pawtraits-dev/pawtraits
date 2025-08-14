@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { AdminSupabaseService } from '@/lib/admin-supabase';
+import { PawSpinner } from '@/components/ui/paw-spinner';
 import { Globe, Plus, Edit, Trash2, Search } from 'lucide-react';
 
 interface Country {
@@ -84,7 +85,11 @@ export default function CountriesPage() {
   const activeCountries = countries.filter(c => c.is_supported);
   const activeCountryCodes = activeCountries.map(c => c.code).join(', ');
 
-  if (loading) return <div className="p-8">Loading countries...</div>;
+  if (loading) return (
+    <div className="p-8 flex items-center justify-center">
+      <PawSpinner size="lg" />
+    </div>
+  );
   if (error) return <div className="p-8 text-red-600">Error: {error}</div>;
 
   return (
