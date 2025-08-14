@@ -184,8 +184,8 @@ export default function NewProductPage() {
           gelato_sku: gelatoProductUID
         }));
         
-        // Fetch real-time pricing from Gelato
-        fetchGelatoPricing(gelatoProductUID);
+        // Note: Pricing is now only fetched manually via the "Refresh Pricing" button
+        // This prevents premature API calls with incomplete variant selections
       } else {
         console.warn('Invalid Product UID received:', gelatoProductUID);
       }
@@ -384,9 +384,9 @@ export default function NewProductPage() {
                     variant="outline"
                     onClick={() => fetchGelatoPricing(formData.gelato_sku)}
                     size="sm"
-                    className="text-xs"
+                    className="text-xs bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
                   >
-                    🔄 Refresh Pricing
+                    💰 Get Pricing
                   </Button>
                 )}
               </div>
@@ -408,15 +408,15 @@ export default function NewProductPage() {
               </div>
             )}
 
-            {/* Real-time Gelato Pricing */}
-            {formData.gelato_sku && (
+            {/* Gelato Pricing */}
+            {formData.gelato_sku && formData.gelato_sku.length > 10 && formData.gelato_sku !== 'canvas' && (
               <div className="mt-4 p-4 bg-yellow-50 rounded-lg border-2 border-yellow-300">
                 <h4 className="text-sm font-semibold text-yellow-800 mb-3 flex items-center">
-                  💰 Live Gelato Pricing
+                  💰 Gelato Pricing
                   {productPricing[formData.gelato_sku] ? (
                     <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">✅ Loaded</span>
                   ) : (
-                    <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">Loading...</span>
+                    <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">Click "Get Pricing" to load</span>
                   )}
                 </h4>
                 
@@ -455,8 +455,13 @@ export default function NewProductPage() {
                     )}
                   </>
                 ) : (
-                  <div className="text-sm text-yellow-700">
-                    Fetching live pricing from Gelato API...
+                  <div className="text-sm text-yellow-700 bg-white p-3 rounded border">
+                    <p className="mb-2">📋 <strong>To get pricing:</strong></p>
+                    <ol className="text-xs list-decimal list-inside space-y-1">
+                      <li>Select all required product variants above</li>
+                      <li>Ensure you have a complete Product UID</li>
+                      <li>Click the "💰 Get Pricing" button</li>
+                    </ol>
                   </div>
                 )}
               </div>
