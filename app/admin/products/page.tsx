@@ -103,6 +103,7 @@ export default function ProductManagementPage() {
   const [selectedGelatoVariant, setSelectedGelatoVariant] = useState<GelatoVariant | null>(null);
   const [selectedVariantValues, setSelectedVariantValues] = useState<Record<string, {uid: string, title: string}>>({});
   const [gelatoSearchTerm, setGelatoSearchTerm] = useState('');
+  const [gelatoUnitFilter, setGelatoUnitFilter] = useState<'mm' | 'inches'>('mm');
   
   const [formData, setFormData] = useState<ProductFormData>({
     medium_id: '',
@@ -516,6 +517,52 @@ export default function ProductManagementPage() {
     const dimensions = extractDimensions(selectedValue.title);
     const gelatoProductUID = buildGelatoProductUID();
     
+    // Auto-populate Medium Type and Format based on Gelato catalog
+    const mapGelatoToMediumAndFormat = (catalogUid: string) => {
+      const mapping: Record<string, {mediumId?: string, formatId?: string}> = {
+        'canvas': { mediumId: media.find(m => m.name.toLowerCase().includes('canvas'))?.id },
+        'acrylic': { mediumId: media.find(m => m.name.toLowerCase().includes('acrylic'))?.id },
+        'posters': { mediumId: media.find(m => m.name.toLowerCase().includes('paper') || m.name.toLowerCase().includes('poster'))?.id },
+        'metal': { mediumId: media.find(m => m.name.toLowerCase().includes('metal') || m.name.toLowerCase().includes('aluminum'))?.id },
+        'wood': { mediumId: media.find(m => m.name.toLowerCase().includes('wood'))?.id },
+        'framed': { mediumId: media.find(m => m.name.toLowerCase().includes('framed'))?.id }
+      };
+      
+      // Find matching medium type based on catalog UID
+      const catalogKey = Object.keys(mapping).find(key => catalogUid.toLowerCase().includes(key));
+      if (catalogKey && mapping[catalogKey].mediumId) {
+        return { medium_id: mapping[catalogKey].mediumId };
+      }
+      
+      return {};
+    };
+    
+    // Auto-populate Format based on orientation and other attributes
+    const mapToFormat = () => {
+      const currentVariants = {...selectedVariantValues};
+      currentVariants[variantUid] = selectedValue;
+      
+      // Look for orientation in variants
+      const orientationVariant = Object.values(currentVariants).find(v => 
+        v.title?.toLowerCase().includes('portrait') || 
+        v.title?.toLowerCase().includes('landscape') ||
+        v.title?.toLowerCase().includes('square')
+      );
+      
+      if (orientationVariant?.title.toLowerCase().includes('portrait')) {
+        return { format_id: formats.find(f => f.name.toLowerCase().includes('portrait'))?.id };
+      } else if (orientationVariant?.title.toLowerCase().includes('landscape')) {
+        return { format_id: formats.find(f => f.name.toLowerCase().includes('landscape'))?.id };
+      } else if (orientationVariant?.title.toLowerCase().includes('square')) {
+        return { format_id: formats.find(f => f.name.toLowerCase().includes('square'))?.id };
+      }
+      
+      return {};
+    };
+    
+    const mediumMapping = mapGelatoToMediumAndFormat(selectedGelatoProduct.uid);
+    const formatMapping = mapToFormat();
+    
     setFormData(prev => ({
       ...prev,
       description: buildDescription(),
@@ -523,7 +570,9 @@ export default function ProductManagementPage() {
       size_name: selectedValue.title.includes('cm') || selectedValue.title.includes('inch') || selectedValue.title.includes('A') 
         ? selectedValue.title 
         : prev.size_name,
-      ...dimensions
+      ...dimensions,
+      ...mediumMapping,
+      ...formatMapping
     }));
   };
 
@@ -1238,53 +1287,177 @@ export default function ProductManagementPage() {
                 <div className="space-y-4 overflow-y-auto">
                   {selectedGelatoProduct && (
                     <>
-                      <h3 className="font-semibold text-gray-900 sticky top-0 bg-white py-2">
-                        Product Attributes ({selectedGelatoProduct.variants?.length || 0})
-                      </h3>
-                      <div className="space-y-4">
-                        {selectedGelatoProduct.variants?.map((variant) => (
-                          <div key={variant.uid} className="border rounded-lg p-4">
-                            <div className="font-medium text-gray-900 mb-3">{variant.name}</div>
-                            {variant.values && variant.values.length > 0 && (
-                              <div>
-                                <Select
-                                  value={selectedVariantValues[variant.uid]?.uid || ''}
-                                  onValueChange={(value) => {
-                                    const selectedValue = variant.values.find(v => v.uid === value);
-                                    if (selectedValue) {
-                                      setSelectedVariantValues(prev => ({
-                                        ...prev,
-                                        [variant.uid]: {
-                                          uid: selectedValue.uid,
-                                          title: selectedValue.title
-                                        }
-                                      }));
-                                      
-                                      // Update form data with selected attributes
-                                      updateFormWithSelectedVariants(variant.uid, selectedValue);
-                                    }
-                                  }}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder={`Select ${variant.name.toLowerCase()}`} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {variant.values.map((value) => (
-                                      <SelectItem key={value.uid} value={value.uid}>
-                                        {value.title}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
+                      <div className="sticky top-0 bg-white py-2 border-b space-y-3">
+                        <h3 className="font-semibold text-gray-900">
+                          Product Configuration
+                        </h3>
+                        
+                        {/* Unit Selector */}
+                        <div className="flex items-center space-x-4">
+                          <span className="text-sm font-medium text-gray-700">Unit:</span>
+                          <div className="flex space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => setGelatoUnitFilter('mm')}
+                              className={`px-3 py-1 text-xs rounded ${
+                                gelatoUnitFilter === 'mm'
+                                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                  : 'bg-gray-100 text-gray-600 border border-gray-300'
+                              }`}
+                            >
+                              Millimeters
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setGelatoUnitFilter('inches')}
+                              className={`px-3 py-1 text-xs rounded ${
+                                gelatoUnitFilter === 'inches'
+                                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                  : 'bg-gray-100 text-gray-600 border border-gray-300'
+                              }`}
+                            >
+                              Inches
+                            </button>
                           </div>
-                        ))}
-                        {(!selectedGelatoProduct.variants || selectedGelatoProduct.variants.length === 0) && (
-                          <div className="text-center py-4 text-gray-500">
-                            No product attributes available
+                        </div>
+                        
+                        {/* Show current Gelato SKU */}
+                        {formData.gelato_sku && (
+                          <div className="p-2 bg-green-50 rounded border">
+                            <span className="text-xs font-medium text-green-800">Gelato SKU:</span>
+                            <div className="font-mono text-sm text-green-700 break-all">{formData.gelato_sku}</div>
                           </div>
                         )}
+                      </div>
+                      
+                      <div className="space-y-4">
+                        {(() => {
+                          if (!selectedGelatoProduct.variants || selectedGelatoProduct.variants.length === 0) {
+                            return (
+                              <div className="text-center py-4 text-gray-500">
+                                No product attributes available
+                              </div>
+                            );
+                          }
+                          
+                          // Filter out Unified formats that duplicate regular formats
+                          const filteredVariants = selectedGelatoProduct.variants.filter(variant => {
+                            const name = variant.name?.toLowerCase() || '';
+                            // Skip unified formats if regular format exists
+                            if (name.includes('unified') && (name.includes('canvas') || name.includes('metal'))) {
+                              const regularFormatExists = selectedGelatoProduct.variants.some(v => {
+                                const vName = v.name?.toLowerCase() || '';
+                                return !vName.includes('unified') && 
+                                       (name.includes('canvas') && vName.includes('canvas') ||
+                                        name.includes('metal') && vName.includes('metal'));
+                              });
+                              return !regularFormatExists;
+                            }
+                            return true;
+                          });
+                          
+                          // Filter variants by unit preference for size/format attributes
+                          const filterByUnit = (values: any[]) => {
+                            if (gelatoUnitFilter === 'mm') {
+                              return values.filter(v => 
+                                v.title?.includes('mm') || 
+                                v.title?.includes('cm') ||
+                                (!v.title?.includes('in') && !v.title?.includes('inch'))
+                              );
+                            } else {
+                              return values.filter(v => 
+                                v.title?.includes('in') || 
+                                v.title?.includes('inch') ||
+                                (!v.title?.includes('mm') && !v.title?.includes('cm'))
+                              );
+                            }
+                          };
+                          
+                          // Apply unit filter to format-related variants
+                          const processedVariants = filteredVariants.map(variant => {
+                            const name = variant.name?.toLowerCase() || '';
+                            if (name.includes('format') || name.includes('size')) {
+                              return {
+                                ...variant,
+                                values: filterByUnit(variant.values || [])
+                              };
+                            }
+                            return variant;
+                          });
+                          
+                          // Separate selectable (multiple options) and fixed (single option) attributes
+                          const selectableVariants = processedVariants.filter(variant => 
+                            variant.values && variant.values.length > 1
+                          );
+                          const fixedVariants = processedVariants.filter(variant => 
+                            variant.values && variant.values.length === 1
+                          );
+                          
+                          return (
+                            <>
+                              {/* Selectable Attributes (at the top) */}
+                              {selectableVariants.length > 0 && (
+                                <div className="space-y-4">
+                                  <h4 className="text-sm font-semibold text-gray-800 border-b pb-1">
+                                    Configurable Options
+                                  </h4>
+                                  {selectableVariants.map((variant) => (
+                                    <div key={variant.uid} className="border rounded-lg p-4">
+                                      <div className="font-medium text-gray-900 mb-3">{variant.name}</div>
+                                      <div>
+                                        <Select
+                                          value={selectedVariantValues[variant.uid]?.uid || ''}
+                                          onValueChange={(value) => {
+                                            const selectedValue = variant.values.find(v => v.uid === value);
+                                            if (selectedValue) {
+                                              setSelectedVariantValues(prev => ({
+                                                ...prev,
+                                                [variant.uid]: {
+                                                  uid: selectedValue.uid,
+                                                  title: selectedValue.title
+                                                }
+                                              }));
+                                              
+                                              // Update form data with selected attributes
+                                              updateFormWithSelectedVariants(variant.uid, selectedValue);
+                                            }
+                                          }}
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder={`Select ${variant.name.toLowerCase()}`} />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {variant.values.map((value) => (
+                                              <SelectItem key={value.uid} value={value.uid}>
+                                                {value.title}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              {/* Fixed Attributes (below selectable ones) */}
+                              {fixedVariants.length > 0 && (
+                                <div className="space-y-3">
+                                  <h4 className="text-sm font-semibold text-gray-800 border-b pb-1">
+                                    Product Specifications
+                                  </h4>
+                                  {fixedVariants.map((variant) => (
+                                    <div key={variant.uid} className="bg-gray-50 rounded-lg p-3 border-l-4 border-gray-400">
+                                      <div className="text-sm font-medium text-gray-700">
+                                        {variant.name}: <span className="text-gray-900">{variant.values[0].title}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </>
                   )}
