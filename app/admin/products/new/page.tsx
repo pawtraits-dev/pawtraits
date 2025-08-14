@@ -178,7 +178,7 @@ export default function NewProductPage() {
 
     // Fetch the correct Product UID asynchronously
     fetchCorrectGelatoProductUID(variantUid, selectedValue).then(gelatoProductUID => {
-      if (gelatoProductUID) {
+      if (gelatoProductUID && gelatoProductUID.length > 10 && gelatoProductUID !== 'canvas') {
         setFormData(prev => ({
           ...prev,
           gelato_sku: gelatoProductUID
@@ -186,6 +186,8 @@ export default function NewProductPage() {
         
         // Fetch real-time pricing from Gelato
         fetchGelatoPricing(gelatoProductUID);
+      } else {
+        console.warn('Invalid Product UID received:', gelatoProductUID);
       }
     });
   };
@@ -243,6 +245,12 @@ export default function NewProductPage() {
   };
 
   const fetchGelatoPricing = async (productUid: string) => {
+    // Validate the Product UID format - Gelato UIDs are typically longer alphanumeric strings
+    if (!productUid || productUid.length < 10 || productUid === 'canvas' || !productUid.match(/^[a-zA-Z0-9_-]+$/)) {
+      console.warn('Invalid Gelato Product UID:', productUid);
+      return;
+    }
+
     try {
       const [baseCostResponse, multiCountryResponse] = await Promise.all([
         fetch(`/api/admin/gelato-products?action=base-cost&uid=${productUid}&country=GB`),
@@ -370,7 +378,7 @@ export default function NewProductPage() {
                   Browse Gelato
                 </Button>
                 
-                {formData.gelato_sku && (
+                {formData.gelato_sku && formData.gelato_sku.length > 10 && formData.gelato_sku !== 'canvas' && (
                   <Button
                     type="button"
                     variant="outline"
@@ -761,10 +769,61 @@ export default function NewProductPage() {
                       </div>
                       
                       <div className="space-y-4">
-                        {/* Variant configuration would go here - simplified for now */}
-                        <div className="text-center py-4 text-gray-500">
-                          Product variants configuration interface
-                        </div>
+                        {/* Variant Selection Interface */}
+                        {selectedGelatoProduct?.variants && selectedGelatoProduct.variants.length > 0 ? (
+                          selectedGelatoProduct.variants.map((variant) => {
+                            // Filter values based on unit preference
+                            const filteredValues = variant.values.filter(value => {
+                              if (gelatoUnitFilter === 'mm') {
+                                return !value.title.toLowerCase().includes('inch') && 
+                                       !value.title.toLowerCase().includes('"');
+                              } else {
+                                return value.title.toLowerCase().includes('inch') || 
+                                       value.title.toLowerCase().includes('"');
+                              }
+                            });
+                            
+                            // If no values match filter, show all values
+                            const valuesToShow = filteredValues.length > 0 ? filteredValues : variant.values;
+                            
+                            return (
+                              <div key={variant.uid} className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-700">
+                                  {variant.name}
+                                </label>
+                                <Select
+                                  value={selectedVariantValues[variant.uid]?.uid || ''}
+                                  onValueChange={(valueUid) => {
+                                    const selectedValue = valuesToShow.find(v => v.uid === valueUid);
+                                    if (selectedValue) {
+                                      updateFormWithSelectedVariants(variant.uid, selectedValue);
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder={`Select ${variant.name.toLowerCase()}`} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {valuesToShow.map(value => (
+                                      <SelectItem key={value.uid} value={value.uid}>
+                                        {value.title}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {selectedVariantValues[variant.uid] && (
+                                  <div className="text-xs text-gray-500">
+                                    Selected: {selectedVariantValues[variant.uid].title}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="text-center py-4 text-gray-500">
+                            {selectedGelatoProduct ? 'No variants available for this product' : 'Select a product to see variants'}
+                          </div>
+                        )}
                       </div>
                     </>
                   )}
