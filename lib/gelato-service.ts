@@ -184,14 +184,32 @@ export class GelatoService {
       console.log('Gelato catalog details response:', data);
       
       // Convert product attributes to variants format
-      const variants = data.productAttributes?.map((attr: any) => ({
-        uid: attr.productAttributeUid,
-        name: attr.title,
-        values: attr.values?.map((val: any) => ({
-          uid: val.productAttributeValueUid,
-          title: val.title
-        })) || []
-      })) || [];
+      const variants = data.productAttributes?.map((attr: any) => {
+        console.log(`Processing attribute: ${attr.productAttributeUid}`, attr.values);
+        
+        // Handle both array and object formats for values
+        let values = [];
+        if (Array.isArray(attr.values)) {
+          values = attr.values.map((val: any) => ({
+            uid: val.productAttributeValueUid || val.uid,
+            title: val.title || val.name
+          }));
+        } else if (attr.values && typeof attr.values === 'object') {
+          // Handle single object value
+          values = [{
+            uid: attr.values.productAttributeValueUid || attr.values.uid,
+            title: attr.values.title || attr.values.name
+          }];
+        }
+        
+        return {
+          uid: attr.productAttributeUid,
+          name: attr.title,
+          values: values
+        };
+      }) || [];
+      
+      console.log('Processed variants:', variants);
 
       return {
         uid: data.catalogUid,
