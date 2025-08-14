@@ -780,19 +780,27 @@ export default function NewProductPage() {
                         {/* Variant Selection Interface */}
                         {selectedGelatoProduct?.variants && selectedGelatoProduct.variants.length > 0 ? (
                           selectedGelatoProduct.variants.map((variant) => {
+                            // Safety check for variant structure
+                            if (!variant || !variant.uid || !variant.name) {
+                              return null;
+                            }
                             // Filter values based on unit preference
-                            const filteredValues = variant.values.filter(value => {
-                              if (gelatoUnitFilter === 'mm') {
-                                return !value.title.toLowerCase().includes('inch') && 
-                                       !value.title.toLowerCase().includes('"');
-                              } else {
-                                return value.title.toLowerCase().includes('inch') || 
-                                       value.title.toLowerCase().includes('"');
+                            const filteredValues = variant.values?.filter(value => {
+                              // Add null/undefined checks to prevent errors
+                              if (!value || !value.title || typeof value.title !== 'string') {
+                                return false;
                               }
-                            });
+                              
+                              const titleLower = value.title.toLowerCase();
+                              if (gelatoUnitFilter === 'mm') {
+                                return !titleLower.includes('inch') && !titleLower.includes('"');
+                              } else {
+                                return titleLower.includes('inch') || titleLower.includes('"');
+                              }
+                            }) || [];
                             
-                            // If no values match filter, show all values
-                            const valuesToShow = filteredValues.length > 0 ? filteredValues : variant.values;
+                            // If no values match filter, show all values (with safety check)
+                            const valuesToShow = filteredValues.length > 0 ? filteredValues : (variant.values || []);
                             
                             return (
                               <div key={variant.uid} className="space-y-2">
