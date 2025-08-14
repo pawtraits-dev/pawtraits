@@ -45,33 +45,12 @@ export async function GET(request: NextRequest) {
           );
         }
 
-        // Get pricing for the product variants
-        const variantsWithPricing = await Promise.all(
-          (productDetails.variants || []).map(async (variant: any) => {
-            try {
-              // Try to get pricing for common countries
-              const pricingPromises = ['GB', 'US', 'DE', 'FR'].map(async (country) => {
-                try {
-                  const pricing = await gelatoService.getProductPricing(productUid, variant.uid, country);
-                  return { country, ...pricing };
-                } catch (error) {
-                  return { country, error: 'Pricing not available' };
-                }
-              });
-
-              const pricing = await Promise.all(pricingPromises);
-              return {
-                ...variant,
-                pricing: pricing.filter(p => !p.error)
-              };
-            } catch (error) {
-              return {
-                ...variant,
-                pricing: []
-              };
-            }
-          })
-        );
+        // Don't fetch pricing automatically - it will be fetched manually after variant selection
+        // Just return the variants without pricing data
+        const variantsWithoutPricing = (productDetails.variants || []).map((variant: any) => ({
+          ...variant,
+          // Note: Pricing will be fetched separately after complete variant configuration
+        }));
 
         return NextResponse.json({
           success: true,
@@ -80,7 +59,7 @@ export async function GET(request: NextRequest) {
             name: productDetails.name || productUid.replace(/_/g, ' '),
             description: productDetails.description || '',
             category: productDetails.category || 'Print',
-            variants: variantsWithPricing
+            variants: variantsWithoutPricing
           }
         });
 

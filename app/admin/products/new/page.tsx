@@ -145,7 +145,7 @@ export default function NewProductPage() {
     try {
       setSelectedGelatoProduct(product);
       
-      // Fetch detailed product info with pricing
+      // Fetch detailed product info to get variants (but don't set pricing yet)
       const response = await fetch(`/api/admin/gelato-products?action=details&uid=${product.uid}`);
       const result = await response.json();
       
@@ -153,11 +153,14 @@ export default function NewProductPage() {
         setSelectedGelatoProduct(result.product);
         setFormData(prev => ({
           ...prev,
-          gelato_sku: product.uid,
+          // Don't set gelato_sku yet - wait for variant selection to generate proper Product UID
           description: result.product.description || prev.description
         }));
         
+        // Clear any previous variant selections
         setSelectedVariantValues({});
+        // Clear any existing pricing data
+        setProductPricing({});
       } else {
         alert('Failed to fetch product details: ' + result.error);
       }
