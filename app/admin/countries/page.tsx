@@ -36,6 +36,8 @@ export default function CountriesPage() {
     try {
       setLoading(true);
       const result = await supabaseService.getCountries(false); // Get all countries, not just supported ones
+      console.log('📊 Loaded countries:', result?.length || 0);
+      console.log('🟢 Active countries:', result?.filter(c => c.is_supported)?.length || 0);
       setCountries(result || []);
     } catch (err) {
       console.error('Error loading countries:', err);
@@ -47,11 +49,13 @@ export default function CountriesPage() {
 
   const toggleCountrySupport = async (countryCode: string, isSupported: boolean) => {
     try {
+      console.log(`Toggling ${countryCode} to ${isSupported ? 'active' : 'inactive'}`);
       await supabaseService.updateCountry(countryCode, { is_supported: isSupported });
       await loadCountries(); // Reload data
+      console.log(`✅ Successfully updated ${countryCode}`);
     } catch (err) {
       console.error('Error updating country:', err);
-      alert('Failed to update country support status');
+      alert(`Failed to update country support status: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 

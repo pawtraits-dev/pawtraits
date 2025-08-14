@@ -29,7 +29,8 @@ import {
   TrendingUp,
   PieChart,
   CreditCard,
-  Target
+  Target,
+  Globe
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -60,6 +61,7 @@ const navigationSections = [
     title: 'Commerce',
     items: [
       { name: 'Products', href: '/admin/products', icon: Package },
+      { name: 'Countries', href: '/admin/countries', icon: Globe },
       { name: 'Media', href: '/admin/media', icon: Database },
       { name: 'Pricing', href: '/admin/pricing', icon: DollarSign },
       { name: 'Pricing Management', href: '/admin/pricing-management', icon: Settings },
