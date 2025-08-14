@@ -84,6 +84,44 @@ export default function NewProductPage() {
     loadSupportingData();
   }, []);
 
+  // Auto-select single-value variants
+  useEffect(() => {
+    if (selectedGelatoProduct?.variants) {
+      selectedGelatoProduct.variants.forEach((variant) => {
+        // Skip if already selected or if variant is invalid
+        if (!variant || !variant.uid || selectedVariantValues[variant.uid]) {
+          return;
+        }
+        
+        // Skip "Unified" format selectors
+        if (variant.name?.toLowerCase().includes('unified')) {
+          return;
+        }
+
+        // Filter values based on unit preference
+        const filteredValues = variant.values?.filter(value => {
+          if (!value || !value.title || typeof value.title !== 'string') {
+            return false;
+          }
+          
+          const titleLower = value.title.toLowerCase();
+          if (gelatoUnitFilter === 'mm') {
+            return !titleLower.includes('inch') && !titleLower.includes('"');
+          } else {
+            return titleLower.includes('inch') || titleLower.includes('"');
+          }
+        }) || [];
+        
+        const valuesToShow = filteredValues.length > 0 ? filteredValues : (variant.values || []);
+        
+        // Auto-select if only one value
+        if (valuesToShow.length === 1 && valuesToShow[0]) {
+          updateFormWithSelectedVariants(variant.uid, valuesToShow[0]);
+        }
+      });
+    }
+  }, [selectedGelatoProduct, gelatoUnitFilter]);
+
   const loadSupportingData = async () => {
     try {
       const [mediaResult, formatsResult] = await Promise.all([
@@ -779,62 +817,102 @@ export default function NewProductPage() {
                       <div className="space-y-4">
                         {/* Variant Selection Interface */}
                         {selectedGelatoProduct?.variants && selectedGelatoProduct.variants.length > 0 ? (
-                          selectedGelatoProduct.variants.map((variant) => {
-                            // Safety check for variant structure
-                            if (!variant || !variant.uid || !variant.name) {
-                              return null;
-                            }
-                            // Filter values based on unit preference
-                            const filteredValues = variant.values?.filter(value => {
-                              // Add null/undefined checks to prevent errors
-                              if (!value || !value.title || typeof value.title !== 'string') {
-                                return false;
-                              }
-                              
-                              const titleLower = value.title.toLowerCase();
-                              if (gelatoUnitFilter === 'mm') {
-                                return !titleLower.includes('inch') && !titleLower.includes('"');
-                              } else {
-                                return titleLower.includes('inch') || titleLower.includes('"');
-                              }
-                            }) || [];
+                          (() => {
+                            // Filter out "Unified" variants and process all variants
+                            const processedVariants = selectedGelatoProduct.variants
+                              .map((variant) => {
+                                // Safety check for variant structure
+                                if (!variant || !variant.uid || !variant.name) {
+                                  return null;
+                                }
+                                
+                                // Skip "Unified" format selectors
+                                if (variant.name.toLowerCase().includes('unified')) {
+                                  return null;
+                                }
+                                
+                                // Filter values based on unit preference
+                                const filteredValues = variant.values?.filter(value => {
+                                  // Add null/undefined checks to prevent errors
+                                  if (!value || !value.title || typeof value.title !== 'string') {
+                                    return false;
+                                  }
+                                  
+                                  const titleLower = value.title.toLowerCase();
+                                  if (gelatoUnitFilter === 'mm') {
+                                    return !titleLower.includes('inch') && !titleLower.includes('"');
+                                  } else {
+                                    return titleLower.includes('inch') || titleLower.includes('"');
+                                  }
+                                }) || [];
+                                
+                                // If no values match filter, show all values (with safety check)
+                                const valuesToShow = filteredValues.length > 0 ? filteredValues : (variant.values || []);
+                                
+                                // Sort values alphabetically by title
+                                const sortedValues = valuesToShow.sort((a, b) => {
+                                  if (!a.title || !b.title) return 0;
+                                  return a.title.localeCompare(b.title);
+                                });
+                                
+                                return {
+                                  ...variant,
+                                  valuesToShow: sortedValues,
+                                  hasMultipleValues: sortedValues.length > 1
+                                };
+                              })
+                              .filter(Boolean); // Remove null entries
                             
-                            // If no values match filter, show all values (with safety check)
-                            const valuesToShow = filteredValues.length > 0 ? filteredValues : (variant.values || []);
+                            // Sort variants: multi-value first, single-value last
+                            const sortedVariants = processedVariants.sort((a, b) => {
+                              if (a.hasMultipleValues && !b.hasMultipleValues) return -1;
+                              if (!a.hasMultipleValues && b.hasMultipleValues) return 1;
+                              return 0;
+                            });
                             
-                            return (
+                            return sortedVariants.map((variant) => (
                               <div key={variant.uid} className="space-y-2">
                                 <label className="block text-sm font-medium text-gray-700">
                                   {variant.name}
                                 </label>
-                                <Select
-                                  value={selectedVariantValues[variant.uid]?.uid || ''}
-                                  onValueChange={(valueUid) => {
-                                    const selectedValue = valuesToShow.find(v => v.uid === valueUid);
-                                    if (selectedValue) {
-                                      updateFormWithSelectedVariants(variant.uid, selectedValue);
-                                    }
-                                  }}
-                                >
-                                  <SelectTrigger className="w-full">
-                                    <SelectValue placeholder={`Select ${variant.name.toLowerCase()}`} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {valuesToShow.map(value => (
-                                      <SelectItem key={value.uid} value={value.uid}>
-                                        {value.title}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                
+                                {variant.hasMultipleValues ? (
+                                  // Multi-value: Show dropdown
+                                  <Select
+                                    value={selectedVariantValues[variant.uid]?.uid || ''}
+                                    onValueChange={(valueUid) => {
+                                      const selectedValue = variant.valuesToShow.find(v => v.uid === valueUid);
+                                      if (selectedValue) {
+                                        updateFormWithSelectedVariants(variant.uid, selectedValue);
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger className="w-full">
+                                      <SelectValue placeholder={`Select ${variant.name.toLowerCase()}`} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {variant.valuesToShow.map(value => (
+                                        <SelectItem key={value.uid} value={value.uid}>
+                                          {value.title}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  // Single value: Show as text (auto-selection handled elsewhere)
+                                  <div className="p-2 bg-gray-50 rounded border border-gray-200 text-sm text-gray-700">
+                                    {variant.valuesToShow[0]?.title || 'No value available'}
+                                  </div>
+                                )}
+                                
                                 {selectedVariantValues[variant.uid] && (
                                   <div className="text-xs text-gray-500">
                                     Selected: {selectedVariantValues[variant.uid].title}
                                   </div>
                                 )}
                               </div>
-                            );
-                          })
+                            ));
+                          })()
                         ) : (
                           <div className="text-center py-4 text-gray-500">
                             {selectedGelatoProduct ? 'No variants available for this product' : 'Select a product to see variants'}
