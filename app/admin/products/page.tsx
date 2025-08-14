@@ -450,19 +450,69 @@ export default function ProductManagementPage() {
       // Start with the catalog UID
       const parts = [selectedGelatoProduct.uid];
       
-      // Add all selected variant values UIDs in order
+      // Get current variants including the new selection
       const currentVariants = {...selectedVariantValues};
-      currentVariants[variantUid] = selectedValue; // Include current selection
-      
-      // Sort by variant order to ensure consistent UID building
-      const sortedVariants = Object.entries(currentVariants).sort((a, b) => a[0].localeCompare(b[0]));
+      currentVariants[variantUid] = selectedValue;
       
       console.log('🔍 Building Gelato Product UID:');
       console.log('  Catalog UID:', selectedGelatoProduct.uid);
-      console.log('  Current variants:', currentVariants);
-      console.log('  Sorted variants:', sortedVariants);
+      console.log('  All variants:', currentVariants);
       
-      sortedVariants.forEach(([variantKey, value]) => {
+      // Process variants in Gelato's expected order and format
+      // Based on actual Gelato format: canvas_300x450-mm-12x18-inch_canvas_wood-fsc-slim_4-0_ver
+      
+      // 1. Format/Size (should include both mm and inch if available)
+      const formatVariants = Object.entries(currentVariants).filter(([key]) => 
+        key.toLowerCase().includes('format') || key.toLowerCase().includes('size')
+      );
+      
+      // 2. Material/Medium attributes
+      const materialVariants = Object.entries(currentVariants).filter(([key]) => 
+        key.toLowerCase().includes('material') || 
+        key.toLowerCase().includes('wood') ||
+        key.toLowerCase().includes('canvas') ||
+        key.toLowerCase().includes('metal')
+      );
+      
+      // 3. Thickness/Edge attributes
+      const thicknessVariants = Object.entries(currentVariants).filter(([key]) => 
+        key.toLowerCase().includes('thickness') || 
+        key.toLowerCase().includes('edge') ||
+        key.toLowerCase().includes('depth')
+      );
+      
+      // 4. Orientation
+      const orientationVariants = Object.entries(currentVariants).filter(([key]) => 
+        key.toLowerCase().includes('orientation')
+      );
+      
+      // 5. Other attributes
+      const otherVariants = Object.entries(currentVariants).filter(([key]) => {
+        const keyLower = key.toLowerCase();
+        return !keyLower.includes('format') && 
+               !keyLower.includes('size') &&
+               !keyLower.includes('material') && 
+               !keyLower.includes('wood') &&
+               !keyLower.includes('canvas') &&
+               !keyLower.includes('metal') &&
+               !keyLower.includes('thickness') && 
+               !keyLower.includes('edge') &&
+               !keyLower.includes('depth') &&
+               !keyLower.includes('orientation');
+      });
+      
+      // Combine in proper order
+      const orderedVariants = [
+        ...formatVariants,
+        ...materialVariants, 
+        ...thicknessVariants,
+        ...otherVariants,
+        ...orientationVariants
+      ];
+      
+      console.log('  Ordered variants:', orderedVariants);
+      
+      orderedVariants.forEach(([variantKey, value]) => {
         if (value.uid) {
           parts.push(value.uid);
           console.log(`  Added variant: ${variantKey} -> ${value.uid} (${value.title})`);
@@ -471,6 +521,7 @@ export default function ProductManagementPage() {
       
       const finalUID = parts.join('_');
       console.log('  Final Gelato Product UID:', finalUID);
+      console.log('  Expected format example: canvas_300x450-mm-12x18-inch_canvas_wood-fsc-slim_4-0_ver');
       
       return finalUID;
     };
@@ -1073,6 +1124,12 @@ export default function ProductManagementPage() {
                               <p className="text-sm font-semibold text-green-800 mb-2">Complete Gelato Product UID:</p>
                               <div className="font-mono text-sm text-green-700 break-all bg-white px-3 py-2 rounded border">
                                 {formData.gelato_sku}
+                              </div>
+                              <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                                <p className="text-xs font-medium text-blue-800 mb-1">Expected Gelato Format Example:</p>
+                                <div className="font-mono text-xs text-blue-600 break-all">
+                                  canvas_300x450-mm-12x18-inch_canvas_wood-fsc-slim_4-0_ver
+                                </div>
                               </div>
                               {selectedGelatoProduct && (
                                 <div className="mt-3 space-y-1">
