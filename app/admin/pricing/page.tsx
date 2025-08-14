@@ -21,6 +21,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
+import { createGelatoService } from '@/lib/gelato-service';
 import type { Product, ProductPricing, ProductPricingCreate, Country } from '@/lib/product-types';
 import { formatPrice, calculateProfitMargin, calculateMarkup } from '@/lib/product-types';
 
@@ -47,6 +48,7 @@ export default function PricingManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [productFilter, setProductFilter] = useState('');
   const [countryFilter, setCountryFilter] = useState('');
+  const [loadingGelatoPricing, setLoadingGelatoPricing] = useState(false);
   
   const [formData, setFormData] = useState<PricingFormData>({
     product_id: '',
@@ -125,6 +127,94 @@ export default function PricingManagementPage() {
       country_code: countryCode,
       currency_code: country?.currency_code || 'GBP'
     }));
+    
+    // Auto-fetch Gelato pricing if both product and country are selected
+    if (formData.product_id) {
+      fetchGelatoPricing(formData.product_id, countryCode);
+    }
+  };
+
+  const handleProductChange = (productId: string) => {
+    setFormData(prev => ({ ...prev, product_id: productId }));
+    
+    // Auto-fetch Gelato pricing if both product and country are selected
+    if (formData.country_code) {
+      fetchGelatoPricing(productId, formData.country_code);
+    }
+  };
+
+  const fetchGelatoPricing = async (productId: string, countryCode: string) => {
+    const product = products.find(p => p.id === productId);
+    const country = countries.find(c => c.code === countryCode);
+    
+    if (!product?.gelato_sku || !country) {
+      console.log('Missing Gelato SKU or country data');
+      return;
+    }
+
+    try {
+      setLoadingGelatoPricing(true);
+      console.log(`🔍 Fetching Gelato pricing for ${product.name} in ${country.name}...`);
+      
+      const gelatoService = createGelatoService();
+      
+      // Get product pricing (base cost)
+      const baseCost = await gelatoService.getBaseCost(product.gelato_sku, countryCode);
+      
+      // Get shipping methods to estimate shipping cost
+      const shippingMethods = await gelatoService.getShippingMethods(countryCode);
+      
+      if (baseCost) {
+        console.log(`✅ Gelato base cost: ${baseCost.currency} ${baseCost.price}`);
+        
+        // Convert USD to local currency if needed (same logic as in products page)
+        let convertedCost = baseCost.price;
+        if (baseCost.currency === 'USD' && country.currency_code !== 'USD') {
+          // Simple conversion rates (same as in products page)
+          const conversionRates: Record<string, number> = {
+            'GBP': 0.79, 'EUR': 0.92, 'CAD': 1.35, 'AUD': 1.52,
+            'JPY': 149.5, 'SGD': 1.34, 'BRL': 5.02, 'CHF': 0.88,
+            'NZD': 1.64, 'SEK': 10.5, 'NOK': 10.8, 'DKK': 6.85,
+            'ISK': 138.2, 'PLN': 4.03, 'CZK': 22.7, 'HUF': 361.0,
+            'KRW': 1320, 'HKD': 7.81, 'MYR': 4.48, 'THB': 35.8,
+            'INR': 83.2, 'MXN': 17.1, 'ZAR': 18.4, 'TRY': 30.5,
+          };
+          
+          const rate = conversionRates[country.currency_code];
+          if (rate) {
+            convertedCost = baseCost.price * rate;
+            console.log(`💱 Converted ${baseCost.price} USD to ${convertedCost.toFixed(2)} ${country.currency_code}`);
+          }
+        }
+        
+        // Estimate shipping cost (use cheapest available method or default)
+        let estimatedShipping = 0;
+        if (shippingMethods && shippingMethods.length > 0) {
+          // Find the cheapest shipping method
+          const cheapestShipping = shippingMethods.reduce((cheapest, method) => {
+            return method.price < cheapest.price ? method : cheapest;
+          }, shippingMethods[0]);
+          
+          estimatedShipping = cheapestShipping.price || 0;
+          console.log(`📦 Estimated shipping: ${country.currency_code} ${estimatedShipping}`);
+        }
+        
+        // Update form with fetched costs
+        setFormData(prev => ({
+          ...prev,
+          product_cost: (Math.round(convertedCost * 100) / 100).toString(),
+          shipping_cost: (Math.round(estimatedShipping * 100) / 100).toString()
+        }));
+        
+        console.log(`✅ Auto-populated pricing for ${product.name} in ${country.name}`);
+      } else {
+        console.warn(`⚠️ No Gelato pricing found for ${product.gelato_sku} in ${countryCode}`);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching Gelato pricing:', error);
+    } finally {
+      setLoadingGelatoPricing(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -330,8 +420,8 @@ export default function PricingManagementPage() {
                     </label>
                     <Select 
                       value={formData.product_id} 
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, product_id: value }))}
-                      disabled={!!editingId}
+                      onValueChange={handleProductChange}
+                      disabled={!!editingId || loadingGelatoPricing}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select product" />
@@ -356,7 +446,7 @@ export default function PricingManagementPage() {
                     <Select 
                       value={formData.country_code} 
                       onValueChange={handleCountryChange}
-                      disabled={!!editingId}
+                      disabled={!!editingId || loadingGelatoPricing}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -381,12 +471,25 @@ export default function PricingManagementPage() {
                       <strong>Currency:</strong> {formData.currency_code} 
                       ({countries.find(c => c.code === formData.country_code)?.currency_symbol})
                     </p>
+                    {loadingGelatoPricing && (
+                      <p className="text-sm text-blue-600 mt-2 flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                        Fetching Gelato pricing...
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 {/* Pricing Details */}
                 <div className="space-y-4">
-                  <h3 className="font-semibold text-gray-900">Pricing Details</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-900">Pricing Details</h3>
+                    {!editingId && (
+                      <p className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                        💡 Costs auto-populate from Gelato when product + country selected
+                      </p>
+                    )}
+                  </div>
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -403,9 +506,23 @@ export default function PricingManagementPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Shipping Cost ({formData.currency_code})
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Shipping Cost ({formData.currency_code})
+                      </label>
+                      {formData.product_id && formData.country_code && !editingId && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fetchGelatoPricing(formData.product_id, formData.country_code)}
+                          disabled={loadingGelatoPricing}
+                          className="text-xs h-6"
+                        >
+                          {loadingGelatoPricing ? 'Loading...' : '🔄 Refresh Costs'}
+                        </Button>
+                      )}
+                    </div>
                     <Input
                       type="number"
                       step="0.01"
