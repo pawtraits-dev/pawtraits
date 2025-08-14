@@ -293,22 +293,54 @@ export default function NewProductPage() {
     }
 
     try {
-      const [baseCostResponse, multiCountryResponse] = await Promise.all([
-        fetch(`/api/admin/gelato-products?action=base-cost&uid=${productUid}&country=GB`),
-        fetch(`/api/admin/gelato-products?action=multi-country-pricing&uid=${productUid}&countries=GB,US,DE`)
-      ]);
-      
-      const [baseCostResult, multiCountryResult] = await Promise.all([
-        baseCostResponse.json(),
-        multiCountryResponse.json()
-      ]);
-      
-      if (baseCostResult.success && multiCountryResult.success) {
+      // Fetch pricing for multiple countries/currencies in native currencies
+      const countries = [
+        { code: 'GB', currency: 'GBP' },
+        { code: 'US', currency: 'USD' },
+        { code: 'DE', currency: 'EUR' },
+        { code: 'FR', currency: 'EUR' },
+        { code: 'CA', currency: 'CAD' },
+        { code: 'AU', currency: 'AUD' }
+      ];
+
+      const pricingPromises = countries.map(async ({ code, currency }) => {
+        try {
+          const response = await fetch(`/api/admin/gelato-products?action=base-cost&uid=${productUid}&country=${code}`);
+          const result = await response.json();
+          
+          if (result.success && result.baseCost) {
+            return {
+              country: code,
+              currency,
+              ...result.baseCost,
+              success: true
+            };
+          }
+          return { country: code, currency, success: false, error: 'No pricing data' };
+        } catch (error) {
+          return { country: code, currency, success: false, error: error.message };
+        }
+      });
+
+      const pricingResults = await Promise.all(pricingPromises);
+      const successfulPricing = pricingResults.filter(p => p.success);
+
+      if (successfulPricing.length > 0) {
+        // Group by currency for better display
+        const byCurrency = successfulPricing.reduce((acc, pricing) => {
+          if (!acc[pricing.currency]) {
+            acc[pricing.currency] = [];
+          }
+          acc[pricing.currency].push(pricing);
+          return acc;
+        }, {} as Record<string, any[]>);
+
         setProductPricing(prev => ({
           ...prev,
           [productUid]: {
-            baseCost: baseCostResult.baseCost,
-            multiCountry: multiCountryResult.pricing
+            byCurrency,
+            allPricing: successfulPricing,
+            lastUpdated: new Date().toISOString()
           }
         }));
       }
@@ -463,35 +495,61 @@ export default function NewProductPage() {
                 
                 {productPricing[formData.gelato_sku] ? (
                   <>
-                    {/* Base Cost */}
-                    {productPricing[formData.gelato_sku].baseCost && (
-                      <div className="mb-3">
-                        <span className="text-sm font-medium text-yellow-700">Base Cost: </span>
-                        <span className="font-mono text-lg font-semibold text-yellow-900">
-                          {productPricing[formData.gelato_sku].baseCost.currency} {productPricing[formData.gelato_sku].baseCost.price}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {/* Multi-Country Pricing */}
-                    {productPricing[formData.gelato_sku].multiCountry && (
-                      <div className="space-y-2">
-                        <div className="text-sm font-medium text-yellow-700">Multi-Country Costs:</div>
-                        <div className="grid grid-cols-3 gap-3">
-                          {Object.entries(productPricing[formData.gelato_sku].multiCountry).map(([country, prices]) => {
-                            const priceArray = prices as any[];
-                            if (!priceArray || priceArray.length === 0) return null;
-                            const basePrice = priceArray.find(p => p.quantity === 1) || priceArray[0];
-                            return (
-                              <div key={country} className="bg-white p-2 rounded border border-yellow-200">
-                                <div className="font-semibold text-yellow-800">{country}</div>
-                                <div className="font-mono text-yellow-700 text-sm">
-                                  {basePrice.currency} {basePrice.price}
-                                </div>
+                    {/* Native Currency Pricing */}
+                    {productPricing[formData.gelato_sku].byCurrency && (
+                      <div className="space-y-4">
+                        {Object.entries(productPricing[formData.gelato_sku].byCurrency).map(([currency, prices]) => {
+                          const priceArray = prices as any[];
+                          if (!priceArray || priceArray.length === 0) return null;
+                          
+                          // Get currency symbol
+                          const getCurrencySymbol = (curr: string) => {
+                            switch(curr) {
+                              case 'USD': return '$';
+                              case 'GBP': return '£';
+                              case 'EUR': return '€';
+                              case 'CAD': return 'C$';
+                              case 'AUD': return 'A$';
+                              default: return curr + ' ';
+                            }
+                          };
+
+                          return (
+                            <div key={currency} className="bg-white p-3 rounded-lg border border-yellow-200">
+                              <div className="flex justify-between items-center mb-2">
+                                <h5 className="font-semibold text-yellow-800 text-lg">{currency} Pricing</h5>
+                                <span className="text-xs text-gray-500">
+                                  {priceArray.length} market{priceArray.length !== 1 ? 's' : ''}
+                                </span>
                               </div>
-                            );
-                          })}
-                        </div>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {priceArray.map((pricing, index) => (
+                                  <div key={`${pricing.country}-${index}`} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                    <span className="text-sm font-medium text-gray-700">
+                                      {pricing.country}
+                                    </span>
+                                    <span className="font-mono text-base font-semibold text-yellow-900">
+                                      {getCurrencySymbol(pricing.currency)}{pricing.price}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                              
+                              {priceArray.length > 0 && (
+                                <div className="mt-2 text-xs text-gray-600">
+                                  Average: {getCurrencySymbol(currency)}{(priceArray.reduce((sum, p) => sum + parseFloat(p.price || 0), 0) / priceArray.length).toFixed(2)}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        
+                        {productPricing[formData.gelato_sku].lastUpdated && (
+                          <div className="text-xs text-gray-500 text-center">
+                            Updated: {new Date(productPricing[formData.gelato_sku].lastUpdated).toLocaleString()}
+                          </div>
+                        )}
                       </div>
                     )}
                   </>
