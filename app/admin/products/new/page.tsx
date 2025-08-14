@@ -1000,7 +1000,7 @@ export default function NewProductPage() {
                         {/* Variant Selection Interface */}
                         {selectedGelatoProduct?.variants && selectedGelatoProduct.variants.length > 0 ? (
                           (() => {
-                            // Filter out "Unified" variants and process all variants
+                            // Process all variants including "Unified" formats
                             const processedVariants = selectedGelatoProduct.variants
                               .map((variant) => {
                                 // Safety check for variant structure
