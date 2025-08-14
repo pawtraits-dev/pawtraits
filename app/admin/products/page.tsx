@@ -410,12 +410,15 @@ export default function ProductManagementPage() {
         setSelectedGelatoProduct(result.product);
         setSelectedGelatoVariant(null);
         
-        // Auto-populate form with Gelato product name
+        // Auto-populate form with Gelato product info
         setFormData(prev => ({
           ...prev,
-          gelato_sku: product.uid,
+          gelato_sku: product.uid, // This will be updated as variants are selected
           description: result.product.description || prev.description
         }));
+        
+        // Reset variant selections when changing products
+        setSelectedVariantValues({});
       } else {
         alert('Failed to fetch product details: ' + result.error);
       }
@@ -437,6 +440,29 @@ export default function ProductManagementPage() {
       // Add the current selection
       parts.push(selectedValue.title);
       return parts.join(' - ');
+    };
+
+    // Build the complete Gelato product UID from selected attributes
+    const buildGelatoProductUID = () => {
+      if (!selectedGelatoProduct) return '';
+      
+      // Start with the catalog UID
+      const parts = [selectedGelatoProduct.uid];
+      
+      // Add all selected variant values UIDs in order
+      const currentVariants = {...selectedVariantValues};
+      currentVariants[variantUid] = selectedValue; // Include current selection
+      
+      // Sort by variant order to ensure consistent UID building
+      const sortedVariants = Object.entries(currentVariants).sort((a, b) => a[0].localeCompare(b[0]));
+      
+      sortedVariants.forEach(([, value]) => {
+        if (value.uid) {
+          parts.push(value.uid);
+        }
+      });
+      
+      return parts.join('_');
     };
 
     // Try to extract dimensions from format/size variants
@@ -488,10 +514,12 @@ export default function ProductManagementPage() {
     };
 
     const dimensions = extractDimensions(selectedValue.title);
+    const gelatoProductUID = buildGelatoProductUID();
     
     setFormData(prev => ({
       ...prev,
       description: buildDescription(),
+      gelato_sku: gelatoProductUID,
       size_name: selectedValue.title.includes('cm') || selectedValue.title.includes('inch') || selectedValue.title.includes('A') 
         ? selectedValue.title 
         : prev.size_name,
