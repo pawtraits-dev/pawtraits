@@ -182,10 +182,7 @@ export default function NewProductPage() {
           return;
         }
         
-        // Skip "Unified" format selectors
-        if (variant.name?.toLowerCase().includes('unified')) {
-          return;
-        }
+        // Note: Unified formats are now allowed and active
 
         // Filter values based on unit preference
         const filteredValues = variant.values?.filter(value => {
@@ -417,10 +414,14 @@ export default function NewProductPage() {
 
       const pricingPromises = countries.map(async ({ code, currency, flag, name }) => {
         try {
+          console.log(`🔍 Fetching pricing for ${name} (${code}) with UID: ${productUid}`);
           const response = await fetch(`/api/admin/gelato-products?action=base-cost&uid=${productUid}&country=${code}`);
           const result = await response.json();
           
+          console.log(`📊 ${name} (${code}) pricing result:`, result);
+          
           if (result.success && result.baseCost) {
+            console.log(`✅ ${name} (${code}) pricing successful:`, result.baseCost);
             return {
               country: code,
               countryName: name,
@@ -431,14 +432,19 @@ export default function NewProductPage() {
               success: true
             };
           }
-          return { country: code, countryName: name, flag: flag, currency, success: false, error: 'No pricing data' };
+          console.warn(`❌ ${name} (${code}) pricing failed:`, result.error || 'No pricing data');
+          return { country: code, countryName: name, flag: flag, currency, success: false, error: result.error || 'No pricing data' };
         } catch (error) {
+          console.error(`💥 ${name} (${code}) pricing error:`, error);
           return { country: code, countryName: name, flag: flag, currency, success: false, error: error.message };
         }
       });
 
       const pricingResults = await Promise.all(pricingPromises);
+      console.log('📋 All pricing results:', pricingResults);
+      
       const successfulPricing = pricingResults.filter(p => p.success);
+      console.log('✅ Successful pricing results:', successfulPricing);
 
       if (successfulPricing.length > 0) {
         // Filter out USD pricing except for US country
@@ -1002,10 +1008,7 @@ export default function NewProductPage() {
                                   return null;
                                 }
                                 
-                                // Skip "Unified" format selectors
-                                if (variant.name.toLowerCase().includes('unified')) {
-                                  return null;
-                                }
+                                // Note: Unified formats are now allowed and active
                                 
                                 // Filter values based on unit preference
                                 const filteredValues = variant.values?.filter(value => {
