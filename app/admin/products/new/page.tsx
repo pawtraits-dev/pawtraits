@@ -359,10 +359,14 @@ export default function NewProductPage() {
         // Extract dimensions if available
         if (result.productDetails && result.productDetails.dimensions) {
           const dims = result.productDetails.dimensions;
-          const widthMm = dims.Width?.value;
-          const heightMm = dims.Height?.value;
+          let widthMm = dims.Width?.value;
+          let heightMm = dims.Height?.value;
           
           if (widthMm && heightMm) {
+            // Ensure correct orientation: width should be smaller dimension for portrait
+            // If height > width, it's already portrait (correct)
+            // If width > height, it's landscape - may need to swap for portrait products
+            
             formUpdates.width_cm = (widthMm / 10).toString();
             formUpdates.height_cm = (heightMm / 10).toString();
             formUpdates.width_inches = (widthMm / 25.4).toFixed(1);
@@ -403,15 +407,15 @@ export default function NewProductPage() {
     try {
       // Fetch pricing for multiple countries/currencies in native currencies
       const countries = [
-        { code: 'GB', currency: 'GBP' },
-        { code: 'US', currency: 'USD' },
-        { code: 'DE', currency: 'EUR' },
-        { code: 'FR', currency: 'EUR' },
-        { code: 'CA', currency: 'CAD' },
-        { code: 'AU', currency: 'AUD' }
+        { code: 'GB', currency: 'GBP', flag: '🇬🇧', name: 'United Kingdom' },
+        { code: 'US', currency: 'USD', flag: '🇺🇸', name: 'United States' },
+        { code: 'DE', currency: 'EUR', flag: '🇩🇪', name: 'Germany' },
+        { code: 'FR', currency: 'EUR', flag: '🇫🇷', name: 'France' },
+        { code: 'CA', currency: 'CAD', flag: '🇨🇦', name: 'Canada' },
+        { code: 'AU', currency: 'AUD', flag: '🇦🇺', name: 'Australia' }
       ];
 
-      const pricingPromises = countries.map(async ({ code, currency }) => {
+      const pricingPromises = countries.map(async ({ code, currency, flag, name }) => {
         try {
           const response = await fetch(`/api/admin/gelato-products?action=base-cost&uid=${productUid}&country=${code}`);
           const result = await response.json();
@@ -419,15 +423,17 @@ export default function NewProductPage() {
           if (result.success && result.baseCost) {
             return {
               country: code,
+              countryName: name,
+              flag: flag,
               currency: result.baseCost.currency || currency, // Use actual currency from API, fallback to expected
               price: result.baseCost.price,
               quantity: result.baseCost.quantity,
               success: true
             };
           }
-          return { country: code, currency, success: false, error: 'No pricing data' };
+          return { country: code, countryName: name, flag: flag, currency, success: false, error: 'No pricing data' };
         } catch (error) {
-          return { country: code, currency, success: false, error: error.message };
+          return { country: code, countryName: name, flag: flag, currency, success: false, error: error.message };
         }
       });
 
@@ -435,8 +441,16 @@ export default function NewProductPage() {
       const successfulPricing = pricingResults.filter(p => p.success);
 
       if (successfulPricing.length > 0) {
+        // Filter out USD pricing except for US country
+        const filteredPricing = successfulPricing.filter(pricing => {
+          // Keep all non-USD prices
+          if (pricing.currency !== 'USD') return true;
+          // For USD, only keep if it's from US country
+          return pricing.country === 'US';
+        });
+        
         // Group by currency for better display
-        const byCurrency = successfulPricing.reduce((acc, pricing) => {
+        const byCurrency = filteredPricing.reduce((acc, pricing) => {
           if (!acc[pricing.currency]) {
             acc[pricing.currency] = [];
           }
@@ -448,7 +462,7 @@ export default function NewProductPage() {
           ...prev,
           [productUid]: {
             byCurrency,
-            allPricing: successfulPricing,
+            allPricing: filteredPricing,
             lastUpdated: new Date().toISOString()
           }
         }));
@@ -611,16 +625,10 @@ export default function NewProductPage() {
                           const priceArray = prices as any[];
                           if (!priceArray || priceArray.length === 0) return null;
                           
-                          // Get currency symbol
-                          const getCurrencySymbol = (curr: string) => {
-                            switch(curr) {
-                              case 'USD': return '$';
-                              case 'GBP': return '£';
-                              case 'EUR': return '€';
-                              case 'CAD': return 'C$';
-                              case 'AUD': return 'A$';
-                              default: return curr + ' ';
-                            }
+                          // Format price display
+                          const formatPrice = (price: number | string, currency: string) => {
+                            const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+                            return `${numPrice.toFixed(2)} ${currency}`;
                           };
 
                           return (
@@ -635,11 +643,12 @@ export default function NewProductPage() {
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                 {priceArray.map((pricing, index) => (
                                   <div key={`${pricing.country}-${index}`} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                                    <span className="text-sm font-medium text-gray-700">
-                                      {pricing.country}
+                                    <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                      <span className="text-lg">{pricing.flag}</span>
+                                      {pricing.countryName || pricing.country}
                                     </span>
                                     <span className="font-mono text-base font-semibold text-yellow-900">
-                                      {getCurrencySymbol(pricing.currency)}{pricing.price}
+                                      {formatPrice(pricing.price, pricing.currency)}
                                     </span>
                                   </div>
                                 ))}
@@ -647,7 +656,7 @@ export default function NewProductPage() {
                               
                               {priceArray.length > 0 && (
                                 <div className="mt-2 text-xs text-gray-600">
-                                  Average: {getCurrencySymbol(currency)}{(priceArray.reduce((sum, p) => sum + parseFloat(p.price || 0), 0) / priceArray.length).toFixed(2)}
+                                  Average: {formatPrice((priceArray.reduce((sum, p) => sum + parseFloat(p.price || 0), 0) / priceArray.length), currency)}
                                 </div>
                               )}
                             </div>
