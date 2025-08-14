@@ -16,22 +16,13 @@ export async function GET(request: NextRequest) {
         console.log('Fetching Gelato product catalog...');
         const products = await gelatoService.getProducts();
         
-        // Filter for print products only (canvas, posters, etc.)
-        const printProducts = products.filter((product: any) => 
-          product.uid.includes('canvas') || 
-          product.uid.includes('poster') || 
-          product.uid.includes('metal') || 
-          product.uid.includes('acrylic') ||
-          product.uid.includes('print')
-        );
-
         return NextResponse.json({
           success: true,
-          products: printProducts.map((product: any) => ({
+          products: products.map((product: any) => ({
             uid: product.uid,
-            name: product.name || product.uid.replace(/_/g, ' '),
-            description: product.description || '',
-            category: product.category || 'Print',
+            name: product.name,
+            description: product.description,
+            category: product.category,
             variants: product.variants || []
           }))
         });

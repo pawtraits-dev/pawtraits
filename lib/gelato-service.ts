@@ -128,41 +128,33 @@ export class GelatoService {
         throw new Error(`Gelato API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      const catalogs = await response.json();
-      console.log('Gelato catalogs response:', catalogs);
-      console.log('Response type:', typeof catalogs);
-      console.log('Is array:', Array.isArray(catalogs));
+      const response_data = await response.json();
+      console.log('Gelato catalogs response success');
       
-      // Handle different response formats
-      let catalogsArray = catalogs;
-      if (!Array.isArray(catalogs)) {
-        if (catalogs.catalogs && Array.isArray(catalogs.catalogs)) {
-          catalogsArray = catalogs.catalogs;
-        } else if (catalogs.data && Array.isArray(catalogs.data)) {
-          catalogsArray = catalogs.data;
-        } else {
-          console.error('Unexpected response format:', catalogs);
-          throw new Error('Invalid response format from Gelato catalogs API');
-        }
-      }
+      // Extract catalogs array from response
+      const catalogsArray = response_data.data || [];
       
-      // Filter for print-related catalogs (posters, canvas, etc.)
+      // Filter for print-related catalogs that are good for pet portraits
       const printCatalogs = catalogsArray.filter((catalog: any) => {
-        const uid = catalog.catalogUid || catalog.uid || catalog.id || '';
-        return uid.includes('poster') ||
-               uid.includes('canvas') ||
-               uid.includes('print') ||
-               uid.includes('wall') ||
-               uid.includes('photo') ||
-               // Include all catalogs for now to see what's available
-               true;
+        const uid = catalog.catalogUid || '';
+        return uid === 'posters' ||
+               uid === 'canvas' ||
+               uid === 'acrylic' ||
+               uid === 'metallic' ||
+               uid === 'framed-posters' ||
+               uid === 'framed-canvas' ||
+               uid === 'wood-prints' ||
+               uid === 'wallpaper' ||
+               uid === 'foam-print-product';
       });
       
-      // Return simplified catalog list as products for now
+      console.log(`Found ${printCatalogs.length} print catalogs:`, printCatalogs.map(c => c.catalogUid));
+      
+      // Return catalog list as products
       return printCatalogs.map((catalog: any) => ({
-        uid: catalog.catalogUid || catalog.uid || catalog.id,
-        name: catalog.title || catalog.name || catalog.catalogUid || catalog.uid,
-        description: `${catalog.title || catalog.name} products`,
+        uid: catalog.catalogUid,
+        name: catalog.title,
+        description: `${catalog.title} - Perfect for pet portraits`,
         category: 'Print',
         variants: []
       }));
