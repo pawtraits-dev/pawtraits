@@ -306,32 +306,32 @@ export default function NewProductPage() {
     if (!selectedGelatoProduct) return;
     
     // Update variant selections
-    setSelectedVariantValues(prev => ({
-      ...prev,
-      [variantUid]: selectedValue
-    }));
-
-    // Fetch the correct Product UID asynchronously
-    fetchCorrectGelatoProductUID(variantUid, selectedValue).then(gelatoProductUID => {
-      if (gelatoProductUID && gelatoProductUID.length > 10 && gelatoProductUID !== 'canvas') {
-        setFormData(prev => ({
-          ...prev,
-          gelato_sku: gelatoProductUID
-        }));
-        
-        // Note: Pricing is now only fetched manually via the "Refresh Pricing" button
-        // This prevents premature API calls with incomplete variant selections
-      } else {
-        console.warn('Invalid Product UID received:', gelatoProductUID);
-      }
+    setSelectedVariantValues(prev => {
+      const newVariants = {
+        ...prev,
+        [variantUid]: selectedValue
+      };
+      
+      // Regenerate Product UID with ALL current variants (including this new one)
+      fetchCorrectGelatoProductUID(newVariants).then(gelatoProductUID => {
+        if (gelatoProductUID && gelatoProductUID.length > 10 && gelatoProductUID !== 'canvas') {
+          setFormData(prevForm => ({
+            ...prevForm,
+            gelato_sku: gelatoProductUID
+          }));
+        } else {
+          console.warn('Invalid Product UID received:', gelatoProductUID);
+        }
+      });
+      
+      return newVariants;
     });
   };
 
-  const fetchCorrectGelatoProductUID = async (variantUid: string, selectedValue: {uid: string, title: string}) => {
+  const fetchCorrectGelatoProductUID = async (allVariants: Record<string, {uid: string, title: string}>) => {
     if (!selectedGelatoProduct) return '';
     
-    const currentVariants = {...selectedVariantValues};
-    currentVariants[variantUid] = selectedValue;
+    const currentVariants = allVariants;
     
     try {
       const selectedAttributes: Record<string, string> = {};
@@ -419,8 +419,9 @@ export default function NewProductPage() {
           if (result.success && result.baseCost) {
             return {
               country: code,
-              currency,
-              ...result.baseCost,
+              currency: result.baseCost.currency || currency, // Use actual currency from API, fallback to expected
+              price: result.baseCost.price,
+              quantity: result.baseCost.quantity,
               success: true
             };
           }
