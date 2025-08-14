@@ -80,6 +80,95 @@ export default function NewProductPage() {
 
   const supabaseService = new AdminSupabaseService();
 
+  // Helper function to map Gelato product to form fields
+  const populateFormFromGelatoProduct = (gelatoProduct: GelatoProduct) => {
+    const updates: Partial<ProductFormData> = {};
+    
+    // Map Gelato product name/category to medium type
+    const productName = gelatoProduct.name?.toLowerCase() || '';
+    const productUid = gelatoProduct.uid?.toLowerCase() || '';
+    
+    // Find matching medium based on Gelato product name/category
+    const matchingMedium = media.find(medium => {
+      const mediumName = medium.name?.toLowerCase() || '';
+      const mediumSlug = medium.slug?.toLowerCase() || '';
+      
+      // Check for direct matches in product name or UID
+      return productName.includes(mediumName) || 
+             productName.includes(mediumSlug) ||
+             productUid.includes(mediumName) ||
+             productUid.includes(mediumSlug) ||
+             // Specific mappings for common Gelato products
+             (productName.includes('canvas') && mediumName.includes('canvas')) ||
+             (productName.includes('acrylic') && mediumName.includes('acrylic')) ||
+             (productName.includes('metal') && mediumName.includes('metal')) ||
+             (productName.includes('poster') && mediumName.includes('poster')) ||
+             (productName.includes('frame') && mediumName.includes('frame'));
+    });
+    
+    if (matchingMedium) {
+      updates.medium_id = matchingMedium.id;
+    }
+    
+    // Map to format - for now, default to most common format or first available
+    // This could be enhanced with more specific mapping logic
+    const defaultFormat = formats.find(f => f.is_active);
+    if (defaultFormat) {
+      updates.format_id = defaultFormat.id;
+    }
+    
+    // Set a default size name based on product name
+    if (productName) {
+      updates.size_name = gelatoProduct.name || 'Standard';
+    }
+    
+    return updates;
+  };
+
+  // Helper function to extract size information from variant selections
+  const extractSizeFromVariants = (variants: Record<string, {uid: string, title: string}>) => {
+    let sizeName = '';
+    let sizeCode = '';
+    
+    // Look through selected variants for size-related information
+    Object.values(variants).forEach(variant => {
+      if (variant && variant.title) {
+        const title = variant.title.toLowerCase();
+        
+        // Check for size variants (usually contain dimensions or size names)
+        if (title.includes('mm') || title.includes('cm') || title.includes('inch') || title.includes('"')) {
+          // Extract dimensions for size name
+          const dimensionMatch = title.match(/(\d+)\s*[x×]\s*(\d+)/);
+          if (dimensionMatch) {
+            const [, width, height] = dimensionMatch;
+            sizeName = `${width}×${height}`;
+            
+            // Create size code from dimensions
+            if (title.includes('mm')) {
+              sizeCode = `${width}x${height}mm`;
+            } else if (title.includes('cm')) {
+              sizeCode = `${width}x${height}cm`;
+            } else if (title.includes('inch') || title.includes('"')) {
+              sizeCode = `${width}x${height}in`;
+            }
+          } else {
+            // Use the full title as size name if it contains size info
+            sizeName = variant.title;
+          }
+        }
+        
+        // Check for standard size names
+        const standardSizes = ['small', 'medium', 'large', 'xl', 'xxl', 'a4', 'a3', 'a2', 'a1', 'a0'];
+        if (standardSizes.some(size => title.includes(size))) {
+          sizeName = variant.title;
+          sizeCode = title.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        }
+      }
+    });
+    
+    return { sizeName, sizeCode };
+  };
+
   useEffect(() => {
     loadSupportingData();
   }, []);
@@ -189,8 +278,13 @@ export default function NewProductPage() {
       
       if (result.success) {
         setSelectedGelatoProduct(result.product);
+        
+        // Auto-populate form fields from Gelato product information
+        const populatedFields = populateFormFromGelatoProduct(result.product);
+        
         setFormData(prev => ({
           ...prev,
+          ...populatedFields,
           // Don't set gelato_sku yet - wait for variant selection to generate proper Product UID
           description: result.product.description || prev.description
         }));
@@ -259,6 +353,9 @@ export default function NewProductPage() {
       const result = await response.json();
       
       if (result.success && result.productUid) {
+        // Extract dimensions and size info from product details
+        const formUpdates: Partial<ProductFormData> = {};
+        
         // Extract dimensions if available
         if (result.productDetails && result.productDetails.dimensions) {
           const dims = result.productDetails.dimensions;
@@ -266,14 +363,25 @@ export default function NewProductPage() {
           const heightMm = dims.Height?.value;
           
           if (widthMm && heightMm) {
-            setFormData(prev => ({
-              ...prev,
-              width_cm: (widthMm / 10).toString(),
-              height_cm: (heightMm / 10).toString(),
-              width_inches: (widthMm / 25.4).toFixed(1),
-              height_inches: (heightMm / 25.4).toFixed(1)
-            }));
+            formUpdates.width_cm = (widthMm / 10).toString();
+            formUpdates.height_cm = (heightMm / 10).toString();
+            formUpdates.width_inches = (widthMm / 25.4).toFixed(1);
+            formUpdates.height_inches = (heightMm / 25.4).toFixed(1);
           }
+        }
+        
+        // Extract size information from selected variants
+        const sizeInfo = extractSizeFromVariants(currentVariants);
+        if (sizeInfo.sizeName) {
+          formUpdates.size_name = sizeInfo.sizeName;
+        }
+        if (sizeInfo.sizeCode) {
+          formUpdates.size_code = sizeInfo.sizeCode;
+        }
+        
+        // Apply all updates at once
+        if (Object.keys(formUpdates).length > 0) {
+          setFormData(prev => ({ ...prev, ...formUpdates }));
         }
         
         return result.productUid;
