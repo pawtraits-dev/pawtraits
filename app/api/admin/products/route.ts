@@ -11,10 +11,36 @@ export async function GET(request: NextRequest) {
     });
 
     const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
     const activeOnly = searchParams.get('activeOnly') !== 'false';
     const featuredOnly = searchParams.get('featuredOnly') === 'true';
     const mediumId = searchParams.get('mediumId');
     const formatId = searchParams.get('formatId');
+
+    // Handle single product request
+    if (id) {
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          medium:media(*),
+          format:formats(*)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return NextResponse.json(
+            { error: 'Product not found' },
+            { status: 404 }
+          );
+        }
+        throw error;
+      }
+
+      return NextResponse.json(data);
+    }
 
     let query = supabase
       .from('products')

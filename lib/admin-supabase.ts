@@ -116,6 +116,20 @@ export class AdminSupabaseService {
     }
   }
 
+  async getProduct(id: string): Promise<Product | null> {
+    try {
+      const response = await fetch(`/api/admin/products?id=${id}`);
+      if (!response.ok) {
+        return null;
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? data[0] : data;
+    } catch (error) {
+      console.error('Error getting product by id:', error);
+      return null;
+    }
+  }
+
   async createProduct(productData: ProductCreate): Promise<Product | null> {
     try {
       const response = await fetch('/api/admin/products', {
@@ -133,12 +147,12 @@ export class AdminSupabaseService {
     }
   }
 
-  async updateProduct(productData: any): Promise<Product | null> {
+  async updateProduct(id: string, productData: any): Promise<Product | null> {
     try {
       const response = await fetch('/api/admin/products', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productData)
+        body: JSON.stringify({ id, ...productData })
       });
       if (!response.ok) {
         return null;
