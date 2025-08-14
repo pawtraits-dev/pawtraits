@@ -566,12 +566,47 @@ export default function ProductManagementPage() {
     
     // Fetch the correct Product UID asynchronously
     fetchCorrectGelatoProductUID().then(gelatoProductUID => {
-      // Update the form data with the correct UID
-      setFormData(prev => ({
-        ...prev,
-        gelato_sku: gelatoProductUID
-      }));
+      if (gelatoProductUID) {
+        // Update the form data with the correct UID
+        setFormData(prev => ({
+          ...prev,
+          gelato_sku: gelatoProductUID
+        }));
+        
+        // Fetch real-time pricing from Gelato
+        fetchGelatoPricing(gelatoProductUID);
+      }
     });
+    
+    // Function to fetch pricing data
+    const fetchGelatoPricing = async (productUid: string) => {
+      try {
+        console.log('Fetching Gelato pricing for:', productUid);
+        
+        // Get base cost and multi-country pricing
+        const [baseCostResponse, multiCountryResponse] = await Promise.all([
+          fetch(`/api/admin/gelato-products?action=base-cost&uid=${productUid}&country=GB`),
+          fetch(`/api/admin/gelato-products?action=multi-country-pricing&uid=${productUid}&countries=GB,US,DE`)
+        ]);
+        
+        const [baseCostResult, multiCountryResult] = await Promise.all([
+          baseCostResponse.json(),
+          multiCountryResponse.json()
+        ]);
+        
+        if (baseCostResult.success && multiCountryResult.success) {
+          setProductPricing(prev => ({
+            ...prev,
+            [productUid]: {
+              baseCost: baseCostResult.baseCost,
+              multiCountry: multiCountryResult.pricing
+            }
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching Gelato pricing:', error);
+      }
+    };
     
     // Auto-populate Medium Type and Format based on Gelato catalog
     const mapGelatoToMediumAndFormat = (catalogUid: string) => {
@@ -1102,14 +1137,58 @@ export default function ProductManagementPage() {
                           placeholder="gelato_sku_12345"
                           className="flex-1"
                         />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setShowGelatoSearch(true)}
-                          size="sm"
-                        >
-                          Browse Gelato
-                        </Button>
+                        <div className="flex space-x-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowGelatoSearch(true)}
+                            size="sm"
+                          >
+                            Browse Gelato
+                          </Button>
+                          
+                          {formData.gelato_sku && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                // Fetch pricing for current SKU
+                                const fetchGelatoPricing = async (productUid: string) => {
+                                  try {
+                                    console.log('Refreshing Gelato pricing for:', productUid);
+                                    
+                                    const [baseCostResponse, multiCountryResponse] = await Promise.all([
+                                      fetch(`/api/admin/gelato-products?action=base-cost&uid=${productUid}&country=GB`),
+                                      fetch(`/api/admin/gelato-products?action=multi-country-pricing&uid=${productUid}&countries=GB,US,DE`)
+                                    ]);
+                                    
+                                    const [baseCostResult, multiCountryResult] = await Promise.all([
+                                      baseCostResponse.json(),
+                                      multiCountryResponse.json()
+                                    ]);
+                                    
+                                    if (baseCostResult.success && multiCountryResult.success) {
+                                      setProductPricing(prev => ({
+                                        ...prev,
+                                        [productUid]: {
+                                          baseCost: baseCostResult.baseCost,
+                                          multiCountry: multiCountryResult.pricing
+                                        }
+                                      }));
+                                    }
+                                  } catch (error) {
+                                    console.error('Error fetching Gelato pricing:', error);
+                                  }
+                                };
+                                fetchGelatoPricing(formData.gelato_sku);
+                              }}
+                              size="sm"
+                              className="text-xs"
+                            >
+                              🔄 Refresh Pricing
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       
                       {/* Display current Gelato SKU prominently */}
@@ -1130,6 +1209,48 @@ export default function ProductManagementPage() {
                                   Example format: canvas_300x450-mm-12x18-inch_canvas_wood-fsc-slim_4-0_ver
                                 </div>
                               </div>
+                              
+                              {/* Real-time Gelato Pricing */}
+                              {formData.gelato_sku && productPricing[formData.gelato_sku] && (
+                                <div className="mt-2 p-3 bg-yellow-50 rounded border border-yellow-200">
+                                  <p className="text-xs font-semibold text-yellow-800 mb-2">💰 Live Gelato Pricing</p>
+                                  
+                                  {/* Base Cost */}
+                                  {productPricing[formData.gelato_sku].baseCost && (
+                                    <div className="mb-2">
+                                      <span className="text-xs font-medium text-yellow-700">Base Cost: </span>
+                                      <span className="font-mono text-xs text-yellow-800">
+                                        {productPricing[formData.gelato_sku].baseCost.currency} {productPricing[formData.gelato_sku].baseCost.price}
+                                        {productPricing[formData.gelato_sku].baseCost.quantity > 1 && (
+                                          <span className="text-gray-600"> (min qty: {productPricing[formData.gelato_sku].baseCost.quantity})</span>
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Multi-Country Pricing */}
+                                  {productPricing[formData.gelato_sku].multiCountry && (
+                                    <div className="space-y-1">
+                                      <div className="text-xs font-medium text-yellow-700">Multi-Country Costs:</div>
+                                      <div className="grid grid-cols-3 gap-2 text-xs">
+                                        {Object.entries(productPricing[formData.gelato_sku].multiCountry).map(([country, prices]) => {
+                                          const priceArray = prices as any[];
+                                          if (!priceArray || priceArray.length === 0) return null;
+                                          const basePrice = priceArray.find(p => p.quantity === 1) || priceArray[0];
+                                          return (
+                                            <div key={country} className="bg-white px-2 py-1 rounded border">
+                                              <div className="font-medium text-yellow-800">{country}</div>
+                                              <div className="font-mono text-yellow-700">
+                                                {basePrice.currency} {basePrice.price}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                               {selectedGelatoProduct && (
                                 <div className="mt-3 space-y-1">
                                   <p className="text-xs text-green-700">
@@ -1516,7 +1637,9 @@ export default function ProductManagementPage() {
                                             <SelectValue placeholder={`Select ${variant.name.toLowerCase()}`} />
                                           </SelectTrigger>
                                           <SelectContent>
-                                            {variant.values.map((value) => (
+                                            {variant.values
+                                              .sort((a, b) => a.title.localeCompare(b.title))
+                                              .map((value) => (
                                               <SelectItem key={value.uid} value={value.uid}>
                                                 {value.title}
                                               </SelectItem>

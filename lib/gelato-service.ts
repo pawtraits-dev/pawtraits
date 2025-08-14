@@ -87,6 +87,27 @@ export interface GelatoPlaceholder {
   dpi: number;
 }
 
+export interface GelatoPriceData {
+  productUid: string;
+  country: string;
+  quantity: number;
+  price: number;
+  currency: string;
+  pageCount?: number;
+}
+
+export interface GelatoPricingOptions {
+  country?: string;
+  currency?: string;
+  pageCount?: number;
+}
+
+export interface GelatoBaseCost {
+  price: number;
+  currency: string;
+  quantity: number;
+}
+
 export class GelatoService {
   private readonly baseUrl: string;
   private readonly apiKey: string;
@@ -305,11 +326,25 @@ export class GelatoService {
   }
 
   /**
-   * Get pricing for a specific product variant in a country
+   * Get comprehensive pricing for a product (replaces old variant-based pricing)
+   * Uses new Gelato API: GET /v3/products/{productUid}/prices
    */
-  async getProductPricing(productUid: string, variantUid: string, countryCode: string): Promise<any> {
+  async getProductPrices(productUid: string, options?: {
+    country?: string;
+    currency?: string;
+    pageCount?: number;
+  }): Promise<any[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/v3/products/${productUid}/variants/${variantUid}/pricing?country=${countryCode}`, {
+      const params = new URLSearchParams();
+      if (options?.country) params.append('country', options.country);
+      if (options?.currency) params.append('currency', options.currency);
+      if (options?.pageCount) params.append('pageCount', options.pageCount.toString());
+      
+      const url = `${this.baseUrl}/v3/products/${productUid}/prices${params.toString() ? '?' + params.toString() : ''}`;
+      
+      console.log(`Fetching Gelato pricing for ${productUid}:`, url);
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: this.getHeaders()
       });
@@ -322,19 +357,112 @@ export class GelatoService {
 
       const data = await response.json();
       console.log('Gelato pricing response:', data);
+      
+      return data; // Returns array of pricing objects with quantities
+    } catch (error) {
+      console.error('Error fetching Gelato product prices:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get pricing for multiple countries at once
+   */
+  async getMultiCountryPricing(productUid: string, countries: string[] = ['GB', 'US', 'DE', 'FR']): Promise<Record<string, any[]>> {
+    try {
+      console.log(`Fetching multi-country pricing for ${productUid}:`, countries);
+      
+      const pricingPromises = countries.map(async (country) => {
+        try {
+          const prices = await this.getProductPrices(productUid, { country });
+          return { country, success: true, prices };
+        } catch (error) {
+          return { 
+            country, 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Unknown error'
+          };
+        }
+      });
+
+      const results = await Promise.all(pricingPromises);
+      
+      // Convert to object format for easy access
+      const pricingData: Record<string, any[]> = {};
+      results.forEach(result => {
+        if (result.success) {
+          pricingData[result.country] = result.prices;
+        } else {
+          console.warn(`Failed to get pricing for ${result.country}:`, result.error);
+          pricingData[result.country] = [];
+        }
+      });
+      
+      return pricingData;
+    } catch (error) {
+      console.error('Error fetching multi-country pricing:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the lowest cost for a product (typically quantity 1)
+   */
+  async getBaseCost(productUid: string, country: string = 'GB'): Promise<{
+    price: number;
+    currency: string;
+    quantity: number;
+  } | null> {
+    try {
+      const prices = await this.getProductPrices(productUid, { country });
+      
+      if (!prices || prices.length === 0) {
+        return null;
+      }
+      
+      // Find the price for quantity 1, or the lowest quantity available
+      const sortedPrices = prices.sort((a, b) => a.quantity - b.quantity);
+      const basePrice = sortedPrices[0];
+      
       return {
-        productUid,
-        variantUid,
-        countryCode,
-        currency: data.currency,
-        price: data.price,
-        formattedPrice: data.formattedPrice,
-        costs: data.costs || {},
-        availableFrom: data.availableFrom,
-        shippingCosts: data.shippingCosts || []
+        price: basePrice.price,
+        currency: basePrice.currency,
+        quantity: basePrice.quantity
       };
     } catch (error) {
-      console.error('Error fetching product pricing:', error);
+      console.error('Error getting base cost:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Legacy method for backwards compatibility
+   * @deprecated Use getProductPrices instead
+   */
+  async getProductPricing(productUid: string, variantUid: string, countryCode: string): Promise<any> {
+    console.warn('getProductPricing is deprecated. Use getProductPrices instead.');
+    
+    try {
+      const prices = await this.getProductPrices(productUid, { country: countryCode });
+      
+      if (!prices || prices.length === 0) {
+        throw new Error('No pricing data available');
+      }
+      
+      const basePrice = prices.find(p => p.quantity === 1) || prices[0];
+      
+      return {
+        productUid,
+        variantUid, // Keep for compatibility
+        countryCode,
+        currency: basePrice.currency,
+        price: basePrice.price,
+        formattedPrice: `${basePrice.currency} ${basePrice.price}`,
+        quantity: basePrice.quantity,
+        allPrices: prices // Include all pricing tiers
+      };
+    } catch (error) {
+      console.error('Error in legacy getProductPricing:', error);
       throw error;
     }
   }

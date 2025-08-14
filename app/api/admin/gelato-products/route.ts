@@ -92,27 +92,70 @@ export async function GET(request: NextRequest) {
           );
         }
 
-        const variantUid = searchParams.get('variant');
         const country = searchParams.get('country') || 'GB';
+        const currency = searchParams.get('currency');
+        const pageCount = searchParams.get('pageCount');
 
-        if (!variantUid) {
+        console.log('Fetching pricing for:', productUid, { country, currency, pageCount });
+        
+        const options: any = { country };
+        if (currency) options.currency = currency;
+        if (pageCount) options.pageCount = parseInt(pageCount);
+        
+        const prices = await gelatoService.getProductPrices(productUid, options);
+
+        return NextResponse.json({
+          success: true,
+          productUid,
+          country,
+          prices
+        });
+
+      case 'multi-country-pricing':
+        if (!productUid) {
           return NextResponse.json(
-            { success: false, error: 'Variant UID required' },
+            { success: false, error: 'Product UID required' },
             { status: 400 }
           );
         }
 
-        console.log('Fetching pricing for:', productUid, variantUid, country);
-        const pricing = await gelatoService.getProductPricing(productUid, variantUid, country);
+        const countries = searchParams.get('countries')?.split(',') || ['GB', 'US', 'DE', 'FR'];
+        console.log('Fetching multi-country pricing for:', productUid, countries);
+        
+        const multiCountryPricing = await gelatoService.getMultiCountryPricing(productUid, countries);
 
         return NextResponse.json({
           success: true,
-          pricing: {
-            productUid,
-            variantUid,
-            country,
-            ...pricing
-          }
+          productUid,
+          countries,
+          pricing: multiCountryPricing
+        });
+
+      case 'base-cost':
+        if (!productUid) {
+          return NextResponse.json(
+            { success: false, error: 'Product UID required' },
+            { status: 400 }
+          );
+        }
+
+        const baseCostCountry = searchParams.get('country') || 'GB';
+        console.log('Fetching base cost for:', productUid, baseCostCountry);
+        
+        const baseCost = await gelatoService.getBaseCost(productUid, baseCostCountry);
+
+        if (!baseCost) {
+          return NextResponse.json(
+            { success: false, error: 'No pricing data available' },
+            { status: 404 }
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          productUid,
+          country: baseCostCountry,
+          baseCost
         });
 
       case 'search-product-uid':
@@ -126,11 +169,13 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           success: false,
           error: 'Invalid action',
-          availableActions: ['search', 'details', 'pricing', 'search-product-uid (POST)'],
+          availableActions: ['search', 'details', 'pricing', 'multi-country-pricing', 'base-cost', 'search-product-uid (POST)'],
           examples: [
             '/api/admin/gelato-products?action=search',
-            '/api/admin/gelato-products?action=details&uid=premium-canvas-prints_premium-canvas-portrait-210gsm',
-            '/api/admin/gelato-products?action=pricing&uid=premium-canvas-prints_premium-canvas-portrait-210gsm&variant=30x30-cm&country=GB',
+            '/api/admin/gelato-products?action=details&uid=canvas',
+            '/api/admin/gelato-products?action=pricing&uid=canvas_300x450-mm_canvas_wood-fsc-slim_ver&country=GB',
+            '/api/admin/gelato-products?action=multi-country-pricing&uid=canvas_300x450-mm_canvas_wood-fsc-slim_ver&countries=GB,US,DE',
+            '/api/admin/gelato-products?action=base-cost&uid=canvas_300x450-mm_canvas_wood-fsc-slim_ver&country=GB',
             'POST /api/admin/gelato-products?action=search-product-uid with body: {catalogUid, attributes}'
           ]
         });
