@@ -51,6 +51,12 @@ interface GelatoProduct {
 interface GelatoVariant {
   uid: string;
   name?: string;
+  values?: Array<{
+    uid: string;
+    title: string;
+  }>;
+  selectedValue?: string;
+  selectedValueTitle?: string;
   size?: {
     width: number;
     height: number;
@@ -95,6 +101,7 @@ export default function ProductManagementPage() {
   const [searchingGelato, setSearchingGelato] = useState(false);
   const [selectedGelatoProduct, setSelectedGelatoProduct] = useState<GelatoProduct | null>(null);
   const [selectedGelatoVariant, setSelectedGelatoVariant] = useState<GelatoVariant | null>(null);
+  const [selectedVariantValues, setSelectedVariantValues] = useState<Record<string, {uid: string, title: string}>>({});
   const [gelatoSearchTerm, setGelatoSearchTerm] = useState('');
   
   const [formData, setFormData] = useState<ProductFormData>({
@@ -418,33 +425,82 @@ export default function ProductManagementPage() {
     }
   };
 
+  const updateFormWithSelectedVariants = (variantUid: string, selectedValue: {uid: string, title: string}) => {
+    if (!selectedGelatoProduct) return;
+    
+    // Build product description from all selected variants
+    const buildDescription = () => {
+      const parts = [selectedGelatoProduct.name];
+      Object.values(selectedVariantValues).forEach(value => {
+        if (value.title) parts.push(value.title);
+      });
+      // Add the current selection
+      parts.push(selectedValue.title);
+      return parts.join(' - ');
+    };
+
+    // Try to extract dimensions from format/size variants
+    const extractDimensions = (title: string) => {
+      // Look for patterns like "A4", "30x40cm", "12x16in", etc.
+      const cmMatch = title.match(/(\d+\.?\d*)\s*[x×]\s*(\d+\.?\d*)\s*cm/i);
+      const inchMatch = title.match(/(\d+\.?\d*)\s*[x×]\s*(\d+\.?\d*)\s*in/i);
+      const aFormatMatch = title.match(/A(\d+)/i);
+      
+      if (cmMatch) {
+        return {
+          width_cm: cmMatch[1],
+          height_cm: cmMatch[2],
+          width_inches: (parseFloat(cmMatch[1]) / 2.54).toFixed(1),
+          height_inches: (parseFloat(cmMatch[2]) / 2.54).toFixed(1)
+        };
+      }
+      
+      if (inchMatch) {
+        return {
+          width_inches: inchMatch[1],
+          height_inches: inchMatch[2],
+          width_cm: (parseFloat(inchMatch[1]) * 2.54).toFixed(1),
+          height_cm: (parseFloat(inchMatch[2]) * 2.54).toFixed(1)
+        };
+      }
+      
+      // A format sizes (approximate)
+      if (aFormatMatch) {
+        const aFormats: Record<string, {width: number, height: number}> = {
+          '4': {width: 21, height: 29.7}, // A4
+          '3': {width: 29.7, height: 42}, // A3
+          '2': {width: 42, height: 59.4}, // A2
+          '1': {width: 59.4, height: 84.1} // A1
+        };
+        
+        const format = aFormats[aFormatMatch[1]];
+        if (format) {
+          return {
+            width_cm: format.width.toString(),
+            height_cm: format.height.toString(),
+            width_inches: (format.width / 2.54).toFixed(1),
+            height_inches: (format.height / 2.54).toFixed(1)
+          };
+        }
+      }
+      
+      return {};
+    };
+
+    const dimensions = extractDimensions(selectedValue.title);
+    
+    setFormData(prev => ({
+      ...prev,
+      description: buildDescription(),
+      size_name: selectedValue.title.includes('cm') || selectedValue.title.includes('inch') || selectedValue.title.includes('A') 
+        ? selectedValue.title 
+        : prev.size_name,
+      ...dimensions
+    }));
+  };
+
   const selectGelatoVariant = (variant: GelatoVariant) => {
     setSelectedGelatoVariant(variant);
-    
-    // Auto-populate form with variant data
-    if (variant.size) {
-      setFormData(prev => ({
-        ...prev,
-        size_name: `${variant.size?.width}x${variant.size?.height}${variant.size?.unit}`,
-        width_cm: variant.size?.unit === 'cm' ? variant.size?.width.toString() : (variant.size?.width * 2.54).toString(),
-        height_cm: variant.size?.unit === 'cm' ? variant.size?.height.toString() : (variant.size?.height * 2.54).toString(),
-        width_inches: variant.size?.unit === 'inches' ? variant.size?.width.toString() : (variant.size?.width / 2.54).toString(),
-        height_inches: variant.size?.unit === 'inches' ? variant.size?.height.toString() : (variant.size?.height / 2.54).toString(),
-      }));
-    }
-    
-    // Auto-populate pricing if available
-    if (variant.pricing && variant.pricing.length > 0) {
-      const newPricingEntries = variant.pricing.map(price => ({
-        country_code: price.country,
-        product_cost: (price.price * 0.8).toFixed(2), // Estimate cost as 80% of Gelato price
-        shipping_cost: '3.99', // Default shipping
-        sale_price: (price.price * 1.5).toFixed(2) // 50% markup
-      }));
-      
-      setPricingEntries(newPricingEntries);
-      setShowPricingSection(true);
-    }
   };
 
   const filteredGelatoProducts = gelatoProducts.filter(product => 
@@ -1074,9 +1130,10 @@ export default function ProductManagementPage() {
 
       {/* Gelato Product Search Modal */}
       {showGelatoSearch && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between mb-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-6xl h-full max-h-[95vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b">
               <h2 className="text-xl font-bold">Browse Gelato Products</h2>
               <Button
                 variant="outline"
@@ -1087,7 +1144,8 @@ export default function ProductManagementPage() {
               </Button>
             </div>
 
-            <div className="space-y-4 mb-6">
+            {/* Search */}
+            <div className="p-6 border-b">
               <div className="flex space-x-4">
                 <Input
                   placeholder="Search products..."
@@ -1110,81 +1168,104 @@ export default function ProductManagementPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Product List */}
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                <h3 className="font-semibold text-gray-900">Products ({filteredGelatoProducts.length})</h3>
-                {filteredGelatoProducts.map((product) => (
-                  <div
-                    key={product.uid}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedGelatoProduct?.uid === product.uid
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => selectGelatoProduct(product)}
-                  >
-                    <div className="font-medium text-gray-900">{product.name}</div>
-                    <div className="text-sm text-gray-600">{product.category}</div>
-                    <div className="text-xs text-gray-500 mt-1">{product.uid}</div>
-                    {product.description && (
-                      <div className="text-xs text-gray-500 mt-1">{product.description.slice(0, 100)}...</div>
+            {/* Content - Scrollable */}
+            <div className="flex-1 overflow-hidden">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full p-6">
+                {/* Product List */}
+                <div className="space-y-4 overflow-y-auto">
+                  <h3 className="font-semibold text-gray-900 sticky top-0 bg-white py-2">
+                    Products ({filteredGelatoProducts.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {filteredGelatoProducts.map((product) => (
+                      <div
+                        key={product.uid}
+                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedGelatoProduct?.uid === product.uid
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        onClick={() => selectGelatoProduct(product)}
+                      >
+                        <div className="font-medium text-gray-900">{product.name}</div>
+                        <div className="text-sm text-gray-600">{product.category}</div>
+                        <div className="text-xs text-gray-500 mt-1">{product.uid}</div>
+                        {product.description && (
+                          <div className="text-xs text-gray-500 mt-1">{product.description.slice(0, 100)}...</div>
+                        )}
+                      </div>
+                    ))}
+                    {filteredGelatoProducts.length === 0 && !searchingGelato && (
+                      <div className="text-center py-8 text-gray-500">
+                        {gelatoProducts.length === 0 
+                          ? 'Click "Search Gelato" to load products'
+                          : 'No products match your search'
+                        }
+                      </div>
                     )}
                   </div>
-                ))}
-                {filteredGelatoProducts.length === 0 && !searchingGelato && (
-                  <div className="text-center py-8 text-gray-500">
-                    {gelatoProducts.length === 0 
-                      ? 'Click "Search Gelato" to load products'
-                      : 'No products match your search'
-                    }
-                  </div>
-                )}
-              </div>
+                </div>
 
-              {/* Variant Selection */}
-              <div className="space-y-4">
-                {selectedGelatoProduct && (
-                  <>
-                    <h3 className="font-semibold text-gray-900">
-                      Variants ({selectedGelatoProduct.variants?.length || 0})
-                    </h3>
-                    <div className="max-h-96 overflow-y-auto space-y-2">
-                      {selectedGelatoProduct.variants?.map((variant) => (
-                        <div
-                          key={variant.uid}
-                          className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                            selectedGelatoVariant?.uid === variant.uid
-                              ? 'border-green-500 bg-green-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                          onClick={() => selectGelatoVariant(variant)}
-                        >
-                          <div className="font-medium text-gray-900">{variant.uid}</div>
-                          {variant.size && (
-                            <div className="text-sm text-gray-600">
-                              {variant.size.width}x{variant.size.height}{variant.size.unit}
-                            </div>
-                          )}
-                          {variant.pricing && variant.pricing.length > 0 && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              Pricing: {variant.pricing.map(p => `${p.country}: ${p.formattedPrice}`).join(', ')}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                      {(!selectedGelatoProduct.variants || selectedGelatoProduct.variants.length === 0) && (
-                        <div className="text-center py-4 text-gray-500">
-                          No variants available
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
+                {/* Variant Selection */}
+                <div className="space-y-4 overflow-y-auto">
+                  {selectedGelatoProduct && (
+                    <>
+                      <h3 className="font-semibold text-gray-900 sticky top-0 bg-white py-2">
+                        Product Attributes ({selectedGelatoProduct.variants?.length || 0})
+                      </h3>
+                      <div className="space-y-4">
+                        {selectedGelatoProduct.variants?.map((variant) => (
+                          <div key={variant.uid} className="border rounded-lg p-4">
+                            <div className="font-medium text-gray-900 mb-3">{variant.name}</div>
+                            {variant.values && variant.values.length > 0 && (
+                              <div>
+                                <Select
+                                  value={selectedVariantValues[variant.uid]?.uid || ''}
+                                  onValueChange={(value) => {
+                                    const selectedValue = variant.values.find(v => v.uid === value);
+                                    if (selectedValue) {
+                                      setSelectedVariantValues(prev => ({
+                                        ...prev,
+                                        [variant.uid]: {
+                                          uid: selectedValue.uid,
+                                          title: selectedValue.title
+                                        }
+                                      }));
+                                      
+                                      // Update form data with selected attributes
+                                      updateFormWithSelectedVariants(variant.uid, selectedValue);
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder={`Select ${variant.name.toLowerCase()}`} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {variant.values.map((value) => (
+                                      <SelectItem key={value.uid} value={value.uid}>
+                                        {value.title}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {(!selectedGelatoProduct.variants || selectedGelatoProduct.variants.length === 0) && (
+                          <div className="text-center py-4 text-gray-500">
+                            No product attributes available
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-end space-x-4 mt-6 pt-4 border-t">
+            {/* Footer */}
+            <div className="flex justify-end space-x-4 p-6 border-t bg-white">
               <Button
                 variant="outline"
                 onClick={() => setShowGelatoSearch(false)}
