@@ -130,20 +130,39 @@ export class GelatoService {
 
       const catalogs = await response.json();
       console.log('Gelato catalogs response:', catalogs);
+      console.log('Response type:', typeof catalogs);
+      console.log('Is array:', Array.isArray(catalogs));
+      
+      // Handle different response formats
+      let catalogsArray = catalogs;
+      if (!Array.isArray(catalogs)) {
+        if (catalogs.catalogs && Array.isArray(catalogs.catalogs)) {
+          catalogsArray = catalogs.catalogs;
+        } else if (catalogs.data && Array.isArray(catalogs.data)) {
+          catalogsArray = catalogs.data;
+        } else {
+          console.error('Unexpected response format:', catalogs);
+          throw new Error('Invalid response format from Gelato catalogs API');
+        }
+      }
       
       // Filter for print-related catalogs (posters, canvas, etc.)
-      const printCatalogs = catalogs.filter((catalog: any) => 
-        catalog.catalogUid.includes('poster') ||
-        catalog.catalogUid.includes('canvas') ||
-        catalog.catalogUid.includes('print') ||
-        catalog.catalogUid.includes('wall')
-      );
+      const printCatalogs = catalogsArray.filter((catalog: any) => {
+        const uid = catalog.catalogUid || catalog.uid || catalog.id || '';
+        return uid.includes('poster') ||
+               uid.includes('canvas') ||
+               uid.includes('print') ||
+               uid.includes('wall') ||
+               uid.includes('photo') ||
+               // Include all catalogs for now to see what's available
+               true;
+      });
       
       // Return simplified catalog list as products for now
       return printCatalogs.map((catalog: any) => ({
-        uid: catalog.catalogUid,
-        name: catalog.title || catalog.catalogUid,
-        description: `${catalog.title} products`,
+        uid: catalog.catalogUid || catalog.uid || catalog.id,
+        name: catalog.title || catalog.name || catalog.catalogUid || catalog.uid,
+        description: `${catalog.title || catalog.name} products`,
         category: 'Print',
         variants: []
       }));
