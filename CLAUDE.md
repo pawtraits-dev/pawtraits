@@ -34,6 +34,39 @@ tsx scripts/check-storage-structure.ts  # Check storage structure
 tsx scripts/test-component-updates.ts   # Test component updates
 ```
 
+## Environment Setup
+
+### Required Environment Variables
+```bash
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Stripe
+STRIPE_SECRET_KEY=your_stripe_secret_key
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
+STRIPE_WEBHOOK_SECRET=your_webhook_secret
+
+# Cloudinary
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+# Claude AI
+CLAUDE_API_KEY=your_claude_api_key
+```
+
+### Stripe Webhook Configuration
+For payment processing to work properly:
+1. Go to Stripe Dashboard → Developers → Webhooks
+2. Add endpoint: `https://yourdomain.com/api/webhooks/stripe`
+3. Select these events:
+   - `payment_intent.succeeded`
+   - `payment_intent.payment_failed`
+   - `payment_intent.canceled`
+   - `charge.dispute.created`
+
 ## Architecture Overview
 
 ### Tech Stack

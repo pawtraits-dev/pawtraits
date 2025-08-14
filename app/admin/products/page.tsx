@@ -243,7 +243,6 @@ export default function ProductsPage() {
                   <SelectValue placeholder="All mediums" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All mediums</SelectItem>
                   {media.filter(m => m.is_active).map(medium => (
                     <SelectItem key={medium.id} value={medium.id}>
                       {medium.name}
@@ -261,7 +260,6 @@ export default function ProductsPage() {
                   <SelectValue placeholder="All formats" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All formats</SelectItem>
                   {formats.filter(f => f.is_active).map(format => (
                     <SelectItem key={format.id} value={format.id}>
                       {format.name}
@@ -279,7 +277,6 @@ export default function ProductsPage() {
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
                   <SelectItem value="in_stock">In Stock</SelectItem>
                   <SelectItem value="low_stock">Low Stock</SelectItem>
                   <SelectItem value="out_of_stock">Out of Stock</SelectItem>
