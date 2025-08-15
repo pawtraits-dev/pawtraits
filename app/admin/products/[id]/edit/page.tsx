@@ -335,10 +335,12 @@ export default function EditProductPage() {
   
   const loadRetailPricing = async (productId: string) => {
     try {
-      const response = await fetch(`/api/admin/pricing?product_id=${productId}`);
+      const response = await fetch(`/api/admin/pricing?productId=${productId}`);
       const result = await response.json();
       
-      if (result.success && result.pricing) {
+      if (Array.isArray(result)) {
+        setRetailPricing(result);
+      } else if (result.success && result.pricing) {
         setRetailPricing(result.pricing);
       }
     } catch (error) {

@@ -9,6 +9,8 @@ import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { ArrowLeft, Save, Search, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { formatPrice } from '@/lib/product-types';
+import { PawSpinner } from '@/components/ui/paw-spinner';
 
 // Import interfaces and types from original file
 interface GelatoProduct {
@@ -690,12 +692,17 @@ export default function NewProductPage() {
             {formData.gelato_sku && formData.gelato_sku.length > 10 && formData.gelato_sku !== 'canvas' && (
               <div className="mt-4 p-4 bg-yellow-50 rounded-lg border-2 border-yellow-300">
                 <h4 className="text-sm font-semibold text-yellow-800 mb-3 flex items-center">
-                  💰 Gelato Pricing
+                  💰 Gelato Costs & Retail Pricing
                   {productPricing[formData.gelato_sku] ? (
                     <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">✅ Loaded</span>
                   ) : (
                     <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">Click "Get Pricing" to load</span>
                   )}
+                  <Link href="/admin/pricing" className="ml-auto">
+                    <Button variant="outline" size="sm" className="text-xs">
+                      Manage Pricing
+                    </Button>
+                  </Link>
                 </h4>
                 
                 {productPricing[formData.gelato_sku] ? (
@@ -707,8 +714,14 @@ export default function NewProductPage() {
                           const priceArray = prices as any[];
                           if (!priceArray || priceArray.length === 0) return null;
                           
+                          // Calculate retail pricing with 70% margin
+                          const calculateRetailPriceWith70Margin = (cost: number): number => {
+                            const retailPrice = cost / 0.30;
+                            return Math.round(retailPrice / 2.5) * 2.5;
+                          };
+                          
                           // Format price display
-                          const formatPrice = (price: number | string, currency: string) => {
+                          const formatLocalPrice = (price: number | string, currency: string) => {
                             const numPrice = typeof price === 'string' ? parseFloat(price) : price;
                             return `${numPrice.toFixed(2)} ${currency}`;
                           };
@@ -723,22 +736,53 @@ export default function NewProductPage() {
                               </div>
                               
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {priceArray.map((pricing, index) => (
-                                  <div key={`${pricing.country}-${index}`} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                                    <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                      <span className="text-lg">{pricing.flag}</span>
-                                      {pricing.countryName || pricing.country}
-                                    </span>
-                                    <span className="font-mono text-base font-semibold text-yellow-900">
-                                      {formatPrice(pricing.price, pricing.currency)}
-                                    </span>
-                                  </div>
-                                ))}
+                                {priceArray.map((pricing, index) => {
+                                  const costPrice = typeof pricing.price === 'string' ? parseFloat(pricing.price) : pricing.price;
+                                  const retailPrice = calculateRetailPriceWith70Margin(costPrice);
+                                  const margin = ((retailPrice - costPrice) / retailPrice * 100);
+                                  
+                                  return (
+                                    <div key={`${pricing.country}-${index}`} className="p-3 bg-white rounded border border-gray-200">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                          <span className="text-lg">{pricing.flag}</span>
+                                          {pricing.countryName || pricing.country}
+                                        </span>
+                                      </div>
+                                      
+                                      <div className="space-y-1 text-sm">
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-600">Cost:</span>
+                                          <span className="font-mono text-yellow-800">{formatLocalPrice(pricing.price, pricing.currency)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-600">Retail (70% margin):</span>
+                                          <span className="font-mono text-green-700 font-semibold">{formatLocalPrice(retailPrice, pricing.currency)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs">
+                                          <span className="text-gray-500">Margin:</span>
+                                          <span className="text-gray-500">{margin.toFixed(1)}%</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                               
                               {priceArray.length > 0 && (
-                                <div className="mt-2 text-xs text-gray-600">
-                                  Average: {formatPrice((priceArray.reduce((sum, p) => sum + parseFloat(p.price || 0), 0) / priceArray.length), currency)}
+                                <div className="mt-3 pt-2 border-t border-gray-200">
+                                  <div className="text-xs text-gray-600">
+                                    <div className="flex justify-between">
+                                      <span>Avg Cost:</span>
+                                      <span>{formatLocalPrice((priceArray.reduce((sum, p) => sum + parseFloat(p.price || 0), 0) / priceArray.length), currency)}</span>
+                                    </div>
+                                    <div className="flex justify-between mt-1">
+                                      <span>Avg Retail:</span>
+                                      <span className="font-medium text-green-700">
+                                        {formatLocalPrice(calculateRetailPriceWith70Margin(priceArray.reduce((sum, p) => sum + parseFloat(p.price || 0), 0) / priceArray.length), currency)}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -946,7 +990,7 @@ export default function NewProductPage() {
                 className="bg-gradient-to-r from-purple-600 to-blue-600"
               >
                 {loading ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <PawSpinner size="sm" className="mr-2" />
                 ) : (
                   <Save className="w-4 h-4 mr-2" />
                 )}
@@ -988,7 +1032,7 @@ export default function NewProductPage() {
                   className="bg-gradient-to-r from-purple-600 to-blue-600"
                 >
                   {searchingGelato ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <PawSpinner size="sm" className="mr-2" />
                   ) : (
                     <Search className="w-4 h-4 mr-2" />
                   )}
