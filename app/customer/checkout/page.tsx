@@ -12,11 +12,13 @@ import { Progress } from "@/components/ui/progress"
 import { ArrowLeft, ArrowRight, CreditCard, Shield, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useServerCart } from "@/lib/server-cart-context"
+import { useCountryPricing } from "@/lib/country-context"
 import { useRouter } from "next/navigation"
 import { getSupabaseClient } from '@/lib/supabase-client'
 import { SupabaseService } from '@/lib/supabase'
 import { Elements } from '@stripe/react-stripe-js'
 import { getStripe } from '@/lib/stripe-client'
+import { formatPrice } from '@/lib/product-types'
 import StripePaymentForm from '@/components/StripePaymentForm'
 
 export default function CustomerCheckoutPage() {
@@ -37,9 +39,13 @@ export default function CustomerCheckoutPage() {
   const [referralValidation, setReferralValidation] = useState<any>(null)
   const [validatingReferral, setValidatingReferral] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [shippingOptions, setShippingOptions] = useState<any[]>([])
+  const [selectedShippingOption, setSelectedShippingOption] = useState<any>(null)
+  const [loadingShipping, setLoadingShipping] = useState(false)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
-  const { cart, getShippingCost, getCartTotal, clearCart } = useServerCart()
+  const { cart, clearCart } = useServerCart()
+  const { selectedCountry, selectedCountryData } = useCountryPricing()
   const router = useRouter()
   const supabase = getSupabaseClient()
   const supabaseService = new SupabaseService()
@@ -154,20 +160,29 @@ export default function CustomerCheckoutPage() {
     }
   }
 
+  // Calculate order summary for display with country-specific currency
+  const subtotal = cart.totalPrice / 100;
+  const discount = referralValidation?.valid && referralValidation?.discount?.eligible 
+    ? referralValidation.discount.amount / 100 
+    : 0;
+  const shipping = selectedShippingOption ? selectedShippingOption.price / 100 : 0;
+  const total = subtotal - discount + shipping;
+  
+  // Get currency formatting for selected country
+  const currencyCode = selectedCountryData?.currency_code || 'GBP';
+  const currencySymbol = selectedCountryData?.currency_symbol || '£';
+
   const orderSummary = {
-    subtotal: cart.totalPrice / 100, // Convert from pence to pounds
-    shipping: getShippingCost() / 100,
-    discount: referralValidation?.valid && referralValidation?.discount?.eligible 
-      ? referralValidation.discount.amount / 100 // Already in pence from API
-      : 0,
-    // Apply discount to subtotal only, then add shipping
-    total: (cart.totalPrice / 100) - (referralValidation?.valid && referralValidation?.discount?.eligible 
-      ? referralValidation.discount.amount / 100 
-      : 0) + (getShippingCost() / 100),
+    subtotal,
+    shipping,
+    discount,
+    total,
+    currencyCode,
+    currencySymbol,
     items: cart.items.map(item => ({
       title: item.imageTitle,
       product: `${item.product.format?.name} ${item.product.medium?.name} - ${item.product.size_name}`,
-      price: item.pricing.sale_price / 100, // Convert from pence to pounds
+      price: item.pricing.sale_price / 100,
       quantity: item.quantity
     })),
   }
@@ -243,49 +258,130 @@ export default function CustomerCheckoutPage() {
     }
   }
 
+  // Fetch shipping options from Gelato after address validation
+  const fetchShippingOptions = async () => {
+    if (!validateShipping()) {
+      return;
+    }
+
+    setLoadingShipping(true);
+    setErrors(prev => ({ ...prev, shipping: '' }));
+
+    try {
+      console.log('🚚 Fetching shipping options from Gelato...');
+      
+      // Create shipping address object
+      const shippingAddress = {
+        firstName: shippingData.firstName,
+        lastName: shippingData.lastName,
+        address1: shippingData.address,
+        city: shippingData.city,
+        postalCode: shippingData.postcode,
+        country: selectedCountry
+      };
+
+      // Call our shipping API endpoint
+      const response = await fetch('/api/shipping/options', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          shippingAddress,
+          cartItems: cart.items.map(item => ({
+            gelatoProductUid: item.gelatoProductUid,
+            quantity: item.quantity,
+            printSpecs: item.printSpecs
+          }))
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch shipping options');
+      }
+
+      const { shippingOptions: options } = await response.json();
+      
+      console.log('🚚 Received shipping options:', options);
+      
+      if (!options || options.length === 0) {
+        throw new Error('No shipping options available for this address');
+      }
+
+      setShippingOptions(options);
+      
+      // Auto-select the first option
+      setSelectedShippingOption(options[0]);
+      
+      // Move to step 2 (shipping selection)
+      setCurrentStep(2);
+
+    } catch (error) {
+      console.error('Error fetching shipping options:', error);
+      setErrors(prev => ({ 
+        ...prev, 
+        shipping: error instanceof Error ? error.message : 'Failed to fetch shipping options'
+      }));
+    } finally {
+      setLoadingShipping(false);
+    }
+  };
+
   const handleShippingSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (validateShipping()) {
-      setIsProcessing(true)
-      try {
-        // Step 2: Validate cart items for Gelato availability before payment
-        console.log('🔍 Validating cart for Gelato availability...');
-        const validationResult = await validateCartForGelato();
+    
+    // Step 1: Validate shipping address and fetch shipping options
+    await fetchShippingOptions();
+  }
+
+  // Handle shipping option selection and move to payment
+  const handleShippingOptionSubmit = async () => {
+    if (!selectedShippingOption) {
+      setErrors(prev => ({ ...prev, shipping: 'Please select a shipping option' }));
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // Step 2: Validate cart items for Gelato availability before payment
+      console.log('🔍 Validating cart for Gelato availability...');
+      const validationResult = await validateCartForGelato();
+      
+      if (!validationResult.isValid) {
+        console.error('❌ Cart validation failed:', validationResult.errors);
         
-        if (!validationResult.isValid) {
-          console.error('❌ Cart validation failed:', validationResult.errors);
-          
-          // Show user-friendly error message
-          const errorMessage = validationResult.errors.length > 0 
-            ? `Unable to process order: ${validationResult.errors[0].error}` 
-            : 'Some items in your cart cannot be printed. Please review your cart.';
-          
-          alert(errorMessage + '\n\nPlease remove or replace the affected items and try again.');
-          return;
-        }
+        // Show user-friendly error message
+        const errorMessage = validationResult.errors.length > 0 
+          ? `Unable to process order: ${validationResult.errors[0].error}` 
+          : 'Some items in your cart cannot be printed. Please review your cart.';
         
-        if (validationResult.warnings && validationResult.warnings.length > 0) {
-          console.warn('⚠️ Cart validation warnings:', validationResult.warnings);
-          // Continue with warnings, but log them
-        }
-        
-        console.log('✅ Cart validation passed, proceeding with payment...');
-        await createPaymentIntent()
-        setCurrentStep(2)
-      } finally {
-        setIsProcessing(false)
+        alert(errorMessage + '\n\nPlease remove or replace the affected items and try again.');
+        return;
       }
+      
+      if (validationResult.warnings && validationResult.warnings.length > 0) {
+        console.warn('⚠️ Cart validation warnings:', validationResult.warnings);
+        // Continue with warnings, but log them
+      }
+      
+      console.log('✅ Cart validation passed, creating payment with shipping...');
+      await createPaymentIntent();
+      setCurrentStep(3); // Move to payment step
+    } finally {
+      setIsProcessing(false);
     }
   }
 
   // Create PaymentIntent when moving to payment step
   const createPaymentIntent = async () => {
     try {
-      const cartTotal = getCartTotal();
+      // Calculate total with selected shipping
+      const totalAmount = Math.round(orderSummary.total * 100); // Convert to minor units
       const customerName = `${shippingData.firstName} ${shippingData.lastName}`.trim();
       
       // Client-side validation
-      if (cartTotal <= 0) {
+      if (totalAmount <= 0) {
         throw new Error('Cart is empty - cannot create payment');
       }
       
@@ -296,13 +392,18 @@ export default function CustomerCheckoutPage() {
       if (!customerName || customerName === '') {
         throw new Error('Customer name is required');
       }
+
+      if (!selectedShippingOption) {
+        throw new Error('Shipping option is required');
+      }
       
       const paymentData = {
-        amount: cartTotal, // in pence
-        currency: 'gbp',
+        amount: totalAmount, // Total including shipping in minor units
+        currency: currencyCode.toLowerCase(),
         customerEmail: shippingData.email.trim(),
         customerName: customerName,
         shippingAddress: shippingData,
+        shippingOption: selectedShippingOption,
         cartItems: cart.items.map(item => ({
           productId: item.productId,
           imageId: item.imageId,
@@ -323,8 +424,8 @@ export default function CustomerCheckoutPage() {
         customerName: paymentData.customerName,
         cartItemsCount: paymentData.cartItems.length,
         cartTotalPrice: cart.totalPrice,
-        shippingCost: getShippingCost(),
-        finalTotal: cartTotal,
+        shippingCost: selectedShippingOption?.price || 0,
+        finalTotal: orderSummary.total,
         shippingData: shippingData
       });
 
@@ -399,9 +500,9 @@ export default function CustomerCheckoutPage() {
   }
 
   const steps = [
-    { number: 1, title: "Shipping", completed: currentStep > 1 },
-    { number: 2, title: "Payment", completed: false },
-    { number: 3, title: "Confirmation", completed: false },
+    { number: 1, title: "Address", completed: currentStep > 1 },
+    { number: 2, title: "Shipping", completed: currentStep > 2 },
+    { number: 3, title: "Payment", completed: false },
   ]
 
   // Show loading state while user profile is loading
@@ -465,11 +566,11 @@ export default function CustomerCheckoutPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2">
-            {/* Step 1: Shipping Information */}
+            {/* Step 1: Address Information */}
             {currentStep === 1 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Shipping Information</CardTitle>
+                  <CardTitle>Shipping Address</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleShippingSubmit} className="space-y-6">
@@ -554,12 +655,120 @@ export default function CustomerCheckoutPage() {
                     <Button 
                       type="submit" 
                       className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3"
-                      disabled={isProcessing}
+                      disabled={loadingShipping}
+                    >
+                      {loadingShipping ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Getting shipping options...
+                        </>
+                      ) : (
+                        <>
+                          Get Shipping Options
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </>
+                      )}
+                    </Button>
+                    {errors.shipping && (
+                      <p className="text-sm text-red-600 mt-2">{errors.shipping}</p>
+                    )}
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Step 2: Shipping Options */}
+            {currentStep === 2 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Choose Shipping Option</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Address Summary */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-medium text-gray-900 mb-2">Shipping to:</h3>
+                    <p className="text-sm text-gray-600">
+                      {shippingData.firstName} {shippingData.lastName}
+                      <br />
+                      {shippingData.address}
+                      <br />
+                      {shippingData.city}, {shippingData.postcode}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCurrentStep(1)}
+                      className="mt-2 text-purple-600 hover:text-purple-700 p-0 h-auto"
+                    >
+                      Change address
+                    </Button>
+                  </div>
+
+                  {/* Shipping Options */}
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-gray-900">Select shipping method:</h3>
+                    
+                    {shippingOptions.map((option) => (
+                      <div
+                        key={option.id}
+                        className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                          selectedShippingOption?.id === option.id
+                            ? 'border-purple-500 bg-purple-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        onClick={() => setSelectedShippingOption(option)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <input
+                              type="radio"
+                              checked={selectedShippingOption?.id === option.id}
+                              onChange={() => setSelectedShippingOption(option)}
+                              className="mr-3 text-purple-600"
+                            />
+                            <div>
+                              <h4 className="font-medium text-gray-900">{option.name}</h4>
+                              <p className="text-sm text-gray-600">{option.description}</p>
+                              {option.carrier && (
+                                <p className="text-xs text-gray-500">via {option.carrier}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-gray-900">
+                              {formatPrice(option.price, currencyCode, currencySymbol)}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {option.estimatedDeliveryDays} days
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {errors.shipping && (
+                    <p className="text-sm text-red-600">{errors.shipping}</p>
+                  )}
+
+                  <div className="flex space-x-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentStep(1)}
+                      className="flex-1"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Back to Address
+                    </Button>
+                    <Button
+                      onClick={handleShippingOptionSubmit}
+                      disabled={!selectedShippingOption || isProcessing}
+                      className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
                     >
                       {isProcessing ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Setting up payment...
+                          Processing...
                         </>
                       ) : (
                         <>
@@ -568,13 +777,13 @@ export default function CustomerCheckoutPage() {
                         </>
                       )}
                     </Button>
-                  </form>
+                  </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* Step 2: Payment */}
-            {currentStep === 2 && (
+            {/* Step 3: Payment */}
+            {currentStep === 3 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
@@ -684,7 +893,7 @@ export default function CustomerCheckoutPage() {
                       <span className="text-gray-900 font-medium">
                         {item.title} {item.quantity > 1 && `(×${item.quantity})`}
                       </span>
-                      <span className="font-medium">£{(item.price * item.quantity).toFixed(2)}</span>
+                      <span className="font-medium">{formatPrice(Math.round(item.price * item.quantity * 100), currencyCode, currencySymbol)}</span>
                     </div>
                     <div className="text-xs text-gray-500">
                       {item.product}
@@ -694,12 +903,18 @@ export default function CustomerCheckoutPage() {
                 <Separator />
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium">£{orderSummary.subtotal.toFixed(2)}</span>
+                  <span className="font-medium">{formatPrice(Math.round(orderSummary.subtotal * 100), currencyCode, currencySymbol)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
                   <span className="font-medium">
-                    {orderSummary.shipping === 0 ? "Free" : `£${orderSummary.shipping.toFixed(2)}`}
+                    {currentStep === 1 ? (
+                      <span className="text-blue-600">To be calculated</span>
+                    ) : orderSummary.shipping === 0 ? (
+                      "Free"
+                    ) : (
+                      formatPrice(Math.round(orderSummary.shipping * 100), currencyCode, currencySymbol)
+                    )}
                   </span>
                 </div>
                 {referralCode && (
@@ -714,7 +929,7 @@ export default function CustomerCheckoutPage() {
                     {referralValidation?.valid && referralValidation?.discount?.eligible && (
                       <div className="flex justify-between text-green-600">
                         <span>First Order Discount (20%)</span>
-                        <span className="font-medium">-£{orderSummary.discount.toFixed(2)}</span>
+                        <span className="font-medium">-{formatPrice(Math.round(orderSummary.discount * 100), currencyCode, currencySymbol)}</span>
                       </div>
                     )}
                     {referralValidation?.valid && !referralValidation?.discount?.eligible && (
@@ -730,7 +945,7 @@ export default function CustomerCheckoutPage() {
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span>£{orderSummary.total.toFixed(2)}</span>
+                  <span>{formatPrice(Math.round(orderSummary.total * 100), currencyCode, currencySymbol)}</span>
                 </div>
               </CardContent>
             </Card>
