@@ -113,14 +113,45 @@ export class GelatoService {
   private readonly apiKey: string;
 
   constructor() {
-    this.baseUrl = process.env.GELATO_API_BASE_URL || 'https://product.gelatoapis.com';
+    // Use correct Gelato API endpoints based on environment
+    const environment = process.env.GELATO_ENVIRONMENT || 'sandbox';
+    const isProduction = environment === 'production';
+    
+    // Set correct base URLs for different API services
+    this.baseUrl = isProduction 
+      ? 'https://product.gelatoapis.com' 
+      : 'https://product.gelatoapis.com'; // Same for both environments
+      
     this.apiKey = process.env.GELATO_API_KEY || '';
     
     console.log('🔧 Gelato service initialized:', {
+      environment,
       baseUrl: this.baseUrl,
       hasApiKey: !!this.apiKey,
-      apiKeyLength: this.apiKey?.length || 0
+      apiKeyLength: this.apiKey?.length || 0,
+      orderEndpoint: this.getOrderApiUrl(),
+      shippingEndpoint: this.getShippingApiUrl()
     });
+  }
+
+  /**
+   * Get the correct orders API URL based on environment
+   */
+  private getOrderApiUrl(): string {
+    const environment = process.env.GELATO_ENVIRONMENT || 'sandbox';
+    return environment === 'production' 
+      ? 'https://order.gelatoapis.com'
+      : 'https://order.gelatoapis.com'; // Use production endpoint for now
+  }
+
+  /**
+   * Get the correct shipping API URL based on environment  
+   */
+  private getShippingApiUrl(): string {
+    const environment = process.env.GELATO_ENVIRONMENT || 'sandbox';
+    return environment === 'production'
+      ? 'https://shipment.gelatoapis.com' 
+      : 'https://shipment.gelatoapis.com'; // Use production endpoint for now
   }
 
   private validateApiKey(): void {
@@ -136,6 +167,65 @@ export class GelatoService {
       'X-API-KEY': this.apiKey,
       'User-Agent': 'Pawtraits/1.0'
     };
+  }
+
+  /**
+   * Test Gelato API connectivity and authentication
+   */
+  async testApiConnection(): Promise<{
+    success: boolean;
+    message: string;
+    details?: any;
+  }> {
+    try {
+      console.log('🔧 Testing Gelato API connection...');
+      
+      // Try a simple API call to test authentication
+      // Use the catalogs endpoint as it's usually available
+      const testUrl = `${this.baseUrl}/v3/catalogs`;
+      console.log('🔧 Testing with URL:', testUrl);
+      
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        headers: this.getHeaders()
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Gelato API connection successful');
+        return {
+          success: true,
+          message: 'Gelato API connection successful',
+          details: {
+            endpoint: testUrl,
+            status: response.status,
+            catalogs: data?.data?.length || 0
+          }
+        };
+      } else {
+        const errorBody = await response.text();
+        console.error('❌ Gelato API connection failed:', {
+          status: response.status,
+          body: errorBody
+        });
+        return {
+          success: false,
+          message: `API connection failed: ${response.status} ${response.statusText}`,
+          details: {
+            endpoint: testUrl,
+            status: response.status,
+            error: errorBody
+          }
+        };
+      }
+    } catch (error) {
+      console.error('💥 Error testing Gelato API:', error);
+      return {
+        success: false,
+        message: `Connection error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        details: { error: String(error) }
+      };
+    }
   }
 
   /**
@@ -275,7 +365,10 @@ export class GelatoService {
       }
 
       // Use the correct Gelato v4 orders API endpoint
-      const response = await fetch('https://order.gelatoapis.com/v4/orders', {
+      const orderUrl = `${this.getOrderApiUrl()}/v4/orders`;
+      console.log('📦 Gelato order API endpoint:', orderUrl);
+      
+      const response = await fetch(orderUrl, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify(orderData)
@@ -333,40 +426,60 @@ export class GelatoService {
   }
 
   /**
-   * Get shipping methods for a country using Gelato v4 API
+   * Get shipping methods for a country
+   * Note: Shipment methods might be at a different API endpoint than orders
    */
   async getShippingMethods(countryCode: string): Promise<any[]> {
     try {
       console.log('🚚 Fetching Gelato shipping methods for country:', countryCode);
       
-      // Use the correct Gelato v4 shipment methods endpoint
-      const url = `https://order.gelatoapis.com/v4/shipment-methods?country=${countryCode}`;
-      console.log('🚚 Gelato shipping API URL:', url);
+      // Try multiple possible endpoints for shipping methods
+      const endpoints = [
+        // Try product API v3 (this might be where shipping methods are)
+        `${this.baseUrl}/v3/shipment-methods?country=${countryCode}`,
+        // Try orders API v4
+        `${this.getOrderApiUrl()}/v4/shipment-methods?country=${countryCode}`,
+        // Try dedicated shipping API
+        `${this.getShippingApiUrl()}/v4/shipment-methods?country=${countryCode}`
+      ];
       
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: this.getHeaders()
-      });
+      let lastError: any = null;
+      
+      for (const url of endpoints) {
+        try {
+          console.log('🚚 Trying Gelato shipping endpoint:', url);
+          
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: this.getHeaders()
+          });
 
-      if (!response.ok) {
-        const errorBody = await response.text();
-        console.error('❌ Gelato shipping methods API failed:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorBody,
-          country: countryCode,
-          url: url
-        });
-        throw new Error(`Gelato API error: ${response.status} ${response.statusText} - ${errorBody}`);
+          if (response.ok) {
+            const data = await response.json();
+            console.log('✅ Gelato shipping methods success:', {
+              endpoint: url,
+              country: countryCode,
+              methodCount: data?.shipmentMethods?.length || data?.data?.length || 0
+            });
+            
+            return data.shipmentMethods || data.data || [];
+          } else {
+            const errorBody = await response.text();
+            console.warn(`❌ Endpoint failed: ${url}`, {
+              status: response.status,
+              body: errorBody.substring(0, 200)
+            });
+            lastError = new Error(`${response.status} ${response.statusText} - ${errorBody}`);
+          }
+        } catch (error) {
+          console.warn(`💥 Error with endpoint: ${url}`, error);
+          lastError = error;
+        }
       }
-
-      const data = await response.json();
-      console.log('✅ Gelato shipping methods response:', {
-        country: countryCode,
-        methodCount: data?.shipmentMethods?.length || 0
-      });
       
-      return data.shipmentMethods || data.data || [];
+      // If all endpoints fail, throw the last error
+      throw lastError || new Error('All shipping endpoints failed');
+      
     } catch (error) {
       console.error('💥 Error fetching shipping methods:', error);
       throw error;
