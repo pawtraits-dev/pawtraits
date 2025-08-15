@@ -229,7 +229,15 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
           quantity: item.quantity,
           addedAt: item.created_at,
           partnerId: item.partner_id,
-          discountCode: item.discount_code
+          discountCode: item.discount_code,
+          // Enhanced Gelato data from product
+          gelatoProductUid: item.product_data?.gelato_sku,
+          printSpecs: item.product_data ? {
+            width_cm: item.product_data.width_cm || 30,
+            height_cm: item.product_data.height_cm || 30,
+            medium: item.product_data.medium?.name || 'Canvas',
+            format: item.product_data.format?.name || 'Portrait'
+          } : undefined
         }));
 
         dispatch({
@@ -273,7 +281,10 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
           pricing: item.pricing,
           product: item.product,
           partnerId: item.partnerId,
-          discountCode: item.discountCode
+          discountCode: item.discountCode,
+          // Enhanced Gelato data for order fulfillment
+          gelatoProductUid: item.gelatoProductUid,
+          printSpecs: item.printSpecs
         })
       });
 
