@@ -77,9 +77,9 @@ export default function PricingManagementPage() {
     return Math.round(price / 2.5) * 2.5;
   };
 
-  const calculateRetailPriceWith70Margin = (totalCost: number): number => {
+  const calculateRetailPriceWith70Margin = (productCost: number): number => {
     // For 70% margin: Sale Price = Cost / (1 - 0.70) = Cost / 0.30
-    const retailPrice = totalCost / 0.30;
+    const retailPrice = productCost / 0.30;
     return roundToNearest250(retailPrice);
   };
 
@@ -89,13 +89,11 @@ export default function PricingManagementPage() {
   };
 
   // Auto-calculate retail price when costs change
-  const updateRetailPrice = (productCost: string, shippingCost: string) => {
+  const updateRetailPrice = (productCost: string) => {
     const cost = parseFloat(productCost || '0');
-    const shipping = parseFloat(shippingCost || '0');
-    const totalCost = cost + shipping;
     
-    if (totalCost > 0) {
-      const calculatedRetailPrice = calculateRetailPriceWith70Margin(totalCost);
+    if (cost > 0) {
+      const calculatedRetailPrice = calculateRetailPriceWith70Margin(cost);
       setFormData(prev => ({
         ...prev,
         retail_price: calculatedRetailPrice.toFixed(2)
@@ -255,7 +253,7 @@ export default function PricingManagementPage() {
           }));
           
           // Auto-calculate retail price with 70% margin
-          updateRetailPrice(roundedProductCost.toString(), roundedShippingCost.toString());
+          updateRetailPrice(roundedProductCost.toString());
           
           console.log(`✅ Auto-populated pricing for ${product.name} in ${country.name}`);
         }
@@ -329,7 +327,7 @@ export default function PricingManagementPage() {
   const getMarginCalculations = () => {
     if (!formData.product_cost) return null;
     
-    const cost = parseFloat(formData.product_cost) + parseFloat(formData.shipping_cost || '0');
+    const productCost = parseFloat(formData.product_cost);
     const salePrice = parseFloat(formData.sale_price || '0');
     const retailPrice = parseFloat(formData.retail_price || '0');
     
@@ -338,22 +336,22 @@ export default function PricingManagementPage() {
     // Sale price calculations (if entered)
     if (salePrice > 0) {
       calculations.sale = {
-        profitMargin: calculateMarginFromPrices(cost, salePrice),
-        markup: calculateMarkup(cost * 100, salePrice * 100),
-        profit: salePrice - cost
+        profitMargin: calculateMarginFromPrices(productCost, salePrice),
+        markup: calculateMarkup(productCost * 100, salePrice * 100),
+        profit: salePrice - productCost
       };
     }
     
     // Retail price calculations (if entered)
     if (retailPrice > 0) {
       calculations.retail = {
-        profitMargin: calculateMarginFromPrices(cost, retailPrice),
-        markup: calculateMarkup(cost * 100, retailPrice * 100),
-        profit: retailPrice - cost
+        profitMargin: calculateMarginFromPrices(productCost, retailPrice),
+        markup: calculateMarkup(productCost * 100, retailPrice * 100),
+        profit: retailPrice - productCost
       };
     }
     
-    calculations.totalCost = cost;
+    calculations.productCost = productCost;
     return calculations;
   };
 
@@ -380,35 +378,25 @@ export default function PricingManagementPage() {
   };
 
   // Bulk operations
-  const handleBulkPriceUpdate = async () => {
+  const handleBulkMarginUpdate = async () => {
     if (selectedPricingIds.length === 0) return;
     
-    const confirmMessage = `Apply ${targetMargin}% margin${discountPercent > 0 ? ` and ${discountPercent}% discount` : ''} to ${selectedPricingIds.length} selected pricing entries?`;
-    if (!confirm(confirmMessage)) return;
+    if (!confirm(`Apply ${targetMargin}% margin to ${selectedPricingIds.length} selected pricing entries?`)) return;
     
     try {
       for (const pricingId of selectedPricingIds) {
         const pricingItem = pricing.find(p => p.id === pricingId);
         if (!pricingItem) continue;
         
-        const totalCost = (pricingItem.product_cost + pricingItem.shipping_cost) / 100; // Convert from minor units
+        const productCost = pricingItem.product_cost / 100; // Convert from minor units
         
         // Calculate retail price with target margin
         const marginDecimal = targetMargin / 100;
-        let retailPrice = totalCost / (1 - marginDecimal);
+        let retailPrice = productCost / (1 - marginDecimal);
         retailPrice = roundToNearest250(retailPrice);
         
-        // Calculate discounted price if discount is specified
-        let discountedPrice = undefined;
-        if (discountPercent > 0) {
-          discountedPrice = retailPrice * (1 - discountPercent / 100);
-          discountedPrice = roundToNearest250(discountedPrice);
-        }
-        
         const updateData = {
-          sale_price: Math.round(retailPrice * 100), // Retail price stays as retail price
-          discount_price: discountedPrice ? Math.round(discountedPrice * 100) : undefined,
-          is_on_sale: discountPercent > 0
+          sale_price: Math.round(retailPrice * 100) // Convert to minor units
         };
         
         await supabaseService.updateProductPricing(pricingId, updateData);
@@ -416,10 +404,65 @@ export default function PricingManagementPage() {
       
       await loadData();
       setSelectedPricingIds([]);
-      alert(`Successfully updated ${selectedPricingIds.length} pricing entries`);
+      alert(`Successfully applied ${targetMargin}% margin to ${selectedPricingIds.length} pricing entries`);
     } catch (error) {
       console.error('Error updating bulk pricing:', error);
       alert('Failed to update pricing');
+    }
+  };
+
+  const handleBulkDiscountUpdate = async () => {
+    if (selectedPricingIds.length === 0 || discountPercent === 0) return;
+    
+    if (!confirm(`Apply ${discountPercent}% discount to ${selectedPricingIds.length} selected pricing entries?`)) return;
+    
+    try {
+      for (const pricingId of selectedPricingIds) {
+        const pricingItem = pricing.find(p => p.id === pricingId);
+        if (!pricingItem) continue;
+        
+        const retailPrice = pricingItem.sale_price / 100; // Convert from minor units
+        
+        // Calculate discounted price from current retail price
+        let discountedPrice = retailPrice * (1 - discountPercent / 100);
+        discountedPrice = roundToNearest250(discountedPrice);
+        
+        const updateData = {
+          discount_price: Math.round(discountedPrice * 100), // Convert to minor units
+          is_on_sale: true
+        };
+        
+        await supabaseService.updateProductPricing(pricingId, updateData);
+      }
+      
+      await loadData();
+      setSelectedPricingIds([]);
+      alert(`Successfully applied ${discountPercent}% discount to ${selectedPricingIds.length} pricing entries`);
+    } catch (error) {
+      console.error('Error applying discount:', error);
+      alert('Failed to apply discount');
+    }
+  };
+
+  const handleRemoveDiscounts = async () => {
+    if (selectedPricingIds.length === 0) return;
+    
+    try {
+      for (const pricingId of selectedPricingIds) {
+        const updateData = {
+          discount_price: null,
+          is_on_sale: false
+        };
+        
+        await supabaseService.updateProductPricing(pricingId, updateData);
+      }
+      
+      await loadData();
+      setSelectedPricingIds([]);
+      alert(`Successfully removed discounts from ${selectedPricingIds.length} pricing entries`);
+    } catch (error) {
+      console.error('Error removing discounts:', error);
+      alert('Failed to remove discounts');
     }
   };
   
@@ -603,83 +646,114 @@ export default function PricingManagementPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
-            {/* Target Margin */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Target Margin (%)
-              </label>
-              <Input
-                type="number"
-                min="10"
-                max="90"
-                step="5"
-                value={targetMargin}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value);
-                  if (!isNaN(value) || e.target.value === '') {
-                    setTargetMargin(value || 0);
-                  }
-                }}
-                onBlur={(e) => {
-                  const value = parseFloat(e.target.value) || 70;
-                  setTargetMargin(Math.min(90, Math.max(10, value)));
-                }}
-                className="text-center"
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Margin Controls */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-gray-900">💰 Retail Pricing</h4>
+              <div className="grid grid-cols-2 gap-4 items-end">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Target Margin (%)
+                  </label>
+                  <Input
+                    type="number"
+                    min="10"
+                    max="90"
+                    step="5"
+                    value={targetMargin}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value);
+                      if (!isNaN(value) || e.target.value === '') {
+                        setTargetMargin(value || 0);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = parseFloat(e.target.value) || 70;
+                      setTargetMargin(Math.min(90, Math.max(10, value)));
+                    }}
+                    className="text-center"
+                  />
+                </div>
+                <div>
+                  <Button
+                    onClick={handleBulkMarginUpdate}
+                    disabled={selectedPricingIds.length === 0}
+                    className="w-full bg-gradient-to-r from-green-600 to-blue-600"
+                  >
+                    Apply {targetMargin}% Margin
+                  </Button>
+                </div>
+              </div>
             </div>
 
-            {/* Discount Percent */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Discount (%)
-              </label>
-              <Input
-                type="number"
-                min="0"
-                max="50"
-                step="5"
-                value={discountPercent}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value);
-                  if (!isNaN(value) || e.target.value === '') {
-                    setDiscountPercent(value || 0);
-                  }
-                }}
-                onBlur={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  setDiscountPercent(Math.min(50, Math.max(0, value)));
-                }}
-                className="text-center"
-              />
+            {/* Discount Controls */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-gray-900">🏷️ Discount Pricing</h4>
+              <div className="grid grid-cols-2 gap-4 items-end">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Discount (%)
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="50"
+                    step="5"
+                    value={discountPercent}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value);
+                      if (!isNaN(value) || e.target.value === '') {
+                        setDiscountPercent(value || 0);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = parseFloat(e.target.value) || 0;
+                      setDiscountPercent(Math.min(50, Math.max(0, value)));
+                    }}
+                    className="text-center"
+                  />
+                </div>
+                <div>
+                  <Button
+                    onClick={handleBulkDiscountUpdate}
+                    disabled={selectedPricingIds.length === 0 || discountPercent === 0}
+                    variant="outline"
+                    className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
+                  >
+                    Apply {discountPercent}% Discount
+                  </Button>
+                </div>
+              </div>
             </div>
-
-            {/* Apply Button */}
-            <div>
-              <Button
-                onClick={handleBulkPriceUpdate}
-                disabled={selectedPricingIds.length === 0}
-                className="w-full bg-gradient-to-r from-green-600 to-blue-600"
-              >
-                Apply to Selected ({selectedPricingIds.length})
-              </Button>
-            </div>
-
-            {/* Refresh Gelato Prices */}
-            <div>
-              <Button
-                onClick={handleBulkGelatoRefresh}
-                disabled={selectedPricingIds.length === 0 || loadingGelatoPricing}
-                variant="outline"
-                className="w-full"
-              >
-                {loadingGelatoPricing ? (
-                  <><PawSpinner size="sm" className="mr-2" />Refreshing...</>
-                ) : (
-                  <>🔄 Refresh Gelato Prices</>
-                )}
-              </Button>
-            </div>
+          </div>
+          
+          {/* Utility Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+            <Button
+              onClick={handleBulkGelatoRefresh}
+              disabled={selectedPricingIds.length === 0 || loadingGelatoPricing}
+              variant="outline"
+              className="w-full"
+            >
+              {loadingGelatoPricing ? (
+                <><PawSpinner size="sm" className="mr-2" />Refreshing...</>
+              ) : (
+                <>🔄 Refresh Gelato Prices</>
+              )}
+            </Button>
+            
+            <Button
+              onClick={() => {
+                if (confirm(`Remove discounts from ${selectedPricingIds.length} selected entries?`)) {
+                  handleRemoveDiscounts();
+                }
+              }}
+              disabled={selectedPricingIds.length === 0}
+              variant="outline"
+              className="w-full text-red-600 border-red-300 hover:bg-red-50"
+            >
+              ❌ Remove Discounts
+            </Button>
           </div>
 
           {/* Selection Info */}
@@ -697,9 +771,11 @@ export default function PricingManagementPage() {
                 </Button>
               )}
             </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Target margin applies £2.50 rounding. Discount is applied after margin calculation.
-            </p>
+            <div className="text-xs text-gray-500 mt-2 space-y-1">
+              <p>• Margin: Calculates retail price from cost with £2.50 rounding</p>
+              <p>• Discount: Applies percentage off current retail price</p>
+              <p>• Remove Discounts: Clears discount pricing and sale status</p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -809,8 +885,8 @@ export default function PricingManagementPage() {
                         const newValue = e.target.value;
                         setFormData(prev => ({ ...prev, product_cost: newValue }));
                         // Auto-update retail price when product cost changes
-                        if (newValue && formData.shipping_cost) {
-                          setTimeout(() => updateRetailPrice(newValue, formData.shipping_cost), 100);
+                        if (newValue) {
+                          setTimeout(() => updateRetailPrice(newValue), 100);
                         }
                       }}
                       placeholder="15.00"
@@ -843,10 +919,6 @@ export default function PricingManagementPage() {
                       onChange={(e) => {
                         const newValue = e.target.value;
                         setFormData(prev => ({ ...prev, shipping_cost: newValue }));
-                        // Auto-update retail price when shipping cost changes
-                        if (formData.product_cost && newValue) {
-                          setTimeout(() => updateRetailPrice(formData.product_cost, newValue), 100);
-                        }
                       }}
                       placeholder="5.00"
                     />
@@ -871,12 +943,12 @@ export default function PricingManagementPage() {
                       <label className="block text-sm font-medium text-gray-700">
                         Retail Price ({formData.currency_code})
                       </label>
-                      {formData.product_cost && formData.shipping_cost && (
+                      {formData.product_cost && (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => updateRetailPrice(formData.product_cost, formData.shipping_cost)}
+                          onClick={() => updateRetailPrice(formData.product_cost)}
                           className="text-xs h-6"
                         >
                           🎯 Auto-calc 70% margin
@@ -900,12 +972,12 @@ export default function PricingManagementPage() {
                     <div className="bg-green-50 p-4 rounded-lg space-y-3">
                       <p className="text-sm font-medium text-green-700">Profit Analysis</p>
                       
-                      {/* Total Cost Display */}
+                      {/* Product Cost Display */}
                       <div className="text-sm">
-                        <span className="text-green-600">Total Cost: </span>
+                        <span className="text-green-600">Product Cost: </span>
                         <span className="font-medium">
                           {countries.find(c => c.code === formData.country_code)?.currency_symbol}
-                          {calculations.totalCost.toFixed(2)}
+                          {calculations.productCost.toFixed(2)}
                         </span>
                       </div>
 
@@ -1080,8 +1152,6 @@ export default function PricingManagementPage() {
                       <th className="text-left p-4 font-medium">Product</th>
                       <th className="text-left p-4 font-medium">Country</th>
                       <th className="text-right p-4 font-medium">Product Cost</th>
-                      <th className="text-right p-4 font-medium">Shipping</th>
-                      <th className="text-right p-4 font-medium">Total Cost</th>
                       <th className="text-right p-4 font-medium">Retail Price</th>
                       <th className="text-right p-4 font-medium">Discounted Price</th>
                       <th className="text-right p-4 font-medium">Profit</th>
@@ -1095,8 +1165,8 @@ export default function PricingManagementPage() {
                       const product = products.find(p => p.id === pricingItem.product_id);
                       const country = countries.find(c => c.code === pricingItem.country_code);
                       const profitMargin = pricingItem.profit_margin_percent || 0;
-                      const totalCost = pricingItem.product_cost + pricingItem.shipping_cost;
-                      const profit = pricingItem.sale_price - totalCost;
+                      const productCost = pricingItem.product_cost;
+                      const profit = pricingItem.sale_price - productCost;
                       
                       return (
                         <tr key={pricingItem.id} className="border-b hover:bg-gray-50">
@@ -1132,12 +1202,6 @@ export default function PricingManagementPage() {
                           </td>
                           <td className="p-4 text-right font-medium">
                             {formatPrice(pricingItem.product_cost, currency, currencySymbol)}
-                          </td>
-                          <td className="p-4 text-right font-medium">
-                            {formatPrice(pricingItem.shipping_cost, currency, currencySymbol)}
-                          </td>
-                          <td className="p-4 text-right font-medium">
-                            {formatPrice(totalCost, currency, currencySymbol)}
                           </td>
                           <td className="p-4 text-right">
                             {editingId === pricingItem.id ? (
