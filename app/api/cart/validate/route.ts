@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { GelatoService } from '@/lib/gelato-service';
+import { createGelatoService } from '@/lib/gelato-service';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -70,8 +70,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`🛒 Validating ${validationItems.length} cart items`);
 
-    // Initialize Gelato service
-    const gelatoService = new GelatoService();
+    // Initialize Gelato service (using same pattern as admin API)
+    const gelatoService = createGelatoService();
 
     let validationResult;
     

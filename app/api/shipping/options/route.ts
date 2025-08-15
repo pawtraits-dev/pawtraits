@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GelatoService } from '@/lib/gelato-service';
+import { createGelatoService } from '@/lib/gelato-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
     console.log('🚚 [SHIPPING API] Shipping to:', `${shippingAddress.city}, ${shippingAddress.country}`);
     console.log('🚚 [SHIPPING API] Cart items:', cartItems.length);
 
-    // Initialize Gelato service
-    const gelatoService = new GelatoService();
+    // Initialize Gelato service (using same pattern as admin API)
+    const gelatoService = createGelatoService();
 
     // Transform cart items for Gelato API
     const gelatoItems = cartItems.map(item => ({
@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
 
     // Call Gelato API for shipping methods (shipping options)
     try {
+      console.log('🚚 [SHIPPING API] Calling Gelato API for country:', shippingAddress.country);
       const shippingMethods = await gelatoService.getShippingMethods(shippingAddress.country);
 
       console.log('🚚 [SHIPPING API] Received shipping methods:', {
