@@ -8,12 +8,14 @@ import { Minus, Plus, Trash2, ShoppingCart, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { useServerCart } from "@/lib/server-cart-context"
 import { formatPrice } from "@/lib/product-types"
+import { useCountryPricing } from "@/lib/country-context"
 import { getSupabaseClient } from '@/lib/supabase-client'
 import { extractDescriptionTitle } from '@/lib/utils'
 import { CatalogImage } from '@/components/CloudinaryImageDisplay'
 
 export default function CustomerCartPage() {
   const { cart, updateQuantity, removeFromCart, getShippingCost, getCartTotal } = useServerCart();
+  const { selectedCountry, selectedCountryData } = useCountryPricing();
   const [referralCode, setReferralCode] = useState("")
   const [referralValidation, setReferralValidation] = useState<any>(null)
   const [userEmail, setUserEmail] = useState("")
@@ -93,14 +95,18 @@ export default function CustomerCartPage() {
     }
   };
 
-  // Convert pricing from minor units (pence) to major units (pounds) for display
+  // Convert pricing from minor units to major units for display
   const subtotal = cart.totalPrice / 100;
-  const shipping = getShippingCost() / 100;
   const discount = referralValidation?.valid && referralValidation?.discount?.eligible 
     ? referralValidation.discount.amount / 100 
     : 0;
-  // Apply discount to subtotal only, then add shipping
-  const total = subtotal - discount + shipping;
+  
+  // Calculate total without shipping (shipping determined at checkout)
+  const total = subtotal - discount;
+  
+  // Get currency formatting for selected country
+  const currencyCode = selectedCountryData?.currency_code || 'GBP';
+  const currencySymbol = selectedCountryData?.currency_symbol || '£';
 
   if (cart.items.length === 0) {
     return (
@@ -230,13 +236,15 @@ export default function CustomerCartPage() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium">£{subtotal.toFixed(2)}</span>
+                  <span className="font-medium">{formatPrice(Math.round(subtotal * 100), currencyCode, currencySymbol)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
-                  <span className="font-medium">{shipping === 0 ? "Free" : `£${shipping.toFixed(2)}`}</span>
+                  <span className="font-medium text-blue-600">Determined at checkout</span>
                 </div>
-                {shipping > 0 && <p className="text-sm text-gray-500">Free shipping on orders over £75</p>}
+                <p className="text-sm text-gray-500">
+                  Shipping costs will be calculated based on your location and selected delivery options
+                </p>
                 
                 {/* Referral Discount Section */}
                 {referralCode && (
@@ -248,7 +256,7 @@ export default function CustomerCartPage() {
                     {referralValidation?.valid && referralValidation?.discount?.eligible && (
                       <div className="flex justify-between text-green-600">
                         <span>Referral Discount (20%)</span>
-                        <span className="font-medium">-£{discount.toFixed(2)}</span>
+                        <span className="font-medium">-{formatPrice(Math.round(discount * 100), currencyCode, currencySymbol)}</span>
                       </div>
                     )}
                     {referralValidation?.valid && !referralValidation?.discount?.eligible && (
@@ -261,9 +269,12 @@ export default function CustomerCartPage() {
                 
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
-                  <span>£{total.toFixed(2)}</span>
+                  <span>Total (excl. shipping)</span>
+                  <span>{formatPrice(Math.round(total * 100), currencyCode, currencySymbol)}</span>
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Final total including shipping will be shown at checkout
+                </p>
 
                 <Link href="/customer/checkout" className="block">
                   <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 text-lg font-semibold">

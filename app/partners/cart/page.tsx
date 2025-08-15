@@ -9,11 +9,13 @@ import Link from "next/link"
 import Image from "next/image"
 import { useServerCart } from "@/lib/server-cart-context"
 import { formatPrice } from "@/lib/product-types"
+import { useCountryPricing } from "@/lib/country-context"
 import { extractDescriptionTitle } from '@/lib/utils'
 import { CatalogImage } from '@/components/CloudinaryImageDisplay'
 
 export default function PartnerCartPage() {
   const { cart, updateQuantity, removeFromCart, getShippingCost, getCartTotal } = useServerCart();
+  const { selectedCountry, selectedCountryData } = useCountryPricing();
 
   const handleUpdateQuantity = async (id: string, newQuantity: number) => {
     try {
@@ -27,12 +29,17 @@ export default function PartnerCartPage() {
     }
   };
 
-  // Convert pricing from minor units (pence) to major units (pounds) for display
+  // Convert pricing from minor units to major units for display
   const subtotal = cart.totalPrice / 100;
   const partnerDiscount = subtotal * 0.15; // 15% partner discount
   const discountedSubtotal = subtotal - partnerDiscount;
-  const shipping = getShippingCost() / 100;
-  const total = discountedSubtotal + shipping;
+  
+  // Calculate total without shipping (shipping determined at checkout)
+  const total = discountedSubtotal;
+  
+  // Get currency formatting for selected country
+  const currencyCode = selectedCountryData?.currency_code || 'GBP';
+  const currencySymbol = selectedCountryData?.currency_symbol || '£';
 
   if (cart.items.length === 0) {
     return (
@@ -186,29 +193,34 @@ export default function PartnerCartPage() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium">£{subtotal.toFixed(2)}</span>
+                  <span className="font-medium">{formatPrice(Math.round(subtotal * 100), currencyCode, currencySymbol)}</span>
                 </div>
                 <div className="flex justify-between text-green-600">
                   <span className="flex items-center">
                     <Percent className="w-4 h-4 mr-1" />
                     Partner Discount (15%)
                   </span>
-                  <span className="font-medium">-£{partnerDiscount.toFixed(2)}</span>
+                  <span className="font-medium">-{formatPrice(Math.round(partnerDiscount * 100), currencyCode, currencySymbol)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Discounted Subtotal</span>
-                  <span className="font-medium">£{discountedSubtotal.toFixed(2)}</span>
+                  <span className="font-medium">{formatPrice(Math.round(discountedSubtotal * 100), currencyCode, currencySymbol)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
-                  <span className="font-medium">{shipping === 0 ? "Free" : `£${shipping.toFixed(2)}`}</span>
+                  <span className="font-medium text-blue-600">Determined at checkout</span>
                 </div>
-                {shipping > 0 && <p className="text-sm text-gray-500">Free shipping on orders over £75</p>}
+                <p className="text-sm text-gray-500">
+                  Shipping costs will be calculated based on your location and selected delivery options
+                </p>
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
-                  <span>£{total.toFixed(2)}</span>
+                  <span>Total (excl. shipping)</span>
+                  <span>{formatPrice(Math.round(total * 100), currencyCode, currencySymbol)}</span>
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Final total including shipping will be shown at checkout
+                </p>
 
                 <Link href="/partners/checkout" className="block">
                   <Button className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg font-semibold">
