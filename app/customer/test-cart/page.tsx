@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useServerCart } from '@/lib/server-cart-context';
+import { getSupabaseClient } from '@/lib/supabase-client';
 import { CheckCircle, XCircle, AlertCircle, Package, Settings, Zap } from 'lucide-react';
 import Link from 'next/link';
 
@@ -13,6 +14,7 @@ export default function TestCartPage() {
   const { cart, refreshCart } = useServerCart();
   const [paymentIntentSimulation, setPaymentIntentSimulation] = useState<any>(null);
   const [validationTest, setValidationTest] = useState<any>(null);
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
     refreshCart();
@@ -108,8 +110,8 @@ export default function TestCartPage() {
     console.log('🔍 Running Step 2 validation test...');
     
     try {
-      // Get auth session for API calls
-      const { data: { session } } = await (window as any).supabase?.auth?.getSession() || { data: { session: null } };
+      // Get auth session for API calls using the same pattern as checkout pages
+      const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
       if (!token) {
