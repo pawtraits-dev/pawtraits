@@ -145,11 +145,86 @@ export default function PartnerCheckoutPage() {
     return Object.keys(newErrors).length === 0
   }
 
+  // Validate cart items for Gelato availability (Step 2 implementation)
+  const validateCartForGelato = async () => {
+    try {
+      const { data: { session } } = await supabaseService.getClient().auth.getSession();
+      const token = session?.access_token;
+      
+      if (!token) {
+        throw new Error('Authentication required for validation');
+      }
+
+      const response = await fetch('/api/cart/validate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          mode: 'full' // Full validation including Gelato API calls
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Validation failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      console.log('🔍 Partner cart validation result:', {
+        isValid: data.isValid,
+        errors: data.errors?.length || 0,
+        warnings: data.warnings?.length || 0
+      });
+
+      return data;
+    } catch (error) {
+      console.error('Error validating partner cart:', error);
+      
+      // Return a failed validation result
+      return {
+        isValid: false,
+        errors: [{
+          itemIndex: -1,
+          imageId: 'unknown',
+          imageTitle: 'Validation Error',
+          error: `Validation service error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          code: 'API_ERROR'
+        }],
+        warnings: []
+      };
+    }
+  }
+
   const handleShippingSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (validateShipping()) {
       setIsProcessing(true)
       try {
+        // Step 2: Validate cart items for Gelato availability before payment
+        console.log('🔍 Validating partner cart for Gelato availability...');
+        const validationResult = await validateCartForGelato();
+        
+        if (!validationResult.isValid) {
+          console.error('❌ Partner cart validation failed:', validationResult.errors);
+          
+          // Show user-friendly error message
+          const errorMessage = validationResult.errors.length > 0 
+            ? `Unable to process partner order: ${validationResult.errors[0].error}` 
+            : 'Some items in your cart cannot be printed. Please review your cart.';
+          
+          alert(errorMessage + '\n\nPlease remove or replace the affected items and try again.');
+          return;
+        }
+        
+        if (validationResult.warnings && validationResult.warnings.length > 0) {
+          console.warn('⚠️ Partner cart validation warnings:', validationResult.warnings);
+          // Continue with warnings, but log them
+        }
+        
+        console.log('✅ Partner cart validation passed, proceeding with payment...');
         await createPaymentIntent()
         setCurrentStep(2)
       } finally {

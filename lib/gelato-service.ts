@@ -712,6 +712,195 @@ export class GelatoService {
   }
 
   /**
+   * Validate cart items for Gelato availability
+   */
+  async validateCartItems(cartItems: Array<{
+    gelatoProductUid?: string;
+    printSpecs?: {
+      width_cm: number;
+      height_cm: number;
+      medium: string;
+      format: string;
+    };
+    quantity: number;
+    imageId: string;
+    imageTitle: string;
+  }>): Promise<{
+    isValid: boolean;
+    errors: Array<{
+      itemIndex: number;
+      imageId: string;
+      imageTitle: string;
+      error: string;
+      code: 'MISSING_GELATO_UID' | 'MISSING_PRINT_SPECS' | 'INVALID_PRODUCT' | 'API_ERROR';
+    }>;
+    warnings: Array<{
+      itemIndex: number;
+      imageId: string;
+      warning: string;
+    }>;
+  }> {
+    const errors: Array<any> = [];
+    const warnings: Array<any> = [];
+
+    console.log('🔍 Validating cart items for Gelato availability:', cartItems.length);
+
+    for (let i = 0; i < cartItems.length; i++) {
+      const item = cartItems[i];
+      
+      // Check 1: Must have Gelato Product UID
+      if (!item.gelatoProductUid || item.gelatoProductUid.trim() === '') {
+        errors.push({
+          itemIndex: i,
+          imageId: item.imageId,
+          imageTitle: item.imageTitle,
+          error: 'Product missing Gelato integration - cannot be printed',
+          code: 'MISSING_GELATO_UID'
+        });
+        continue;
+      }
+
+      // Check 2: Must have print specifications
+      if (!item.printSpecs) {
+        errors.push({
+          itemIndex: i,
+          imageId: item.imageId,
+          imageTitle: item.imageTitle,
+          error: 'Product missing print specifications',
+          code: 'MISSING_PRINT_SPECS'
+        });
+        continue;
+      }
+
+      // Check 3: Validate dimensions are reasonable
+      const { width_cm, height_cm } = item.printSpecs;
+      if (width_cm < 5 || height_cm < 5 || width_cm > 200 || height_cm > 200) {
+        errors.push({
+          itemIndex: i,
+          imageId: item.imageId,
+          imageTitle: item.imageTitle,
+          error: `Invalid dimensions: ${width_cm}×${height_cm}cm. Must be 5-200cm per side.`,
+          code: 'INVALID_PRODUCT'
+        });
+        continue;
+      }
+
+      // Check 4: Validate product availability with Gelato API
+      try {
+        await this.validateProductAvailability(item.gelatoProductUid, item.quantity);
+        console.log(`✅ Item ${i + 1}: ${item.gelatoProductUid} is available`);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown API error';
+        
+        // Check if it's a permanent product issue vs temporary API error
+        if (errorMessage.includes('404') || errorMessage.includes('not found')) {
+          errors.push({
+            itemIndex: i,
+            imageId: item.imageId,
+            imageTitle: item.imageTitle,
+            error: 'Product no longer available for printing',
+            code: 'INVALID_PRODUCT'
+          });
+        } else {
+          // Temporary API error - treat as warning, not blocking error
+          warnings.push({
+            itemIndex: i,
+            imageId: item.imageId,
+            warning: `Could not verify availability: ${errorMessage}`
+          });
+        }
+      }
+    }
+
+    const isValid = errors.length === 0;
+    console.log(`🎯 Cart validation result: ${isValid ? 'VALID' : 'INVALID'}`, {
+      errors: errors.length,
+      warnings: warnings.length
+    });
+
+    return { isValid, errors, warnings };
+  }
+
+  /**
+   * Validate single product availability with Gelato
+   */
+  async validateProductAvailability(productUid: string, quantity: number = 1): Promise<boolean> {
+    try {
+      console.log(`🔍 Checking availability for product: ${productUid}`);
+      
+      // Try to get product pricing as a way to validate availability
+      // If pricing is available, product exists and can be ordered
+      const prices = await this.getProductPrices(productUid, { country: 'GB' });
+      
+      if (!prices || prices.length === 0) {
+        throw new Error('Product not available for pricing');
+      }
+
+      // Check if requested quantity is supported
+      const maxQuantity = Math.max(...prices.map(p => p.quantity));
+      if (quantity > maxQuantity) {
+        throw new Error(`Maximum quantity ${maxQuantity} exceeded for this product`);
+      }
+
+      console.log(`✅ Product ${productUid} is available (max quantity: ${maxQuantity})`);
+      return true;
+      
+    } catch (error) {
+      console.error(`❌ Product ${productUid} validation failed:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if all required services are available
+   */
+  async validateGelatoServiceHealth(): Promise<{
+    isHealthy: boolean;
+    services: {
+      pricing: boolean;
+      orders: boolean;
+    };
+    errors: string[];
+  }> {
+    const errors: string[] = [];
+    const services = {
+      pricing: false,
+      orders: false
+    };
+
+    try {
+      // Test pricing API with a known product (if available)
+      try {
+        // Try a common canvas product for health check
+        await this.getProductPrices('canvas_200x200-mm-8x8-inch_canvas_wood-fsc-slim_4-0_hor', { country: 'GB' });
+        services.pricing = true;
+      } catch (error) {
+        errors.push('Pricing service unavailable');
+      }
+
+      // Test orders API by checking headers (don't create actual order)
+      try {
+        const headers = this.getHeaders();
+        if (headers.Authorization) {
+          services.orders = true;
+        } else {
+          errors.push('Orders service authentication not configured');
+        }
+      } catch (error) {
+        errors.push('Orders service unavailable');
+      }
+
+    } catch (error) {
+      errors.push('General Gelato service error');
+    }
+
+    const isHealthy = services.pricing && services.orders;
+    console.log('🏥 Gelato service health check:', { isHealthy, services, errors });
+
+    return { isHealthy, services, errors };
+  }
+
+  /**
    * Generate high-quality image URL for printing
    * Uses Cloudinary transformations to ensure print quality
    */
