@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, ArrowRight, CreditCard, Shield, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useServerCart } from "@/lib/server-cart-context"
@@ -33,7 +34,7 @@ export default function CustomerCheckoutPage() {
     address: "",
     city: "",
     postcode: "",
-    country: "United Kingdom",
+    country: "", // Will be set from selectedCountryData
   })
   const [referralCode, setReferralCode] = useState("")
   const [referralValidation, setReferralValidation] = useState<any>(null)
@@ -45,7 +46,7 @@ export default function CustomerCheckoutPage() {
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
   const { cart, clearCart } = useServerCart()
-  const { selectedCountry, selectedCountryData } = useCountryPricing()
+  const { selectedCountry, selectedCountryData, countries } = useCountryPricing()
   const router = useRouter()
   const supabase = getSupabaseClient()
   const supabaseService = new SupabaseService()
@@ -81,7 +82,7 @@ export default function CustomerCheckoutPage() {
             address: prev.address,
             city: prev.city,
             postcode: prev.postcode,
-            country: "United Kingdom",
+            country: selectedCountryData?.name || "United Kingdom",
           }));
 
           // Check for referral code (keeping existing logic)
@@ -101,6 +102,16 @@ export default function CustomerCheckoutPage() {
 
     loadUserProfile();
   }, []);
+
+  // Set default country when countries load or selectedCountryData changes
+  useEffect(() => {
+    if (selectedCountryData && !shippingData.country) {
+      setShippingData(prev => ({
+        ...prev,
+        country: selectedCountryData.name
+      }));
+    }
+  }, [selectedCountryData, shippingData.country]);
 
   // Check for referral code in URL or localStorage (only if no server-side data available)
   useEffect(() => {
@@ -191,6 +202,7 @@ export default function CustomerCheckoutPage() {
   const validateShipping = () => {
     const newErrors: Record<string, string> = {}
 
+    // Basic field validation
     if (!shippingData.firstName.trim()) newErrors.firstName = "First name is required"
     if (!shippingData.lastName.trim()) newErrors.lastName = "Last name is required"
     if (!shippingData.email.trim()) {
@@ -201,6 +213,58 @@ export default function CustomerCheckoutPage() {
     if (!shippingData.address.trim()) newErrors.address = "Address is required"
     if (!shippingData.city.trim()) newErrors.city = "City is required"
     if (!shippingData.postcode.trim()) newErrors.postcode = "Postcode is required"
+    
+    // Country validation - ensure it's a supported country
+    if (!shippingData.country || !shippingData.country.trim()) {
+      newErrors.country = "Country is required"
+    } else {
+      // Validate against supported countries from the context
+      const isValidCountry = countries.some(c => c.name === shippingData.country);
+      if (!isValidCountry) {
+        newErrors.country = "Please select a valid country from the list"
+      }
+    }
+    
+    // Postcode format validation based on country
+    const postcode = shippingData.postcode.trim();
+    if (postcode && shippingData.country) {
+      // Get country code from country name
+      const selectedCountryInfo = countries.find(c => c.name === shippingData.country);
+      const countryCode = selectedCountryInfo?.code;
+      let postcodeValid = true;
+      let postcodeFormat = "";
+      
+      switch (countryCode) {
+        case 'GB': // UK postcode format
+          postcodeValid = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i.test(postcode);
+          postcodeFormat = "UK postcode format (e.g., SW1A 1AA)";
+          break;
+        case 'US': // US zip code format
+          postcodeValid = /^[0-9]{5}(-[0-9]{4})?$/.test(postcode);
+          postcodeFormat = "US zip code format (e.g., 12345 or 12345-6789)";
+          break;
+        case 'CA': // Canadian postal code format
+          postcodeValid = /^[A-Z][0-9][A-Z]\s?[0-9][A-Z][0-9]$/i.test(postcode);
+          postcodeFormat = "Canadian postal code format (e.g., K1A 0A6)";
+          break;
+        case 'DE': // German postcode format
+        case 'FR': // French postcode format
+          postcodeValid = /^[0-9]{5}$/.test(postcode);
+          postcodeFormat = "5-digit postal code (e.g., 12345)";
+          break;
+        case 'AU': // Australian postcode format
+          postcodeValid = /^[0-9]{4}$/.test(postcode);
+          postcodeFormat = "4-digit postcode (e.g., 1234)";
+          break;
+        default:
+          // For other countries, just check it's not empty (already validated above)
+          postcodeValid = true;
+      }
+      
+      if (!postcodeValid) {
+        newErrors.postcode = `Please enter a valid ${postcodeFormat}`;
+      }
+    }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -288,13 +352,17 @@ export default function CustomerCheckoutPage() {
       console.log('🚚 Fetching shipping options from Gelato...');
       
       // Create shipping address object
+      // Get country code from selected country name
+      const selectedCountryInfo = countries.find(c => c.name === shippingData.country);
+      const countryCode = selectedCountryInfo?.code || selectedCountryData?.code || selectedCountry;
+      
       const shippingAddress = {
         firstName: shippingData.firstName,
         lastName: shippingData.lastName,
         address1: shippingData.address,
         city: shippingData.city,
         postalCode: shippingData.postcode,
-        country: selectedCountry
+        country: countryCode
       };
 
       // Get auth token for API calls
@@ -671,6 +739,26 @@ export default function CustomerCheckoutPage() {
                         />
                         {errors.postcode && <p className="text-sm text-red-600">{errors.postcode}</p>}
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="country">Country *</Label>
+                      <Select
+                        value={shippingData.country}
+                        onValueChange={(value) => handleInputChange("country", value)}
+                      >
+                        <SelectTrigger className={errors.country ? "border-red-500" : ""}>
+                          <SelectValue placeholder="Select country" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {countries.map((country) => (
+                            <SelectItem key={country.code} value={country.name}>
+                              {country.flag} {country.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.country && <p className="text-sm text-red-600">{errors.country}</p>}
                     </div>
 
                     <Button 
