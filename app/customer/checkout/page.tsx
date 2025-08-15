@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, ArrowRight, CreditCard, Shield, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useServerCart } from "@/lib/server-cart-context"
-import { useCountryPricing } from "@/lib/country-context"
+import { useCountry } from "@/lib/country-context"
 import { useRouter } from "next/navigation"
 import { getSupabaseClient } from '@/lib/supabase-client'
 import { SupabaseService } from '@/lib/supabase'
@@ -46,7 +46,7 @@ export default function CustomerCheckoutPage() {
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
   const { cart, clearCart } = useServerCart()
-  const { selectedCountry, selectedCountryData, countries } = useCountryPricing()
+  const { selectedCountry, selectedCountryData, countries, isLoading: countriesLoading } = useCountry()
   const router = useRouter()
   const supabase = getSupabaseClient()
   const supabaseService = new SupabaseService()
@@ -217,8 +217,8 @@ export default function CustomerCheckoutPage() {
     // Country validation - ensure it's a supported country
     if (!shippingData.country || !shippingData.country.trim()) {
       newErrors.country = "Country is required"
-    } else {
-      // Validate against supported countries from the context
+    } else if (countries && countries.length > 0) {
+      // Validate against supported countries from the context (only if countries are loaded)
       const isValidCountry = countries.some(c => c.name === shippingData.country);
       if (!isValidCountry) {
         newErrors.country = "Please select a valid country from the list"
@@ -227,7 +227,7 @@ export default function CustomerCheckoutPage() {
     
     // Postcode format validation based on country
     const postcode = shippingData.postcode.trim();
-    if (postcode && shippingData.country) {
+    if (postcode && shippingData.country && countries && countries.length > 0) {
       // Get country code from country name
       const selectedCountryInfo = countries.find(c => c.name === shippingData.country);
       const countryCode = selectedCountryInfo?.code;
@@ -353,7 +353,7 @@ export default function CustomerCheckoutPage() {
       
       // Create shipping address object
       // Get country code from selected country name
-      const selectedCountryInfo = countries.find(c => c.name === shippingData.country);
+      const selectedCountryInfo = countries?.find(c => c.name === shippingData.country);
       const countryCode = selectedCountryInfo?.code || selectedCountryData?.code || selectedCountry;
       
       const shippingAddress = {
@@ -594,8 +594,8 @@ export default function CustomerCheckoutPage() {
     { number: 3, title: "Payment", completed: false },
   ]
 
-  // Show loading state while user profile is loading
-  if (loading) {
+  // Show loading state while user profile or countries are loading
+  if (loading || countriesLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 py-8 flex items-center justify-center">
         <div className="text-center">
@@ -746,16 +746,21 @@ export default function CustomerCheckoutPage() {
                       <Select
                         value={shippingData.country}
                         onValueChange={(value) => handleInputChange("country", value)}
+                        disabled={!countries || countries.length === 0}
                       >
                         <SelectTrigger className={errors.country ? "border-red-500" : ""}>
-                          <SelectValue placeholder="Select country" />
+                          <SelectValue placeholder={
+                            !countries || countries.length === 0 
+                              ? "Loading countries..." 
+                              : "Select country"
+                          } />
                         </SelectTrigger>
                         <SelectContent>
-                          {countries.map((country) => (
+                          {countries?.map((country) => (
                             <SelectItem key={country.code} value={country.name}>
                               {country.flag} {country.name}
                             </SelectItem>
-                          ))}
+                          )) || []}
                         </SelectContent>
                       </Select>
                       {errors.country && <p className="text-sm text-red-600">{errors.country}</p>}
