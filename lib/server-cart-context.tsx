@@ -17,6 +17,15 @@ export interface CartItem {
   addedAt: string;
   partnerId?: string;
   discountCode?: string;
+  // Enhanced Gelato integration data (internal use only, not displayed to user)
+  gelatoProductUid?: string; // From product.gelato_sku
+  printSpecs?: {
+    width_cm: number;
+    height_cm: number;
+    medium: string;
+    format: string;
+    print_ready_url?: string; // Generated at checkout time
+  };
 }
 
 interface CartState {
@@ -149,7 +158,15 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
             quantity: item.quantity,
             addedAt: item.created_at,
             partnerId: item.partner_id,
-            discountCode: item.discount_code
+            discountCode: item.discount_code,
+            // Enhanced Gelato data from product
+            gelatoProductUid: item.product_data?.gelato_sku,
+            printSpecs: item.product_data ? {
+              width_cm: item.product_data.width_cm || 30,
+              height_cm: item.product_data.height_cm || 30,
+              medium: item.product_data.medium?.name || 'Canvas',
+              format: item.product_data.format?.name || 'Portrait'
+            } : undefined
           }));
 
           if (mounted) {

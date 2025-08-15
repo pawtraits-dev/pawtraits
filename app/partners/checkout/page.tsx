@@ -189,6 +189,9 @@ export default function PartnerCheckoutPage() {
           imageTitle: item.imageTitle,
           quantity: item.quantity,
           unitPrice: Math.round(item.pricing.sale_price * 0.85), // Partner discount applied
+          // Enhanced Gelato data for order fulfillment
+          gelatoProductUid: item.gelatoProductUid,
+          printSpecs: item.printSpecs
         })),
         // Partner-specific metadata
         isPartnerOrder: true,

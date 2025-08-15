@@ -235,6 +235,9 @@ export default function CustomerCheckoutPage() {
           imageTitle: item.imageTitle,
           quantity: item.quantity,
           unitPrice: item.pricing.sale_price,
+          // Enhanced Gelato data for order fulfillment
+          gelatoProductUid: item.gelatoProductUid,
+          printSpecs: item.printSpecs
         })),
         referralCode: referralCode || undefined,
       };

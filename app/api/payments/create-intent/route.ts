@@ -25,6 +25,14 @@ interface CreatePaymentIntentRequest {
     imageTitle: string;
     quantity: number;
     unitPrice: number;
+    // Enhanced Gelato data for order fulfillment
+    gelatoProductUid?: string;
+    printSpecs?: {
+      width_cm: number;
+      height_cm: number;
+      medium: string;
+      format: string;
+    };
   }>;
   referralCode?: string;
   // Partner-specific fields
@@ -125,6 +133,16 @@ export async function POST(request: NextRequest) {
         metadata[`item${index + 1}_id`] = item.imageId;
         metadata[`item${index + 1}_title`] = item.imageTitle.substring(0, 50); // Truncate to avoid metadata limit
         metadata[`item${index + 1}_qty`] = item.quantity.toString();
+        // Enhanced Gelato data for fulfillment
+        if (item.gelatoProductUid) {
+          metadata[`item${index + 1}_gelato_uid`] = item.gelatoProductUid.substring(0, 100);
+        }
+        if (item.printSpecs) {
+          metadata[`item${index + 1}_width`] = item.printSpecs.width_cm.toString();
+          metadata[`item${index + 1}_height`] = item.printSpecs.height_cm.toString();
+          metadata[`item${index + 1}_medium`] = item.printSpecs.medium.substring(0, 30);
+          metadata[`item${index + 1}_format`] = item.printSpecs.format.substring(0, 30);
+        }
       });
     }
 

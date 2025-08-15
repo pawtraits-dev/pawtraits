@@ -104,6 +104,15 @@ export default function ProductSelectionModal({
           product,
           pricing: productPricing,
           quantity: item.quantity,
+          // Enhanced Gelato data (not shown to user, used internally)
+          gelatoProductUid: product.gelato_sku || undefined,
+          printSpecs: {
+            width_cm: product.width_cm || 30,
+            height_cm: product.height_cm || 30,
+            medium: product.medium?.name || 'Canvas',
+            format: product.format?.name || 'Portrait'
+            // print_ready_url will be generated at checkout time
+          }
         });
       }
     });

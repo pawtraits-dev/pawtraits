@@ -612,8 +612,9 @@ export class GelatoService {
 
     // Map order items to Gelato line items
     const items: GelatoLineItem[] = orderItems.map(item => ({
-      productUid: this.mapProductToGelatoUID(item.product_data),
-      variantUid: this.mapVariantToGelatoUID(item.product_data),
+      // Use stored Gelato Product UID from database (preferred method)
+      productUid: item.product_data?.gelato_sku || this.mapProductToGelatoUID(item.product_data),
+      variantUid: item.product_data?.gelato_sku || this.mapVariantToGelatoUID(item.product_data),
       quantity: item.quantity,
       printFileUrl: imageUrls[item.image_id] || '',
       printFileType: 'url' as const,

@@ -310,23 +310,38 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
     const metadata = paymentIntent.metadata || {};
     const cartItems: any[] = [];
     
-    // Reconstruct cart items from metadata
+    // Reconstruct cart items from enhanced metadata
     for (let i = 1; i <= 10; i++) {
       const itemId = metadata[`item${i}_id`];
       const itemTitle = metadata[`item${i}_title`];
       const itemQty = metadata[`item${i}_qty`];
       
       if (itemId) {
+        // Enhanced Gelato data from metadata
+        const gelatoUid = metadata[`item${i}_gelato_uid`];
+        const width = parseFloat(metadata[`item${i}_width`]) || 30;
+        const height = parseFloat(metadata[`item${i}_height`]) || 30;
+        const medium = metadata[`item${i}_medium`] || 'Canvas';
+        const format = metadata[`item${i}_format`] || 'Portrait';
+        
         cartItems.push({
           image_id: itemId,
           image_title: itemTitle,
           quantity: parseInt(itemQty) || 1,
           product_data: {
-            // Default product data - in production, this would come from your database
-            medium: { name: 'Canvas' },
-            format: { name: 'Portrait' },
-            width_cm: 30,
-            height_cm: 30
+            // Use saved Gelato product UID instead of mapping
+            gelato_sku: gelatoUid,
+            medium: { name: medium },
+            format: { name: format },
+            width_cm: width,
+            height_cm: height
+          },
+          // Enhanced print specs for precise image generation
+          printSpecs: {
+            width_cm: width,
+            height_cm: height,
+            medium: medium,
+            format: format
           }
         });
       }
@@ -337,15 +352,18 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
       return;
     }
 
-    // Generate print-ready image URLs
+    // Generate print-ready image URLs using existing Cloudinary transformations
     const gelatoService = createGelatoService();
     const imageUrls: Record<string, string> = {};
     for (const item of cartItems) {
-      const { width_cm, height_cm } = item.product_data;
+      // Use enhanced cart data if available, fallback to product data
+      const widthCm = item.printSpecs?.width_cm || item.product_data?.width_cm || 30;
+      const heightCm = item.printSpecs?.height_cm || item.product_data?.height_cm || 30;
+      
       imageUrls[item.image_id] = gelatoService.generatePrintImageUrl(
         item.image_id,
-        width_cm || 30,
-        height_cm || 30
+        widthCm,
+        heightCm
       );
     }
 
