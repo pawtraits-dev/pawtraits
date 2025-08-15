@@ -426,59 +426,56 @@ export class GelatoService {
   }
 
   /**
-   * Get shipping methods for a country
-   * Note: Shipment methods might be at a different API endpoint than orders
+   * Get shipping methods for a country using correct Gelato Shipment API v1
    */
   async getShippingMethods(countryCode: string): Promise<any[]> {
     try {
       console.log('🚚 Fetching Gelato shipping methods for country:', countryCode);
       
-      // Try multiple possible endpoints for shipping methods
-      const endpoints = [
-        // Try product API v3 (this might be where shipping methods are)
-        `${this.baseUrl}/v3/shipment-methods?country=${countryCode}`,
-        // Try orders API v4
-        `${this.getOrderApiUrl()}/v4/shipment-methods?country=${countryCode}`,
-        // Try dedicated shipping API
-        `${this.getShippingApiUrl()}/v4/shipment-methods?country=${countryCode}`
-      ];
+      // Use the correct Gelato Shipment API v1 endpoint
+      const url = `https://shipment.gelatoapis.com/v1/shipment-methods?country=${countryCode}`;
+      console.log('🚚 Gelato shipping API URL:', url);
       
-      let lastError: any = null;
-      
-      for (const url of endpoints) {
-        try {
-          console.log('🚚 Trying Gelato shipping endpoint:', url);
-          
-          const response = await fetch(url, {
-            method: 'GET',
-            headers: this.getHeaders()
-          });
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders()
+      });
 
-          if (response.ok) {
-            const data = await response.json();
-            console.log('✅ Gelato shipping methods success:', {
-              endpoint: url,
-              country: countryCode,
-              methodCount: data?.shipmentMethods?.length || data?.data?.length || 0
-            });
-            
-            return data.shipmentMethods || data.data || [];
-          } else {
-            const errorBody = await response.text();
-            console.warn(`❌ Endpoint failed: ${url}`, {
-              status: response.status,
-              body: errorBody.substring(0, 200)
-            });
-            lastError = new Error(`${response.status} ${response.statusText} - ${errorBody}`);
-          }
-        } catch (error) {
-          console.warn(`💥 Error with endpoint: ${url}`, error);
-          lastError = error;
-        }
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error('❌ Gelato shipping methods API failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody,
+          country: countryCode,
+          url: url
+        });
+        throw new Error(`Gelato Shipment API error: ${response.status} ${response.statusText} - ${errorBody}`);
       }
+
+      const data = await response.json();
+      console.log('✅ Gelato shipping methods response:', {
+        country: countryCode,
+        methodCount: data?.shipmentMethods?.length || 0,
+        methods: data?.shipmentMethods?.map((method: any) => ({
+          uid: method.shipmentMethodUid,
+          name: method.name,
+          type: method.type,
+          hasTracking: method.hasTracking
+        })) || []
+      });
       
-      // If all endpoints fail, throw the last error
-      throw lastError || new Error('All shipping endpoints failed');
+      // Filter methods that support the requested country
+      const availableMethods = data.shipmentMethods?.filter((method: any) => 
+        method.supportedCountries?.includes(countryCode.toUpperCase())
+      ) || [];
+      
+      console.log('🚚 Filtered methods for', countryCode + ':', {
+        available: availableMethods.length,
+        methods: availableMethods.map((m: any) => ({ uid: m.shipmentMethodUid, name: m.name }))
+      });
+      
+      return availableMethods;
       
     } catch (error) {
       console.error('💥 Error fetching shipping methods:', error);
@@ -807,7 +804,7 @@ export class GelatoService {
       customerReferenceId: order.customer_email,
       currency: order.currency.toUpperCase(),
       items: items,
-      shipmentMethodUid: "standard", // Use standard shipping method
+      shipmentMethodUid: this.getDefaultShipmentMethodUid(order.shipping_country), // Use appropriate shipping method
       shippingAddress: shippingAddress,
       metadata: [
         {
@@ -887,6 +884,44 @@ export class GelatoService {
     
     // Default variant
     return '30x30-cm';
+  }
+
+  /**
+   * Get appropriate shipment method UID based on destination country
+   */
+  private getDefaultShipmentMethodUid(country: string): string {
+    const countryCode = this.mapCountryToGelatoCode(country);
+    
+    // Based on the Gelato shipment methods API documentation
+    // Map countries to appropriate shipment methods
+    
+    // DHL Global Parcel covers most EU countries + UK
+    const dhlGlobalCountries = ['AT', 'BE', 'BG', 'CH', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FO', 'FR', 'GB', 'GI', 'GL', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NG', 'NL', 'NO', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK'];
+    
+    if (dhlGlobalCountries.includes(countryCode)) {
+      return 'dhl_global_parcel';
+    }
+    
+    // Germany has specific DHL Parcel
+    if (countryCode === 'DE') {
+      return 'dhl_parcel';
+    }
+    
+    // Netherlands has PostNL
+    if (countryCode === 'NL') {
+      return 'tnt_parcel';
+    }
+    
+    // PostNL Global Pack covers many international destinations
+    const globalPackCountries = ['AT', 'AU', 'AX', 'BE', 'BG', 'BR', 'CA', 'CH', 'CN', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HK', 'HR', 'HU', 'IE', 'IN', 'IT', 'JP', 'LT', 'LU', 'LV', 'MT', 'NO', 'NZ', 'PL', 'PT', 'RO', 'RU', 'SE', 'SI', 'SK', 'TR', 'US', 'ZA'];
+    
+    if (globalPackCountries.includes(countryCode)) {
+      return 'tnt_global_pack';
+    }
+    
+    // Default fallback - use DHL Global Parcel as it has widest coverage
+    console.log(`🚚 No specific shipment method found for ${countryCode}, using DHL Global Parcel as fallback`);
+    return 'dhl_global_parcel';
   }
 
   /**

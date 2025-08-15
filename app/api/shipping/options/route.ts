@@ -61,125 +61,135 @@ export async function POST(request: NextRequest) {
       })
     }));
 
-    // For now, use standard shipping options while we resolve Gelato shipping API
-    // Based on typical print-on-demand shipping times and costs
-    console.log('🚚 [SHIPPING API] Using standard shipping options for country:', shippingAddress.country);
-    
-    // Country-specific shipping options
-    const getShippingOptionsForCountry = (country: string) => {
-      const countryCode = country.toUpperCase();
-      
-      // UK shipping options
-      if (countryCode === 'GB' || countryCode === 'UK') {
-        return [
+    // Get real Gelato shipping methods for the destination country
+    try {
+      console.log('🚚 [SHIPPING API] Calling Gelato API for country:', shippingAddress.country);
+      const shippingMethods = await gelatoService.getShippingMethods(shippingAddress.country);
+
+      console.log('🚚 [SHIPPING API] Received shipping methods:', {
+        count: shippingMethods?.length || 0,
+        methods: shippingMethods?.map(method => ({
+          uid: method.shipmentMethodUid,
+          name: method.name,
+          type: method.type,
+          hasTracking: method.hasTracking
+        })) || []
+      });
+
+      if (!shippingMethods || shippingMethods.length === 0) {
+        console.log('🚚 [SHIPPING API] No Gelato methods found, using fallback options');
+        
+        // Fallback to standard options if no Gelato methods available
+        const fallbackOptions = [
           {
-            id: 'standard_uk',
-            name: 'Standard UK Delivery',
-            description: 'Delivery in 5-7 business days',
-            price: 499, // £4.99 in pence
+            id: 'standard_fallback',
+            name: 'Standard Delivery',
+            description: 'Standard delivery to your location',
+            price: 999, // £9.99 in pence
             currency: 'GBP',
-            estimatedDeliveryDays: '5-7',
-            carrier: 'Royal Mail',
-            service: 'Standard'
-          },
-          {
-            id: 'express_uk',
-            name: 'Express UK Delivery', 
-            description: 'Delivery in 2-3 business days',
-            price: 899, // £8.99 in pence
-            currency: 'GBP',
-            estimatedDeliveryDays: '2-3',
-            carrier: 'DPD',
-            service: 'Express'
-          }
-        ];
-      }
-      
-      // EU shipping options
-      if (['DE', 'FR', 'ES', 'IT', 'NL', 'BE', 'AT', 'SE', 'NO', 'DK'].includes(countryCode)) {
-        return [
-          {
-            id: 'standard_eu',
-            name: 'Standard EU Delivery',
-            description: 'Delivery in 7-10 business days',
-            price: 899, // €8.99 equivalent in pence
-            currency: 'EUR',
             estimatedDeliveryDays: '7-10',
-            carrier: 'DHL',
+            carrier: 'Standard',
             service: 'Standard'
-          },
-          {
-            id: 'express_eu',
-            name: 'Express EU Delivery',
-            description: 'Delivery in 3-5 business days', 
-            price: 1599, // €15.99 equivalent in pence
-            currency: 'EUR',
-            estimatedDeliveryDays: '3-5',
-            carrier: 'DHL',
-            service: 'Express'
           }
         ];
+
+        return NextResponse.json({
+          success: true,
+          shippingOptions: fallbackOptions,
+          shippingAddress: shippingAddress,
+          note: 'Using fallback shipping - no Gelato methods available for destination'
+        });
+      }
+
+      // Transform Gelato shipping methods to our format with estimated pricing
+      const transformedOptions = shippingMethods.map(method => {
+        // Estimate pricing based on method type and destination
+        let price = 999; // Default £9.99
+        let estimatedDays = '5-7';
+        
+        if (method.type === 'express') {
+          price = 1999; // £19.99 for express
+          estimatedDays = '2-3';
+        } else if (method.type === 'normal') {
+          price = 999; // £9.99 for normal
+          estimatedDays = '5-7';
+        }
+
+        // Adjust pricing based on destination country
+        const countryCode = shippingAddress.country.toUpperCase();
+        if (['DE', 'FR', 'ES', 'IT', 'NL', 'BE', 'AT'].includes(countryCode)) {
+          // EU countries - slightly higher
+          price = Math.round(price * 1.2);
+        } else if (countryCode === 'US') {
+          // US - convert to USD cents
+          price = Math.round(price * 1.3); // Rough USD conversion
+        } else if (!['GB', 'UK'].includes(countryCode)) {
+          // International - higher cost
+          price = Math.round(price * 1.5);
+        }
+
+        return {
+          id: method.shipmentMethodUid,
+          name: method.name,
+          description: `${method.name} - Delivery in ${estimatedDays} business days${method.hasTracking ? ' (with tracking)' : ''}`,
+          price: price,
+          currency: 'GBP', // TODO: Use proper currency based on destination
+          estimatedDeliveryDays: estimatedDays,
+          carrier: method.name,
+          service: method.type,
+          hasTracking: method.hasTracking
+        };
+      });
+
+      return NextResponse.json({
+        success: true,
+        shippingOptions: transformedOptions,
+        shippingAddress: shippingAddress,
+        note: 'Real Gelato shipping methods'
+      });
+
+    } catch (gelatoError: any) {
+      console.error('🚚 [SHIPPING API] Gelato API error:', gelatoError);
+      
+      // Handle specific Gelato API errors
+      if (gelatoError.message?.includes('Invalid address')) {
+        return NextResponse.json(
+          { error: 'Invalid shipping address. Please check your address details.' },
+          { status: 400 }
+        );
       }
       
-      // US shipping options
-      if (countryCode === 'US') {
-        return [
-          {
-            id: 'standard_us',
-            name: 'Standard US Delivery',
-            description: 'Delivery in 7-10 business days',
-            price: 799, // $7.99 in cents
-            currency: 'USD',
-            estimatedDeliveryDays: '7-10',
-            carrier: 'USPS',
-            service: 'Standard'
-          },
-          {
-            id: 'express_us',
-            name: 'Express US Delivery',
-            description: 'Delivery in 3-5 business days',
-            price: 1499, // $14.99 in cents
-            currency: 'USD', 
-            estimatedDeliveryDays: '3-5',
-            carrier: 'FedEx',
-            service: 'Express'
-          }
-        ];
+      if (gelatoError.message?.includes('No shipping available')) {
+        return NextResponse.json(
+          { error: 'Shipping is not available to this location.' },
+          { status: 404 }
+        );
       }
+
+      // Fallback to standard shipping options if Gelato API fails
+      console.log('🚚 [SHIPPING API] Falling back to standard options due to API error');
       
-      // Default international shipping
-      return [
+      const fallbackOptions = [
         {
-          id: 'standard_intl',
-          name: 'Standard International Delivery',
-          description: 'Delivery in 10-15 business days',
-          price: 1299, // £12.99 in pence
+          id: 'standard_fallback',
+          name: 'Standard Delivery',
+          description: 'Standard delivery to your location',
+          price: 999, // £9.99 in pence
           currency: 'GBP',
-          estimatedDeliveryDays: '10-15',
-          carrier: 'International Post',
-          service: 'Standard'
+          estimatedDeliveryDays: '7-10',
+          carrier: 'Standard',
+          service: 'Standard',
+          hasTracking: false
         }
       ];
-    };
 
-    const shippingOptions = getShippingOptionsForCountry(shippingAddress.country);
-    
-    console.log('🚚 [SHIPPING API] Shipping options for', shippingAddress.country + ':', {
-      count: shippingOptions.length,
-      options: shippingOptions.map(opt => ({ 
-        id: opt.id, 
-        name: opt.name, 
-        price: opt.price, 
-        currency: opt.currency 
-      }))
-    });
-
-    return NextResponse.json({
-      success: true,
-      shippingOptions: shippingOptions,
-      shippingAddress: shippingAddress,
-      note: 'Using standard shipping rates - Gelato integration pending'
-    });
+      return NextResponse.json({
+        success: true,
+        shippingOptions: fallbackOptions,
+        shippingAddress: shippingAddress,
+        note: 'Using fallback shipping due to API error'
+      });
+    }
 
   } catch (error: any) {
     console.error('🚚 [SHIPPING API] Unexpected error:', error);
