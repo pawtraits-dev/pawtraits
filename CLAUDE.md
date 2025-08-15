@@ -331,3 +331,19 @@ Use Stripe test mode with test API keys. Test cards:
 - Debug API endpoints for troubleshooting RLS policies
 - Cloudinary migration and testing utilities
 - Component update validation scripts
+
+## Important Implementation Notes
+
+### Legacy Peer Dependencies
+When installing new dependencies, always use `npm install --legacy-peer-deps` due to React 19 compatibility requirements.
+
+### Retail Pricing System
+- Products have a 70% margin calculation built-in for retail pricing
+- Prices are automatically rounded to nearest £2.50 for retail display
+- Admin product pages show both base cost and retail pricing with margin calculations
+
+### Cart System Implementation
+- Server-side cart context in `lib/server-cart-context.tsx`
+- Client-side cart state management with React Context
+- Cart operations integrated with Stripe payment intents
+- Supports both authenticated and guest user sessions

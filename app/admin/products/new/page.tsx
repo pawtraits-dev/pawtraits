@@ -42,6 +42,7 @@ interface ProductFormData {
   is_active: boolean;
   is_featured: boolean;
   stock_status: string;
+  product_weight_g?: number;
 }
 
 export default function NewProductPage() {
@@ -63,7 +64,8 @@ export default function NewProductPage() {
     gelato_sku: '',
     is_active: true,
     is_featured: false,
-    stock_status: 'in_stock'
+    stock_status: 'in_stock',
+    product_weight_g: undefined
   });
 
   // Supporting data
@@ -81,6 +83,22 @@ export default function NewProductPage() {
   const [productPricing, setProductPricing] = useState<{[key: string]: any}>({});
 
   const supabaseService = new AdminSupabaseService();
+
+  // Helper function to determine format based on dimensions
+  const determineFormatFromDimensions = (width: number, height: number) => {
+    const ratio = width / height;
+    
+    if (Math.abs(ratio - 1) < 0.1) {
+      // Square (1:1)
+      return formats.find(f => f.name === 'Square' && f.is_active);
+    } else if (ratio > 1) {
+      // Landscape (wider than tall)
+      return formats.find(f => f.name === 'Landscape' && f.is_active);
+    } else {
+      // Portrait (taller than wide)
+      return formats.find(f => f.name === 'Portrait' && f.is_active);
+    }
+  };
 
   // Helper function to map Gelato product to form fields
   const populateFormFromGelatoProduct = (gelatoProduct: GelatoProduct) => {
@@ -112,19 +130,18 @@ export default function NewProductPage() {
       updates.medium_id = matchingMedium.id;
     }
     
-    // Map to format - for now, default to most common format or first available
-    // This could be enhanced with more specific mapping logic
-    const defaultFormat = formats.find(f => f.is_active);
-    if (defaultFormat) {
-      updates.format_id = defaultFormat.id;
-    }
-    
     // Set a default size name based on product name
     if (productName) {
       updates.size_name = gelatoProduct.name || 'Standard';
     }
     
     return updates;
+  };
+
+  // Helper function to generate description based on size, format, and medium
+  const generateDescription = (sizeName: string, formatName: string, mediumName: string) => {
+    const cleanSizeName = sizeName.replace(/\d+[xX×]\d+/, '').trim() || sizeName;
+    return `${cleanSizeName} ${formatName} ${mediumName}`.trim();
   };
 
   // Helper function to extract size information from variant selections
@@ -360,16 +377,24 @@ export default function NewProductPage() {
           const dims = result.productDetails.dimensions;
           let widthMm = dims.Width?.value;
           let heightMm = dims.Height?.value;
+          let weightG = dims.Weight?.value;
           
           if (widthMm && heightMm) {
-            // Ensure correct orientation: width should be smaller dimension for portrait
-            // If height > width, it's already portrait (correct)
-            // If width > height, it's landscape - may need to swap for portrait products
-            
             formUpdates.width_cm = (widthMm / 10).toString();
             formUpdates.height_cm = (heightMm / 10).toString();
             formUpdates.width_inches = (widthMm / 25.4).toFixed(1);
             formUpdates.height_inches = (heightMm / 25.4).toFixed(1);
+            
+            // Determine format based on dimensions
+            const determinedFormat = determineFormatFromDimensions(widthMm, heightMm);
+            if (determinedFormat) {
+              formUpdates.format_id = determinedFormat.id;
+            }
+            
+            // Store weight if available
+            if (weightG) {
+              formUpdates.product_weight_g = weightG;
+            }
           }
         }
         
@@ -382,10 +407,24 @@ export default function NewProductPage() {
           formUpdates.size_code = sizeInfo.sizeCode;
         }
         
-        // Apply all updates at once
-        if (Object.keys(formUpdates).length > 0) {
-          setFormData(prev => ({ ...prev, ...formUpdates }));
-        }
+        // Generate description after we have all the info
+        setFormData(prev => {
+          const updatedForm = { ...prev, ...formUpdates };
+          
+          // Find the format and medium names for description
+          const selectedFormat = formats.find(f => f.id === updatedForm.format_id);
+          const selectedMedium = media.find(m => m.id === updatedForm.medium_id);
+          
+          if (selectedFormat && selectedMedium && updatedForm.size_name) {
+            updatedForm.description = generateDescription(
+              updatedForm.size_name,
+              selectedFormat.name,
+              selectedMedium.name
+            );
+          }
+          
+          return updatedForm;
+        });
         
         return result.productUid;
       }
@@ -705,7 +744,7 @@ export default function NewProductPage() {
                   </Link>
                 </h4>
                 
-                {productPricing[formData.gelato_sku] ? (
+                {productPricing[formData.gelato_sku] && (
                   <>
                     {/* Native Currency Pricing */}
                     {productPricing[formData.gelato_sku].byCurrency && (
@@ -797,7 +836,9 @@ export default function NewProductPage() {
                       </div>
                     )}
                   </>
-                ) : (
+                )}
+                
+                {!productPricing[formData.gelato_sku] && (
                   <div className="text-sm text-yellow-700 bg-white p-3 rounded border">
                     <p className="mb-2">📋 <strong>To get pricing:</strong></p>
                     <ol className="text-xs list-decimal list-inside space-y-1">
@@ -809,6 +850,73 @@ export default function NewProductPage() {
                 )}
               </div>
             )}
+
+            {/* Product Details moved from separate card */}
+            <div className="border-t pt-6">
+              <h4 className="font-semibold text-gray-900 mb-4">Product Details</h4>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <Input
+                    value={formData.description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Product description (auto-generated from selections)"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Stock Status
+                    </label>
+                    <Select 
+                      value={formData.stock_status} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, stock_status: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="in_stock">In Stock</SelectItem>
+                        <SelectItem value="low_stock">Low Stock</SelectItem>
+                        <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                        <SelectItem value="discontinued">Discontinued</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="is_active"
+                        checked={formData.is_active}
+                        onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                        className="rounded"
+                      />
+                      <label htmlFor="is_active" className="text-sm font-medium text-gray-700">
+                        Active Product
+                      </label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="is_featured"
+                        checked={formData.is_featured}
+                        onChange={(e) => setFormData(prev => ({ ...prev, is_featured: e.target.checked }))}
+                        className="rounded"
+                      />
+                      <label htmlFor="is_featured" className="text-sm font-medium text-gray-700">
+                        Featured Product
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -902,78 +1010,27 @@ export default function NewProductPage() {
                 />
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Product Details */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Details</CardTitle>
-            <CardDescription>Additional product information</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description
-              </label>
-              <Input
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Additional product description (optional)"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+            {/* Product Weight */}
+            {formData.product_weight_g && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Stock Status
+                  Product Weight
                 </label>
-                <Select 
-                  value={formData.stock_status} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, stock_status: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="in_stock">In Stock</SelectItem>
-                    <SelectItem value="low_stock">Low Stock</SelectItem>
-                    <SelectItem value="out_of_stock">Out of Stock</SelectItem>
-                    <SelectItem value="discontinued">Discontinued</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="is_active"
-                    checked={formData.is_active}
-                    onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
-                    className="rounded"
-                  />
-                  <label htmlFor="is_active" className="text-sm font-medium text-gray-700">
-                    Active Product
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="is_featured"
-                    checked={formData.is_featured}
-                    onChange={(e) => setFormData(prev => ({ ...prev, is_featured: e.target.checked }))}
-                    className="rounded"
-                  />
-                  <label htmlFor="is_featured" className="text-sm font-medium text-gray-700">
-                    Featured Product
-                  </label>
+                <div className="p-3 bg-gray-50 rounded border">
+                  <div className="text-sm font-medium text-gray-900">
+                    {formData.product_weight_g}g ({(formData.product_weight_g / 1000).toFixed(2)}kg)
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">
+                    Weight from Gelato product specifications
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Product Details moved to Product Information card */}
 
         {/* Form Actions */}
         <Card>
