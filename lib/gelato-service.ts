@@ -115,6 +115,12 @@ export class GelatoService {
   constructor() {
     this.baseUrl = process.env.GELATO_API_BASE_URL || 'https://product.gelatoapis.com';
     this.apiKey = process.env.GELATO_API_KEY || '';
+    
+    console.log('🔧 Gelato service initialized:', {
+      baseUrl: this.baseUrl,
+      hasApiKey: !!this.apiKey,
+      apiKeyLength: this.apiKey?.length || 0
+    });
   }
 
   private validateApiKey(): void {
@@ -246,17 +252,29 @@ export class GelatoService {
   }
 
   /**
-   * Create an order with Gelato
+   * Create an order with Gelato v4 API
    */
-  async createOrder(orderData: GelatoOrderRequest): Promise<GelatoOrderResponse> {
+  async createOrder(orderData: any): Promise<any> {
     try {
-      console.log('Creating Gelato order:', {
-        externalId: orderData.externalId,
-        itemCount: orderData.items.length,
-        currency: orderData.currency
+      console.log('📦 Creating Gelato v4 order:', {
+        orderReferenceId: orderData.orderReferenceId,
+        itemCount: orderData.items?.length || 0,
+        currency: orderData.currency,
+        shippingCountry: orderData.shippingAddress?.country
       });
 
-      // Use the orders API endpoint
+      // Validate required fields
+      if (!orderData.orderReferenceId) {
+        throw new Error('orderReferenceId is required');
+      }
+      if (!orderData.items || orderData.items.length === 0) {
+        throw new Error('items array is required and must not be empty');
+      }
+      if (!orderData.shippingAddress) {
+        throw new Error('shippingAddress is required');
+      }
+
+      // Use the correct Gelato v4 orders API endpoint
       const response = await fetch('https://order.gelatoapis.com/v4/orders', {
         method: 'POST',
         headers: this.getHeaders(),
@@ -265,19 +283,30 @@ export class GelatoService {
 
       if (!response.ok) {
         const errorBody = await response.text();
-        console.error('Gelato order creation failed:', {
+        console.error('❌ Gelato order creation failed:', {
           status: response.status,
           statusText: response.statusText,
-          body: errorBody
+          body: errorBody,
+          requestData: {
+            orderReferenceId: orderData.orderReferenceId,
+            itemCount: orderData.items?.length,
+            currency: orderData.currency
+          }
         });
-        throw new Error(`Gelato order creation failed: ${response.status} ${response.statusText}`);
+        throw new Error(`Gelato order creation failed: ${response.status} ${response.statusText} - ${errorBody}`);
       }
 
       const order = await response.json();
-      console.log('Gelato order created successfully:', order.id);
+      console.log('✅ Gelato order created successfully:', {
+        id: order.id,
+        orderReferenceId: order.orderReferenceId,
+        fulfillmentStatus: order.fulfillmentStatus,
+        financialStatus: order.financialStatus
+      });
+      
       return order;
     } catch (error) {
-      console.error('Error creating Gelato order:', error);
+      console.error('💥 Error creating Gelato order:', error);
       throw error;
     }
   }
@@ -304,23 +333,42 @@ export class GelatoService {
   }
 
   /**
-   * Get shipping methods for a country
+   * Get shipping methods for a country using Gelato v4 API
    */
   async getShippingMethods(countryCode: string): Promise<any[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/v4/shipment-methods?country=${countryCode}`, {
+      console.log('🚚 Fetching Gelato shipping methods for country:', countryCode);
+      
+      // Use the correct Gelato v4 shipment methods endpoint
+      const url = `https://order.gelatoapis.com/v4/shipment-methods?country=${countryCode}`;
+      console.log('🚚 Gelato shipping API URL:', url);
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: this.getHeaders()
       });
 
       if (!response.ok) {
-        throw new Error(`Gelato API error: ${response.status} ${response.statusText}`);
+        const errorBody = await response.text();
+        console.error('❌ Gelato shipping methods API failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody,
+          country: countryCode,
+          url: url
+        });
+        throw new Error(`Gelato API error: ${response.status} ${response.statusText} - ${errorBody}`);
       }
 
       const data = await response.json();
-      return data.shipmentMethods || [];
+      console.log('✅ Gelato shipping methods response:', {
+        country: countryCode,
+        methodCount: data?.shipmentMethods?.length || 0
+      });
+      
+      return data.shipmentMethods || data.data || [];
     } catch (error) {
-      console.error('Error fetching shipping methods:', error);
+      console.error('💥 Error fetching shipping methods:', error);
       throw error;
     }
   }
@@ -592,51 +640,90 @@ export class GelatoService {
   }
 
   /**
-   * Convert our order data to Gelato format
+   * Convert our order data to Gelato v4 API format
    */
   mapOrderToGelato(
     order: any,
     orderItems: any[],
     imageUrls: Record<string, string>
-  ): GelatoOrderRequest {
-    // Map shipping address
-    const shippingAddress: GelatoAddress = {
+  ): any {
+    console.log('🔄 Mapping order to Gelato v4 format:', {
+      orderNumber: order.order_number,
+      itemCount: orderItems.length,
+      currency: order.currency
+    });
+
+    // Map order items to Gelato items format
+    const items = orderItems.map((item, index) => {
+      const imageUrl = imageUrls[item.image_id] || '';
+      console.log(`Item ${index + 1}:`, {
+        productUid: item.product_data?.gelato_sku,
+        imageId: item.image_id,
+        quantity: item.quantity,
+        imageUrl: imageUrl
+      });
+
+      return {
+        itemReferenceId: `item_${item.image_id}`,
+        productUid: item.product_data?.gelato_sku,
+        files: [
+          {
+            type: "default",
+            url: imageUrl
+          }
+        ],
+        quantity: item.quantity
+      };
+    });
+
+    // Map shipping address to Gelato format
+    const shippingAddress = {
       firstName: order.shipping_first_name,
       lastName: order.shipping_last_name,
-      address1: order.shipping_address,
+      addressLine1: order.shipping_address,
       city: order.shipping_city,
-      postalCode: order.shipping_postcode,
+      postCode: order.shipping_postcode,
       country: this.mapCountryToGelatoCode(order.shipping_country),
       email: order.customer_email
     };
 
-    // Map order items to Gelato line items
-    const items: GelatoLineItem[] = orderItems.map(item => ({
-      // Use stored Gelato Product UID from database (preferred method)
-      productUid: item.product_data?.gelato_sku || this.mapProductToGelatoUID(item.product_data),
-      variantUid: item.product_data?.gelato_sku || this.mapVariantToGelatoUID(item.product_data),
-      quantity: item.quantity,
-      printFileUrl: imageUrls[item.image_id] || '',
-      printFileType: 'url' as const,
-      personalizationParts: {
-        // Add any custom text or personalization data
-        title: item.image_title || '',
-      }
-    }));
-
-    return {
-      externalId: order.order_number,
-      orderReferenceId: order.id,
-      shippingAddress,
-      items,
+    // Build Gelato v4 order data
+    const gelatoOrderData = {
+      orderType: "order",
+      orderReferenceId: order.order_number,
+      customerReferenceId: order.customer_email,
       currency: order.currency.toUpperCase(),
-      metadata: {
-        pawtraitsOrderId: order.id,
-        paymentIntentId: order.payment_intent_id,
-        customerEmail: order.customer_email,
-        isPartnerOrder: order.metadata?.isPartnerOrder || 'false'
-      }
+      items: items,
+      shippingAddress: shippingAddress,
+      metadata: [
+        {
+          key: "pawtraitsOrderId",
+          value: order.id
+        },
+        {
+          key: "paymentIntentId", 
+          value: order.payment_intent_id || ""
+        },
+        {
+          key: "customerEmail",
+          value: order.customer_email
+        },
+        {
+          key: "isPartnerOrder",
+          value: order.metadata?.isPartnerOrder || "false"
+        }
+      ]
     };
+
+    console.log('✅ Gelato order data prepared:', {
+      orderType: gelatoOrderData.orderType,
+      orderReferenceId: gelatoOrderData.orderReferenceId,
+      itemCount: gelatoOrderData.items.length,
+      currency: gelatoOrderData.currency,
+      shippingCountry: shippingAddress.country
+    });
+
+    return gelatoOrderData;
   }
 
   /**
