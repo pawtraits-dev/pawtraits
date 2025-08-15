@@ -142,20 +142,20 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
     <CountryProvider userPhone={userProfile?.phone || partner?.phone}>
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
         {/* Sidebar overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-black bg-opacity-50"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 z-40 bg-black bg-opacity-50"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
-      {/* Sidebar - Only shows when sidebarOpen is true */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}>
-        
-        {/* Sidebar Header */}
-        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white">
+        {/* Sidebar - Only shows when sidebarOpen is true */}
+        <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}>
+          
+          {/* Sidebar Header */}
+          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white">
           <div className="flex items-center space-x-2">
             <Image 
               src="/assets/logos/paw-svgrepo-200x200-green.svg" 
@@ -236,16 +236,16 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="w-full">
-        {/* Top Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="flex items-center space-x-2 hover:bg-gray-100 rounded-lg p-2 transition-colors"
-              >
+        {/* Main Content */}
+        <div className="w-full">
+          {/* Top Header */}
+          <header className="bg-white shadow-sm border-b border-gray-200">
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="flex items-center space-x-2 hover:bg-gray-100 rounded-lg p-2 transition-colors"
+                >
                 <Image 
                   src="/assets/logos/paw-svgrepo-200x200-green.svg" 
                   alt="PawTraits Partners"
@@ -278,12 +278,13 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
               <CartIcon />
             </div>
           </div>
-        </header>
+          </header>
 
-        {/* Page Content */}
-        <main className="p-6">
-          {children}
-        </main>
+          {/* Page Content */}
+          <main className="p-6">
+            {children}
+          </main>
+        </div>
       </div>
     </CountryProvider>
   );
