@@ -209,25 +209,42 @@ export default function CustomerCheckoutPage() {
   // Validate cart items for Gelato availability (Step 2 implementation)
   const validateCartForGelato = async () => {
     try {
-      const token = await supabase.auth.getSession().then(({ data: { session } }) => session?.access_token);
+      console.log('🔍 Getting authentication token for cart validation...');
       
-      if (!token) {
-        throw new Error('Authentication required for validation');
+      // Get fresh session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error(`Session error: ${sessionError.message}`);
       }
+      
+      if (!session?.access_token) {
+        console.error('No access token found in session:', { 
+          hasSession: !!session, 
+          hasUser: !!session?.user 
+        });
+        throw new Error('Authentication required - please refresh the page and try again');
+      }
+
+      console.log('🔍 Auth token obtained, making validation request...');
 
       const response = await fetch('/api/cart/validate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           mode: 'full' // Full validation including Gelato API calls
         })
       });
 
+      console.log('🔍 Validation API response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Validation API error:', errorData);
         throw new Error(errorData.error || `Validation failed: ${response.status}`);
       }
 
@@ -280,11 +297,15 @@ export default function CustomerCheckoutPage() {
         country: selectedCountry
       };
 
+      // Get auth token for API calls
+      const token = await supabase.auth.getSession().then(({ data: { session } }) => session?.access_token);
+      
       // Call our shipping API endpoint
       const response = await fetch('/api/shipping/options', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
         },
         body: JSON.stringify({
           shippingAddress,

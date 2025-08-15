@@ -4,6 +4,9 @@ import { GelatoService } from '@/lib/gelato-service';
 export async function POST(request: NextRequest) {
   try {
     console.log('🚚 [SHIPPING API] Fetching shipping options...');
+    
+    // Note: Shipping options don't require authentication as they're public info
+    // Authentication is handled separately for order placement
 
     const body = await request.json();
     const { shippingAddress, cartItems } = body;
@@ -58,51 +61,38 @@ export async function POST(request: NextRequest) {
       })
     }));
 
-    // Call Gelato API for shipping options
+    // Call Gelato API for shipping methods (shipping options)
     try {
-      const shippingOptions = await gelatoService.getShippingOptions({
-        shippingAddress: {
-          firstName: shippingAddress.firstName,
-          lastName: shippingAddress.lastName,
-          companyName: shippingAddress.companyName || '',
-          addressLine1: shippingAddress.address1,
-          addressLine2: shippingAddress.address2 || '',
-          city: shippingAddress.city,
-          postalCode: shippingAddress.postalCode,
-          stateCode: shippingAddress.stateCode || '',
-          countryCode: shippingAddress.country
-        },
-        items: gelatoItems
-      });
+      const shippingMethods = await gelatoService.getShippingMethods(shippingAddress.country);
 
-      console.log('🚚 [SHIPPING API] Received shipping options:', {
-        count: shippingOptions?.length || 0,
-        options: shippingOptions?.map(opt => ({
-          id: opt.id,
-          name: opt.name,
-          price: opt.price,
-          currency: opt.currency,
-          estimatedDelivery: opt.estimatedDeliveryDays
+      console.log('🚚 [SHIPPING API] Received shipping methods:', {
+        count: shippingMethods?.length || 0,
+        methods: shippingMethods?.map(method => ({
+          uid: method.uid,
+          name: method.name,
+          price: method.price,
+          currency: method.currency,
+          estimatedDays: method.estimatedDeliveryDays
         })) || []
       });
 
-      if (!shippingOptions || shippingOptions.length === 0) {
+      if (!shippingMethods || shippingMethods.length === 0) {
         return NextResponse.json(
           { error: 'No shipping options available for this destination' },
           { status: 404 }
         );
       }
 
-      // Transform shipping options to our format
-      const transformedOptions = shippingOptions.map(option => ({
-        id: option.id,
-        name: option.name,
-        description: option.description || `Delivery in ${option.estimatedDeliveryDays || '5-7'} business days`,
-        price: option.price, // Price in minor units (cents)
-        currency: option.currency,
-        estimatedDeliveryDays: option.estimatedDeliveryDays || '5-7',
-        carrier: option.carrier || 'Standard',
-        service: option.service || 'Standard'
+      // Transform shipping methods to our format
+      const transformedOptions = shippingMethods.map(method => ({
+        id: method.uid || method.id,
+        name: method.name,
+        description: method.description || `Delivery in ${method.estimatedDeliveryDays || '5-7'} business days`,
+        price: method.price || 999, // Price in minor units (cents), fallback to £9.99
+        currency: method.currency || 'GBP',
+        estimatedDeliveryDays: method.estimatedDeliveryDays || '5-7',
+        carrier: method.carrier || method.name || 'Standard',
+        service: method.service || 'Standard'
       }));
 
       return NextResponse.json({
