@@ -33,6 +33,7 @@ interface PricingFormData {
   product_cost: string;
   shipping_cost: string;
   sale_price: string;
+  retail_price: string;
   discount_price: string;
   is_on_sale: boolean;
   sale_start_date: string;
@@ -58,6 +59,7 @@ export default function PricingManagementPage() {
     product_cost: '',
     shipping_cost: '0',
     sale_price: '',
+    retail_price: '',
     discount_price: '',
     is_on_sale: false,
     sale_start_date: '',
@@ -65,6 +67,37 @@ export default function PricingManagementPage() {
   });
 
   const supabaseService = new AdminSupabaseService();
+
+  // Pricing calculation functions
+  const roundToNearest250 = (price: number): number => {
+    return Math.round(price / 2.5) * 2.5;
+  };
+
+  const calculateRetailPriceWith70Margin = (totalCost: number): number => {
+    // For 70% margin: Sale Price = Cost / (1 - 0.70) = Cost / 0.30
+    const retailPrice = totalCost / 0.30;
+    return roundToNearest250(retailPrice);
+  };
+
+  const calculateMarginFromPrices = (cost: number, salePrice: number): number => {
+    if (salePrice <= 0) return 0;
+    return ((salePrice - cost) / salePrice) * 100;
+  };
+
+  // Auto-calculate retail price when costs change
+  const updateRetailPrice = (productCost: string, shippingCost: string) => {
+    const cost = parseFloat(productCost || '0');
+    const shipping = parseFloat(shippingCost || '0');
+    const totalCost = cost + shipping;
+    
+    if (totalCost > 0) {
+      const calculatedRetailPrice = calculateRetailPriceWith70Margin(totalCost);
+      setFormData(prev => ({
+        ...prev,
+        retail_price: calculatedRetailPrice.toFixed(2)
+      }));
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -97,6 +130,7 @@ export default function PricingManagementPage() {
       product_cost: '',
       shipping_cost: '0',
       sale_price: '',
+      retail_price: '',
       discount_price: '',
       is_on_sale: false,
       sale_start_date: '',
@@ -201,11 +235,17 @@ export default function PricingManagementPage() {
         }
         
         // Update form with fetched costs
+        const roundedProductCost = (Math.round(convertedCost * 100) / 100);
+        const roundedShippingCost = (Math.round(estimatedShipping * 100) / 100);
+        
         setFormData(prev => ({
           ...prev,
-          product_cost: (Math.round(convertedCost * 100) / 100).toString(),
-          shipping_cost: (Math.round(estimatedShipping * 100) / 100).toString()
+          product_cost: roundedProductCost.toString(),
+          shipping_cost: roundedShippingCost.toString()
         }));
+        
+        // Auto-calculate retail price with 70% margin
+        updateRetailPrice(roundedProductCost.toString(), roundedShippingCost.toString());
         
         console.log(`✅ Auto-populated pricing for ${product.name} in ${country.name}`);
       } else {
@@ -276,16 +316,34 @@ export default function PricingManagementPage() {
   };
 
   const getMarginCalculations = () => {
-    if (!formData.product_cost || !formData.sale_price) return null;
+    if (!formData.product_cost) return null;
     
     const cost = parseFloat(formData.product_cost) + parseFloat(formData.shipping_cost || '0');
-    const price = parseFloat(formData.sale_price);
+    const salePrice = parseFloat(formData.sale_price || '0');
+    const retailPrice = parseFloat(formData.retail_price || '0');
     
-    return {
-      profitMargin: calculateProfitMargin(cost * 100, price * 100),
-      markup: calculateMarkup(cost * 100, price * 100),
-      profit: price - cost
-    };
+    const calculations: any = {};
+    
+    // Sale price calculations (if entered)
+    if (salePrice > 0) {
+      calculations.sale = {
+        profitMargin: calculateMarginFromPrices(cost, salePrice),
+        markup: calculateMarkup(cost * 100, salePrice * 100),
+        profit: salePrice - cost
+      };
+    }
+    
+    // Retail price calculations (if entered)
+    if (retailPrice > 0) {
+      calculations.retail = {
+        profitMargin: calculateMarginFromPrices(cost, retailPrice),
+        markup: calculateMarkup(cost * 100, retailPrice * 100),
+        profit: retailPrice - cost
+      };
+    }
+    
+    calculations.totalCost = cost;
+    return calculations;
   };
 
   // Filter pricing
@@ -500,7 +558,14 @@ export default function PricingManagementPage() {
                       type="number"
                       step="0.01"
                       value={formData.product_cost}
-                      onChange={(e) => setFormData(prev => ({ ...prev, product_cost: e.target.value }))}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        setFormData(prev => ({ ...prev, product_cost: newValue }));
+                        // Auto-update retail price when product cost changes
+                        if (newValue && formData.shipping_cost) {
+                          setTimeout(() => updateRetailPrice(newValue, formData.shipping_cost), 100);
+                        }
+                      }}
                       placeholder="15.00"
                       required
                     />
@@ -528,7 +593,14 @@ export default function PricingManagementPage() {
                       type="number"
                       step="0.01"
                       value={formData.shipping_cost}
-                      onChange={(e) => setFormData(prev => ({ ...prev, shipping_cost: e.target.value }))}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        setFormData(prev => ({ ...prev, shipping_cost: newValue }));
+                        // Auto-update retail price when shipping cost changes
+                        if (formData.product_cost && newValue) {
+                          setTimeout(() => updateRetailPrice(formData.product_cost, newValue), 100);
+                        }
+                      }}
                       placeholder="5.00"
                     />
                   </div>
@@ -547,27 +619,100 @@ export default function PricingManagementPage() {
                     />
                   </div>
 
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Retail Price ({formData.currency_code})
+                      </label>
+                      {formData.product_cost && formData.shipping_cost && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateRetailPrice(formData.product_cost, formData.shipping_cost)}
+                          className="text-xs h-6"
+                        >
+                          🎯 Auto-calc 70% margin
+                        </Button>
+                      )}
+                    </div>
+                    <Input
+                      type="number"
+                      step="2.50"
+                      value={formData.retail_price}
+                      onChange={(e) => setFormData(prev => ({ ...prev, retail_price: e.target.value }))}
+                      placeholder="Auto-calculated from costs"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 Rounds to nearest £2.50 increments (e.g. 27.50, 30.00, 32.50)
+                    </p>
+                  </div>
+
                   {/* Margin Calculations */}
                   {calculations && (
-                    <div className="bg-green-50 p-3 rounded-lg">
-                      <p className="text-sm font-medium text-green-700 mb-2">Profit Analysis:</p>
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        <div>
-                          <span className="text-green-600">Profit:</span>
-                          <p className="font-medium">
-                            {countries.find(c => c.code === formData.country_code)?.currency_symbol}
-                            {calculations.profit.toFixed(2)}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-green-600">Margin:</span>
-                          <p className="font-medium">{calculations.profitMargin.toFixed(1)}%</p>
-                        </div>
-                        <div>
-                          <span className="text-green-600">Markup:</span>
-                          <p className="font-medium">{calculations.markup.toFixed(1)}%</p>
-                        </div>
+                    <div className="bg-green-50 p-4 rounded-lg space-y-3">
+                      <p className="text-sm font-medium text-green-700">Profit Analysis</p>
+                      
+                      {/* Total Cost Display */}
+                      <div className="text-sm">
+                        <span className="text-green-600">Total Cost: </span>
+                        <span className="font-medium">
+                          {countries.find(c => c.code === formData.country_code)?.currency_symbol}
+                          {calculations.totalCost.toFixed(2)}
+                        </span>
                       </div>
+
+                      {/* Sale Price Analysis */}
+                      {calculations.sale && (
+                        <div className="border-l-2 border-blue-300 pl-3">
+                          <p className="text-xs font-medium text-blue-700 mb-1">Sale Price Analysis:</p>
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div>
+                              <span className="text-blue-600">Profit:</span>
+                              <p className="font-medium">
+                                {countries.find(c => c.code === formData.country_code)?.currency_symbol}
+                                {calculations.sale.profit.toFixed(2)}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-blue-600">Margin:</span>
+                              <p className="font-medium">{calculations.sale.profitMargin.toFixed(1)}%</p>
+                            </div>
+                            <div>
+                              <span className="text-blue-600">Markup:</span>
+                              <p className="font-medium">{calculations.sale.markup.toFixed(1)}%</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Retail Price Analysis */}
+                      {calculations.retail && (
+                        <div className="border-l-2 border-purple-300 pl-3">
+                          <p className="text-xs font-medium text-purple-700 mb-1">
+                            Retail Price Analysis (Target: 70% margin):
+                          </p>
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div>
+                              <span className="text-purple-600">Profit:</span>
+                              <p className="font-medium">
+                                {countries.find(c => c.code === formData.country_code)?.currency_symbol}
+                                {calculations.retail.profit.toFixed(2)}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-purple-600">Margin:</span>
+                              <p className={`font-medium ${calculations.retail.profitMargin >= 68 && calculations.retail.profitMargin <= 72 ? 'text-green-600' : 'text-orange-600'}`}>
+                                {calculations.retail.profitMargin.toFixed(1)}%
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-purple-600">Markup:</span>
+                              <p className="font-medium">{calculations.retail.markup.toFixed(1)}%</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
