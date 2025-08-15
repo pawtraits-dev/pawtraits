@@ -42,6 +42,7 @@ interface ProductFormData {
   is_active: boolean;
   is_featured: boolean;
   stock_status: string;
+  product_weight_g?: number;
 }
 
 interface Product {
@@ -89,7 +90,8 @@ export default function EditProductPage() {
     gelato_sku: '',
     is_active: true,
     is_featured: false,
-    stock_status: 'in_stock'
+    stock_status: 'in_stock',
+    product_weight_g: undefined
   });
 
   // Supporting data
@@ -106,8 +108,75 @@ export default function EditProductPage() {
   const [gelatoUnitFilter, setGelatoUnitFilter] = useState<'mm' | 'inches'>('mm');
   const [productPricing, setProductPricing] = useState<{[key: string]: any}>({});
   const [retailPricing, setRetailPricing] = useState<any[]>([]);
+  const [targetMarginPercent, setTargetMarginPercent] = useState<number>(70);
 
   const supabaseService = new AdminSupabaseService();
+
+  // Helper function to determine format based on dimensions
+  const determineFormatFromDimensions = (width: number, height: number) => {
+    const ratio = width / height;
+    
+    if (Math.abs(ratio - 1) < 0.1) {
+      // Square (1:1)
+      return formats.find(f => f.name === 'Square' && f.is_active);
+    } else if (ratio > 1) {
+      // Landscape (wider than tall)
+      return formats.find(f => f.name === 'Landscape' && f.is_active);
+    } else {
+      // Portrait (taller than wide)
+      return formats.find(f => f.name === 'Portrait' && f.is_active);
+    }
+  };
+
+  // Helper function to generate description based on size, format, and medium
+  const generateDescription = (sizeName: string, formatName: string, mediumName: string) => {
+    const cleanSizeName = sizeName.replace(/\d+[xX×]\d+/, '').trim() || sizeName;
+    return `${cleanSizeName} ${formatName} ${mediumName}`.trim();
+  };
+
+  // Helper function to extract size information from variant selections
+  const extractSizeFromVariants = (variants: Record<string, {uid: string, title: string}>) => {
+    let sizeName = '';
+    let sizeCode = '';
+    
+    // Look through selected variants for size-related information
+    Object.values(variants).forEach(variant => {
+      if (variant && variant.title) {
+        const title = variant.title.toLowerCase();
+        
+        // Check for size variants (usually contain dimensions or size names)
+        if (title.includes('mm') || title.includes('cm') || title.includes('inch') || title.includes('"')) {
+          // Extract dimensions for size name
+          const dimensionMatch = title.match(/(\d+)\s*[x×]\s*(\d+)/);
+          if (dimensionMatch) {
+            const [, width, height] = dimensionMatch;
+            sizeName = `${width}×${height}`;
+            
+            // Create size code from dimensions
+            if (title.includes('mm')) {
+              sizeCode = `${width}x${height}mm`;
+            } else if (title.includes('cm')) {
+              sizeCode = `${width}x${height}cm`;
+            } else if (title.includes('inch') || title.includes('"')) {
+              sizeCode = `${width}x${height}in`;
+            }
+          } else {
+            // Use the full title as size name if it contains size info
+            sizeName = variant.title;
+          }
+        }
+        
+        // Check for standard size names
+        const standardSizes = ['small', 'medium', 'large', 'xl', 'xxl', 'a4', 'a3', 'a2', 'a1', 'a0'];
+        if (standardSizes.some(size => title.includes(size))) {
+          sizeName = variant.title;
+          sizeCode = title.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        }
+      }
+    });
+    
+    return { sizeName, sizeCode };
+  };
 
   useEffect(() => {
     loadData();
@@ -144,6 +213,7 @@ export default function EditProductPage() {
         height_inches: productResult.height_inches || '',
         gelato_sku: productResult.gelato_sku || '',
         is_active: productResult.is_active,
+        product_weight_g: (productResult as any).product_weight_g || undefined,
         is_featured: productResult.is_featured,
         stock_status: productResult.stock_status
       });
@@ -281,22 +351,62 @@ export default function EditProductPage() {
       const result = await response.json();
       
       if (result.success && result.productUid) {
+        // Extract dimensions and size info from product details
+        const formUpdates: Partial<ProductFormData> = {};
+        
         // Extract dimensions if available
         if (result.productDetails && result.productDetails.dimensions) {
           const dims = result.productDetails.dimensions;
-          const widthMm = dims.Width?.value;
-          const heightMm = dims.Height?.value;
+          let widthMm = dims.Width?.value;
+          let heightMm = dims.Height?.value;
+          let weightG = dims.Weight?.value;
           
           if (widthMm && heightMm) {
-            setFormData(prev => ({
-              ...prev,
-              width_cm: (widthMm / 10).toString(),
-              height_cm: (heightMm / 10).toString(),
-              width_inches: (widthMm / 25.4).toFixed(1),
-              height_inches: (heightMm / 25.4).toFixed(1)
-            }));
+            formUpdates.width_cm = (widthMm / 10).toString();
+            formUpdates.height_cm = (heightMm / 10).toString();
+            formUpdates.width_inches = (widthMm / 25.4).toFixed(1);
+            formUpdates.height_inches = (heightMm / 25.4).toFixed(1);
+            
+            // Determine format based on dimensions
+            const determinedFormat = determineFormatFromDimensions(widthMm, heightMm);
+            if (determinedFormat) {
+              formUpdates.format_id = determinedFormat.id;
+            }
+            
+            // Store weight if available
+            if (weightG) {
+              formUpdates.product_weight_g = weightG;
+            }
           }
         }
+        
+        // Extract size information from selected variants
+        const sizeInfo = extractSizeFromVariants(currentVariants);
+        if (sizeInfo.sizeName) {
+          formUpdates.size_name = sizeInfo.sizeName;
+        }
+        if (sizeInfo.sizeCode) {
+          formUpdates.size_code = sizeInfo.sizeCode;
+        }
+        
+        // Generate description after we have all the info
+        setFormData(prev => {
+          const updatedForm = { ...prev, ...formUpdates };
+          
+          // Find the format and medium names for description
+          const selectedFormat = formats.find(f => f.id === updatedForm.format_id);
+          const selectedMedium = media.find(m => m.id === updatedForm.medium_id);
+          
+          if (selectedFormat && selectedMedium && updatedForm.size_name) {
+            updatedForm.description = generateDescription(
+              updatedForm.size_name,
+              selectedFormat.name,
+              selectedMedium.name
+            );
+          }
+          
+          return updatedForm;
+        });
         
         return result.productUid;
       }
@@ -570,20 +680,73 @@ export default function EditProductPage() {
             {/* Retail Pricing */}
             {retailPricing.length > 0 && (
               <div className="mt-4 p-4 bg-green-50 rounded-lg border-2 border-green-300">
-                <h4 className="text-sm font-semibold text-green-800 mb-3 flex items-center">
-                  🏪 Retail Pricing
-                  <Link href="/admin/pricing" className="ml-auto">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-green-800">
+                    🏪 Retail Pricing
+                  </h4>
+                  <Link href="/admin/pricing">
                     <Button variant="outline" size="sm" className="text-xs">
                       Edit Pricing
                     </Button>
                   </Link>
-                </h4>
+                </div>
+                
+                {/* Target Margin Control */}
+                <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
+                  <div className="flex items-center space-x-4">
+                    <label className="text-sm font-medium text-blue-800 whitespace-nowrap">
+                      Target Margin:
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        type="number"
+                        min="10"
+                        max="90"
+                        step="5"
+                        value={targetMarginPercent}
+                        onChange={(e) => setTargetMarginPercent(Math.min(90, Math.max(10, parseFloat(e.target.value) || 70)))}
+                        className="w-20 text-center"
+                      />
+                      <span className="text-sm text-blue-700">%</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Recalculate retail pricing with new margin
+                          const updatedPricing = retailPricing.map(pricing => {
+                            const costPrice = pricing.cost_price || 0;
+                            if (costPrice > 0) {
+                              const marginDecimal = targetMarginPercent / 100;
+                              const newRetailPrice = Math.round((costPrice / (1 - marginDecimal)) / 2.5) * 2.5;
+                              const actualMargin = ((newRetailPrice - costPrice) / newRetailPrice * 100);
+                              return {
+                                ...pricing,
+                                retail_price: newRetailPrice,
+                                profit_margin_percent: actualMargin
+                              };
+                            }
+                            return pricing;
+                          });
+                          setRetailPricing(updatedPricing);
+                        }}
+                        className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-300"
+                      >
+                        Update Pricing
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Adjust target profit margin and click "Update Pricing" to recalculate retail prices
+                  </p>
+                </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {retailPricing.map((pricing) => {
                     const salePrice = pricing.sale_price || 0;
                     const retailPrice = pricing.retail_price || 0;
                     const costPrice = pricing.cost_price || 0;
+                    const actualMargin = pricing.profit_margin_percent || 0;
                     
                     return (
                       <div key={pricing.country_code} className="bg-white p-3 rounded border border-green-200">
@@ -609,13 +772,16 @@ export default function EditProductPage() {
                           
                           {retailPrice > 0 && (
                             <div className="text-green-700 font-medium">
-                              <span className="font-medium">Retail:</span> {formatPrice(retailPrice, pricing.currency_code, pricing.currency_symbol)}
+                              <span className="font-medium">Retail ({targetMarginPercent}% target):</span> {formatPrice(retailPrice, pricing.currency_code, pricing.currency_symbol)}
                             </div>
                           )}
                           
-                          {pricing.profit_margin_percent && (
-                            <div className="text-xs text-gray-500">
-                              Margin: {pricing.profit_margin_percent.toFixed(1)}%
+                          {actualMargin > 0 && (
+                            <div className="text-xs flex justify-between">
+                              <span className="text-gray-500">Actual Margin:</span>
+                              <span className={`${Math.abs(actualMargin - targetMarginPercent) <= 1 ? 'text-green-600' : 'text-orange-600'}`}>
+                                {actualMargin.toFixed(1)}%
+                              </span>
                             </div>
                           )}
                         </div>
@@ -718,6 +884,23 @@ export default function EditProductPage() {
                 />
               </div>
             </div>
+
+            {/* Product Weight */}
+            {formData.product_weight_g && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Product Weight
+                </label>
+                <div className="p-3 bg-gray-50 rounded border">
+                  <div className="text-sm font-medium text-gray-900">
+                    {formData.product_weight_g}g ({(formData.product_weight_g / 1000).toFixed(2)}kg)
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">
+                    Weight from Gelato product specifications
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

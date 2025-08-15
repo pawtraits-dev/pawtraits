@@ -254,7 +254,45 @@ export default function NewProductPage() {
       setLoading(true);
       setError(null);
       
-      await supabaseService.createProduct(formData);
+      // Create the product first
+      const createdProduct = await supabaseService.createProduct(formData);
+      
+      if (!createdProduct) {
+        throw new Error('Failed to create product');
+      }
+      
+      // Save pricing data if available
+      if (formData.gelato_sku && productPricing[formData.gelato_sku] && productPricing[formData.gelato_sku].allPricing) {
+        const pricingData = productPricing[formData.gelato_sku].allPricing;
+        
+        // Create pricing entries for each country with successful pricing
+        for (const pricing of pricingData) {
+          if (pricing.success && pricing.price) {
+            try {
+              const costInMinorUnits = Math.round(pricing.price * 100); // Convert to pence/cents
+              
+              // Calculate 70% margin retail price
+              const retailPrice = (costInMinorUnits / 100) / 0.30; // 70% margin
+              const roundedRetailPrice = Math.round(retailPrice / 2.5) * 2.5; // Round to £2.50
+              const retailPriceMinorUnits = Math.round(roundedRetailPrice * 100);
+              
+              const pricingEntry = {
+                product_id: createdProduct.id,
+                country_code: pricing.country,
+                product_cost: costInMinorUnits,
+                shipping_cost: 0, // Gelato pricing is typically base cost
+                sale_price: retailPriceMinorUnits
+              };
+              
+              await supabaseService.createProductPricing(pricingEntry);
+            } catch (pricingError) {
+              console.warn(`Failed to create pricing for ${pricing.country}:`, pricingError);
+              // Continue with other pricing entries even if one fails
+            }
+          }
+        }
+      }
+      
       router.push('/admin/products');
     } catch (err) {
       console.error('Error creating product:', err);
