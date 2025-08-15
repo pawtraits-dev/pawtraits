@@ -21,7 +21,6 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
-import { createGelatoService } from '@/lib/gelato-service';
 import { PawSpinner } from '@/components/ui/paw-spinner';
 import type { Product, ProductPricing, ProductPricingCreate, Country } from '@/lib/product-types';
 import { formatPrice, calculateProfitMargin, calculateMarkup } from '@/lib/product-types';
@@ -196,13 +195,13 @@ export default function PricingManagementPage() {
       setLoadingGelatoPricing(true);
       console.log(`🔍 Fetching Gelato pricing for ${product.name} in ${country.name}...`);
       
-      const gelatoService = createGelatoService();
+      // Get product pricing (base cost) via API
+      const baseCostResponse = await fetch(`/api/admin/gelato-products?action=base-cost&uid=${encodeURIComponent(product.gelato_sku)}&country=${countryCode}`);
+      const baseCostResult = await baseCostResponse.json();
+      const baseCost = baseCostResult.success ? baseCostResult.baseCost : null;
       
-      // Get product pricing (base cost)
-      const baseCost = await gelatoService.getBaseCost(product.gelato_sku, countryCode);
-      
-      // Get shipping methods to estimate shipping cost
-      const shippingMethods = await gelatoService.getShippingMethods(countryCode);
+      // For now, we'll estimate shipping as 0 (can be enhanced later)
+      const shippingMethods = null;
       
       if (baseCost) {
         console.log(`✅ Gelato base cost: ${baseCost.currency} ${baseCost.price}`);
@@ -227,17 +226,9 @@ export default function PricingManagementPage() {
           }
         }
         
-        // Estimate shipping cost (use cheapest available method or default)
+        // Estimate shipping cost (default to 0 for now - can be enhanced later)
         let estimatedShipping = 0;
-        if (shippingMethods && shippingMethods.length > 0) {
-          // Find the cheapest shipping method
-          const cheapestShipping = shippingMethods.reduce((cheapest, method) => {
-            return method.price < cheapest.price ? method : cheapest;
-          }, shippingMethods[0]);
-          
-          estimatedShipping = cheapestShipping.price || 0;
-          console.log(`📦 Estimated shipping: ${country.currency_code} ${estimatedShipping}`);
-        }
+        // TODO: Implement shipping cost estimation via API if needed
         
         // Update form with fetched costs if in form mode, or update existing pricing if refreshing
         const roundedProductCost = (Math.round(convertedCost * 100) / 100);
@@ -447,50 +438,44 @@ export default function PricingManagementPage() {
         const product = products.find(p => p.id === pricingItem.product_id);
         if (!product?.gelato_sku) continue;
         
-        // Fetch updated Gelato pricing using stored gelato_sku
-        const gelatoService = createGelatoService();
-        
-        // Get product pricing (base cost)
-        const baseCost = await gelatoService.getBaseCost(product.gelato_sku, pricingItem.country_code);
-        
-        // Get shipping methods to estimate shipping cost
-        const shippingMethods = await gelatoService.getShippingMethods(pricingItem.country_code);
-        
-        if (baseCost) {
-          const country = countries.find(c => c.code === pricingItem.country_code);
-          let convertedCost = baseCost.price;
+        // Fetch updated Gelato pricing using server-side API
+        try {
+          const baseCostResponse = await fetch(`/api/admin/gelato-products?action=base-cost&uid=${encodeURIComponent(product.gelato_sku)}&country=${pricingItem.country_code}`);
+          const baseCostResult = await baseCostResponse.json();
           
-          // Convert USD to local currency if needed
-          if (baseCost.currency === 'USD' && country?.currency_code !== 'USD') {
-            const conversionRates: Record<string, number> = {
-              'GBP': 0.79, 'EUR': 0.92, 'CAD': 1.35, 'AUD': 1.52,
-              'JPY': 149.5, 'SGD': 1.34, 'BRL': 5.02, 'CHF': 0.88,
-              'NZD': 1.64, 'SEK': 10.5, 'NOK': 10.8, 'DKK': 6.85,
-              'ISK': 138.2, 'PLN': 4.03, 'CZK': 22.7, 'HUF': 361.0,
-              'KRW': 1320, 'HKD': 7.81, 'MYR': 4.48, 'THB': 35.8,
-              'INR': 83.2, 'MXN': 17.1, 'ZAR': 18.4, 'TRY': 30.5,
-            };
+          if (baseCostResult.success && baseCostResult.baseCost) {
+            const baseCost = baseCostResult.baseCost;
+            const country = countries.find(c => c.code === pricingItem.country_code);
+            let convertedCost = baseCost.price;
             
-            const rate = conversionRates[country.currency_code];
-            if (rate) {
-              convertedCost = baseCost.price * rate;
+            // Convert USD to local currency if needed
+            if (baseCost.currency === 'USD' && country?.currency_code !== 'USD') {
+              const conversionRates: Record<string, number> = {
+                'GBP': 0.79, 'EUR': 0.92, 'CAD': 1.35, 'AUD': 1.52,
+                'JPY': 149.5, 'SGD': 1.34, 'BRL': 5.02, 'CHF': 0.88,
+                'NZD': 1.64, 'SEK': 10.5, 'NOK': 10.8, 'DKK': 6.85,
+                'ISK': 138.2, 'PLN': 4.03, 'CZK': 22.7, 'HUF': 361.0,
+                'KRW': 1320, 'HKD': 7.81, 'MYR': 4.48, 'THB': 35.8,
+                'INR': 83.2, 'MXN': 17.1, 'ZAR': 18.4, 'TRY': 30.5,
+              };
+              
+              const rate = conversionRates[country.currency_code];
+              if (rate) {
+                convertedCost = baseCost.price * rate;
+              }
             }
+            
+            // For now, keep existing shipping cost (can be enhanced later to fetch from Gelato)
+            // Update the pricing entry with new product cost
+            await supabaseService.updateProductPricing(pricingId, {
+              product_cost: Math.round(convertedCost * 100) // Convert to minor units
+            });
+          } else {
+            console.warn(`Failed to fetch Gelato pricing for ${product.name}:`, baseCostResult.error);
           }
-          
-          // Estimate shipping cost (use cheapest available method)
-          let estimatedShipping = 0;
-          if (shippingMethods && shippingMethods.length > 0) {
-            const cheapestShipping = shippingMethods.reduce((cheapest, method) => {
-              return method.price < cheapest.price ? method : cheapest;
-            }, shippingMethods[0]);
-            estimatedShipping = cheapestShipping.price || 0;
-          }
-          
-          // Update the pricing entry with new costs
-          await supabaseService.updateProductPricing(pricingId, {
-            product_cost: Math.round(convertedCost * 100), // Convert to minor units
-            shipping_cost: Math.round(estimatedShipping * 100)
-          });
+        } catch (error) {
+          console.error(`Error fetching Gelato pricing for ${product.name}:`, error);
+          throw error;
         }
       }
       
@@ -632,9 +617,13 @@ export default function PricingManagementPage() {
                 value={targetMargin}
                 onChange={(e) => {
                   const value = parseFloat(e.target.value);
-                  if (!isNaN(value)) {
-                    setTargetMargin(Math.min(90, Math.max(10, value)));
+                  if (!isNaN(value) || e.target.value === '') {
+                    setTargetMargin(value || 0);
                   }
+                }}
+                onBlur={(e) => {
+                  const value = parseFloat(e.target.value) || 70;
+                  setTargetMargin(Math.min(90, Math.max(10, value)));
                 }}
                 className="text-center"
               />
@@ -653,9 +642,13 @@ export default function PricingManagementPage() {
                 value={discountPercent}
                 onChange={(e) => {
                   const value = parseFloat(e.target.value);
-                  if (!isNaN(value)) {
-                    setDiscountPercent(Math.min(50, Math.max(0, value)));
+                  if (!isNaN(value) || e.target.value === '') {
+                    setDiscountPercent(value || 0);
                   }
+                }}
+                onBlur={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  setDiscountPercent(Math.min(50, Math.max(0, value)));
                 }}
                 className="text-center"
               />
