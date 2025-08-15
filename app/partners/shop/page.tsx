@@ -16,6 +16,7 @@ import ProductSelectionModal from '@/components/ProductSelectionModal';
 import CartIcon from '@/components/cart-icon';
 import { useServerCart } from '@/lib/server-cart-context';
 import UserInteractionsService from '@/lib/user-interactions';
+import { useCountryPricing } from '@/lib/country-context';
 import ShareModal from '@/components/share-modal';
 import PartnerQRModal from '@/components/PartnerQRModal';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
@@ -60,6 +61,7 @@ export default function PartnerShopPage() {
   const supabaseService = new SupabaseService();
   // Using SupabaseService for partner access
   const { addToCart } = useServerCart();
+  const { selectedCountry, selectedCountryData, getCountryPricing, getLowestPrice } = useCountryPricing();
 
   useEffect(() => {
     const initializeData = async () => {
@@ -333,16 +335,15 @@ export default function PartnerShopPage() {
       return { productCount: 0, lowestPrice: null, currency: null };
     }
 
-    const gbPricing = pricing.filter(p => 
-      p.country_code === 'GB' && 
+    const countryPricing = getCountryPricing(pricing).filter(p => 
       availableProducts.some(product => product.id === p.product_id)
     );
 
-    if (gbPricing.length === 0) {
+    if (countryPricing.length === 0) {
       return { productCount: availableProducts.length, lowestPrice: null, currency: null };
     }
 
-    const lowestPricing = gbPricing.reduce((lowest, current) => 
+    const lowestPricing = countryPricing.reduce((lowest, current) => 
       current.sale_price < lowest.sale_price ? current : lowest
     );
 
@@ -363,7 +364,7 @@ export default function PartnerShopPage() {
     if (!selectedImage) return;
 
     const product = products.find(p => p.id === productId);
-    const productPricing = pricing.find(p => p.product_id === productId && p.country_code === 'GB');
+    const productPricing = pricing.find(p => p.product_id === productId && p.country_code === selectedCountry);
     
     if (!product || !productPricing) {
       alert('Product information not found');

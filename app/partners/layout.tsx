@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
+import { CountryProvider } from '@/lib/country-context';
+import CountrySelector from '@/components/CountrySelector';
 
 interface PartnerLayoutProps {
   children: React.ReactNode;
@@ -48,6 +50,7 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [partner, setPartner] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -86,6 +89,7 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
       const partnerData = await supabaseService.getCurrentPartner();
       
       setUser(user);
+      setUserProfile(userProfile);
       setPartner(partnerData);
     } catch (error) {
       console.error('Error checking partner access:', error);
@@ -122,7 +126,11 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
 
   // For marketing pages (non-authenticated users on /partners route), render children without layout
   if (!user && pathname === '/partners') {
-    return <div className="w-full">{children}</div>;
+    return (
+      <CountryProvider>
+        <div className="w-full">{children}</div>
+      </CountryProvider>
+    );
   }
 
   // For other routes, don't render anything if no user
@@ -131,8 +139,9 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
-      {/* Sidebar overlay */}
+    <CountryProvider userPhone={userProfile?.phone || partner?.phone}>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
+        {/* Sidebar overlay */}
       {sidebarOpen && (
         <div 
           className="fixed inset-0 z-40 bg-black bg-opacity-50"
@@ -262,6 +271,7 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
             </div>
             
             <div className="flex items-center space-x-4">
+              <CountrySelector compact={true} showLabel={false} />
               <Badge variant="secondary" className="bg-green-100 text-green-800">
                 Business Partner
               </Badge>
@@ -275,6 +285,6 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
           {children}
         </main>
       </div>
-    </div>
+    </CountryProvider>
   );
 }

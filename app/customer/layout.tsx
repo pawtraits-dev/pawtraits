@@ -26,6 +26,8 @@ import {
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
 import { getSupabaseClient } from '@/lib/supabase-client';
+import { CountryProvider } from '@/lib/country-context';
+import CountrySelector from '@/components/CountrySelector';
 
 interface CustomerLayoutProps {
   children: React.ReactNode;
@@ -120,9 +122,11 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   // For marketing pages (non-authenticated users on /customer route), render children without any layout constraints
   if (!user && !loading && pathname === '/customer') {
     return (
-      <div style={{ margin: 0, padding: 0, width: '100%', minHeight: '100vh' }}>
-        {children}
-      </div>
+      <CountryProvider>
+        <div style={{ margin: 0, padding: 0, width: '100%', minHeight: '100vh' }}>
+          {children}
+        </div>
+      </CountryProvider>
     );
   }
 
@@ -141,8 +145,9 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
-      {/* Sidebar overlay */}
+    <CountryProvider userPhone={profile?.phone}>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+        {/* Sidebar overlay */}
       {sidebarOpen && (
         <div 
           className="fixed inset-0 z-40 bg-black bg-opacity-50"
@@ -264,6 +269,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
             </div>
             
             <div className="flex items-center space-x-4">
+              <CountrySelector compact={true} showLabel={false} />
               <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                 Customer
               </Badge>
@@ -277,6 +283,6 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
           {children}
         </main>
       </div>
-    </div>
+    </CountryProvider>
   );
 }
