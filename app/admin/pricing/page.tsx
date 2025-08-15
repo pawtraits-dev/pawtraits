@@ -55,6 +55,7 @@ export default function PricingManagementPage() {
   const [selectedPricingIds, setSelectedPricingIds] = useState<string[]>([]);
   const [targetMargin, setTargetMargin] = useState(70);
   const [discountPercent, setDiscountPercent] = useState(0);
+  const [editingPrices, setEditingPrices] = useState<{[key: string]: {original: number, current: number}}>({});
   
   const [formData, setFormData] = useState<PricingFormData>({
     product_id: '',
@@ -406,16 +407,16 @@ export default function PricingManagementPage() {
         let retailPrice = totalCost / (1 - marginDecimal);
         retailPrice = roundToNearest250(retailPrice);
         
-        // Apply discount if specified
-        let finalPrice = retailPrice;
+        // Calculate discounted price if discount is specified
+        let discountedPrice = undefined;
         if (discountPercent > 0) {
-          finalPrice = retailPrice * (1 - discountPercent / 100);
-          finalPrice = roundToNearest250(finalPrice);
+          discountedPrice = retailPrice * (1 - discountPercent / 100);
+          discountedPrice = roundToNearest250(discountedPrice);
         }
         
         const updateData = {
-          sale_price: Math.round(finalPrice * 100), // Convert to minor units
-          discount_price: discountPercent > 0 ? Math.round(finalPrice * 100) : undefined,
+          sale_price: Math.round(retailPrice * 100), // Retail price stays as retail price
+          discount_price: discountedPrice ? Math.round(discountedPrice * 100) : undefined,
           is_on_sale: discountPercent > 0
         };
         
@@ -629,7 +630,12 @@ export default function PricingManagementPage() {
                 max="90"
                 step="5"
                 value={targetMargin}
-                onChange={(e) => setTargetMargin(Math.min(90, Math.max(10, parseFloat(e.target.value) || 70)))}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  if (!isNaN(value)) {
+                    setTargetMargin(Math.min(90, Math.max(10, value)));
+                  }
+                }}
                 className="text-center"
               />
             </div>
@@ -645,7 +651,12 @@ export default function PricingManagementPage() {
                 max="50"
                 step="5"
                 value={discountPercent}
-                onChange={(e) => setDiscountPercent(Math.min(50, Math.max(0, parseFloat(e.target.value) || 0)))}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  if (!isNaN(value)) {
+                    setDiscountPercent(Math.min(50, Math.max(0, value)));
+                  }
+                }}
                 className="text-center"
               />
             </div>
@@ -700,8 +711,8 @@ export default function PricingManagementPage() {
         </CardContent>
       </Card>
 
-      {/* Add/Edit Form */}
-      {(showAddForm || editingId) && (
+      {/* Add/Edit Form - Hidden during inline row editing */}
+      {showAddForm && (
         <Card className="mb-8 border-2 border-purple-200">
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -1140,26 +1151,24 @@ export default function PricingManagementPage() {
                               <Input
                                 type="number"
                                 step="2.50"
-                                value={(pricingItem.sale_price / 100).toString()}
+                                value={(editingPrices[pricingItem.id]?.current ?? pricingItem.sale_price) / 100}
                                 onChange={(e) => {
                                   const newSalePrice = Math.round(parseFloat(e.target.value) * 100);
-                                  // Update the pricing item directly
-                                  setPricing(prev => prev.map(p => 
-                                    p.id === pricingItem.id ? { ...p, sale_price: newSalePrice } : p
-                                  ));
-                                }}
-                                className="w-24 text-right"
-                                onBlur={async () => {
-                                  try {
-                                    await supabaseService.updateProductPricing(pricingItem.id, {
-                                      sale_price: pricingItem.sale_price
-                                    });
-                                    await loadData();
-                                  } catch (error) {
-                                    console.error('Error updating price:', error);
-                                    alert('Failed to update price');
+                                  
+                                  // Track the original price if not already tracking
+                                  if (!editingPrices[pricingItem.id]) {
+                                    setEditingPrices(prev => ({
+                                      ...prev,
+                                      [pricingItem.id]: { original: pricingItem.sale_price, current: newSalePrice }
+                                    }));
+                                  } else {
+                                    setEditingPrices(prev => ({
+                                      ...prev,
+                                      [pricingItem.id]: { ...prev[pricingItem.id], current: newSalePrice }
+                                    }));
                                   }
                                 }}
+                                className="w-24 text-right"
                               />
                             ) : (
                               <div className="font-medium">
@@ -1203,15 +1212,39 @@ export default function PricingManagementPage() {
                               <Button
                                 size="sm"
                                 variant={editingId === pricingItem.id ? "default" : "outline"}
-                                onClick={() => {
+                                onClick={async () => {
                                   if (editingId === pricingItem.id) {
+                                    // If we have changes, save them
+                                    const editingPrice = editingPrices[pricingItem.id];
+                                    if (editingPrice && editingPrice.current !== editingPrice.original) {
+                                      try {
+                                        await supabaseService.updateProductPricing(pricingItem.id, {
+                                          sale_price: editingPrice.current
+                                        });
+                                        await loadData();
+                                      } catch (error) {
+                                        console.error('Error updating price:', error);
+                                        alert('Failed to update price');
+                                      }
+                                    }
+                                    
+                                    // Clear editing state
                                     setEditingId(null);
+                                    setEditingPrices(prev => {
+                                      const newState = { ...prev };
+                                      delete newState[pricingItem.id];
+                                      return newState;
+                                    });
                                   } else {
                                     setEditingId(pricingItem.id);
                                   }
                                 }}
                               >
-                                <Edit2 className="w-4 h-4" />
+                                {editingId === pricingItem.id && editingPrices[pricingItem.id]?.current !== editingPrices[pricingItem.id]?.original ? (
+                                  <Save className="w-4 h-4" />
+                                ) : (
+                                  <Edit2 className="w-4 h-4" />
+                                )}
                               </Button>
                               <Button
                                 size="sm"
