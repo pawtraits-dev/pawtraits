@@ -32,6 +32,11 @@ tsx scripts/upload-watermark.ts         # Upload watermark assets
 tsx scripts/migrate-to-cloudinary.ts    # Migrate to Cloudinary storage
 tsx scripts/check-storage-structure.ts  # Check storage structure
 tsx scripts/test-component-updates.ts   # Test component updates
+
+# Enhanced Cart & Gelato Integration Tests
+./scripts/run-step1-tests.sh            # Run all Step 1 enhanced cart tests
+tsx scripts/test-enhanced-cart.ts       # Test enhanced cart data structure
+tsx scripts/test-cart-api-integration.ts # Test cart API integration with enhanced data
 ```
 
 ## Environment Setup
