@@ -4,6 +4,7 @@ import React, { createContext, useContext, useReducer, useEffect, useState } fro
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { getSupabaseClient } from '@/lib/supabase-client';
 import { SupabaseService } from '@/lib/supabase';
+import { useCountry } from '@/lib/country-context';
 
 export interface CartItem {
   id: string; // Server-side cart item ID
@@ -98,6 +99,7 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
   const [cart, dispatch] = useReducer(cartReducer, initialState);
   const [hasError, setHasError] = useState(false);
   const supabaseService = new SupabaseService();
+  const { selectedCountryData } = useCountry();
 
   // Get auth token for API calls
   const getAuthToken = async () => {
@@ -383,8 +385,24 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
   };
 
   const getShippingCost = () => {
-    // Free shipping over £75 (converted to minor units)
-    return cart.totalPrice >= 7500 ? 0 : 999; // £9.99 in pence
+    if (!selectedCountryData) {
+      // Fallback to UK rates if country data not available
+      return cart.totalPrice >= 7500 ? 0 : 999; // £9.99 in pence
+    }
+
+    // Country-specific shipping rates (can be moved to database later)
+    const shippingRates: Record<string, { freeThreshold: number; standardCost: number }> = {
+      'GB': { freeThreshold: 7500, standardCost: 999 }, // £75 free, £9.99 standard
+      'US': { freeThreshold: 10000, standardCost: 1299 }, // $100 free, $12.99 standard (assuming USD cents)
+      'EU': { freeThreshold: 8500, standardCost: 1199 }, // €85 free, €11.99 standard (assuming EUR cents)
+      'DE': { freeThreshold: 8500, standardCost: 1199 }, // €85 free, €11.99 standard
+      'FR': { freeThreshold: 8500, standardCost: 1199 }, // €85 free, €11.99 standard
+      'CA': { freeThreshold: 12000, standardCost: 1599 }, // CAD $120 free, $15.99 standard
+      'AU': { freeThreshold: 12000, standardCost: 1599 }, // AUD $120 free, $15.99 standard
+    };
+
+    const rates = shippingRates[selectedCountryData.code] || shippingRates['GB'];
+    return cart.totalPrice >= rates.freeThreshold ? 0 : rates.standardCost;
   };
 
   const getCartTotal = () => {

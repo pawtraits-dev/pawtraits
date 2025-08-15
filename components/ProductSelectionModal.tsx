@@ -27,6 +27,7 @@ interface GenericImage {
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice, formatProductDimensions } from '@/lib/product-types';
 import { useServerCart } from '@/lib/server-cart-context';
+import { useCountryPricing } from '@/lib/country-context';
 import { useRouter } from 'next/navigation';
 
 interface ProductSelectionModalProps {
@@ -53,20 +54,21 @@ export default function ProductSelectionModal({
 }: ProductSelectionModalProps) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const { addToCart } = useServerCart();
+  const { selectedCountry, getCountryPricing } = useCountryPricing();
   const router = useRouter();
 
-  // Get products that match the image's format and have GB pricing (default country)
+  // Get products that match the image's format and have pricing for selected country
   const availableProducts = products.filter(product => {
-    const gbPricing = pricing.find(p => 
-      p.product_id === product.id && p.country_code === 'GB'
+    const countryPricing = pricing.find(p => 
+      p.product_id === product.id && p.country_code === selectedCountry
     );
     // Filter by format_id if available, otherwise show all active products with pricing
     const formatMatches = !image.format_id || product.format_id === image.format_id;
-    return product.is_active && gbPricing && formatMatches;
+    return product.is_active && countryPricing && formatMatches;
   });
 
   const getProductPricing = (productId: string) => {
-    return pricing.find(p => p.product_id === productId && p.country_code === 'GB');
+    return pricing.find(p => p.product_id === productId && p.country_code === selectedCountry);
   };
 
   const updateQuantity = (productId: string, newQuantity: number) => {
@@ -146,7 +148,7 @@ export default function ProductSelectionModal({
 
   const totalItems = getTotalItems();
   const totalPrice = getTotalPrice();
-  const gbCurrency = pricing.find(p => p.country_code === 'GB');
+  const countryCurrency = pricing.find(p => p.country_code === selectedCountry);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -284,7 +286,7 @@ export default function ProductSelectionModal({
                   <div className="flex justify-between items-center text-lg font-semibold">
                     <span>Total:</span>
                     <span>
-                      {gbCurrency && formatPrice(totalPrice, gbCurrency.currency_code, gbCurrency.currency_symbol)}
+                      {countryCurrency && formatPrice(totalPrice, countryCurrency.currency_code, countryCurrency.currency_symbol)}
                     </span>
                   </div>
                   
