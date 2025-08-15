@@ -50,7 +50,11 @@ export default function PricingManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [productFilter, setProductFilter] = useState('');
   const [countryFilter, setCountryFilter] = useState('');
+  const [currencyFilter, setCurrencyFilter] = useState('');
   const [loadingGelatoPricing, setLoadingGelatoPricing] = useState(false);
+  const [selectedPricingIds, setSelectedPricingIds] = useState<string[]>([]);
+  const [targetMargin, setTargetMargin] = useState(70);
+  const [discountPercent, setDiscountPercent] = useState(0);
   
   const [formData, setFormData] = useState<PricingFormData>({
     product_id: '',
@@ -178,7 +182,7 @@ export default function PricingManagementPage() {
     }
   };
 
-  const fetchGelatoPricing = async (productId: string, countryCode: string) => {
+  const fetchGelatoPricing = async (productId: string, countryCode: string, existingPricingId?: string) => {
     const product = products.find(p => p.id === productId);
     const country = countries.find(c => c.code === countryCode);
     
@@ -234,20 +238,35 @@ export default function PricingManagementPage() {
           console.log(`📦 Estimated shipping: ${country.currency_code} ${estimatedShipping}`);
         }
         
-        // Update form with fetched costs
+        // Update form with fetched costs if in form mode, or update existing pricing if refreshing
         const roundedProductCost = (Math.round(convertedCost * 100) / 100);
         const roundedShippingCost = (Math.round(estimatedShipping * 100) / 100);
         
-        setFormData(prev => ({
-          ...prev,
-          product_cost: roundedProductCost.toString(),
-          shipping_cost: roundedShippingCost.toString()
-        }));
-        
-        // Auto-calculate retail price with 70% margin
-        updateRetailPrice(roundedProductCost.toString(), roundedShippingCost.toString());
-        
-        console.log(`✅ Auto-populated pricing for ${product.name} in ${country.name}`);
+        if (existingPricingId) {
+          // Update existing pricing entry
+          try {
+            await supabaseService.updateProductPricing(existingPricingId, {
+              product_cost: Math.round(roundedProductCost * 100),
+              shipping_cost: Math.round(roundedShippingCost * 100)
+            });
+            console.log(`✅ Updated pricing for ${product.name} in ${country.name}`);
+          } catch (error) {
+            console.error('Failed to update pricing with Gelato costs:', error);
+            throw error;
+          }
+        } else {
+          // Update form for new pricing
+          setFormData(prev => ({
+            ...prev,
+            product_cost: roundedProductCost.toString(),
+            shipping_cost: roundedShippingCost.toString()
+          }));
+          
+          // Auto-calculate retail price with 70% margin
+          updateRetailPrice(roundedProductCost.toString(), roundedShippingCost.toString());
+          
+          console.log(`✅ Auto-populated pricing for ${product.name} in ${country.name}`);
+        }
       } else {
         console.warn(`⚠️ No Gelato pricing found for ${product.gelato_sku} in ${countryCode}`);
       }
@@ -356,14 +375,133 @@ export default function PricingManagementPage() {
     
     const matchesProduct = !productFilter || pricingItem.product_id === productFilter;
     const matchesCountry = !countryFilter || pricingItem.country_code === countryFilter;
+    const matchesCurrency = !currencyFilter || pricingItem.currency_code === currencyFilter;
     
-    return matchesSearch && matchesProduct && matchesCountry;
+    return matchesSearch && matchesProduct && matchesCountry && matchesCurrency;
   });
 
   const clearFilters = () => {
     setSearchTerm('');
     setProductFilter('');
     setCountryFilter('');
+    setCurrencyFilter('');
+  };
+
+  // Bulk operations
+  const handleBulkPriceUpdate = async () => {
+    if (selectedPricingIds.length === 0) return;
+    
+    const confirmMessage = `Apply ${targetMargin}% margin${discountPercent > 0 ? ` and ${discountPercent}% discount` : ''} to ${selectedPricingIds.length} selected pricing entries?`;
+    if (!confirm(confirmMessage)) return;
+    
+    try {
+      for (const pricingId of selectedPricingIds) {
+        const pricingItem = pricing.find(p => p.id === pricingId);
+        if (!pricingItem) continue;
+        
+        const totalCost = (pricingItem.product_cost + pricingItem.shipping_cost) / 100; // Convert from minor units
+        
+        // Calculate retail price with target margin
+        const marginDecimal = targetMargin / 100;
+        let retailPrice = totalCost / (1 - marginDecimal);
+        retailPrice = roundToNearest250(retailPrice);
+        
+        // Apply discount if specified
+        let finalPrice = retailPrice;
+        if (discountPercent > 0) {
+          finalPrice = retailPrice * (1 - discountPercent / 100);
+          finalPrice = roundToNearest250(finalPrice);
+        }
+        
+        const updateData = {
+          sale_price: Math.round(finalPrice * 100), // Convert to minor units
+          discount_price: discountPercent > 0 ? Math.round(finalPrice * 100) : undefined,
+          is_on_sale: discountPercent > 0
+        };
+        
+        await supabaseService.updateProductPricing(pricingId, updateData);
+      }
+      
+      await loadData();
+      setSelectedPricingIds([]);
+      alert(`Successfully updated ${selectedPricingIds.length} pricing entries`);
+    } catch (error) {
+      console.error('Error updating bulk pricing:', error);
+      alert('Failed to update pricing');
+    }
+  };
+  
+  const handleBulkGelatoRefresh = async () => {
+    if (selectedPricingIds.length === 0) return;
+    
+    if (!confirm(`Refresh Gelato pricing for ${selectedPricingIds.length} selected entries? This will update product and shipping costs.`)) return;
+    
+    setLoadingGelatoPricing(true);
+    
+    try {
+      for (const pricingId of selectedPricingIds) {
+        const pricingItem = pricing.find(p => p.id === pricingId);
+        if (!pricingItem) continue;
+        
+        const product = products.find(p => p.id === pricingItem.product_id);
+        if (!product?.gelato_sku) continue;
+        
+        // Fetch updated Gelato pricing using stored gelato_sku
+        const gelatoService = createGelatoService();
+        
+        // Get product pricing (base cost)
+        const baseCost = await gelatoService.getBaseCost(product.gelato_sku, pricingItem.country_code);
+        
+        // Get shipping methods to estimate shipping cost
+        const shippingMethods = await gelatoService.getShippingMethods(pricingItem.country_code);
+        
+        if (baseCost) {
+          const country = countries.find(c => c.code === pricingItem.country_code);
+          let convertedCost = baseCost.price;
+          
+          // Convert USD to local currency if needed
+          if (baseCost.currency === 'USD' && country?.currency_code !== 'USD') {
+            const conversionRates: Record<string, number> = {
+              'GBP': 0.79, 'EUR': 0.92, 'CAD': 1.35, 'AUD': 1.52,
+              'JPY': 149.5, 'SGD': 1.34, 'BRL': 5.02, 'CHF': 0.88,
+              'NZD': 1.64, 'SEK': 10.5, 'NOK': 10.8, 'DKK': 6.85,
+              'ISK': 138.2, 'PLN': 4.03, 'CZK': 22.7, 'HUF': 361.0,
+              'KRW': 1320, 'HKD': 7.81, 'MYR': 4.48, 'THB': 35.8,
+              'INR': 83.2, 'MXN': 17.1, 'ZAR': 18.4, 'TRY': 30.5,
+            };
+            
+            const rate = conversionRates[country.currency_code];
+            if (rate) {
+              convertedCost = baseCost.price * rate;
+            }
+          }
+          
+          // Estimate shipping cost (use cheapest available method)
+          let estimatedShipping = 0;
+          if (shippingMethods && shippingMethods.length > 0) {
+            const cheapestShipping = shippingMethods.reduce((cheapest, method) => {
+              return method.price < cheapest.price ? method : cheapest;
+            }, shippingMethods[0]);
+            estimatedShipping = cheapestShipping.price || 0;
+          }
+          
+          // Update the pricing entry with new costs
+          await supabaseService.updateProductPricing(pricingId, {
+            product_cost: Math.round(convertedCost * 100), // Convert to minor units
+            shipping_cost: Math.round(estimatedShipping * 100)
+          });
+        }
+      }
+      
+      await loadData();
+      setSelectedPricingIds([]);
+      alert(`Successfully refreshed ${selectedPricingIds.length} pricing entries`);
+    } catch (error) {
+      console.error('Error refreshing Gelato pricing:', error);
+      alert('Failed to refresh pricing');
+    } finally {
+      setLoadingGelatoPricing(false);
+    }
   };
 
   const calculations = getMarginCalculations();
@@ -442,6 +580,19 @@ export default function PricingManagementPage() {
                     ))}
                   </SelectContent>
                 </Select>
+
+                <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[...new Set(countries.map(c => c.currency_code))].sort().map(currency => (
+                      <SelectItem key={currency} value={currency}>
+                        {currency}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 
                 <Button variant="outline" onClick={clearFilters} size="sm">
                   <Filter className="w-4 h-4 mr-2" />
@@ -453,6 +604,98 @@ export default function PricingManagementPage() {
                 Showing {filteredPricing.length} of {pricing.length} pricing entries
               </p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bulk Pricing Controls */}
+      <Card className="mb-8 border-2 border-green-200">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <TrendingUp className="w-5 h-5 mr-2" />
+            Bulk Pricing Controls
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+            {/* Target Margin */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Target Margin (%)
+              </label>
+              <Input
+                type="number"
+                min="10"
+                max="90"
+                step="5"
+                value={targetMargin}
+                onChange={(e) => setTargetMargin(Math.min(90, Math.max(10, parseFloat(e.target.value) || 70)))}
+                className="text-center"
+              />
+            </div>
+
+            {/* Discount Percent */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Discount (%)
+              </label>
+              <Input
+                type="number"
+                min="0"
+                max="50"
+                step="5"
+                value={discountPercent}
+                onChange={(e) => setDiscountPercent(Math.min(50, Math.max(0, parseFloat(e.target.value) || 0)))}
+                className="text-center"
+              />
+            </div>
+
+            {/* Apply Button */}
+            <div>
+              <Button
+                onClick={handleBulkPriceUpdate}
+                disabled={selectedPricingIds.length === 0}
+                className="w-full bg-gradient-to-r from-green-600 to-blue-600"
+              >
+                Apply to Selected ({selectedPricingIds.length})
+              </Button>
+            </div>
+
+            {/* Refresh Gelato Prices */}
+            <div>
+              <Button
+                onClick={handleBulkGelatoRefresh}
+                disabled={selectedPricingIds.length === 0 || loadingGelatoPricing}
+                variant="outline"
+                className="w-full"
+              >
+                {loadingGelatoPricing ? (
+                  <><PawSpinner size="sm" className="mr-2" />Refreshing...</>
+                ) : (
+                  <>🔄 Refresh Gelato Prices</>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Selection Info */}
+          <div className="mt-4 p-3 bg-gray-50 rounded">
+            <p className="text-sm text-gray-600">
+              <strong>Selection:</strong> {selectedPricingIds.length} pricing entries selected
+              {selectedPricingIds.length > 0 && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => setSelectedPricingIds([])}
+                  className="ml-2 h-auto p-0 text-xs"
+                >
+                  Clear Selection
+                </Button>
+              )}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Target margin applies £2.50 rounding. Discount is applied after margin calculation.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -816,12 +1059,27 @@ export default function PricingManagementPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
+                      <th className="text-center p-2 font-medium">
+                        <input
+                          type="checkbox"
+                          checked={pricingItems.every(item => selectedPricingIds.includes(item.id))}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedPricingIds(prev => [...new Set([...prev, ...pricingItems.map(item => item.id)])]);
+                            } else {
+                              setSelectedPricingIds(prev => prev.filter(id => !pricingItems.map(item => item.id).includes(id)));
+                            }
+                          }}
+                          className="rounded"
+                        />
+                      </th>
                       <th className="text-left p-4 font-medium">Product</th>
                       <th className="text-left p-4 font-medium">Country</th>
                       <th className="text-right p-4 font-medium">Product Cost</th>
                       <th className="text-right p-4 font-medium">Shipping</th>
                       <th className="text-right p-4 font-medium">Total Cost</th>
-                      <th className="text-right p-4 font-medium">Sale Price</th>
+                      <th className="text-right p-4 font-medium">Retail Price</th>
+                      <th className="text-right p-4 font-medium">Discounted Price</th>
                       <th className="text-right p-4 font-medium">Profit</th>
                       <th className="text-right p-4 font-medium">Margin %</th>
                       <th className="text-center p-4 font-medium">Status</th>
@@ -838,6 +1096,20 @@ export default function PricingManagementPage() {
                       
                       return (
                         <tr key={pricingItem.id} className="border-b hover:bg-gray-50">
+                          <td className="p-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedPricingIds.includes(pricingItem.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedPricingIds(prev => [...prev, pricingItem.id]);
+                                } else {
+                                  setSelectedPricingIds(prev => prev.filter(id => id !== pricingItem.id));
+                                }
+                              }}
+                              className="rounded"
+                            />
+                          </td>
                           <td className="p-4">
                             <div>
                               <div className="font-medium text-gray-900">
@@ -864,16 +1136,45 @@ export default function PricingManagementPage() {
                             {formatPrice(totalCost, currency, currencySymbol)}
                           </td>
                           <td className="p-4 text-right">
-                            <div>
+                            {editingId === pricingItem.id ? (
+                              <Input
+                                type="number"
+                                step="2.50"
+                                value={(pricingItem.sale_price / 100).toString()}
+                                onChange={(e) => {
+                                  const newSalePrice = Math.round(parseFloat(e.target.value) * 100);
+                                  // Update the pricing item directly
+                                  setPricing(prev => prev.map(p => 
+                                    p.id === pricingItem.id ? { ...p, sale_price: newSalePrice } : p
+                                  ));
+                                }}
+                                className="w-24 text-right"
+                                onBlur={async () => {
+                                  try {
+                                    await supabaseService.updateProductPricing(pricingItem.id, {
+                                      sale_price: pricingItem.sale_price
+                                    });
+                                    await loadData();
+                                  } catch (error) {
+                                    console.error('Error updating price:', error);
+                                    alert('Failed to update price');
+                                  }
+                                }}
+                              />
+                            ) : (
                               <div className="font-medium">
                                 {formatPrice(pricingItem.sale_price, currency, currencySymbol)}
                               </div>
-                              {pricingItem.is_on_sale && pricingItem.discount_price && (
-                                <div className="text-sm text-red-600">
-                                  Discount: {formatPrice(pricingItem.discount_price, currency, currencySymbol)}
-                                </div>
-                              )}
-                            </div>
+                            )}
+                          </td>
+                          <td className="p-4 text-right">
+                            {pricingItem.is_on_sale && pricingItem.discount_price ? (
+                              <div className="font-medium text-red-600">
+                                {formatPrice(pricingItem.discount_price, currency, currencySymbol)}
+                              </div>
+                            ) : (
+                              <div className="text-sm text-gray-400">-</div>
+                            )}
                           </td>
                           <td className="p-4 text-right font-medium">
                             {formatPrice(profit, currency, currencySymbol)}
@@ -901,8 +1202,14 @@ export default function PricingManagementPage() {
                             <div className="flex items-center justify-end space-x-2">
                               <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={() => handleEdit(pricingItem)}
+                                variant={editingId === pricingItem.id ? "default" : "outline"}
+                                onClick={() => {
+                                  if (editingId === pricingItem.id) {
+                                    setEditingId(null);
+                                  } else {
+                                    setEditingId(pricingItem.id);
+                                  }
+                                }}
                               >
                                 <Edit2 className="w-4 h-4" />
                               </Button>
