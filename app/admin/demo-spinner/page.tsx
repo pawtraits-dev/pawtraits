@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PawSpinner, PawSpinnerWithText, PawLoadingOverlay } from '@/components/ui/paw-spinner';
+import Image from 'next/image';
 import { useState } from 'react';
 
 export default function SpinnerDemoPage() {
@@ -12,7 +13,12 @@ export default function SpinnerDemoPage() {
     <div className="container mx-auto p-6 space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">PawSpinner Demo</h1>
-        <p className="text-gray-600 mt-2">Custom rotating paw logo spinner variations</p>
+        <p className="text-gray-600 mt-2">Custom paw logo spinner with pause-and-spin animation</p>
+        <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+          <p className="text-sm text-blue-800">
+            ✨ <strong>New Animation:</strong> Each spinner does a full 360° rotation, then pauses for 75% of the cycle before spinning again. This creates a distinctive, attention-grabbing pattern that's more interesting than continuous spinning.
+          </p>
+        </div>
       </div>
 
       {/* Sizes */}
@@ -42,6 +48,41 @@ export default function SpinnerDemoPage() {
         </CardContent>
       </Card>
 
+      {/* Animation Comparison */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Animation Comparison</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-8 items-center">
+            <div className="text-center space-y-3 p-4 border-2 border-gray-200 rounded-lg">
+              <h3 className="font-medium text-gray-900">New: Pause-and-Spin</h3>
+              <PawSpinner size="xl" speed="normal" />
+              <p className="text-sm text-gray-600">
+                Spins 360°, then pauses for 75% of cycle.<br/>
+                More attention-grabbing and distinctive.
+              </p>
+            </div>
+            <div className="text-center space-y-3 p-4 border-2 border-gray-200 rounded-lg">
+              <h3 className="font-medium text-gray-900">Old: Continuous Spin</h3>
+              <div className="w-12 h-12 animate-spin mx-auto">
+                <Image
+                  src="/assets/logos/paw-svgrepo-200x200-gold.svg"
+                  alt="Continuous spin"
+                  width={48}
+                  height={48}
+                  className="w-full h-full filter drop-shadow-sm"
+                />
+              </div>
+              <p className="text-sm text-gray-600">
+                Continuous rotation.<br/>
+                Standard but less distinctive.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Speeds */}
       <Card>
         <CardHeader>
@@ -51,15 +92,15 @@ export default function SpinnerDemoPage() {
           <div className="grid grid-cols-3 gap-8 items-center">
             <div className="text-center space-y-2">
               <PawSpinner size="lg" speed="slow" />
-              <p className="text-sm text-gray-600">Slow (3s per rotation)</p>
+              <p className="text-sm text-gray-600">Slow (4s cycle: spin + 3s pause)</p>
             </div>
             <div className="text-center space-y-2">
               <PawSpinner size="lg" speed="normal" />
-              <p className="text-sm text-gray-600">Normal (2s per rotation)</p>
+              <p className="text-sm text-gray-600">Normal (3s cycle: spin + 2.25s pause)</p>
             </div>
             <div className="text-center space-y-2">
               <PawSpinner size="lg" speed="fast" />
-              <p className="text-sm text-gray-600">Fast (1s per rotation)</p>
+              <p className="text-sm text-gray-600">Fast (2s cycle: spin + 1.5s pause)</p>
             </div>
           </div>
         </CardContent>

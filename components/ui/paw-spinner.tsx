@@ -16,9 +16,9 @@ const sizeMap = {
 };
 
 const speedMap = {
-  slow: 'animate-spin-slow',
-  normal: 'animate-spin',
-  fast: 'animate-spin-fast'
+  slow: 'animate-paw-spin-slow',
+  normal: 'animate-paw-spin-normal',
+  fast: 'animate-paw-spin-fast'
 };
 
 export function PawSpinner({ size = 'md', className, speed = 'normal' }: PawSpinnerProps) {
@@ -46,17 +46,28 @@ export function PawSpinnerCSS({ size = 'md', className, speed = 'normal' }: PawS
   const sizeClass = sizeMap[size];
   
   const spinDuration = {
-    slow: '3s',
-    normal: '2s', 
-    fast: '1s'
+    slow: '4s',
+    normal: '3s', 
+    fast: '2s'
   };
+
+  const pawSpinKeyframes = `
+    @keyframes pawSpin {
+      0% { transform: rotate(0deg); }
+      25% { transform: rotate(360deg); }
+      50% { transform: rotate(360deg); }
+      75% { transform: rotate(360deg); }
+      100% { transform: rotate(360deg); }
+    }
+  `;
 
   return (
     <div className={cn('inline-flex items-center justify-center', className)}>
+      <style>{pawSpinKeyframes}</style>
       <div 
         className={cn(sizeClass)}
         style={{
-          animation: `spin ${spinDuration[speed]} linear infinite`,
+          animation: `pawSpin ${spinDuration[speed]} ease-in-out infinite`,
         }}
       >
         <Image

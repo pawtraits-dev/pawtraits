@@ -51,6 +51,18 @@ module.exports = {
       animation: {
         'spin-slow': 'spin 3s linear infinite',
         'spin-fast': 'spin 1s linear infinite',
+        'paw-spin-slow': 'pawSpin 4s ease-in-out infinite',
+        'paw-spin-normal': 'pawSpin 3s ease-in-out infinite', 
+        'paw-spin-fast': 'pawSpin 2s ease-in-out infinite',
+      },
+      keyframes: {
+        pawSpin: {
+          '0%': { transform: 'rotate(0deg)' },
+          '25%': { transform: 'rotate(360deg)' },
+          '50%': { transform: 'rotate(360deg)' },
+          '75%': { transform: 'rotate(360deg)' },
+          '100%': { transform: 'rotate(360deg)' },
+        },
       },
     },
   },
