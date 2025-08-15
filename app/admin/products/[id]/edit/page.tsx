@@ -9,6 +9,8 @@ import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { ArrowLeft, Save, Search, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
+import { formatPrice } from '@/lib/product-types';
+import { PawSpinner } from '@/components/ui/paw-spinner';
 
 // Import interfaces and types from new product page
 interface GelatoProduct {
@@ -103,6 +105,7 @@ export default function EditProductPage() {
   const [gelatoSearchTerm, setGelatoSearchTerm] = useState('');
   const [gelatoUnitFilter, setGelatoUnitFilter] = useState<'mm' | 'inches'>('mm');
   const [productPricing, setProductPricing] = useState<{[key: string]: any}>({});
+  const [retailPricing, setRetailPricing] = useState<any[]>([]);
 
   const supabaseService = new AdminSupabaseService();
 
@@ -149,6 +152,9 @@ export default function EditProductPage() {
       if (productResult.gelato_sku) {
         fetchGelatoPricing(productResult.gelato_sku);
       }
+      
+      // Load retail pricing for this product
+      loadRetailPricing(productId);
 
     } catch (err) {
       console.error('Error loading data:', err);
@@ -326,6 +332,19 @@ export default function EditProductPage() {
       console.error('Error fetching Gelato pricing:', error);
     }
   };
+  
+  const loadRetailPricing = async (productId: string) => {
+    try {
+      const response = await fetch(`/api/admin/pricing?product_id=${productId}`);
+      const result = await response.json();
+      
+      if (result.success && result.pricing) {
+        setRetailPricing(result.pricing);
+      }
+    } catch (error) {
+      console.error('Error loading retail pricing:', error);
+    }
+  };
 
   const filteredGelatoProducts = gelatoProducts.filter(product =>
     !gelatoSearchTerm || product.name.toLowerCase().includes(gelatoSearchTerm.toLowerCase())
@@ -334,13 +353,9 @@ export default function EditProductPage() {
   if (loadingProduct) {
     return (
       <div className="container mx-auto p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="space-y-4">
-            <div className="h-32 bg-gray-200 rounded"></div>
-            <div className="h-32 bg-gray-200 rounded"></div>
-            <div className="h-32 bg-gray-200 rounded"></div>
-          </div>
+        <div className="flex flex-col items-center justify-center py-12">
+          <PawSpinner size="xl" />
+          <p className="mt-4 text-gray-600">Loading product details...</p>
         </div>
       </div>
     );
@@ -500,7 +515,7 @@ export default function EditProductPage() {
             {formData.gelato_sku && (
               <div className="mt-4 p-4 bg-yellow-50 rounded-lg border-2 border-yellow-300">
                 <h4 className="text-sm font-semibold text-yellow-800 mb-3 flex items-center">
-                  💰 Live Gelato Pricing
+                  💰 Live Gelato Costs
                   {productPricing[formData.gelato_sku] ? (
                     <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">✅ Loaded</span>
                   ) : (
@@ -520,7 +535,7 @@ export default function EditProductPage() {
                       </div>
                     )}
                     
-                    {/* Multi-Country Pricing */}
+                    {/* Multi-Country Costs */}
                     {productPricing[formData.gelato_sku].multiCountry && (
                       <div className="space-y-2">
                         <div className="text-sm font-medium text-yellow-700">Multi-Country Costs:</div>
@@ -544,9 +559,68 @@ export default function EditProductPage() {
                   </>
                 ) : (
                   <div className="text-sm text-yellow-700">
-                    Fetching live pricing from Gelato API...
+                    Fetching live costs from Gelato API...
                   </div>
                 )}
+              </div>
+            )}
+            
+            {/* Retail Pricing */}
+            {retailPricing.length > 0 && (
+              <div className="mt-4 p-4 bg-green-50 rounded-lg border-2 border-green-300">
+                <h4 className="text-sm font-semibold text-green-800 mb-3 flex items-center">
+                  🏪 Retail Pricing
+                  <Link href="/admin/pricing" className="ml-auto">
+                    <Button variant="outline" size="sm" className="text-xs">
+                      Edit Pricing
+                    </Button>
+                  </Link>
+                </h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {retailPricing.map((pricing) => {
+                    const salePrice = pricing.sale_price || 0;
+                    const retailPrice = pricing.retail_price || 0;
+                    const costPrice = pricing.cost_price || 0;
+                    
+                    return (
+                      <div key={pricing.country_code} className="bg-white p-3 rounded border border-green-200">
+                        <div className="font-semibold text-green-800 mb-2">
+                          {pricing.country_code === 'GB' ? '🇬🇧 UK' : 
+                           pricing.country_code === 'US' ? '🇺🇸 USA' :
+                           pricing.country_code === 'DE' ? '🇩🇪 Germany' :
+                           pricing.country_code}
+                        </div>
+                        
+                        <div className="space-y-1 text-sm">
+                          {costPrice > 0 && (
+                            <div className="text-gray-600">
+                              <span className="font-medium">Cost:</span> {formatPrice(costPrice, pricing.currency_code, pricing.currency_symbol)}
+                            </div>
+                          )}
+                          
+                          {salePrice > 0 && (
+                            <div className="text-blue-700">
+                              <span className="font-medium">Sale:</span> {formatPrice(salePrice, pricing.currency_code, pricing.currency_symbol)}
+                            </div>
+                          )}
+                          
+                          {retailPrice > 0 && (
+                            <div className="text-green-700 font-medium">
+                              <span className="font-medium">Retail:</span> {formatPrice(retailPrice, pricing.currency_code, pricing.currency_symbol)}
+                            </div>
+                          )}
+                          
+                          {pricing.profit_margin_percent && (
+                            <div className="text-xs text-gray-500">
+                              Margin: {pricing.profit_margin_percent.toFixed(1)}%
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </CardContent>
@@ -730,7 +804,7 @@ export default function EditProductPage() {
                 className="bg-gradient-to-r from-purple-600 to-blue-600"
               >
                 {loading ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <PawSpinner size="sm" className="mr-2" />
                 ) : (
                   <Save className="w-4 h-4 mr-2" />
                 )}
@@ -772,7 +846,7 @@ export default function EditProductPage() {
                   className="bg-gradient-to-r from-purple-600 to-blue-600"
                 >
                   {searchingGelato ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <PawSpinner size="sm" className="mr-2" />
                   ) : (
                     <Search className="w-4 h-4 mr-2" />
                   )}
