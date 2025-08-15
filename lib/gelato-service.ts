@@ -807,6 +807,7 @@ export class GelatoService {
       customerReferenceId: order.customer_email,
       currency: order.currency.toUpperCase(),
       items: items,
+      shipmentMethodUid: "standard", // Use standard shipping method
       shippingAddress: shippingAddress,
       metadata: [
         {
