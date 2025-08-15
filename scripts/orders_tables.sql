@@ -25,6 +25,13 @@ CREATE TABLE IF NOT EXISTS orders (
   estimated_delivery TIMESTAMP WITH TIME ZONE,
   tracking_number TEXT,
   notes TEXT,
+  -- Stripe payment integration fields
+  payment_intent_id TEXT,
+  payment_status TEXT DEFAULT 'pending', -- pending, paid, failed, canceled
+  -- Gelato fulfillment fields  
+  gelato_order_id TEXT,
+  gelato_status TEXT,
+  error_message TEXT,
   metadata JSONB DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL

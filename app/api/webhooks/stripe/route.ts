@@ -147,7 +147,14 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       return;
     }
 
-    console.log('Order created from payment:', order.id);
+    console.log('✅ Order created successfully:', {
+      id: order.id,
+      order_number: order.order_number,
+      customer_email: order.customer_email,
+      total_amount: order.total_amount,
+      payment_intent_id: order.payment_intent_id,
+      status: order.status
+    });
 
     // Handle referral if present
     if (metadata.referralCode) {
@@ -405,21 +412,31 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
     }
 
     // Store detailed cart items for the order
+    console.log(`Creating ${cartItems.length} order items for order ${order.id}`);
     for (const item of cartItems) {
+      const itemData = {
+        order_id: order.id,
+        product_id: item.product_data?.gelato_sku || 'unknown',
+        image_id: item.image_id,
+        image_url: imageUrls[item.image_id] || '',
+        image_title: item.image_title,
+        quantity: item.quantity,
+        unit_price: Math.round(paymentIntent.amount / cartItems.reduce((sum, i) => sum + i.quantity, 0)), // Estimate unit price
+        total_price: Math.round((paymentIntent.amount / cartItems.reduce((sum, i) => sum + i.quantity, 0)) * item.quantity),
+        product_data: JSON.stringify(item.product_data),
+        print_image_url: imageUrls[item.image_id],
+        created_at: new Date().toISOString()
+      };
+
       const { error: itemError } = await supabase
         .from('order_items')
-        .insert({
-          order_id: order.id,
-          image_id: item.image_id,
-          image_title: item.image_title,
-          quantity: item.quantity,
-          product_data: JSON.stringify(item.product_data),
-          print_image_url: imageUrls[item.image_id],
-          created_at: new Date().toISOString()
-        });
+        .insert(itemData);
 
       if (itemError) {
         console.error('Failed to create order item:', itemError);
+        console.error('Order item data:', itemData);
+      } else {
+        console.log(`✅ Created order item: ${item.image_title}`);
       }
     }
 
