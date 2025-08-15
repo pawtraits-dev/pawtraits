@@ -40,11 +40,9 @@ export function CountryProvider({
   useEffect(() => {
     const loadCountries = async () => {
       try {
-        const response = await fetch('/api/countries');
+        const response = await fetch('/api/admin/countries?supportedOnly=true');
         if (response.ok) {
-          const countriesData = await response.json();
-          // Only include supported countries
-          const supportedCountries = countriesData.filter((c: Country) => c.is_supported);
+          const supportedCountries = await response.json();
           setCountries(supportedCountries);
           
           // Detect user's default country from phone number
