@@ -374,8 +374,13 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
       );
     }
 
+    // Log the generated image URLs for debugging
+    console.log('🖼️ Generated image URLs for Gelato:', imageUrls);
+    
     // Convert order to Gelato format
     const gelatoOrderData = gelatoService.mapOrderToGelato(order, cartItems, imageUrls);
+    
+    console.log('📦 Gelato order data to be sent:', JSON.stringify(gelatoOrderData, null, 2));
 
     // Add partner order information if applicable
     if (metadata.isPartnerOrder === 'true') {

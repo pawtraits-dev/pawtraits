@@ -1143,9 +1143,21 @@ export class GelatoService {
   generatePrintImageUrl(imageId: string, width: number, height: number): string {
     const cloudinaryBaseUrl = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     
+    console.log('🖼️ Generating print image URL:', {
+      imageId,
+      width,
+      height,
+      cloudinaryConfigured: !!cloudinaryBaseUrl,
+      cloudinaryBaseUrl: cloudinaryBaseUrl
+    });
+    
     if (!cloudinaryBaseUrl) {
-      console.warn('Cloudinary not configured, using fallback URL');
-      return `/api/images/print/${imageId}?w=${width}&h=${height}`;
+      console.warn('❌ Cloudinary not configured, cannot generate valid URL for Gelato');
+      // Return a placeholder URL that Gelato can access
+      // This should be replaced with actual image hosting
+      const fallbackUrl = `https://pawtraits-nu.vercel.app/api/images/print/${imageId}?w=${width}&h=${height}`;
+      console.log('⚠️ Using fallback URL:', fallbackUrl);
+      return fallbackUrl;
     }
 
     // Calculate required pixels for 300 DPI
@@ -1163,7 +1175,10 @@ export class GelatoService {
       'fl_progressive:steep' // Progressive JPEG
     ].join(',');
 
-    return `https://res.cloudinary.com/${cloudinaryBaseUrl}/image/upload/${transformation}/pawtraits_catalog/${imageId}`;
+    const cloudinaryUrl = `https://res.cloudinary.com/${cloudinaryBaseUrl}/image/upload/${transformation}/pawtraits_catalog/${imageId}`;
+    
+    console.log('✅ Generated Cloudinary URL:', cloudinaryUrl);
+    return cloudinaryUrl;
   }
 }
 
