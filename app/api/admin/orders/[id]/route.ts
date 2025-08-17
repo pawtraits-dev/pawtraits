@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SupabaseService } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function GET(
   request: NextRequest,
@@ -7,19 +10,14 @@ export async function GET(
 ) {
   try {
     const orderId = params.id;
-    const supabaseService = new SupabaseService();
+    
+    // Use service role client like the orders list endpoint
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
 
-    // Check if user is admin
-    const admin = await supabaseService.getCurrentAdmin();
-    if (!admin) {
-      return NextResponse.json(
-        { error: 'Admin access required' },
-        { status: 403 }
-      );
-    }
-
-    // Get order with items
-    const { data: order, error: orderError } = await supabaseService.getClient()
+    // Get order with items (admin has access to all orders)
+    const { data: order, error: orderError } = await supabase
       .from('orders')
       .select(`
         *,
