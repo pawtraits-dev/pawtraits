@@ -37,33 +37,23 @@ export async function GET(
       );
     }
 
-    // TODO: Query actual orders table when it exists
-    // For now, return empty array since orders system may not be implemented yet
-    console.log('Customer orders API: Orders system not yet implemented, returning empty array');
-    return NextResponse.json([]);
-
-    // Example of what the orders query might look like when implemented:
-    /*
+    // Query orders by customer email
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select(`
-        id,
-        order_date,
-        total_amount,
-        status,
-        items_count
+        *,
+        order_items (*)
       `)
-      .eq('customer_id', customerProfile.user_id)
-      .order('order_date', { ascending: false });
+      .eq('customer_email', customerProfile.email)
+      .order('created_at', { ascending: false });
 
     if (ordersError) {
       console.error('Error fetching customer orders:', ordersError);
       return NextResponse.json([], { status: 200 });
     }
 
-    console.log('Customer orders API: Found', orders?.length || 0, 'orders for customer');
+    console.log('Customer orders API: Found', orders?.length || 0, 'orders for customer', customerProfile.email);
     return NextResponse.json(orders || []);
-    */
 
   } catch (error) {
     console.error('Error fetching customer orders:', error);
