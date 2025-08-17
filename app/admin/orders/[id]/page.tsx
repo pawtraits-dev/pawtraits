@@ -41,6 +41,7 @@ interface Order {
   id: string;
   order_number: string;
   status: string;
+  customer_id: string;
   customer_email: string;
   shipping_first_name: string;
   shipping_last_name: string;
@@ -363,7 +364,7 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <Link href={`/admin/customers?search=${encodeURIComponent(order.customer_email)}`} className="font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                <Link href={`/admin/customers/${order.customer_id}`} className="font-medium text-blue-600 hover:text-blue-800 hover:underline">
                   {order.shipping_first_name} {order.shipping_last_name}
                 </Link>
                 <div className="flex items-center space-x-2 text-sm text-gray-600 mt-1">

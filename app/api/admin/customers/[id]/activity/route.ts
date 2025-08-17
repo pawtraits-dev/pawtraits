@@ -156,7 +156,7 @@ export async function GET(
     const { data: orders } = await supabase
       .from('orders')
       .select('created_at, metadata, order_items(*)')
-      .eq('customer_email', customer.email)
+      .eq('customer_id', customerId)
       .order('created_at', { ascending: false });
 
     if (orders) {
