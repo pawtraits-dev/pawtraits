@@ -31,7 +31,7 @@ import ProductSelectionModal from '@/components/ProductSelectionModal';
 import ShareModal from '@/components/share-modal';
 import UserInteractionsService from '@/lib/user-interactions';
 import { useServerCart } from '@/lib/server-cart-context';
-import { useCountryPricing } from '@/lib/country-context';
+import { CountryProvider, useCountryPricing } from '@/lib/country-context';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
@@ -47,7 +47,7 @@ interface Review {
   image_url?: string;
 }
 
-export default function HomePage() {
+function HomePageContent() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
@@ -904,5 +904,13 @@ export default function HomePage() {
         />
       )}
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <CountryProvider>
+      <HomePageContent />
+    </CountryProvider>
   );
 }
