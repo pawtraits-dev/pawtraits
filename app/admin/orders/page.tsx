@@ -51,7 +51,18 @@ interface Order {
   currency: string;
   estimated_delivery: string;
   created_at: string;
+  updated_at: string;
   order_items: OrderItem[];
+  // Gelato tracking fields
+  gelato_order_id?: string;
+  gelato_status?: string;
+  tracking_code?: string;
+  tracking_url?: string;
+  carrier_name?: string;
+  shipped_at?: string;
+  delivered_at?: string;
+  payment_status?: string;
+  payment_intent_id?: string;
 }
 
 export default function AdminOrdersPage() {
@@ -163,10 +174,18 @@ export default function AdminOrdersPage() {
         return <Clock className="w-4 h-4 text-yellow-600" />;
       case 'processing':
         return <Package className="w-4 h-4 text-blue-600" />;
+      case 'printing':
+        return <Package className="w-4 h-4 text-orange-600" />;
+      case 'printed':
+        return <CheckCircle className="w-4 h-4 text-blue-600" />;
       case 'shipped':
+        return <Truck className="w-4 h-4 text-purple-600" />;
+      case 'in_transit':
         return <Truck className="w-4 h-4 text-purple-600" />;
       case 'delivered':
         return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case 'fulfillment_error':
+        return <X className="w-4 h-4 text-red-600" />;
       default:
         return <Clock className="w-4 h-4 text-gray-600" />;
     }
@@ -176,8 +195,13 @@ export default function AdminOrdersPage() {
     const variants: Record<string, string> = {
       confirmed: "bg-yellow-100 text-yellow-800",
       processing: "bg-blue-100 text-blue-800",
+      printing: "bg-orange-100 text-orange-800",
+      printed: "bg-blue-100 text-blue-800",
       shipped: "bg-purple-100 text-purple-800",
+      in_transit: "bg-purple-100 text-purple-800",
       delivered: "bg-green-100 text-green-800",
+      fulfillment_error: "bg-red-100 text-red-800",
+      cancelled: "bg-gray-100 text-gray-800",
     };
     return variants[status.toLowerCase()] || "bg-gray-100 text-gray-800";
   };
@@ -257,8 +281,12 @@ export default function AdminOrdersPage() {
                     <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="confirmed">Confirmed</SelectItem>
                     <SelectItem value="processing">Processing</SelectItem>
+                    <SelectItem value="printing">Printing</SelectItem>
+                    <SelectItem value="printed">Printed</SelectItem>
                     <SelectItem value="shipped">Shipped</SelectItem>
+                    <SelectItem value="in_transit">In Transit</SelectItem>
                     <SelectItem value="delivered">Delivered</SelectItem>
+                    <SelectItem value="fulfillment_error">Fulfillment Error</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -350,6 +378,17 @@ export default function AdminOrdersPage() {
                           <Package className="w-4 h-4" />
                           <span>{order.order_items?.length || 0} item{(order.order_items?.length || 0) !== 1 ? 's' : ''}</span>
                         </div>
+                        {order.tracking_code && (
+                          <div className="flex items-center space-x-2">
+                            <Truck className="w-4 h-4" />
+                            <span className="text-xs">Tracking: {order.tracking_code}</span>
+                          </div>
+                        )}
+                        {order.gelato_status && order.gelato_status !== order.status && (
+                          <div className="text-xs text-gray-500">
+                            Gelato: {order.gelato_status}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -386,9 +425,11 @@ export default function AdminOrdersPage() {
                     </div>
 
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
-                        <Eye className="w-4 h-4 mr-2" />
-                        View Details
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={`/admin/orders/${order.id}`}>
+                          <Eye className="w-4 h-4 mr-2" />
+                          View Details
+                        </a>
                       </Button>
                     </div>
                   </div>

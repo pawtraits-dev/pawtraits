@@ -289,9 +289,14 @@ export default function CustomerOrdersPage() {
                 <div className="mt-6 pt-6 border-t border-gray-200">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
                     <div className="space-y-1">
-                      {order.tracking_number && (
+                      {(order.tracking_code || order.tracking_number) && (
                         <div className="text-sm text-gray-600">
-                          <span className="font-medium">Tracking:</span> {order.tracking_number}
+                          <span className="font-medium">Tracking:</span> {order.tracking_code || order.tracking_number}
+                        </div>
+                      )}
+                      {order.carrier_name && (
+                        <div className="text-sm text-gray-600">
+                          <span className="font-medium">Carrier:</span> {order.carrier_name}
                         </div>
                       )}
                       {order.estimated_delivery && (
@@ -299,18 +304,27 @@ export default function CustomerOrdersPage() {
                           <span className="font-medium">Estimated Delivery:</span> {new Date(order.estimated_delivery).toLocaleDateString()}
                         </div>
                       )}
+                      {order.gelato_status && order.gelato_status !== order.status && (
+                        <div className="text-sm text-gray-500">
+                          <span className="font-medium">Print Status:</span> {order.gelato_status}
+                        </div>
+                      )}
                     </div>
                     
                     <div className="flex space-x-3">
-                      <Button variant="outline" size="sm">
-                        <Eye className="w-4 h-4 mr-2" />
-                        View Details
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={`/customer/orders/${order.id}`}>
+                          <Eye className="w-4 h-4 mr-2" />
+                          View Details
+                        </a>
                       </Button>
                       
-                      {(order.status === 'shipped' && order.tracking_number) && (
-                        <Button variant="outline" size="sm">
-                          <Truck className="w-4 h-4 mr-2" />
-                          Track Package
+                      {(order.status === 'shipped' && (order.tracking_code || order.tracking_number)) && (
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={order.tracking_url || `#`} target="_blank" rel="noopener noreferrer">
+                            <Truck className="w-4 h-4 mr-2" />
+                            Track Package
+                          </a>
                         </Button>
                       )}
                       

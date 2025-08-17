@@ -351,9 +351,11 @@ function PartnerOrdersContent() {
                     </div>
                     
                     <div className="flex space-x-3">
-                      <Button variant="outline" size="sm">
-                        <Eye className="w-4 h-4 mr-2" />
-                        View Details
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={`/partners/orders/${order.id}`}>
+                          <Eye className="w-4 h-4 mr-2" />
+                          View Details
+                        </a>
                       </Button>
                       
                       {order.status === 'shipped' && order.trackingNumber && (
