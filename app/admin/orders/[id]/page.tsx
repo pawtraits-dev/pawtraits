@@ -363,8 +363,10 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <p className="font-medium">{order.shipping_first_name} {order.shipping_last_name}</p>
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <Link href={`/admin/customers?search=${encodeURIComponent(order.customer_email)}`} className="font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                  {order.shipping_first_name} {order.shipping_last_name}
+                </Link>
+                <div className="flex items-center space-x-2 text-sm text-gray-600 mt-1">
                   <Mail className="w-4 h-4" />
                   <span>{order.customer_email}</span>
                 </div>
