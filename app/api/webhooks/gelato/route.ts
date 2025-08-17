@@ -19,9 +19,10 @@ export async function POST(request: NextRequest) {
 
     const event = JSON.parse(body);
     console.log('Gelato webhook event received:', {
-      type: event.type || event.event_type,
-      orderId: event.order?.id || event.orderId,
-      status: event.order?.status || event.status,
+      eventType: event.eventType,
+      orderId: event.orderId,
+      orderReferenceId: event.orderReferenceId,
+      timestamp: new Date().toISOString()
     });
 
     // Initialize Supabase client
@@ -29,34 +30,26 @@ export async function POST(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    // Handle different event types
-    switch (event.type || event.event_type) {
-      case 'order.confirmed':
-        await handleOrderConfirmed(event, supabase);
+    // Handle different webhook event types (updated format)
+    switch (event.eventType) {
+      case 'order_status_updated':
+        await handleOrderStatusUpdated(event, supabase);
         break;
-        
-      case 'order.production':
-        await handleOrderProduction(event, supabase);
+      
+      case 'order_item_status_updated':
+        await handleOrderItemStatusUpdated(event, supabase);
         break;
-        
-      case 'order.shipped':
-        await handleOrderShipped(event, supabase);
+      
+      case 'order_item_tracking_code_updated':
+        await handleOrderItemTrackingUpdated(event, supabase);
         break;
-        
-      case 'order.delivered':
-        await handleOrderDelivered(event, supabase);
-        break;
-        
-      case 'order.cancelled':
-        await handleOrderCancelled(event, supabase);
-        break;
-        
-      case 'order.failed':
-        await handleOrderFailed(event, supabase);
+      
+      case 'order_delivery_estimate_updated':
+        await handleOrderDeliveryEstimateUpdated(event, supabase);
         break;
         
       default:
-        console.log(`Unhandled Gelato event type: ${event.type || event.event_type}`);
+        console.log(`Unhandled Gelato webhook event: ${event.eventType}`);
     }
 
     return NextResponse.json({ received: true });
@@ -70,230 +63,286 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleOrderConfirmed(event: any, supabase: any) {
-  const order = event.order || event;
-  const externalId = order.externalId || order.external_id;
-
-  console.log('Gelato order confirmed:', {
-    gelatoOrderId: order.id,
-    externalId: externalId,
-    status: order.status
-  });
-
+// Handle order status updates (overall order status)
+async function handleOrderStatusUpdated(event: any, supabase: any) {
   try {
-    // Update our order with Gelato order ID and status
-    const { error } = await supabase
+    const { orderId, orderReferenceId, order } = event;
+    
+    console.log('Order status updated:', {
+      orderId,
+      orderReferenceId,
+      status: order?.status,
+      fulfillmentStatus: order?.fulfillmentStatus
+    });
+
+    // Find our order using orderReferenceId (our order_number) or gelato_order_id
+    const { data: orders, error: findError } = await supabase
+      .from('orders')
+      .select('*')
+      .or(`order_number.eq.${orderReferenceId},gelato_order_id.eq.${orderId}`)
+      .limit(1);
+
+    if (findError || !orders || orders.length === 0) {
+      console.error('Order not found for Gelato webhook:', { orderReferenceId, orderId });
+      return;
+    }
+
+    const dbOrder = orders[0];
+    const newStatus = mapGelatoStatusToDbStatus(order.status);
+
+    // Update order status in database
+    const { error: updateError } = await supabase
       .from('orders')
       .update({
-        gelato_order_id: order.id,
-        gelato_status: 'confirmed',
-        status: 'processing', // Update our internal status
+        gelato_status: order.status,
+        status: newStatus,
         updated_at: new Date().toISOString(),
-        metadata: supabase.from('orders')
-          .select('metadata')
-          .eq('order_number', externalId)
-          .then((result: any) => {
-            const existingMetadata = result.data?.[0]?.metadata ? JSON.parse(result.data[0].metadata) : {};
-            return JSON.stringify({
-              ...existingMetadata,
-              gelatoOrderId: order.id,
-              gelatoStatus: 'confirmed',
-              gelatoConfirmedAt: new Date().toISOString()
-            });
-          })
+        metadata: JSON.stringify({
+          ...JSON.parse(dbOrder.metadata || '{}'),
+          last_gelato_update: new Date().toISOString(),
+          gelato_fulfillment_status: order.fulfillmentStatus
+        })
       })
-      .eq('order_number', externalId);
+      .eq('id', dbOrder.id);
 
-    if (error) {
-      console.error('Failed to update order with Gelato confirmation:', error);
+    if (updateError) {
+      console.error('Failed to update order status:', updateError);
     } else {
-      console.log('Order updated with Gelato confirmation');
-      
-      // TODO: Send customer notification about order confirmation
-      // TODO: Update inventory if applicable
+      console.log(`✅ Order ${dbOrder.order_number} status updated to: ${newStatus} (Gelato: ${order.status})`);
     }
+
+    // Send customer notification for significant status changes
+    if (shouldNotifyCustomer(order.status)) {
+      await sendOrderStatusNotification(dbOrder, order.status, supabase);
+    }
+
   } catch (error) {
-    console.error('Error handling Gelato order confirmation:', error);
+    console.error('Error handling order status update:', error);
   }
 }
 
-async function handleOrderProduction(event: any, supabase: any) {
-  const order = event.order || event;
-  const externalId = order.externalId || order.external_id;
-
-  console.log('Gelato order in production:', {
-    gelatoOrderId: order.id,
-    externalId: externalId,
-    status: order.status
-  });
-
+// Handle individual item status updates
+async function handleOrderItemStatusUpdated(event: any, supabase: any) {
   try {
-    const { error } = await supabase
+    const { orderId, orderReferenceId, orderItem } = event;
+    
+    console.log('Order item status updated:', {
+      orderId,
+      orderReferenceId,
+      itemId: orderItem?.id,
+      status: orderItem?.status
+    });
+
+    // Find the order and update item status tracking
+    const { data: orders, error: findError } = await supabase
+      .from('orders')
+      .select('id, metadata')
+      .or(`order_number.eq.${orderReferenceId},gelato_order_id.eq.${orderId}`)
+      .single();
+
+    if (findError || !orders) {
+      console.error('Order not found for item status update:', { orderReferenceId, orderId });
+      return;
+    }
+
+    // Update order metadata with item status information
+    const existingMetadata = JSON.parse(orders.metadata || '{}');
+    const itemStatusHistory = existingMetadata.item_status_history || [];
+    
+    itemStatusHistory.push({
+      item_id: orderItem.id,
+      status: orderItem.status,
+      updated_at: new Date().toISOString(),
+      fulfillment_country: orderItem.fulfillmentCountry,
+      facility_id: orderItem.fulfillmentFacilityId
+    });
+
+    const { error: updateError } = await supabase
       .from('orders')
       .update({
-        gelato_status: 'production',
-        status: 'printing', // Update our internal status
+        metadata: JSON.stringify({
+          ...existingMetadata,
+          item_status_history: itemStatusHistory,
+          last_item_update: new Date().toISOString()
+        }),
         updated_at: new Date().toISOString()
       })
-      .eq('order_number', externalId);
+      .eq('id', orders.id);
 
-    if (error) {
-      console.error('Failed to update order production status:', error);
+    if (updateError) {
+      console.error('Failed to update item status:', updateError);
     } else {
-      console.log('Order status updated to production');
-      
-      // TODO: Send customer notification about production start
+      console.log(`✅ Item status recorded: ${orderItem.status}`);
     }
+
   } catch (error) {
-    console.error('Error handling Gelato production update:', error);
+    console.error('Error handling item status update:', error);
   }
 }
 
-async function handleOrderShipped(event: any, supabase: any) {
-  const order = event.order || event;
-  const externalId = order.externalId || order.external_id;
-  const shipment = order.shipments?.[0] || event.shipment;
-
-  console.log('Gelato order shipped:', {
-    gelatoOrderId: order.id,
-    externalId: externalId,
-    trackingNumber: shipment?.trackingNumber,
-    trackingUrl: shipment?.trackingUrl
-  });
-
+// Handle tracking code updates (shipping notifications)
+async function handleOrderItemTrackingUpdated(event: any, supabase: any) {
   try {
-    const updateData: any = {
-      gelato_status: 'shipped',
-      status: 'shipped',
+    const { orderId, orderReferenceId, orderItem } = event;
+    
+    console.log('Order item tracking updated:', {
+      orderId,
+      orderReferenceId,
+      itemId: orderItem?.id,
+      trackingCode: orderItem?.trackingCode,
+      shipmentMethod: orderItem?.shipmentMethodName
+    });
+
+    // Find and update the order with tracking information
+    const { data: orders, error: findError } = await supabase
+      .from('orders')
+      .select('*')
+      .or(`order_number.eq.${orderReferenceId},gelato_order_id.eq.${orderId}`)
+      .single();
+
+    if (findError || !orders) {
+      console.error('Order not found for tracking update:', { orderReferenceId, orderId });
+      return;
+    }
+
+    // Update order with tracking information
+    const trackingData = {
+      tracking_code: orderItem.trackingCode,
+      tracking_url: orderItem.trackingUrl,
+      carrier_name: orderItem.shipmentMethodName,
       shipped_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      status: 'shipped',
+      gelato_status: 'shipped',
+      updated_at: new Date().toISOString(),
+      metadata: JSON.stringify({
+        ...JSON.parse(orders.metadata || '{}'),
+        tracking_info: {
+          tracking_code: orderItem.trackingCode,
+          tracking_url: orderItem.trackingUrl,
+          shipment_method: orderItem.shipmentMethodName,
+          fulfillment_country: orderItem.fulfillmentCountry,
+          facility_id: orderItem.fulfillmentFacilityId,
+          shipped_at: new Date().toISOString()
+        }
+      })
     };
 
-    if (shipment?.trackingNumber) {
-      updateData.tracking_number = shipment.trackingNumber;
-    }
-
-    if (shipment?.trackingUrl) {
-      updateData.tracking_url = shipment.trackingUrl;
-    }
-
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from('orders')
-      .update(updateData)
-      .eq('order_number', externalId);
+      .update(trackingData)
+      .eq('id', orders.id);
 
-    if (error) {
-      console.error('Failed to update order shipping status:', error);
+    if (updateError) {
+      console.error('Failed to update tracking info:', updateError);
     } else {
-      console.log('Order status updated to shipped');
-      
-      // TODO: Send customer shipping notification with tracking info
+      console.log(`✅ Tracking info updated for order ${orders.order_number}: ${orderItem.trackingCode}`);
     }
+
+    // Send shipping notification to customer
+    await sendShippingNotification(orders, orderItem, supabase);
+
   } catch (error) {
-    console.error('Error handling Gelato shipping update:', error);
+    console.error('Error handling tracking update:', error);
   }
 }
 
-async function handleOrderDelivered(event: any, supabase: any) {
-  const order = event.order || event;
-  const externalId = order.externalId || order.external_id;
-
-  console.log('Gelato order delivered:', {
-    gelatoOrderId: order.id,
-    externalId: externalId,
-    status: order.status
-  });
-
+// Handle delivery estimate updates
+async function handleOrderDeliveryEstimateUpdated(event: any, supabase: any) {
   try {
-    const { error } = await supabase
-      .from('orders')
-      .update({
-        gelato_status: 'delivered',
-        status: 'delivered',
-        delivered_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('order_number', externalId);
+    const { orderId, orderReferenceId, estimatedDeliveryDate } = event;
+    
+    console.log('Delivery estimate updated:', {
+      orderId,
+      orderReferenceId,
+      estimatedDeliveryDate
+    });
 
-    if (error) {
-      console.error('Failed to update order delivery status:', error);
-    } else {
-      console.log('Order status updated to delivered');
-      
-      // TODO: Send customer delivery confirmation
-      // TODO: Request customer review/feedback
+    const { data: orders, error: findError } = await supabase
+      .from('orders')
+      .select('id, metadata')
+      .or(`order_number.eq.${orderReferenceId},gelato_order_id.eq.${orderId}`)
+      .single();
+
+    if (findError || !orders) {
+      console.error('Order not found for delivery estimate update:', { orderReferenceId, orderId });
+      return;
     }
-  } catch (error) {
-    console.error('Error handling Gelato delivery update:', error);
-  }
-}
 
-async function handleOrderCancelled(event: any, supabase: any) {
-  const order = event.order || event;
-  const externalId = order.externalId || order.external_id;
-
-  console.log('Gelato order cancelled:', {
-    gelatoOrderId: order.id,
-    externalId: externalId,
-    reason: order.cancellationReason
-  });
-
-  try {
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from('orders')
       .update({
-        gelato_status: 'cancelled',
-        status: 'cancelled',
-        cancelled_at: new Date().toISOString(),
+        estimated_delivery: estimatedDeliveryDate,
         updated_at: new Date().toISOString(),
-        cancellation_reason: order.cancellationReason || 'Cancelled by print provider'
+        metadata: JSON.stringify({
+          ...JSON.parse(orders.metadata || '{}'),
+          delivery_estimate_updated: new Date().toISOString()
+        })
       })
-      .eq('order_number', externalId);
+      .eq('id', orders.id);
 
-    if (error) {
-      console.error('Failed to update order cancellation status:', error);
+    if (updateError) {
+      console.error('Failed to update delivery estimate:', updateError);
     } else {
-      console.log('Order status updated to cancelled');
-      
-      // TODO: Send customer cancellation notification
-      // TODO: Process refund if applicable
+      console.log(`✅ Delivery estimate updated: ${estimatedDeliveryDate}`);
     }
+
   } catch (error) {
-    console.error('Error handling Gelato cancellation:', error);
+    console.error('Error handling delivery estimate update:', error);
   }
 }
 
-async function handleOrderFailed(event: any, supabase: any) {
-  const order = event.order || event;
-  const externalId = order.externalId || order.external_id;
+// Map Gelato status to our database status
+function mapGelatoStatusToDbStatus(gelatoStatus: string): string {
+  const statusMap: Record<string, string> = {
+    'created': 'confirmed',
+    'uploading': 'processing',
+    'passed': 'confirmed',
+    'in_production': 'printing',
+    'printed': 'printed',
+    'shipped': 'shipped',
+    'in_transit': 'in_transit',
+    'delivered': 'delivered',
+    'failed': 'fulfillment_error',
+    'canceled': 'cancelled',
+    'on_hold': 'on_hold'
+  };
+  
+  return statusMap[gelatoStatus] || 'processing';
+}
 
-  console.log('Gelato order failed:', {
-    gelatoOrderId: order.id,
-    externalId: externalId,
-    reason: order.failureReason
-  });
+// Determine if customer should be notified for this status change
+function shouldNotifyCustomer(gelatoStatus: string): boolean {
+  const notifyStatuses = ['printed', 'shipped', 'delivered', 'failed', 'on_hold'];
+  return notifyStatuses.includes(gelatoStatus);
+}
 
+// Send order status notification to customer
+async function sendOrderStatusNotification(order: any, gelatoStatus: string, supabase: any) {
   try {
-    const { error } = await supabase
-      .from('orders')
-      .update({
-        gelato_status: 'failed',
-        status: 'failed',
-        updated_at: new Date().toISOString(),
-        failure_reason: order.failureReason || 'Order failed at print provider'
-      })
-      .eq('order_number', externalId);
-
-    if (error) {
-      console.error('Failed to update order failure status:', error);
-    } else {
-      console.log('Order status updated to failed');
-      
-      // TODO: Send customer failure notification
-      // TODO: Process refund
-      // TODO: Alert admin to investigate
-    }
+    console.log(`📧 Would send ${gelatoStatus} notification to ${order.customer_email} for order ${order.order_number}`);
+    
+    // TODO: Implement email notification service
+    // This would integrate with SendGrid, AWS SES, or similar service
+    
   } catch (error) {
-    console.error('Error handling Gelato order failure:', error);
+    console.error('Error sending status notification:', error);
+  }
+}
+
+// Send shipping notification with tracking info
+async function sendShippingNotification(order: any, orderItem: any, supabase: any) {
+  try {
+    console.log(`📦 Would send shipping notification to ${order.customer_email}:`, {
+      order_number: order.order_number,
+      tracking_code: orderItem.trackingCode,
+      tracking_url: orderItem.trackingUrl,
+      carrier: orderItem.shipmentMethodName
+    });
+    
+    // TODO: Implement shipping email notification
+    // This would send an email with tracking details
+    
+  } catch (error) {
+    console.error('Error sending shipping notification:', error);
   }
 }
