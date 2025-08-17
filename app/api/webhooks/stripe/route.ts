@@ -369,10 +369,10 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
       console.log(`🔍 Processing item: ${item.image_id} (${item.image_title})`);
       
       try {
-        // Get image details from database to get cloudinary_public_id
+        // Get image details from database including stored variants
         const { data: imageData, error: imageError } = await supabase
           .from('image_catalog')
-          .select('cloudinary_public_id, public_url')
+          .select('cloudinary_public_id, public_url, image_variants')
           .eq('id', item.image_id)
           .single();
 
@@ -383,24 +383,29 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
 
         console.log(`📷 Image data for ${item.image_id}:`, {
           cloudinary_public_id: imageData.cloudinary_public_id,
-          has_public_url: !!imageData.public_url
+          has_public_url: !!imageData.public_url,
+          has_image_variants: !!imageData.image_variants,
+          has_original_variant: !!(imageData.image_variants?.original)
         });
 
         let printUrl = '';
 
-        if (imageData.cloudinary_public_id) {
-          // Use Cloudinary original variant for print fulfillment (300 DPI, no overlay)
+        // First try to use the existing original variant URL from database
+        if (imageData.image_variants && imageData.image_variants.original && imageData.image_variants.original.url) {
+          printUrl = imageData.image_variants.original.url;
+          console.log(`✅ Using stored original variant URL for ${item.image_id}`);
+        } else if (imageData.cloudinary_public_id) {
+          // Fallback: Generate new Cloudinary original URL
           const { cloudinaryService } = await import('@/lib/cloudinary');
           
-          // Get the original print URL (300 DPI, no watermark, perfect for Gelato)
           printUrl = await cloudinaryService.getOriginalPrintUrl(
             imageData.cloudinary_public_id, 
             order.id
           );
           
-          console.log(`✅ Generated Cloudinary original print URL for ${item.image_id}`);
+          console.log(`✅ Generated new Cloudinary original print URL for ${item.image_id}`);
         } else if (imageData.public_url) {
-          // Fallback to public URL if no Cloudinary ID
+          // Final fallback to public URL
           printUrl = imageData.public_url;
           console.log(`⚠️ Using fallback public URL for ${item.image_id}`);
         } else {
