@@ -1,9 +1,14 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Margarine } from 'next/font/google';
 import './globals.css';
 import { ServerCartProvider } from '@/lib/server-cart-context';
 
 const inter = Inter({ subsets: ['latin'] });
+const margarine = Margarine({ 
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-margarine'
+});
 
 export const metadata: Metadata = {
   title: 'PawTraits - AI Pet Portraits',
@@ -40,7 +45,7 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" />
         <meta name="theme-color" content="#7c3aed" />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.className} ${margarine.variable}`}>
         <div id="root">
           <ServerCartProvider>
             {children}
