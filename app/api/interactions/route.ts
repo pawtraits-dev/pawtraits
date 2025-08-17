@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate interaction type
-    const validTypes = ['like', 'share', 'unlike', 'view'];
+    const validTypes = ['like', 'share', 'unlike', 'view', 'login', 'cart_add'];
     if (!validTypes.includes(interactionType)) {
       return NextResponse.json(
         { error: 'Invalid interaction type. Must be one of: ' + validTypes.join(', ') },

@@ -1254,6 +1254,27 @@ export class SupabaseService {
     });
 
     if (error) throw error;
+
+    // Track login activity
+    if (data.user && typeof window !== 'undefined') {
+      try {
+        fetch('/api/interactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageId: 'system_login',
+            interactionType: 'login',
+            metadata: {
+              userEmail: data.user.email,
+              loginTimestamp: new Date().toISOString()
+            }
+          })
+        }).catch(err => console.warn('Failed to track login activity:', err));
+      } catch (error) {
+        console.warn('Could not track login activity:', error);
+      }
+    }
+
     return data;
   }
 

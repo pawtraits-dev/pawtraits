@@ -22,7 +22,11 @@ import {
   Star,
   Camera,
   UserCheck,
-  Settings
+  Settings,
+  LogIn,
+  Share2,
+  Eye,
+  CreditCard
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { Customer, Pet, PetWithDetails } from '@/lib/types';
@@ -35,15 +39,27 @@ interface OrderSummary {
   items_count: number;
 }
 
+interface CustomerActivity {
+  type: string;
+  title: string;
+  description: string;
+  timestamp: string;
+  icon: string;
+  color: string;
+  metadata?: any;
+}
+
 export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [pets, setPets] = useState<PetWithDetails[]>([]);
   const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [activities, setActivities] = useState<CustomerActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [petsLoading, setPetsLoading] = useState(true);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [selectedPet, setSelectedPet] = useState<PetWithDetails | null>(null);
   const [showPetModal, setShowPetModal] = useState(false);
 
@@ -52,6 +68,7 @@ export default function CustomerDetailPage() {
       loadCustomerDetails();
       loadCustomerPets();
       loadCustomerOrders();
+      loadCustomerActivity();
     }
   }, [params.id]);
 
@@ -103,6 +120,21 @@ export default function CustomerDetailPage() {
     }
   };
 
+  const loadCustomerActivity = async () => {
+    try {
+      const response = await fetch(`/api/admin/customers/${params.id}/activity`);
+      if (response.ok) {
+        const data = await response.json();
+        setActivities(data.activities || []);
+      }
+    } catch (error) {
+      console.error('Error loading customer activity:', error);
+      setActivities([]);
+    } finally {
+      setActivitiesLoading(false);
+    }
+  };
+
   const handleToggleActive = async (isActive: boolean) => {
     if (!customer) return;
     
@@ -145,6 +177,33 @@ export default function CustomerDetailPage() {
     if (!age) return 'Unknown';
     if (age < 1) return `${Math.round(age * 12)} months`;
     return `${age} ${age === 1 ? 'year' : 'years'}`;
+  };
+
+  const getActivityIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'user': return <User className="w-4 h-4" />;
+      case 'check': return <Check className="w-4 h-4" />;
+      case 'log-in': return <LogIn className="w-4 h-4" />;
+      case 'heart': return <Heart className="w-4 h-4" />;
+      case 'share': return <Share2 className="w-4 h-4" />;
+      case 'shopping-cart': return <ShoppingCart className="w-4 h-4" />;
+      case 'eye': return <Eye className="w-4 h-4" />;
+      case 'credit-card': return <CreditCard className="w-4 h-4" />;
+      default: return <Clock className="w-4 h-4" />;
+    }
+  };
+
+  const getActivityColorClasses = (color: string) => {
+    const colorMap: Record<string, string> = {
+      blue: 'bg-blue-100 text-blue-600',
+      green: 'bg-green-100 text-green-600', 
+      purple: 'bg-purple-100 text-purple-600',
+      pink: 'bg-pink-100 text-pink-600',
+      indigo: 'bg-indigo-100 text-indigo-600',
+      orange: 'bg-orange-100 text-orange-600',
+      gray: 'bg-gray-100 text-gray-600'
+    };
+    return colorMap[color] || 'bg-gray-100 text-gray-600';
   };
 
   if (loading) {
@@ -550,57 +609,65 @@ export default function CustomerDetailPage() {
         <TabsContent value="activity" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Account Activity</CardTitle>
-              <CardDescription>Customer account and activity timeline</CardDescription>
+              <CardTitle>Customer Activity Timeline</CardTitle>
+              <CardDescription>
+                Comprehensive activity history including logins, interactions, and purchases
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">Account created</p>
-                    <p className="text-sm text-gray-600">{formatDate(customer.created_at)}</p>
-                  </div>
+              {activitiesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
                 </div>
-
-                {customer.email_verified && (
-                  <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                      <Check className="w-4 h-4 text-green-600" />
+              ) : activities.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Clock className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                  <p>No activity recorded yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {activities.map((activity, index) => (
+                    <div key={`${activity.type}-${activity.timestamp}-${index}`} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${getActivityColorClasses(activity.color)}`}>
+                        {getActivityIcon(activity.icon)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium text-gray-900">{activity.title}</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(activity.timestamp).toLocaleDateString('en-GB', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                        <p className="text-sm text-gray-600">{activity.description}</p>
+                        {activity.metadata && (
+                          <div className="mt-2">
+                            {activity.metadata.imageId && (
+                              <Badge variant="outline" className="text-xs">
+                                Image: {activity.metadata.imageId.slice(-8)}
+                              </Badge>
+                            )}
+                            {activity.metadata.platform && (
+                              <Badge variant="outline" className="text-xs ml-2">
+                                {activity.metadata.platform}
+                              </Badge>
+                            )}
+                            {activity.metadata.itemCount && (
+                              <Badge variant="outline" className="text-xs ml-2">
+                                {activity.metadata.itemCount} items
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="font-medium">Email verified</p>
-                      <p className="text-sm text-gray-600">Customer verified their email address</p>
-                    </div>
-                  </div>
-                )}
-
-                {pets.length > 0 && (
-                  <div className="flex items-center space-x-3 p-3 bg-pink-50 rounded-lg">
-                    <div className="w-8 h-8 bg-pink-100 rounded-full flex items-center justify-center">
-                      <Heart className="w-4 h-4 text-pink-600" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">Pets registered</p>
-                      <p className="text-sm text-gray-600">{pets.length} pet{pets.length !== 1 ? 's' : ''} added to account</p>
-                    </div>
-                  </div>
-                )}
-
-                {totalOrders > 0 && (
-                  <div className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg">
-                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                      <ShoppingCart className="w-4 h-4 text-purple-600" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">First order placed</p>
-                      <p className="text-sm text-gray-600">Customer became a paying customer</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

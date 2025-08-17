@@ -143,6 +143,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addToCart = (item: Omit<CartItem, 'id' | 'addedAt'>) => {
     dispatch({ type: 'ADD_ITEM', payload: item });
+    
+    // Track cart addition activity
+    if (typeof window !== 'undefined') {
+      try {
+        fetch('/api/interactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageId: item.imageId,
+            interactionType: 'cart_add',
+            metadata: {
+              imageTitle: item.imageTitle,
+              quantity: item.quantity,
+              medium: item.product?.medium?.name,
+              format: item.product?.format?.name,
+              addedAt: new Date().toISOString()
+            }
+          })
+        }).catch(err => console.warn('Failed to track cart addition:', err));
+      } catch (error) {
+        console.warn('Could not track cart addition:', error);
+      }
+    }
   };
 
   const updateQuantity = (id: string, quantity: number) => {
