@@ -107,6 +107,10 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       return;
     }
 
+    // Extract shipping cost from metadata and calculate subtotal
+    const shippingCost = parseInt(metadata.shippingCost || '0');
+    const subtotalAmount = paymentIntent.amount - shippingCost;
+
     // Create order record from payment data
     const orderData = {
       order_number: `PW-${Date.now()}-${paymentIntent.id.slice(-6)}`,
@@ -118,11 +122,11 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       shipping_city: metadata.shippingCity || '',
       shipping_postcode: metadata.shippingPostcode || '',
       shipping_country: metadata.shippingCountry || 'United Kingdom',
-      subtotal_amount: paymentIntent.amount, // Amount in pence
-      shipping_amount: 0, // Will be calculated based on order logic
-      total_amount: paymentIntent.amount,
+      subtotal_amount: subtotalAmount, // Product cost only
+      shipping_amount: shippingCost, // Actual shipping cost from metadata
+      total_amount: paymentIntent.amount, // Total including shipping
       currency: paymentIntent.currency.toUpperCase(),
-      estimated_delivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+      estimated_delivery: metadata.shippingDeliveryEstimate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       payment_intent_id: paymentIntent.id,
       payment_status: 'paid',
       created_at: new Date().toISOString(),
@@ -132,6 +136,8 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
         stripeChargeId: paymentIntent.latest_charge,
         referralCode: metadata.referralCode,
         paymentMethod: paymentIntent.payment_method_types[0] || 'card',
+        shippingMethodUid: metadata.shippingMethodUid,
+        shippingMethodName: metadata.shippingMethodName,
       }),
     };
 

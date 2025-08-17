@@ -35,6 +35,14 @@ interface CreatePaymentIntentRequest {
     };
   }>;
   referralCode?: string;
+  // Shipping option data
+  shippingOption?: {
+    uid: string;
+    name: string;
+    price: number; // in minor units (pence)
+    currency: string;
+    delivery_estimate?: string;
+  };
   // Partner-specific fields
   isPartnerOrder?: boolean;
   partnerDiscount?: number; // in pence
@@ -104,6 +112,17 @@ export async function POST(request: NextRequest) {
       metadata.shippingCity = body.shippingAddress.city;
       metadata.shippingPostcode = body.shippingAddress.postcode;
       metadata.shippingCountry = body.shippingAddress.country;
+    }
+
+    // Add shipping option data to metadata
+    if (body.shippingOption) {
+      metadata.shippingMethodUid = body.shippingOption.uid;
+      metadata.shippingMethodName = body.shippingOption.name.substring(0, 50);
+      metadata.shippingCost = body.shippingOption.price.toString();
+      metadata.shippingCurrency = body.shippingOption.currency;
+      if (body.shippingOption.delivery_estimate) {
+        metadata.shippingDeliveryEstimate = body.shippingOption.delivery_estimate;
+      }
     }
 
     // Add referral code if provided
