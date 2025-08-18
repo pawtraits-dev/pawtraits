@@ -90,8 +90,8 @@ function CatsPageContent() {
       const [breedsData, themesData, productsData, pricingData] = await Promise.all([
         supabaseService.getBreeds('cat'),
         supabaseService.getThemes(),
-        supabaseService.getProducts() || [],
-        supabaseService.getProductPricing() || []
+        supabaseService.getPublicProducts() || [],  // Use public method to bypass RLS
+        supabaseService.getPublicProductPricing() || []  // Use public method to bypass RLS
       ]);
       setBreeds(breedsData);
       setThemes(themesData.filter(theme => theme.is_active));

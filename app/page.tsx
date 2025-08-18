@@ -125,7 +125,7 @@ function HomePageContent() {
 
   const loadProducts = async () => {
     try {
-      const productsData = await supabaseService.getProducts() || [];
+      const productsData = await supabaseService.getPublicProducts() || [];  // Use public method to bypass RLS
       setProducts(productsData);
     } catch (error) {
       console.error('Error loading products:', error);
@@ -134,7 +134,7 @@ function HomePageContent() {
 
   const loadPricing = async () => {
     try {
-      const pricingData = await supabaseService.getProductPricing() || [];
+      const pricingData = await supabaseService.getPublicProductPricing() || [];  // Use public method to bypass RLS
       setPricing(pricingData);
     } catch (error) {
       console.error('Error loading pricing:', error);

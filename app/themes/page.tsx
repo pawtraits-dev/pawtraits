@@ -65,8 +65,8 @@ function ThemesPageContent() {
     try {
       const [themesData, productsData, pricingData] = await Promise.all([
         supabaseService.getThemes(),
-        supabaseService.getProducts() || [],
-        supabaseService.getProductPricing() || []
+        supabaseService.getPublicProducts() || [],  // Use public method to bypass RLS
+        supabaseService.getPublicProductPricing() || []  // Use public method to bypass RLS
       ]);
       setThemes(themesData.filter(theme => theme.is_active));
       setProducts(productsData);
