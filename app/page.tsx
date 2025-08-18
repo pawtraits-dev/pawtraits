@@ -182,7 +182,7 @@ function HomePageContent() {
 
   const loadGalleryImages = async () => {
     try {
-      const response = await fetch('/api/gallery/images');
+      const response = await fetch('/api/images?public=true');
       if (response.ok) {
         const data = await response.json();
         setImages(data.images || []);

@@ -117,7 +117,7 @@ function CatsPageContent() {
   const loadCatImages = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/gallery/images');
+      const response = await fetch('/api/images?public=true');
       if (response.ok) {
         const data = await response.json();
         // Filter for cat images only
