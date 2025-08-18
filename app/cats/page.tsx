@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -33,6 +33,7 @@ import { CountryProvider, useCountryPricing } from '@/lib/country-context';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
+import ReactMarkdown from 'react-markdown';
 
 
 function CatsPageContent() {
@@ -273,6 +274,24 @@ function CatsPageContent() {
     setImageToShare(null);
   };
 
+  // Get selected breed for description display
+  const selectedBreedData = selectedBreed ? breeds.find(b => b.id === selectedBreed) : null;
+  
+  // Get selected theme for description display
+  const selectedThemeData = selectedTheme ? themes.find(t => t.id === selectedTheme) : null;
+  
+  // Check if only breed filter is selected (and no other filters)
+  const showBreedDescription = selectedBreedData && 
+    !selectedTheme && 
+    !searchTerm.trim() && 
+    !featuredOnly;
+
+  // Check if only theme filter is selected (and no other filters)
+  const showThemeDescription = selectedThemeData && 
+    !selectedBreed && 
+    !searchTerm.trim() && 
+    !featuredOnly;
+
   const renderStars = (rating: number) => {
     const stars = [];
     const fullStars = Math.floor(rating);
@@ -307,7 +326,7 @@ function CatsPageContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-              <span className="font-[family-name:var(--font-margarine)] text-purple-600">Cat</span> Portraits
+              <span className="font-[family-name:var(--font-life-savers)] text-purple-600">Cat</span> Portraits
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
               Honor your feline friend with elegant AI-generated portraits. From playful kittens to regal cats, 
@@ -467,11 +486,107 @@ function CatsPageContent() {
         </div>
       </section>
 
+      {/* Breed Description */}
+      {showBreedDescription && selectedBreedData && (
+        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              🐱 {selectedBreedData.name}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Hero Image */}
+              {selectedBreedData.hero_image_url && (
+                <div className="lg:w-1/3 flex-shrink-0">
+                  <img 
+                    src={selectedBreedData.hero_image_url}
+                    alt={selectedBreedData.hero_image_alt || `${selectedBreedData.name} hero image`}
+                    className="w-full h-48 lg:h-64 object-contain bg-gray-50 rounded-lg shadow-md"
+                  />
+                </div>
+              )}
+              
+              {/* Content */}
+              <div className="flex-1">
+                <div className="text-gray-700 text-lg leading-relaxed prose prose-gray max-w-none">
+                  <ReactMarkdown>{selectedBreedData.description}</ReactMarkdown>
+                </div>
+                {selectedBreedData.personality_traits && selectedBreedData.personality_traits.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">Personality Traits:</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedBreedData.personality_traits.map((trait, index) => (
+                        <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-800">
+                          {trait}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Theme Description */}
+      {showThemeDescription && selectedThemeData && (
+        <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              🎨 {selectedThemeData.name}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Hero Image */}
+              {selectedThemeData.hero_image_url && (
+                <div className="lg:w-1/3 flex-shrink-0">
+                  <img 
+                    src={selectedThemeData.hero_image_url}
+                    alt={selectedThemeData.hero_image_alt || `${selectedThemeData.name} theme hero image`}
+                    className="w-full h-48 lg:h-32 object-cover rounded-lg shadow-md"
+                  />
+                </div>
+              )}
+              
+              {/* Content */}
+              <div className="flex-1">
+                <p className="text-gray-700 text-lg leading-relaxed">
+                  {selectedThemeData.description}
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-900">Difficulty:</span>
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                      {selectedThemeData.difficulty_level}/5
+                    </Badge>
+                  </div>
+                  {selectedThemeData.style_keywords && selectedThemeData.style_keywords.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">Keywords:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedThemeData.style_keywords.slice(0, 3).map((keyword, index) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {keyword}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Gallery Section */}
       <section className="py-12 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-margarine)]">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
               Elegant Cat Portraits
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">

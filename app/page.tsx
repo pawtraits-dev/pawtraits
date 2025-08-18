@@ -315,6 +315,13 @@ function HomePageContent() {
     setCurrentReview((prev) => (prev - 1 + reviews.length) % reviews.length);
   };
 
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
 
   // Filter images by category
   const popularImages = images.filter(img => img.rating && img.rating >= 4.5).slice(0, 6);
@@ -473,7 +480,7 @@ function HomePageContent() {
           <div className="text-center">
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
               AI-Generated Pet Portraits
-              <span className="block text-purple-600 font-[family-name:var(--font-margarine)]">Made with Love</span>
+              <span className="block text-purple-600 font-[family-name:var(--font-life-savers)]">Made with Love</span>
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
               Transform your beloved pets into stunning, personalized artworks using cutting-edge AI technology. 
@@ -504,7 +511,7 @@ function HomePageContent() {
       <section id="gallery" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-margarine)]">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
               Discover Amazing Pet Portraits
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
@@ -514,13 +521,13 @@ function HomePageContent() {
 
           <Tabs defaultValue="popular" className="space-y-8">
             <TabsList className="grid w-full max-w-md mx-auto grid-cols-3">
-              <TabsTrigger value="popular" className="font-[family-name:var(--font-margarine)]">
+              <TabsTrigger value="popular" className="font-[family-name:var(--font-life-savers)]">
                 Popular ({popularImages.length})
               </TabsTrigger>
-              <TabsTrigger value="new" className="font-[family-name:var(--font-margarine)]">
+              <TabsTrigger value="new" className="font-[family-name:var(--font-life-savers)]">
                 New ({newImages.length})
               </TabsTrigger>
-              <TabsTrigger value="featured" className="font-[family-name:var(--font-margarine)]">
+              <TabsTrigger value="featured" className="font-[family-name:var(--font-life-savers)]">
                 Featured ({featuredImages.length})
               </TabsTrigger>
             </TabsList>
@@ -582,7 +589,7 @@ function HomePageContent() {
       <section id="reviews" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-margarine)]">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
               What Our Customers Say
             </h2>
             <p className="text-xl text-gray-600">
@@ -659,7 +666,7 @@ function HomePageContent() {
       <section id="signup" className="py-20 bg-gradient-to-br from-purple-600 to-blue-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center text-white">
-            <h2 className="text-4xl font-bold mb-6 font-[family-name:var(--font-margarine)]">
+            <h2 className="text-4xl font-bold mb-6 font-[family-name:var(--font-life-savers)]">
               Ready to Create Your Pet's Portrait?
             </h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90">
@@ -691,7 +698,7 @@ function HomePageContent() {
       <section id="about" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-6 font-[family-name:var(--font-margarine)]">
+            <h2 className="text-4xl font-bold text-gray-900 mb-6 font-[family-name:var(--font-life-savers)]">
               About PawTraits
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
@@ -751,7 +758,7 @@ function HomePageContent() {
             <div className="space-y-4">
               <div className="flex items-center space-x-2">
                 <Sparkles className="w-6 h-6 text-purple-400" />
-                <span className="text-xl font-bold font-[family-name:var(--font-margarine)]">PawTraits</span>
+                <span className="text-xl font-bold font-[family-name:var(--font-life-savers)]">PawTraits</span>
               </div>
               <p className="text-gray-400">
                 Creating beautiful memories of your beloved pets through AI-powered artwork.

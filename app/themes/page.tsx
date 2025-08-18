@@ -239,7 +239,7 @@ function ThemesPageContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-              <span className="font-[family-name:var(--font-margarine)] text-purple-600">Artistic</span> Themes
+              <span className="font-[family-name:var(--font-life-savers)] text-purple-600">Artistic</span> Themes
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
               Explore our diverse collection of artistic themes and styles. From classical Renaissance to modern abstract, 
@@ -270,7 +270,7 @@ function ThemesPageContent() {
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-margarine)]">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
               Available Themes
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
@@ -293,7 +293,7 @@ function ThemesPageContent() {
                     <div className="mb-8">
                       <div className="flex items-center space-x-3 mb-4">
                         <Palette className="w-8 h-8 text-purple-600" />
-                        <h3 className="text-3xl font-bold text-gray-900 font-[family-name:var(--font-margarine)]">
+                        <h3 className="text-3xl font-bold text-gray-900 font-[family-name:var(--font-life-savers)]">
                           {theme.name}
                         </h3>
                         <Badge variant="outline" className="ml-2">
