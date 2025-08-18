@@ -53,11 +53,6 @@ export async function POST(request: NextRequest) {
         folder: `pawtraits/carousels/${pageType}`,
         resource_type: 'image',
         quality: 'auto:good',
-        format: 'auto',
-        transformation: [
-          { quality: 'auto:good' },
-          { fetch_format: 'auto' }
-        ],
         overwrite: false,
         unique_filename: true,
         tags: ['carousel', pageType, 'admin-upload']
@@ -72,7 +67,6 @@ export async function POST(request: NextRequest) {
         height: 800,
         crop: 'fill',
         quality: 'auto:good',
-        format: 'auto',
         gravity: 'center'
       }),
       // Thumbnail URL (400x200, optimized)
@@ -81,7 +75,6 @@ export async function POST(request: NextRequest) {
         height: 200,
         crop: 'fill',
         quality: 'auto:good',
-        format: 'auto',
         gravity: 'center'
       }),
       // Original secure URL
