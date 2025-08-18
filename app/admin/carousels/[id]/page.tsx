@@ -206,6 +206,16 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
       };
     });
 
+    // Update form data when initialData changes (e.g., after image upload)
+    useEffect(() => {
+      if (initialData) {
+        setData({
+          ...initialData,
+          carousel_id: carousel?.id || initialData.carousel_id || ''
+        });
+      }
+    }, [initialData, carousel?.id]);
+
     return (
       <Card className="mb-6">
         <CardHeader>
@@ -404,6 +414,11 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
               <Save className="w-4 h-4 mr-2" />
               Save Slide
             </Button>
+            {(!data.image_url || !carousel?.id) && (
+              <p className="text-xs text-gray-500 mt-1">
+                Debug: image_url={!!data.image_url}, carousel_id={!!carousel?.id}
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
