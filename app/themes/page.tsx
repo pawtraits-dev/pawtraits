@@ -297,7 +297,7 @@ function ThemesPageContent() {
                           {theme.name}
                         </h3>
                         <Badge variant="outline" className="ml-2">
-                          {theme.animal_type === 'both' ? 'Dogs & Cats' : theme.animal_type.charAt(0).toUpperCase() + theme.animal_type.slice(1)}
+                          {theme.animal_type === 'both' ? 'Dogs & Cats' : theme.animal_type?.charAt(0).toUpperCase() + theme.animal_type?.slice(1) || 'Unknown'}
                         </Badge>
                       </div>
                       <p className="text-lg text-gray-600 max-w-3xl">
