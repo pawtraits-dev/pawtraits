@@ -34,6 +34,7 @@ import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import EnhancedHeroCarousel from '@/components/EnhancedHeroCarousel';
 
 
 function DogsPageContent() {
@@ -321,36 +322,13 @@ function DogsPageContent() {
       {/* Navigation Header */}
       <PublicNavigation />
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-purple-50 to-blue-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-              <span className="font-[family-name:var(--font-life-savers)] text-purple-600">Dog</span> Portraits
-            </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              Celebrate your loyal companion with stunning AI-generated portraits. From playful puppies to majestic seniors, 
-              every dog deserves a masterpiece.
-            </p>
-            <div className="flex items-center justify-center space-x-4">
-              <Button 
-                size="lg"
-                onClick={() => router.push('/customer/shop')}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-              >
-                <Heart className="w-5 h-5 mr-2" />
-                Create Dog Portrait
-              </Button>
-              <Button 
-                size="lg"
-                variant="outline"
-                onClick={() => router.push('/cats')}
-              >
-                View Cat Portraits
-              </Button>
-            </div>
-          </div>
-        </div>
+      {/* Hero Carousel Section */}
+      <section className="relative">
+        <EnhancedHeroCarousel 
+          pageType="dogs"
+          className="h-[400px] md:h-[500px]"
+          showControls={true}
+        />
       </section>
 
       {/* Search and Filter Section */}

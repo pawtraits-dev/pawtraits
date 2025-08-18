@@ -36,7 +36,7 @@ import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
 import PublicNavigation from '@/components/PublicNavigation';
-import HeroCarousel from '@/components/HeroCarousel';
+import EnhancedHeroCarousel from '@/components/EnhancedHeroCarousel';
 
 
 interface Review {
@@ -477,10 +477,10 @@ function HomePageContent() {
 
       {/* Hero Carousel Section */}
       <section className="relative">
-        <HeroCarousel 
-          autoPlayInterval={6000}
-          showThumbnails={true}
+        <EnhancedHeroCarousel 
+          pageType="home"
           className="h-[600px] md:h-[700px]"
+          showControls={true}
         />
       </section>
 

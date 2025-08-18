@@ -22,14 +22,20 @@ export async function GET() {
     // Ensure Cloudinary is configured
     ensureCloudinaryConfig();
 
-    // Get images from the pawtraits/heros folder
+    // Get images from the pawtraits/heros folder or root level with hero in the name
     const result = await cloudinary.api.resources({
       type: 'upload',
-      prefix: 'pawtraits/heros/',
+      prefix: '', // Search all images
       resource_type: 'image',
-      max_results: 20, // Limit to 20 hero images
+      max_results: 100, // Get more to filter
       sort_by: [['created_at', 'desc']] // Newest first
     });
+
+    // Filter for hero images (either in pawtraits/heros/ folder or containing 'hero' in the name)
+    result.resources = result.resources.filter((resource: any) => 
+      resource.public_id.startsWith('pawtraits/heros/') || 
+      resource.public_id.includes('hero')
+    ).slice(0, 20);
 
     // Transform the results to provide optimized URLs for hero display
     const heroImages = result.resources.map((resource: any) => ({
