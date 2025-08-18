@@ -414,7 +414,7 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
             <div>
               <h1 className="text-3xl font-bold text-gray-900">{carousel.name}</h1>
               <p className="text-gray-600">
-                {carousel.page_type.charAt(0).toUpperCase() + carousel.page_type.slice(1)} Page Carousel
+                {carousel.page_type?.charAt(0).toUpperCase() + carousel.page_type?.slice(1) || 'Unknown'} Page Carousel
               </p>
             </div>
           </div>
