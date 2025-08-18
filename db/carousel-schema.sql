@@ -12,10 +12,7 @@ CREATE TABLE IF NOT EXISTS carousels (
     show_thumbnails BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_by UUID REFERENCES user_profiles(id),
-    
-    -- Ensure only one active carousel per page type
-    UNIQUE(page_type, is_active) WHERE is_active = true
+    created_by UUID REFERENCES user_profiles(id)
 );
 
 -- Create carousel_slides table
@@ -128,13 +125,17 @@ USING (
     )
 );
 
+-- Create unique partial index to ensure only one active carousel per page type
+CREATE UNIQUE INDEX IF NOT EXISTS idx_carousels_unique_active_per_page 
+ON carousels(page_type) WHERE is_active = true;
+
 -- Insert default carousels for each page type
 INSERT INTO carousels (name, page_type, description) VALUES
 ('Home Page Carousel', 'home', 'Main carousel for the homepage'),
 ('Dogs Page Carousel', 'dogs', 'Carousel for the dogs gallery page'),
 ('Cats Page Carousel', 'cats', 'Carousel for the cats gallery page'),
 ('Themes Page Carousel', 'themes', 'Carousel for the themes gallery page')
-ON CONFLICT (page_type, is_active) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- Create view for easy carousel management
 CREATE OR REPLACE VIEW carousel_management_view AS
