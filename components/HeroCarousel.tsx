@@ -136,9 +136,6 @@ export default function HeroCarousel({
           className="w-full h-full object-cover transition-opacity duration-500"
           loading="lazy"
         />
-        
-        {/* Overlay gradient for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent"></div>
       </div>
 
       {/* Navigation Controls */}

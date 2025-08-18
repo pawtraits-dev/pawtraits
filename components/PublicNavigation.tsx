@@ -121,13 +121,13 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
               height={32} 
               className="w-8 h-8"
             />
-            <span className="text-2xl font-bold text-gray-900 font-[family-name:var(--font-margarine)]">
+            <span className="text-2xl font-bold text-gray-900 font-[family-name:var(--font-life-savers)]">
               PawTraits
             </span>
           </Link>
 
           {/* Desktop Menu */}
-          <div className="hidden md:flex items-center space-x-8 font-[family-name:var(--font-margarine)] text-lg" ref={dropdownRef}>
+          <div className="hidden md:flex items-center space-x-8 font-[family-name:var(--font-life-savers)] text-lg" ref={dropdownRef}>
             {/* Dogs Dropdown */}
             <div 
               className="relative"
@@ -280,7 +280,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t bg-white">
-            <div className="px-2 pt-2 pb-3 space-y-1 font-[family-name:var(--font-margarine)]">
+            <div className="px-2 pt-2 pb-3 space-y-1 font-[family-name:var(--font-life-savers)]">
               <div className="space-y-2">
                 <div className="px-3 py-2 font-medium text-gray-900">Dogs</div>
                 <button
