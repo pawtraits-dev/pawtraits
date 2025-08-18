@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,11 +11,16 @@ import {
   ShoppingCart, 
   Sparkles, 
   ArrowRight,
-  ArrowLeft
+  ArrowLeft,
+  Search,
+  Filter
 } from 'lucide-react';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
+import PublicNavigation from '@/components/PublicNavigation';
+import { Input } from '@/components/ui/input';
+import type { Breed, Theme, AnimalType } from '@/lib/types';
 
 interface GalleryImage {
   id: string;
@@ -48,26 +53,105 @@ interface GalleryImage {
 
 export default function DogsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [images, setImages] = useState<GalleryImage[]>([]);
+  const [breeds, setBreeds] = useState<Breed[]>([]);
+  const [themes, setThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBreed, setSelectedBreed] = useState('');
+  const [selectedTheme, setSelectedTheme] = useState('');
+  const [featuredOnly, setFeaturedOnly] = useState(false);
   
   const supabaseService = new SupabaseService();
 
   useEffect(() => {
-    loadDogImages();
+    loadData();
+    initializeFilters();
   }, []);
+
+  useEffect(() => {
+    loadDogImages();
+  }, [searchTerm, selectedBreed, selectedTheme, featuredOnly]);
+
+  const initializeFilters = () => {
+    const breedParam = searchParams.get('breed');
+    const themeParam = searchParams.get('theme');
+    const searchParam = searchParams.get('search');
+    const featuredParam = searchParams.get('featured');
+
+    if (breedParam) setSelectedBreed(breedParam);
+    if (themeParam) setSelectedTheme(themeParam);
+    if (searchParam) setSearchTerm(searchParam);
+    if (featuredParam === 'true') setFeaturedOnly(true);
+  };
+
+  const loadData = async () => {
+    try {
+      const [breedsData, themesData] = await Promise.all([
+        supabaseService.getBreeds('dog'),
+        supabaseService.getThemes()
+      ]);
+      setBreeds(breedsData);
+      setThemes(themesData.filter(theme => theme.is_active));
+    } catch (error) {
+      console.error('Error loading filter data:', error);
+    }
+  };
+
+  const updateUrlParams = (updates: { [key: string]: string | null }) => {
+    const params = new URLSearchParams(searchParams.toString());
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+    
+    const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+    router.push(newUrl);
+  };
 
   const loadDogImages = async () => {
     try {
+      setLoading(true);
       const response = await fetch('/api/gallery/images');
       if (response.ok) {
         const data = await response.json();
         // Filter for dog images only
-        const dogImages = (data.images || []).filter((img: GalleryImage) => 
+        let dogImages = (data.images || []).filter((img: GalleryImage) => 
           img.breed?.animal_type === 'dog' || 
           img.tags?.includes('dog') ||
           (!img.breed?.animal_type && !img.tags?.includes('cat')) // Default to dog if unclear
         );
+
+        // Apply search filter
+        if (searchTerm) {
+          dogImages = dogImages.filter((img: GalleryImage) =>
+            img.prompt_text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            img.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            img.breed?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            img.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+          );
+        }
+
+        // Apply breed filter
+        if (selectedBreed) {
+          dogImages = dogImages.filter((img: GalleryImage) => img.breed_id === selectedBreed);
+        }
+
+        // Apply theme filter
+        if (selectedTheme) {
+          dogImages = dogImages.filter((img: GalleryImage) => img.theme_id === selectedTheme);
+        }
+
+        // Apply featured filter
+        if (featuredOnly) {
+          dogImages = dogImages.filter((img: GalleryImage) => img.is_featured);
+        }
+
         setImages(dogImages);
       }
     } catch (error) {
@@ -88,27 +172,7 @@ export default function DogsPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation Header */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <Link href="/" className="flex items-center space-x-2">
-              <Sparkles className="w-8 h-8 text-purple-600" />
-              <span className="text-2xl font-bold text-gray-900 font-[family-name:var(--font-margarine)]">PawTraits</span>
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link href="/">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Home
-                </Button>
-              </Link>
-              <Link href="/cart">
-                <ShoppingCart className="w-6 h-6 text-gray-700 hover:text-purple-600 transition-colors" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <PublicNavigation />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-purple-50 to-blue-50 py-20">
@@ -142,8 +206,141 @@ export default function DogsPage() {
         </div>
       </section>
 
+      {/* Search and Filter Section */}
+      <section className="py-8 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Card className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Search dog images..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSearchTerm(value);
+                    updateUrlParams({ search: value || null });
+                  }}
+                  className="pl-10"
+                />
+              </div>
+              
+              <select
+                value={selectedBreed}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSelectedBreed(value);
+                  updateUrlParams({ breed: value || null });
+                }}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+              >
+                <option value="">All Dog Breeds</option>
+                {breeds.map(breed => (
+                  <option key={breed.id} value={breed.id}>{breed.name}</option>
+                ))}
+              </select>
+              
+              <select
+                value={selectedTheme}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSelectedTheme(value);
+                  updateUrlParams({ theme: value || null });
+                }}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+              >
+                <option value="">All Themes</option>
+                {themes.map(theme => (
+                  <option key={theme.id} value={theme.id}>{theme.name}</option>
+                ))}
+              </select>
+              
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="featured"
+                  checked={featuredOnly}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFeaturedOnly(checked);
+                    updateUrlParams({ featured: checked ? 'true' : null });
+                  }}
+                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                />
+                <label htmlFor="featured" className="text-sm text-gray-700">Featured only</label>
+              </div>
+            </div>
+            
+            {(searchTerm || selectedBreed || selectedTheme || featuredOnly) && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-gray-600">Active filters:</span>
+                {searchTerm && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    Search: {searchTerm}
+                    <button onClick={() => {
+                      setSearchTerm('');
+                      updateUrlParams({ search: null });
+                    }} className="ml-1 hover:text-red-600">
+                      ×
+                    </button>
+                  </Badge>
+                )}
+                {selectedBreed && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    Breed: {breeds.find(b => b.id === selectedBreed)?.name}
+                    <button onClick={() => {
+                      setSelectedBreed('');
+                      updateUrlParams({ breed: null });
+                    }} className="ml-1 hover:text-red-600">
+                      ×
+                    </button>
+                  </Badge>
+                )}
+                {selectedTheme && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    Theme: {themes.find(t => t.id === selectedTheme)?.name}
+                    <button onClick={() => {
+                      setSelectedTheme('');
+                      updateUrlParams({ theme: null });
+                    }} className="ml-1 hover:text-red-600">
+                      ×
+                    </button>
+                  </Badge>
+                )}
+                {featuredOnly && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    Featured
+                    <button onClick={() => {
+                      setFeaturedOnly(false);
+                      updateUrlParams({ featured: null });
+                    }} className="ml-1 hover:text-red-600">
+                      ×
+                    </button>
+                  </Badge>
+                )}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSelectedBreed('');
+                    setSelectedTheme('');
+                    setFeaturedOnly(false);
+                    updateUrlParams({ search: null, breed: null, theme: null, featured: null });
+                  }}
+                  className="text-xs"
+                >
+                  Clear all
+                </Button>
+              </div>
+            )}
+          </Card>
+        </div>
+      </section>
+
       {/* Gallery Section */}
-      <section className="py-20 bg-white">
+      <section className="py-12 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-margarine)]">

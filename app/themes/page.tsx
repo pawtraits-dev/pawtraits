@@ -17,6 +17,7 @@ import {
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
+import PublicNavigation from '@/components/PublicNavigation';
 
 interface Theme {
   id: string;
@@ -106,27 +107,7 @@ export default function ThemesPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation Header */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <Link href="/" className="flex items-center space-x-2">
-              <Sparkles className="w-8 h-8 text-purple-600" />
-              <span className="text-2xl font-bold text-gray-900 font-[family-name:var(--font-margarine)]">PawTraits</span>
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link href="/">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Home
-                </Button>
-              </Link>
-              <Link href="/cart">
-                <ShoppingCart className="w-6 h-6 text-gray-700 hover:text-purple-600 transition-colors" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <PublicNavigation />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-purple-50 to-blue-50 py-20">

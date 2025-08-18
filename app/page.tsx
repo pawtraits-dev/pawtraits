@@ -34,7 +34,7 @@ import { useServerCart } from '@/lib/server-cart-context';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
-import { extractDescriptionTitle } from '@/lib/utils';
+import { extractDescriptionTitle } from '@/lib/utils';\nimport PublicNavigation from '@/components/PublicNavigation';
 
 
 interface Review {
@@ -102,7 +102,6 @@ function HomePageContent() {
     }
   ]);
   const [currentReview, setCurrentReview] = useState(0);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const supabase = getSupabaseClient();
   const supabaseService = new SupabaseService();
@@ -315,10 +314,6 @@ function HomePageContent() {
     setCurrentReview((prev) => (prev - 1 + reviews.length) % reviews.length);
   };
 
-  const scrollToSection = (sectionId: string) => {
-    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
-    setMobileMenuOpen(false);
-  };
 
   // Filter images by category
   const popularImages = images.filter(img => img.rating && img.rating >= 4.5).slice(0, 6);
@@ -469,65 +464,7 @@ function HomePageContent() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation Header */}
-      <nav className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            {/* Logo */}
-            <Link href="/" className="flex items-center space-x-2">
-              <Sparkles className="w-8 h-8 text-purple-600" />
-              <span className="text-2xl font-bold text-gray-900 font-[family-name:var(--font-margarine)]">PawTraits</span>
-            </Link>
-
-            {/* Desktop Menu */}
-            <div className="hidden md:flex items-center space-x-8 font-[family-name:var(--font-margarine)] text-lg">
-              <Link href="/dogs" className="text-gray-700 hover:text-purple-600 transition-colors">
-                Dogs
-              </Link>
-              <Link href="/cats" className="text-gray-700 hover:text-purple-600 transition-colors">
-                Cats
-              </Link>
-              <button onClick={() => scrollToSection('reviews')} className="text-gray-700 hover:text-purple-600 transition-colors">
-                Reviews
-              </button>
-              <Link href="/themes" className="text-gray-700 hover:text-purple-600 transition-colors">
-                Themes
-              </Link>
-              <button onClick={() => scrollToSection('about')} className="text-gray-700 hover:text-purple-600 transition-colors">
-                About
-              </button>
-              <button onClick={() => scrollToSection('signup')} className="text-gray-700 hover:text-purple-600 transition-colors">
-                Sign Up
-              </button>
-              <Link href="/cart" className="relative">
-                <ShoppingCart className="w-6 h-6 text-gray-700 hover:text-purple-600 transition-colors" />
-              </Link>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <button 
-              className="md:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
-
-          {/* Mobile Menu */}
-          {mobileMenuOpen && (
-            <div className="md:hidden border-t bg-white">
-              <div className="px-2 pt-2 pb-3 space-y-1 font-[family-name:var(--font-margarine)]">
-                <Link href="/dogs" className="block px-3 py-2 text-gray-700 hover:text-purple-600">Dogs</Link>
-                <Link href="/cats" className="block px-3 py-2 text-gray-700 hover:text-purple-600">Cats</Link>
-                <button onClick={() => scrollToSection('reviews')} className="block px-3 py-2 text-gray-700 hover:text-purple-600 w-full text-left">Reviews</button>
-                <Link href="/themes" className="block px-3 py-2 text-gray-700 hover:text-purple-600">Themes</Link>
-                <button onClick={() => scrollToSection('about')} className="block px-3 py-2 text-gray-700 hover:text-purple-600 w-full text-left">About</button>
-                <button onClick={() => scrollToSection('signup')} className="block px-3 py-2 text-gray-700 hover:text-purple-600 w-full text-left">Sign Up</button>
-                <Link href="/cart" className="block px-3 py-2 text-gray-700 hover:text-purple-600">Basket</Link>
-              </div>
-            </div>
-          )}
-        </div>
-      </nav>
+      <PublicNavigation />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-purple-50 to-blue-50 py-20">
