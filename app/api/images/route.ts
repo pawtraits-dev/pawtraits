@@ -31,7 +31,13 @@ export async function GET(request: NextRequest) {
       publicOnly
     });
 
-    return NextResponse.json(images);
+    // Return in the expected format for public pages
+    return NextResponse.json({
+      images: images,
+      total_count: images.length,
+      current_page: page,
+      total_pages: Math.ceil(images.length / limit)
+    });
   } catch (error) {
     console.error('Error fetching images:', error);
     return NextResponse.json(
