@@ -13,61 +13,60 @@ import {
   ArrowRight,
   ArrowLeft,
   Search,
-  Filter
+  Filter,
+  Star
 } from 'lucide-react';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase-client';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import PublicNavigation from '@/components/PublicNavigation';
 import { Input } from '@/components/ui/input';
-import type { Breed, Theme, AnimalType } from '@/lib/types';
+import type { Breed, Theme, AnimalType, ImageCatalogWithDetails } from '@/lib/types';
+import type { Product, ProductPricing } from '@/lib/product-types';
+import { formatPrice } from '@/lib/product-types';
+import ProductSelectionModal from '@/components/ProductSelectionModal';
+import ShareModal from '@/components/share-modal';
+import UserInteractionsService from '@/lib/user-interactions';
+import { useServerCart } from '@/lib/server-cart-context';
+import { CountryProvider, useCountryPricing } from '@/lib/country-context';
+import ClickableMetadataTags from '@/components/clickable-metadata-tags';
+import ImageModal from '@/components/ImageModal';
+import { extractDescriptionTitle } from '@/lib/utils';
 
-interface GalleryImage {
-  id: string;
-  filename: string;
-  public_url: string;
-  prompt_text: string;
-  description: string;
-  tags: string[];
-  breed_id?: string;
-  theme_id?: string;
-  style_id?: string;
-  format_id?: string;
-  rating?: number;
-  is_featured: boolean;
-  created_at: string;
-  breed?: {
-    id: string;
-    name: string;
-    animal_type: string;
-  };
-  theme?: {
-    id: string;
-    name: string;
-  };
-  style?: {
-    id: string;
-    name: string;
-  };
-}
 
 function DogsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [images, setImages] = useState<GalleryImage[]>([]);
+  const [images, setImages] = useState<ImageCatalogWithDetails[]>([]);
   const [breeds, setBreeds] = useState<Breed[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [pricing, setPricing] = useState<ProductPricing[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBreed, setSelectedBreed] = useState('');
   const [selectedTheme, setSelectedTheme] = useState('');
   const [featuredOnly, setFeaturedOnly] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<ImageCatalogWithDetails | null>(null);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [imageToShare, setImageToShare] = useState<ImageCatalogWithDetails | null>(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [modalImage, setModalImage] = useState<ImageCatalogWithDetails | null>(null);
+  const [likedImages, setLikedImages] = useState<Set<string>>(new Set());
+  const [sharedImages, setSharedImages] = useState<Set<string>>(new Set());
+  const [purchasedImages, setPurchasedImages] = useState<Set<string>>(new Set());
   
   const supabaseService = new SupabaseService();
+  const supabase = getSupabaseClient();
+  const { addToCart } = useServerCart();
+  const { selectedCountry, selectedCountryData, getCountryPricing, getLowestPrice } = useCountryPricing();
 
   useEffect(() => {
     loadData();
     initializeFilters();
+    loadUserInteractions();
   }, []);
 
   useEffect(() => {
@@ -88,15 +87,29 @@ function DogsPageContent() {
 
   const loadData = async () => {
     try {
-      const [breedsData, themesData] = await Promise.all([
+      const [breedsData, themesData, productsData, pricingData] = await Promise.all([
         supabaseService.getBreeds('dog'),
-        supabaseService.getThemes()
+        supabaseService.getThemes(),
+        supabaseService.getProducts() || [],
+        supabaseService.getProductPricing() || []
       ]);
       setBreeds(breedsData);
       setThemes(themesData.filter(theme => theme.is_active));
+      setProducts(productsData);
+      setPricing(pricingData);
     } catch (error) {
-      console.error('Error loading filter data:', error);
+      console.error('Error loading data:', error);
     }
+  };
+
+  const loadUserInteractions = () => {
+    const liked = UserInteractionsService.getLikedImageIds();
+    const shared = UserInteractionsService.getSharedImageIds();
+    const purchased = UserInteractionsService.getPurchasedImageIds();
+    
+    setLikedImages(new Set(liked));
+    setSharedImages(new Set(shared));
+    setPurchasedImages(new Set(purchased));
   };
 
   const updateUrlParams = (updates: { [key: string]: string | null }) => {
@@ -121,7 +134,7 @@ function DogsPageContent() {
       if (response.ok) {
         const data = await response.json();
         // Filter for dog images only
-        let dogImages = (data.images || []).filter((img: GalleryImage) => 
+        let dogImages = (data.images || []).filter((img: ImageCatalogWithDetails) => 
           img.breed?.animal_type === 'dog' || 
           img.tags?.includes('dog') ||
           (!img.breed?.animal_type && !img.tags?.includes('cat')) // Default to dog if unclear
@@ -129,7 +142,7 @@ function DogsPageContent() {
 
         // Apply search filter
         if (searchTerm) {
-          dogImages = dogImages.filter((img: GalleryImage) =>
+          dogImages = dogImages.filter((img: ImageCatalogWithDetails) =>
             img.prompt_text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             img.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             img.breed?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -139,17 +152,17 @@ function DogsPageContent() {
 
         // Apply breed filter
         if (selectedBreed) {
-          dogImages = dogImages.filter((img: GalleryImage) => img.breed_id === selectedBreed);
+          dogImages = dogImages.filter((img: ImageCatalogWithDetails) => img.breed_id === selectedBreed);
         }
 
         // Apply theme filter
         if (selectedTheme) {
-          dogImages = dogImages.filter((img: GalleryImage) => img.theme_id === selectedTheme);
+          dogImages = dogImages.filter((img: ImageCatalogWithDetails) => img.theme_id === selectedTheme);
         }
 
         // Apply featured filter
         if (featuredOnly) {
-          dogImages = dogImages.filter((img: GalleryImage) => img.is_featured);
+          dogImages = dogImages.filter((img: ImageCatalogWithDetails) => img.is_featured);
         }
 
         setImages(dogImages);
@@ -159,6 +172,121 @@ function DogsPageContent() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getImageProductInfo = (imageId: string) => {
+    const image = images.find(img => img.id === imageId);
+    
+    if (!image || !image.format_id) {
+      return { productCount: 0, lowestPrice: null, currency: null };
+    }
+
+    const availableProducts = (products || []).filter(p => 
+      p.is_active && p.format_id === image.format_id
+    );
+    
+    if (availableProducts.length === 0) {
+      return { productCount: 0, lowestPrice: null, currency: null };
+    }
+
+    const countryPricing = getCountryPricing(pricing || []).filter(p => 
+      availableProducts.some(product => product.id === p.product_id)
+    );
+
+    if (countryPricing.length === 0) {
+      return { productCount: availableProducts.length, lowestPrice: null, currency: null };
+    }
+
+    const lowestPricing = countryPricing.reduce((lowest, current) => 
+      current.sale_price < lowest.sale_price ? current : lowest
+    );
+
+    return {
+      productCount: availableProducts.length,
+      lowestPrice: lowestPricing.sale_price,
+      currency: lowestPricing.currency_code,
+      currencySymbol: lowestPricing.currency_symbol
+    };
+  };
+
+  const handleBuyClick = (image: ImageCatalogWithDetails) => {
+    setSelectedImage(image);
+    setShowProductModal(true);
+  };
+
+  const handleAddToCart = (productId: string, quantity: number) => {
+    if (!selectedImage) return;
+
+    const product = products.find(p => p.id === productId);
+    const productPricing = pricing.find(p => p.product_id === productId && p.country_code === selectedCountry);
+    
+    if (!product || !productPricing) {
+      alert('Product information not found');
+      return;
+    }
+
+    addToCart({
+      imageId: selectedImage.id,
+      productId: productId,
+      imageUrl: selectedImage.image_variants?.thumbnail?.url || selectedImage.image_variants?.mid_size?.url || selectedImage.public_url,
+      imageTitle: selectedImage.description || 'Pet Portrait',
+      product: product,
+      pricing: productPricing,
+      quantity: quantity
+    });
+
+    setShowProductModal(false);
+    setSelectedImage(null);
+  };
+
+  const handleLike = (imageId: string) => {
+    const image = images.find(img => img.id === imageId);
+    const isNowLiked = UserInteractionsService.toggleLikeSync(imageId, image);
+    
+    setLikedImages(prev => {
+      const newLiked = new Set(prev);
+      if (isNowLiked) {
+        newLiked.add(imageId);
+      } else {
+        newLiked.delete(imageId);
+      }
+      return newLiked;
+    });
+  };
+
+  const handleShare = (image: ImageCatalogWithDetails) => {
+    setImageToShare(image);
+    setShowShareModal(true);
+  };
+
+  const handleImageClick = (image: ImageCatalogWithDetails) => {
+    setModalImage(image);
+    setShowImageModal(true);
+  };
+
+  const handleShareComplete = (platform: string) => {
+    if (imageToShare) {
+      UserInteractionsService.recordShare(imageToShare.id, platform, imageToShare);
+      setSharedImages(prev => new Set(prev).add(imageToShare.id));
+    }
+    setShowShareModal(false);
+    setImageToShare(null);
+  };
+
+  const renderStars = (rating: number) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 !== 0;
+    
+    for (let i = 0; i < fullStars; i++) {
+      stars.push(<Star key={i} className="w-3 h-3 fill-current" />);
+    }
+    
+    if (hasHalfStar) {
+      stars.push(<Star key="half" className="w-3 h-3 fill-current opacity-50" />);
+    }
+    
+    return <div className="flex items-center space-x-0.5">{stars}</div>;
   };
 
   if (loading) {
@@ -358,43 +486,132 @@ function DogsPageContent() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {images.map((image) => (
-                <Card key={image.id} className="group hover:shadow-lg transition-all duration-300 overflow-hidden">
-                  <div className="relative aspect-square">
-                    <CatalogImage
-                      imageId={image.id}
-                      alt={image.prompt_text}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    {image.is_featured && (
-                      <div className="absolute top-4 left-4">
-                        <Badge className="bg-purple-100 text-purple-800">
-                          <Sparkles className="w-3 h-3 mr-1" />
-                          Featured
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{image.prompt_text}</h3>
-                    <div className="flex items-center justify-between">
-                      <div className="flex space-x-1">
-                        {image.breed && (
-                          <Badge variant="outline" className="text-xs">{image.breed.name}</Badge>
+              {images.map((image) => {
+                const isLiked = likedImages.has(image.id);
+                const isShared = sharedImages.has(image.id);
+                const isPurchased = purchasedImages.has(image.id);
+                const productInfo = getImageProductInfo(image.id);
+
+                return (
+                  <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
+                    <div 
+                      className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
+                      onClick={() => handleImageClick(image)}
+                    >
+                      <CatalogImage
+                        imageId={image.id}
+                        alt={image.description || 'Generated image'}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        fallbackUrl={image.image_url || image.public_url}
+                      />
+                      {image.rating && image.rating > 0 && (
+                        <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                          {renderStars(image.rating)}
+                        </div>
+                      )}
+                      
+                      <div className="absolute top-2 right-2 flex space-x-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLike(image.id);
+                          }}
+                          className={`p-2 rounded-full transition-all ${
+                            isLiked 
+                              ? 'bg-red-500 text-white' 
+                              : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
+                          }`}
+                          title={isLiked ? 'Unlike' : 'Like'}
+                        >
+                          <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                        </button>
+                        
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShare(image);
+                          }}
+                          className={`p-2 rounded-full transition-all ${
+                            isShared 
+                              ? 'bg-blue-500 text-white' 
+                              : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
+                          }`}
+                          title={isShared ? 'Shared' : 'Share'}
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                        
+                        {isPurchased && (
+                          <div className="bg-green-500 text-white p-2 rounded-full" title="Purchased">
+                            <ShoppingCart className="w-4 h-4 fill-current" />
+                          </div>
                         )}
-                        {image.style && (
-                          <Badge variant="outline" className="text-xs">{image.style.name}</Badge>
-                        )}
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <Heart className="w-4 h-4 text-gray-400 hover:text-red-500 transition-colors cursor-pointer" />
-                        <Share2 className="w-4 h-4 text-gray-400 hover:text-blue-500 transition-colors cursor-pointer" />
-                        <ShoppingCart className="w-4 h-4 text-gray-400 hover:text-green-500 transition-colors cursor-pointer" />
+
+                      <div className="absolute bottom-2 left-2">
+                        {image.is_featured && (
+                          <Badge className="bg-purple-100 text-purple-800">
+                            <Sparkles className="w-3 h-3 mr-1" />
+                            Featured
+                          </Badge>
+                        )}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    
+                    <CardContent className="p-4 space-y-3">
+                      <ClickableMetadataTags
+                        breed_id={image.breed_id}
+                        breed_name={image.breed_name}
+                        breed_animal_type={image.breed_animal_type}
+                        theme_id={image.theme_id}
+                        theme_name={image.theme_name}
+                        style_id={image.style_id}
+                        style_name={image.style_name}
+                        coat_id={image.coat_id}
+                        coat_name={image.coat_name}
+                        coat_hex_color={image.coat_hex_color}
+                        coat_animal_type={image.coat_animal_type}
+                      />
+                      
+                      {image.description && (
+                        <p className="text-sm text-gray-900 font-medium line-clamp-2">
+                          {extractDescriptionTitle(image.description)}
+                        </p>
+                      )}
+                      
+                      <div className="pt-3 border-t">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-sm text-gray-600">
+                            {productInfo.productCount > 0 ? (
+                              <>
+                                {productInfo.productCount} product{productInfo.productCount > 1 ? 's' : ''} from{' '}
+                                {productInfo.lowestPrice && productInfo.currencySymbol ? 
+                                  formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol) : 
+                                  'Price TBC'
+                                }
+                              </>
+                            ) : (
+                              'Price TBC'
+                            )}
+                          </div>
+                        </div>
+                        <Button 
+                          size="sm"
+                          className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                          disabled={productInfo.productCount === 0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBuyClick(image);
+                          }}
+                        >
+                          <ShoppingCart className="w-4 h-4 mr-2" />
+                          {productInfo.productCount === 0 ? 'Coming Soon' : 'Add to Cart'}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
 
@@ -410,18 +627,66 @@ function DogsPageContent() {
           </div>
         </div>
       </section>
+
+      {/* Modals */}
+      {selectedImage && (
+        <ProductSelectionModal
+          image={selectedImage}
+          products={products}
+          pricing={pricing}
+          isOpen={showProductModal}
+          onClose={() => {
+            setShowProductModal(false);
+            setSelectedImage(null);
+          }}
+          onAddToBasket={handleAddToCart}
+        />
+      )}
+
+      {imageToShare && (
+        <ShareModal
+          image={imageToShare}
+          isOpen={showShareModal}
+          onClose={() => {
+            setShowShareModal(false);
+            setImageToShare(null);
+          }}
+          onShare={handleShareComplete}
+        />
+      )}
+
+      {modalImage && (
+        <ImageModal
+          imageId={modalImage.id}
+          imageData={{
+            id: modalImage.id,
+            description: modalImage.description,
+            prompt_text: modalImage.prompt_text,
+            breed_name: modalImage.breed_name,
+            theme_name: modalImage.theme_name,
+            style_name: modalImage.style_name
+          }}
+          isOpen={showImageModal}
+          onClose={() => {
+            setShowImageModal(false);
+            setModalImage(null);
+          }}
+        />
+      )}
     </div>
   );
 }
 
 export default function DogsPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-      </div>
-    }>
-      <DogsPageContent />
-    </Suspense>
+    <CountryProvider>
+      <Suspense fallback={
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        </div>
+      }>
+        <DogsPageContent />
+      </Suspense>
+    </CountryProvider>
   );
 }
