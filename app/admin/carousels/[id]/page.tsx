@@ -500,6 +500,46 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
         />
       )}
 
+      {/* Edit Slide Form */}
+      {editingSlide && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              Edit Slide
+              <Button variant="ghost" size="sm" onClick={() => setEditingSlide(null)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <NewSlideForm 
+              onSubmit={(data) => {
+                handleUpdateSlide(editingSlide.id, data);
+                setEditingSlide(null);
+              }}
+              initialData={{
+                carousel_id: carousel?.id || '',
+                image_url: editingSlide.image_url,
+                cloudinary_public_id: editingSlide.cloudinary_public_id || '',
+                image_alt: editingSlide.image_alt || '',
+                title: editingSlide.title || '',
+                subtitle: editingSlide.subtitle || '',
+                description: editingSlide.description || '',
+                cta_text: editingSlide.cta_text || '',
+                cta_url: editingSlide.cta_url || '',
+                cta_style: editingSlide.cta_style,
+                text_position: editingSlide.text_position,
+                text_color: editingSlide.text_color,
+                show_overlay: editingSlide.show_overlay,
+                overlay_opacity: editingSlide.overlay_opacity,
+                sort_order: editingSlide.sort_order,
+                is_active: editingSlide.is_active
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Slides List */}
       <div className="space-y-4">
         {carousel.slides.length === 0 ? (
@@ -524,8 +564,8 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
                     <GripVertical className="w-4 h-4 text-gray-400 cursor-move" />
                   </div>
 
-                  {/* Image Preview */}
-                  <div className="w-32 h-20 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                  {/* Image Preview - 16:9 aspect ratio */}
+                  <div className="w-32 h-[4.5rem] bg-gray-100 rounded overflow-hidden flex-shrink-0">
                     <img
                       src={slide.image_url}
                       alt={slide.image_alt || 'Slide'}
@@ -572,7 +612,11 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
                         >
                           {slide.is_active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                         </button>
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setEditingSlide(slide)}
+                        >
                           <Edit className="w-4 h-4 mr-1" />
                           Edit
                         </Button>

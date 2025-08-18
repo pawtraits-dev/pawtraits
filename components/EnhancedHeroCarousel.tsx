@@ -164,7 +164,7 @@ export default function EnhancedHeroCarousel({
 
   if (loading) {
     return (
-      <div className={`relative w-full h-96 bg-gradient-to-br from-purple-50 to-blue-50 ${className}`}>
+      <div className={`relative w-full aspect-video bg-gradient-to-br from-purple-50 to-blue-50 ${className}`}>
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
         </div>
@@ -174,7 +174,7 @@ export default function EnhancedHeroCarousel({
 
   if (error || carouselData.slides.length === 0) {
     return (
-      <div className={`relative w-full h-96 bg-gradient-to-br from-purple-50 to-blue-50 ${className}`}>
+      <div className={`relative w-full aspect-video bg-gradient-to-br from-purple-50 to-blue-50 ${className}`}>
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center text-gray-600">
             <p className="text-lg mb-2">{error || `No carousel configured for ${pageType} page`}</p>
@@ -189,7 +189,7 @@ export default function EnhancedHeroCarousel({
   const shouldShowThumbnails = showThumbnails !== undefined ? showThumbnails : carouselData.carousel?.show_thumbnails;
 
   return (
-    <div className={`relative w-full h-96 overflow-hidden ${className}`}>
+    <div className={`relative w-full aspect-video overflow-hidden ${className}`}>
       {/* Main Image Display */}
       <div className="relative w-full h-full">
         <img
@@ -314,7 +314,7 @@ export default function EnhancedHeroCarousel({
               <button
                 key={slide.id}
                 onClick={() => goToSlide(index)}
-                className={`flex-shrink-0 w-16 h-10 overflow-hidden rounded border-2 transition-all duration-200 ${
+                className={`flex-shrink-0 w-16 h-9 overflow-hidden rounded border-2 transition-all duration-200 ${
                   index === currentIndex 
                     ? 'border-white shadow-lg' 
                     : 'border-white/50 hover:border-white/75'

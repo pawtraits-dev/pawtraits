@@ -59,20 +59,20 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Generate optimized URLs for different use cases
+    // Generate optimized URLs for different use cases (16:9 aspect ratio)
     const optimizedUrls = {
-      // Hero display URL (1920x800, optimized)
+      // Hero display URL (1920x1080, 16:9 aspect ratio)
       hero: cloudinary.url(uploadResult.public_id, {
         width: 1920,
-        height: 800,
+        height: 1080,
         crop: 'fill',
         quality: 'auto:good',
         gravity: 'center'
       }),
-      // Thumbnail URL (400x200, optimized)
+      // Thumbnail URL (400x225, 16:9 aspect ratio) 
       thumbnail: cloudinary.url(uploadResult.public_id, {
         width: 400,
-        height: 200,
+        height: 225,
         crop: 'fill',
         quality: 'auto:good',
         gravity: 'center'
