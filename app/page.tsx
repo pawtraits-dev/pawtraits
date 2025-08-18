@@ -36,6 +36,7 @@ import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
 import PublicNavigation from '@/components/PublicNavigation';
+import HeroCarousel from '@/components/HeroCarousel';
 
 
 interface Review {
@@ -474,15 +475,22 @@ function HomePageContent() {
       {/* Navigation Header */}
       <PublicNavigation />
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-purple-50 to-blue-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+      {/* Hero Carousel Section */}
+      <section className="relative">
+        <HeroCarousel 
+          autoPlayInterval={6000}
+          showThumbnails={true}
+          className="h-[600px] md:h-[700px]"
+        />
+        
+        {/* Hero Content Overlay */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center text-white px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 drop-shadow-lg">
               AI-Generated Pet Portraits
-              <span className="block text-purple-600 font-[family-name:var(--font-life-savers)]">Made with Love</span>
+              <span className="block text-purple-300 font-[family-name:var(--font-life-savers)] mt-2">Made with Love</span>
             </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+            <p className="text-lg md:text-xl mb-8 max-w-3xl mx-auto drop-shadow-lg opacity-90">
               Transform your beloved pets into stunning, personalized artworks using cutting-edge AI technology. 
               Perfect for gifts, memorials, or just celebrating your furry family members.
             </p>
@@ -490,7 +498,7 @@ function HomePageContent() {
               <Button 
                 size="lg"
                 onClick={() => router.push('/customer/shop')}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg"
               >
                 <Heart className="w-5 h-5 mr-2" />
                 Start Creating
@@ -499,6 +507,7 @@ function HomePageContent() {
                 size="lg"
                 variant="outline"
                 onClick={() => scrollToSection('gallery')}
+                className="border-white text-white hover:bg-white hover:text-purple-600 shadow-lg backdrop-blur-sm bg-white/20"
               >
                 View Gallery
               </Button>

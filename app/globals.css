@@ -103,6 +103,15 @@
   background-color: rgb(148 163 184);
 }
 
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Animation utilities */
 @keyframes fadeIn {
   from {
