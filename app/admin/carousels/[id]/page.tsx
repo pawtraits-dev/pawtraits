@@ -29,6 +29,7 @@ import {
   CTAStyleOptions,
   DefaultSlideSettings 
 } from '@/lib/carousel-types';
+import { compressImage, formatFileSize, isValidImageType } from '@/lib/image-compression';
 
 export default function CarouselSlidesPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -65,10 +66,31 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
   const handleImageUpload = async (file: File) => {
     if (!carousel || !file) return null;
 
+    // Validate file type
+    if (!isValidImageType(file)) {
+      setError('Please select a valid image file (JPEG, PNG, or WebP)');
+      return null;
+    }
+
     setUploading(true);
     try {
+      console.log(`Original file: ${file.name} (${formatFileSize(file.size)})`);
+      
+      // Compress if file is larger than 2MB
+      let processedFile = file;
+      if (file.size > 2 * 1024 * 1024) {
+        console.log('Compressing image for carousel upload...');
+        processedFile = await compressImage(file, {
+          maxWidth: 1920,  // Hero images can be larger
+          maxHeight: 1080,
+          quality: 0.85,
+          maxSizeKB: 8192  // 8MB max for hero images
+        });
+        console.log(`Compressed file: ${processedFile.name} (${formatFileSize(processedFile.size)})`);
+      }
+
       const uploadFormData = new FormData();
-      uploadFormData.append('file', file);
+      uploadFormData.append('file', processedFile);
       uploadFormData.append('pageType', carousel.page_type);
       uploadFormData.append('slideName', `slide_${Date.now()}`);
 
@@ -212,11 +234,14 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
                 className="w-full h-32 border-dashed"
               >
                 {uploading ? (
-                  <>Uploading...</>
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                    Compressing & Uploading...
+                  </>
                 ) : (
                   <>
                     <Upload className="w-6 h-6 mr-2" />
-                    Upload Image
+                    Upload Carousel Image
                   </>
                 )}
               </Button>
@@ -224,10 +249,13 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/jpg,image/png,image/webp"
               onChange={handleFileSelect}
               className="hidden"
             />
+            <p className="text-xs text-gray-500 mt-2">
+              Supports JPEG, PNG, and WebP files. Images over 2MB will be automatically compressed.
+            </p>
           </div>
 
           {/* Content Fields */}
