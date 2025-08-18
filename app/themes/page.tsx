@@ -28,6 +28,7 @@ import ShareModal from '@/components/share-modal';
 import UserInteractionsService from '@/lib/user-interactions';
 import { useServerCart } from '@/lib/server-cart-context';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
+import EnhancedHeroCarousel from '@/components/EnhancedHeroCarousel';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
@@ -234,36 +235,13 @@ function ThemesPageContent() {
       {/* Navigation Header */}
       <PublicNavigation />
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-purple-50 to-blue-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-              <span className="font-[family-name:var(--font-life-savers)] text-purple-600">Artistic</span> Themes
-            </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              Explore our diverse collection of artistic themes and styles. From classical Renaissance to modern abstract, 
-              find the perfect artistic expression for your pet's personality.
-            </p>
-            <div className="flex items-center justify-center space-x-4">
-              <Button 
-                size="lg"
-                onClick={() => router.push('/customer/shop')}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-              >
-                <Palette className="w-5 h-5 mr-2" />
-                Start Creating
-              </Button>
-              <Button 
-                size="lg"
-                variant="outline"
-                onClick={() => router.push('/customer/gallery')}
-              >
-                View Gallery
-              </Button>
-            </div>
-          </div>
-        </div>
+      {/* Hero Carousel Section */}
+      <section className="relative">
+        <EnhancedHeroCarousel 
+          pageType="themes"
+          className="h-[400px] md:h-[500px]"
+          showControls={true}
+        />
       </section>
 
       {/* Themes Section */}
