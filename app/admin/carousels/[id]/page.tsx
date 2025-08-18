@@ -54,7 +54,15 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
       if (!response.ok) throw new Error('Failed to load carousel');
       
       const data = await response.json();
-      setCarousel(data);
+      console.log('Loaded carousel data:', data);
+      
+      // The API returns { carousel, slides }, so we need to restructure
+      const carouselWithSlides: CarouselWithSlides = {
+        ...data.carousel,
+        slides: data.slides
+      };
+      
+      setCarousel(carouselWithSlides);
     } catch (err) {
       console.error('Error loading carousel:', err);
       setError(err instanceof Error ? err.message : 'Failed to load carousel');
