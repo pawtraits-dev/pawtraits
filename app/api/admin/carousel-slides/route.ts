@@ -10,11 +10,22 @@ const supabase = createClient(
 export async function POST(request: NextRequest) {
   try {
     const body: CarouselSlideFormData = await request.json();
+    console.log('Creating carousel slide with data:', JSON.stringify(body, null, 2));
 
     // Validate required fields
     if (!body.carousel_id || !body.image_url) {
+      console.error('Validation failed - missing required fields:', {
+        carousel_id: body.carousel_id,
+        image_url: body.image_url
+      });
       return NextResponse.json(
-        { error: 'Carousel ID and image URL are required' },
+        { 
+          error: 'Carousel ID and image URL are required',
+          received: {
+            carousel_id: !!body.carousel_id,
+            image_url: !!body.image_url
+          }
+        },
         { status: 400 }
       );
     }

@@ -172,6 +172,7 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
 
     const uploadResult = await handleImageUpload(file);
     if (uploadResult) {
+      console.log('Upload result:', uploadResult);
       const newFormData: CarouselSlideFormData = {
         ...DefaultSlideSettings,
         carousel_id: carousel.id,
@@ -180,6 +181,7 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
         image_alt: `Slide image for ${carousel.name}`
       };
       
+      console.log('New form data:', newFormData);
       setFormData(newFormData);
       setShowNewSlideForm(true);
     }
