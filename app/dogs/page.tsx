@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,7 +51,7 @@ interface GalleryImage {
   };
 }
 
-export default function DogsPage() {
+function DogsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [images, setImages] = useState<GalleryImage[]>([]);
@@ -411,5 +411,17 @@ export default function DogsPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function DogsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      </div>
+    }>
+      <DogsPageContent />
+    </Suspense>
   );
 }

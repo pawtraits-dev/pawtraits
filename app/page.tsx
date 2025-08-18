@@ -34,7 +34,8 @@ import { useServerCart } from '@/lib/server-cart-context';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
-import { extractDescriptionTitle } from '@/lib/utils';\nimport PublicNavigation from '@/components/PublicNavigation';
+import { extractDescriptionTitle } from '@/lib/utils';
+import PublicNavigation from '@/components/PublicNavigation';
 
 
 interface Review {
