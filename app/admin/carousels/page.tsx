@@ -135,7 +135,7 @@ export default function CarouselManagementPage() {
                   className={`${getPageTypeColor(carousel.page_type)} flex items-center gap-1`}
                 >
                   {getPageIcon(carousel.page_type)}
-                  {carousel.page_type.charAt(0).toUpperCase() + carousel.page_type.slice(1)}
+                  {carousel.page_type?.charAt(0).toUpperCase() + carousel.page_type?.slice(1) || 'Unknown'}
                 </Badge>
                 <div className="flex items-center gap-2">
                   <button
@@ -185,12 +185,10 @@ export default function CarouselManagementPage() {
                       Slides
                     </Button>
                   </Link>
-                  <Link href={`/admin/carousels/${carousel.id}/settings`}>
-                    <Button size="sm" variant="outline">
-                      <Settings className="w-4 h-4 mr-1" />
-                      Settings
-                    </Button>
-                  </Link>
+                  <Button size="sm" variant="outline" disabled>
+                    <Settings className="w-4 h-4 mr-1" />
+                    Settings
+                  </Button>
                 </div>
                 
                 <div className={`text-xs px-2 py-1 rounded ${
