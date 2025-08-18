@@ -191,12 +191,20 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
     onSubmit: (data: CarouselSlideFormData) => void; 
     initialData?: CarouselSlideFormData;
   }) => {
-    const [data, setData] = useState<CarouselSlideFormData>(
-      initialData || {
+    const [data, setData] = useState<CarouselSlideFormData>(() => {
+      if (initialData) {
+        // Ensure carousel_id is set even in initialData
+        return {
+          ...initialData,
+          carousel_id: carousel?.id || initialData.carousel_id || ''
+        };
+      }
+      
+      return {
         ...DefaultSlideSettings,
         carousel_id: carousel?.id || ''
-      }
-    );
+      };
+    });
 
     return (
       <Card className="mb-6">
@@ -392,7 +400,7 @@ export default function CarouselSlidesPage({ params }: { params: { id: string } 
             <Button variant="outline" onClick={() => setShowNewSlideForm(false)}>
               Cancel
             </Button>
-            <Button onClick={() => onSubmit(data)} disabled={!data.image_url}>
+            <Button onClick={() => onSubmit(data)} disabled={!data.image_url || !carousel?.id}>
               <Save className="w-4 h-4 mr-2" />
               Save Slide
             </Button>
