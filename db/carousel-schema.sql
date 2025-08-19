@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS carousel_slides (
     cta_style VARCHAR(50) DEFAULT 'primary' CHECK (cta_style IN ('primary', 'secondary', 'outline')),
     
     -- Display settings
-    text_position VARCHAR(50) DEFAULT 'center' CHECK (text_position IN ('center', 'left', 'right', 'bottom-left', 'bottom-right', 'top-left', 'top-right')),
+    text_position VARCHAR(50) DEFAULT 'center' CHECK (text_position IN ('center', 'left', 'right', 'bottom-left', 'bottom-center', 'bottom-right', 'top-left', 'top-right')),
     text_color VARCHAR(50) DEFAULT 'white' CHECK (text_color IN ('white', 'black', 'purple', 'blue')),
     show_overlay BOOLEAN DEFAULT true,
     overlay_opacity INTEGER DEFAULT 40 CHECK (overlay_opacity >= 0 AND overlay_opacity <= 100),
