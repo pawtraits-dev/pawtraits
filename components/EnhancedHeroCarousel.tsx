@@ -140,6 +140,7 @@ export default function EnhancedHeroCarousel({
       case 'black': return 'text-black';
       case 'purple': return 'text-purple-600';
       case 'blue': return 'text-blue-600';
+      case 'gold': return 'text-yellow-400';
       default: return 'text-white';
     }
   };
@@ -191,30 +192,30 @@ export default function EnhancedHeroCarousel({
 
   return (
     <div className={`relative w-full aspect-video overflow-hidden ${className}`}>
-      {/* Previous Slide Preview (Blurred) */}
+      {/* Previous Slide Preview (Cropped Right Edge) */}
       {carouselData.slides.length > 1 && (
-        <div className="absolute left-0 top-0 w-1/4 h-full z-10">
+        <div className="absolute left-0 top-0 w-16 sm:w-24 md:w-32 lg:w-40 h-full z-10 overflow-hidden">
           <div className="relative w-full h-full">
             <img
               src={carouselData.slides[(currentIndex - 1 + carouselData.slides.length) % carouselData.slides.length].image_url}
               alt="Previous slide preview"
-              className="w-full h-full object-contain opacity-60 blur-sm"
+              className="w-full h-full object-cover object-right opacity-70 blur-[1px]"
             />
-            <div className="absolute inset-0 bg-black/20" />
+            <div className="absolute inset-0 bg-black/30" />
           </div>
         </div>
       )}
 
-      {/* Next Slide Preview (Blurred) */}
+      {/* Next Slide Preview (Cropped Left Edge) */}
       {carouselData.slides.length > 1 && (
-        <div className="absolute right-0 top-0 w-1/4 h-full z-10">
+        <div className="absolute right-0 top-0 w-16 sm:w-24 md:w-32 lg:w-40 h-full z-10 overflow-hidden">
           <div className="relative w-full h-full">
             <img
               src={carouselData.slides[(currentIndex + 1) % carouselData.slides.length].image_url}
               alt="Next slide preview"
-              className="w-full h-full object-contain opacity-60 blur-sm"
+              className="w-full h-full object-cover object-left opacity-70 blur-[1px]"
             />
-            <div className="absolute inset-0 bg-black/20" />
+            <div className="absolute inset-0 bg-black/30" />
           </div>
         </div>
       )}
@@ -240,21 +241,21 @@ export default function EnhancedHeroCarousel({
         {/* Content Overlay */}
         {(currentSlide.title || currentSlide.subtitle || currentSlide.description || currentSlide.cta_text) && (
           <div className={`absolute inset-0 flex ${getTextPositionClasses(currentSlide.text_position)}`}>
-            <div className={`max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 ${getTextColorClasses(currentSlide.text_color)}`}>
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
               {currentSlide.title && (
-                <h1 className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg font-[family-name:var(--font-life-savers)]">
+                <h1 className={`text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg font-[family-name:var(--font-life-savers)] ${getTextColorClasses(currentSlide.title_color || currentSlide.text_color)}`}>
                   {currentSlide.title}
                 </h1>
               )}
               
               {currentSlide.subtitle && (
-                <h2 className="text-2xl md:text-3xl font-semibold mb-4 drop-shadow-lg">
+                <h2 className={`text-2xl md:text-3xl font-semibold mb-4 drop-shadow-lg ${getTextColorClasses(currentSlide.subtitle_color || currentSlide.text_color)}`}>
                   {currentSlide.subtitle}
                 </h2>
               )}
               
               {currentSlide.description && (
-                <p className="text-lg md:text-xl mb-8 max-w-3xl drop-shadow-lg opacity-90 leading-relaxed">
+                <p className={`text-lg md:text-xl mb-8 max-w-3xl drop-shadow-lg opacity-90 leading-relaxed ${getTextColorClasses(currentSlide.description_color || currentSlide.text_color)}`}>
                   {currentSlide.description}
                 </p>
               )}

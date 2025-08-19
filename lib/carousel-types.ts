@@ -12,7 +12,7 @@ export type TextPosition =
   | 'top-left' 
   | 'top-right';
 
-export type TextColor = 'white' | 'black' | 'purple' | 'blue';
+export type TextColor = 'white' | 'black' | 'purple' | 'blue' | 'gold';
 
 export type CTAStyle = 'primary' | 'secondary' | 'outline';
 
@@ -51,6 +51,9 @@ export interface CarouselSlide {
   // Display settings
   text_position: TextPosition;
   text_color: TextColor;
+  title_color?: TextColor;
+  subtitle_color?: TextColor; 
+  description_color?: TextColor;
   show_overlay: boolean;
   overlay_opacity: number;
   
@@ -104,6 +107,9 @@ export interface CarouselSlideFormData {
   // Display settings
   text_position: TextPosition;
   text_color: TextColor;
+  title_color?: TextColor;
+  subtitle_color?: TextColor;
+  description_color?: TextColor;
   show_overlay: boolean;
   overlay_opacity: number;
   
@@ -164,7 +170,8 @@ export const TextColorOptions: { label: string; value: TextColor }[] = [
   { label: 'White', value: 'white' },
   { label: 'Black', value: 'black' },
   { label: 'Purple', value: 'purple' },
-  { label: 'Blue', value: 'blue' }
+  { label: 'Blue', value: 'blue' },
+  { label: 'Gold', value: 'gold' }
 ];
 
 export const CTAStyleOptions: { label: string; value: CTAStyle }[] = [
