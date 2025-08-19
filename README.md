@@ -1,4 +1,4 @@
-# PawTraits - AI-Generated Pet Portraits
+# Pawtraits - AI-Generated Pet Portraits
 
 A comprehensive Next.js application for creating, managing, and selling AI-generated pet portraits with integrated e-commerce functionality.
 

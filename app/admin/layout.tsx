@@ -182,7 +182,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <div className="flex items-center space-x-2">
             <Image 
               src="/assets/logos/paw-svgrepo-200x200-gold.svg" 
-              alt="PawTraits Admin"
+              alt="Pawtraits Admin"
               width={32}
               height={32}
               className="w-8 h-8 filter brightness-0 invert"
@@ -257,7 +257,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </button>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">Admin Dashboard</h1>
-                <p className="text-sm text-gray-600">Manage your PawTraits platform</p>
+                <p className="text-sm text-gray-600">Manage your Pawtraits platform</p>
               </div>
             </div>
             

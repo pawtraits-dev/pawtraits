@@ -56,7 +56,7 @@ function PartnerMarketingPage() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
               <Sparkles className="w-8 h-8 text-green-600" />
-              <span className="text-2xl font-bold text-gray-900">PawTraits Partners</span>
+              <span className="text-2xl font-bold text-gray-900">Pawtraits Partners</span>
             </div>
             <div className="flex items-center space-x-4">
               <Link href="/auth/login?redirect=/partners">
@@ -79,7 +79,7 @@ function PartnerMarketingPage() {
             </Badge>
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
               Grow Your Business With
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600"> PawTraits</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600"> Pawtraits</span>
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
               Join our exclusive partner program for pet groomers, veterinarians, and pet service providers. 
@@ -150,7 +150,7 @@ function PartnerMarketingPage() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">How Partnership Works</h2>
-            <p className="text-xl text-gray-600">Simple steps to start earning with PawTraits</p>
+            <p className="text-xl text-gray-600">Simple steps to start earning with Pawtraits</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -180,7 +180,7 @@ function PartnerMarketingPage() {
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-4">Refer Clients</h3>
               <p className="text-gray-600">
-                Use your unique links and QR codes to refer clients to PawTraits.
+                Use your unique links and QR codes to refer clients to Pawtraits.
               </p>
             </div>
             
@@ -310,7 +310,7 @@ function PartnerMarketingPage() {
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto text-center">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">What Partners Say</h2>
-          <p className="text-xl text-gray-600 mb-12">Hear from successful PawTraits partners</p>
+          <p className="text-xl text-gray-600 mb-12">Hear from successful Pawtraits partners</p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="p-8 bg-gray-50 rounded-2xl">
@@ -320,7 +320,7 @@ function PartnerMarketingPage() {
                 ))}
               </div>
               <p className="text-gray-700 mb-4">
-                "PawTraits has been an amazing addition to our grooming business. Our clients love 
+                "Pawtraits has been an amazing addition to our grooming business. Our clients love 
                 the portraits and we've earned over £2,000 in commissions this year!"
               </p>
               <div className="flex items-center">
@@ -341,7 +341,7 @@ function PartnerMarketingPage() {
                 ))}
               </div>
               <p className="text-gray-700 mb-4">
-                "The memorial portraits we offer through PawTraits have helped so many families 
+                "The memorial portraits we offer through Pawtraits have helped so many families 
                 celebrate their pets. It's a meaningful service with great returns."
               </p>
               <div className="flex items-center">
@@ -365,7 +365,7 @@ function PartnerMarketingPage() {
             Ready to Start Earning?
           </h2>
           <p className="text-xl mb-8 opacity-90">
-            Join hundreds of successful partners earning commissions with PawTraits
+            Join hundreds of successful partners earning commissions with Pawtraits
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/signup/partner">
@@ -389,7 +389,7 @@ function PartnerMarketingPage() {
         <div className="max-w-7xl mx-auto text-center">
           <div className="flex items-center justify-center space-x-3 mb-4">
             <Sparkles className="w-8 h-8 text-green-400" />
-            <span className="text-2xl font-bold">PawTraits Partners</span>
+            <span className="text-2xl font-bold">Pawtraits Partners</span>
           </div>
           <p className="text-gray-400">
             Professional partnership program for pet service providers

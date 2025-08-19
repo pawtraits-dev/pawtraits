@@ -676,7 +676,7 @@ function HomePageContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-6 font-[family-name:var(--font-life-savers)]">
-              About PawTraits
+              About Pawtraits
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               We're passionate about celebrating the special bond between pets and their families through beautiful, AI-generated artwork
@@ -735,7 +735,7 @@ function HomePageContent() {
             <div className="space-y-4">
               <div className="flex items-center space-x-2">
                 <Sparkles className="w-6 h-6 text-purple-400" />
-                <span className="text-xl font-bold font-[family-name:var(--font-life-savers)]">PawTraits</span>
+                <span className="text-xl font-bold font-[family-name:var(--font-life-savers)]">Pawtraits</span>
               </div>
               <p className="text-gray-400">
                 Creating beautiful memories of your beloved pets through AI-powered artwork.
@@ -774,7 +774,7 @@ function HomePageContent() {
           
           <div className="border-t border-gray-800 mt-12 pt-8 text-center">
             <p className="text-gray-400">
-              © 2024 PawTraits. All rights reserved.
+              © 2024 Pawtraits. All rights reserved.
             </p>
           </div>
         </div>

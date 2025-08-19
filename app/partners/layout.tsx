@@ -159,7 +159,7 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
           <div className="flex items-center space-x-2">
             <Image 
               src="/assets/logos/paw-svgrepo-200x200-green.svg" 
-              alt="PawTraits Partners"
+              alt="Pawtraits Partners"
               width={32}
               height={32}
               className="w-8 h-8 filter brightness-0 invert"
@@ -248,12 +248,12 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
                 >
                 <Image 
                   src="/assets/logos/paw-svgrepo-200x200-green.svg" 
-                  alt="PawTraits Partners"
+                  alt="Pawtraits Partners"
                   width={24}
                   height={24}
                   className="w-6 h-6"
                 />
-                <span className="text-xl font-semibold text-gray-900">PawTraits Partners</span>
+                <span className="text-xl font-semibold text-gray-900">Pawtraits Partners</span>
               </button>
             </div>
             

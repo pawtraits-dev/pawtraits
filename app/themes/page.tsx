@@ -23,7 +23,7 @@ import { getSupabaseClient } from '@/lib/supabase-client';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import PublicNavigation from '@/components/PublicNavigation';
 import { Input } from '@/components/ui/input';
-import type { Theme, ImageCatalogWithDetails, Breed, AnimalType } from '@/lib/types';
+import type { Theme, ImageCatalogWithDetails, Breed } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
@@ -46,7 +46,6 @@ function ThemesPageContent() {
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAnimalType, setSelectedAnimalType] = useState<AnimalType | ''>('');
   const [sortBy, setSortBy] = useState('name');
   
   const supabaseService = new SupabaseService();
@@ -115,10 +114,6 @@ function ThemesPageContent() {
       return false;
     }
     
-    if (selectedAnimalType && theme.animal_type !== selectedAnimalType && theme.animal_type !== 'both') {
-      return false;
-    }
-    
     return true;
   }).sort((a, b) => {
     switch (sortBy) {
@@ -160,7 +155,7 @@ function ThemesPageContent() {
       <section className="py-8 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Card className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
@@ -173,17 +168,6 @@ function ThemesPageContent() {
               </div>
               
               <select
-                value={selectedAnimalType}
-                onChange={(e) => setSelectedAnimalType(e.target.value as AnimalType | '')}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-              >
-                <option value="">All Animals</option>
-                <option value="dog">Dogs</option>
-                <option value="cat">Cats</option>
-                <option value="both">Both</option>
-              </select>
-              
-              <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
@@ -194,32 +178,19 @@ function ThemesPageContent() {
               </select>
             </div>
 
-            {(searchTerm || selectedAnimalType) && (
+            {searchTerm && (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-gray-600">Active filters:</span>
-                {searchTerm && (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    Search: {searchTerm}
-                    <button onClick={() => setSearchTerm('')} className="ml-1 hover:text-red-600">
-                      ×
-                    </button>
-                  </Badge>
-                )}
-                {selectedAnimalType && (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    Animal: {selectedAnimalType === 'both' ? 'Dogs & Cats' : selectedAnimalType === 'dog' ? 'Dogs' : 'Cats'}
-                    <button onClick={() => setSelectedAnimalType('')} className="ml-1 hover:text-red-600">
-                      ×
-                    </button>
-                  </Badge>
-                )}
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  Search: {searchTerm}
+                  <button onClick={() => setSearchTerm('')} className="ml-1 hover:text-red-600">
+                    ×
+                  </button>
+                </Badge>
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  onClick={() => {
-                    setSearchTerm('');
-                    setSelectedAnimalType('');
-                  }}
+                  onClick={() => setSearchTerm('')}
                 >
                   Clear all
                 </Button>
@@ -257,18 +228,19 @@ function ThemesPageContent() {
                 return (
                   <Card key={theme.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
                     <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-purple-50 to-blue-50">
-                      {/* Theme preview or placeholder */}
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Palette className="w-16 h-16 text-purple-400" />
-                      </div>
+                      {/* Hero image or placeholder */}
+                      {theme.hero_image_url ? (
+                        <img 
+                          src={theme.hero_image_url}
+                          alt={theme.hero_image_alt || `${theme.name} theme`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Palette className="w-16 h-16 text-purple-400" />
+                        </div>
+                      )}
                       
-                      {/* Animal type badge */}
-                      <div className="absolute top-2 left-2">
-                        <Badge variant="secondary" className="bg-white/90">
-                          {theme.animal_type === 'both' ? 'Dogs & Cats' : 
-                           theme.animal_type?.charAt(0).toUpperCase() + theme.animal_type?.slice(1) || 'Unknown'}
-                        </Badge>
-                      </div>
                     </div>
 
                     <CardContent className="p-4 space-y-3">
@@ -284,26 +256,22 @@ function ThemesPageContent() {
 
                       {/* Animal type tags */}
                       <div className="flex flex-wrap gap-2">
-                        {(theme.animal_type === 'dog' || theme.animal_type === 'both') && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs"
-                            onClick={() => router.push(`/dogs?theme=${theme.id}`)}
-                          >
-                            Dogs
-                          </Button>
-                        )}
-                        {(theme.animal_type === 'cat' || theme.animal_type === 'both') && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs"
-                            onClick={() => router.push(`/cats?theme=${theme.id}`)}
-                          >
-                            Cats
-                          </Button>
-                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          onClick={() => router.push(`/dogs?theme=${theme.id}`)}
+                        >
+                          Dogs
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          onClick={() => router.push(`/cats?theme=${theme.id}`)}
+                        >
+                          Cats
+                        </Button>
                       </div>
                       
                       <div className="pt-3 border-t">
@@ -326,11 +294,7 @@ function ThemesPageContent() {
                         <Button 
                           className="w-full" 
                           size="sm"
-                          onClick={() => {
-                            // Navigate to dogs or cats page with theme filter, or both if theme supports both
-                            const targetPage = theme.animal_type === 'cat' ? '/cats' : '/dogs';
-                            router.push(`${targetPage}?theme=${theme.id}`);
-                          }}
+                          onClick={() => router.push(`/dogs?theme=${theme.id}`)}
                           disabled={imageCount === 0}
                         >
                           <ShoppingCart className="w-4 h-4 mr-2" />

@@ -165,12 +165,12 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
           <div className="flex items-center space-x-2">
             <Image 
               src="/assets/logos/paw-svgrepo-200x200-purple.svg" 
-              alt="PawTraits"
+              alt="Pawtraits"
               width={32}
               height={32}
               className="w-8 h-8 filter brightness-0 invert"
             />
-            <span className="text-xl font-bold">PawTraits</span>
+            <span className="text-xl font-bold">Pawtraits</span>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -246,12 +246,12 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
                 >
                 <Image 
                   src="/assets/logos/paw-svgrepo-200x200-purple.svg" 
-                  alt="PawTraits"
+                  alt="Pawtraits"
                   width={24}
                   height={24}
                   className="w-6 h-6"
                 />
-                <span className="text-xl font-semibold text-gray-900">PawTraits</span>
+                <span className="text-xl font-semibold text-gray-900">Pawtraits</span>
               </button>
             </div>
             

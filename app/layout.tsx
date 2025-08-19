@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'PawTraits - AI Pet Portraits',
+    title: 'Pawtraits - AI Pet Portraits',
     description: 'Fantastic Fun Picture of your Furry Friends ',
   },
   robots: 'index, follow',

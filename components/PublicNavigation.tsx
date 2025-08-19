@@ -116,13 +116,13 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
           <Link href="/" className="flex items-center space-x-2">
             <Image 
               src="/assets/logos/paw-svgrepo-200x200-purple.svg" 
-              alt="PawTraits Logo" 
+              alt="Pawtraits Logo" 
               width={32} 
               height={32} 
               className="w-8 h-8"
             />
             <span className="text-2xl font-bold text-gray-900 font-[family-name:var(--font-life-savers)]">
-              PawTraits
+              Pawtraits
             </span>
           </Link>
 

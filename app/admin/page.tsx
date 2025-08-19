@@ -207,7 +207,7 @@ export default function AdminDashboard() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Dashboard Overview</h1>
         <p className="text-gray-600 mt-2">
-          Welcome to the PawTraits admin panel. Monitor your platform's performance and manage content.
+          Welcome to the Pawtraits admin panel. Monitor your platform's performance and manage content.
         </p>
       </div>
 

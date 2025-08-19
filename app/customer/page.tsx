@@ -50,7 +50,7 @@ function CustomerMarketingPage() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
               <Sparkles className="w-8 h-8 text-purple-600" />
-              <span className="text-2xl font-bold text-gray-900">PawTraits</span>
+              <span className="text-2xl font-bold text-gray-900">Pawtraits</span>
             </div>
             <div className="flex items-center space-x-4">
               <Link href="/auth/login?redirect=/customer">
@@ -101,7 +101,7 @@ function CustomerMarketingPage() {
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Choose PawTraits?</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Choose Pawtraits?</h2>
             <p className="text-xl text-gray-600">Discover what makes our AI pet portraits special</p>
           </div>
           
@@ -194,7 +194,7 @@ function CustomerMarketingPage() {
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto text-center">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">Join Thousands of Happy Pet Parents</h2>
-          <p className="text-xl text-gray-600 mb-12">See what our customers are saying about PawTraits</p>
+          <p className="text-xl text-gray-600 mb-12">See what our customers are saying about Pawtraits</p>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="p-6 bg-gray-50 rounded-2xl">
@@ -246,7 +246,7 @@ function CustomerMarketingPage() {
             Ready to Transform Your Pet Into Art?
           </h2>
           <p className="text-xl mb-8 opacity-90">
-            Join thousands of pet parents who have created beautiful memories with PawTraits
+            Join thousands of pet parents who have created beautiful memories with Pawtraits
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/signup/user">
@@ -270,7 +270,7 @@ function CustomerMarketingPage() {
         <div className="max-w-7xl mx-auto text-center">
           <div className="flex items-center justify-center space-x-3 mb-4">
             <Sparkles className="w-8 h-8 text-purple-400" />
-            <span className="text-2xl font-bold">PawTraits</span>
+            <span className="text-2xl font-bold">Pawtraits</span>
           </div>
           <p className="text-gray-400">
             Transform your pet photos into beautiful artwork with AI
