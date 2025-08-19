@@ -126,6 +126,7 @@ export default function EnhancedHeroCarousel({
       case 'left': return 'items-center justify-start text-left pl-8 md:pl-16';
       case 'right': return 'items-center justify-end text-right pr-8 md:pr-16';
       case 'bottom-left': return 'items-end justify-start text-left pl-8 md:pl-16 pb-8 md:pb-16';
+      case 'bottom-center': return 'items-end justify-center text-center pb-8 md:pb-16';
       case 'bottom-right': return 'items-end justify-end text-right pr-8 md:pr-16 pb-8 md:pb-16';
       case 'top-left': return 'items-start justify-start text-left pl-8 md:pl-16 pt-8 md:pt-16';
       case 'top-right': return 'items-start justify-end text-right pr-8 md:pr-16 pt-8 md:pt-16';
@@ -191,12 +192,12 @@ export default function EnhancedHeroCarousel({
   return (
     <div className={`relative w-full aspect-video overflow-hidden ${className}`}>
       {/* Main Image Display */}
-      <div className="relative w-full h-full">
+      <div className="relative w-full h-full bg-gradient-to-br from-gray-100 to-gray-200">
         <img
           key={currentSlide.id}
           src={currentSlide.image_url}
           alt={currentSlide.image_alt || 'Carousel image'}
-          className="w-full h-full object-cover transition-opacity duration-500"
+          className="w-full h-full object-contain transition-opacity duration-500"
           loading="lazy"
         />
         

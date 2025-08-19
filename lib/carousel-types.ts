@@ -7,6 +7,7 @@ export type TextPosition =
   | 'left' 
   | 'right' 
   | 'bottom-left' 
+  | 'bottom-center'
   | 'bottom-right' 
   | 'top-left' 
   | 'top-right';
@@ -153,6 +154,7 @@ export const TextPositionOptions: { label: string; value: TextPosition }[] = [
   { label: 'Left', value: 'left' },
   { label: 'Right', value: 'right' },
   { label: 'Bottom Left', value: 'bottom-left' },
+  { label: 'Bottom Center', value: 'bottom-center' },
   { label: 'Bottom Right', value: 'bottom-right' },
   { label: 'Top Left', value: 'top-left' },
   { label: 'Top Right', value: 'top-right' }
