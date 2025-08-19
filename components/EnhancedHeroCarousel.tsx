@@ -191,6 +191,34 @@ export default function EnhancedHeroCarousel({
 
   return (
     <div className={`relative w-full aspect-video overflow-hidden ${className}`}>
+      {/* Previous Slide Preview (Blurred) */}
+      {carouselData.slides.length > 1 && (
+        <div className="absolute left-0 top-0 w-1/4 h-full z-10">
+          <div className="relative w-full h-full">
+            <img
+              src={carouselData.slides[(currentIndex - 1 + carouselData.slides.length) % carouselData.slides.length].image_url}
+              alt="Previous slide preview"
+              className="w-full h-full object-contain opacity-60 blur-sm"
+            />
+            <div className="absolute inset-0 bg-black/20" />
+          </div>
+        </div>
+      )}
+
+      {/* Next Slide Preview (Blurred) */}
+      {carouselData.slides.length > 1 && (
+        <div className="absolute right-0 top-0 w-1/4 h-full z-10">
+          <div className="relative w-full h-full">
+            <img
+              src={carouselData.slides[(currentIndex + 1) % carouselData.slides.length].image_url}
+              alt="Next slide preview"
+              className="w-full h-full object-contain opacity-60 blur-sm"
+            />
+            <div className="absolute inset-0 bg-black/20" />
+          </div>
+        </div>
+      )}
+
       {/* Main Image Display */}
       <div className="relative w-full h-full bg-gradient-to-br from-gray-100 to-gray-200">
         <img
@@ -287,30 +315,11 @@ export default function EnhancedHeroCarousel({
         </>
       )}
 
-      {/* Dot Indicators */}
-      {carouselData.slides.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-          <div className="flex space-x-2">
-            {carouselData.slides.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => goToSlide(index)}
-                className={`w-3 h-3 rounded-full transition-colors duration-200 ${
-                  index === currentIndex 
-                    ? 'bg-white' 
-                    : 'bg-white/50 hover:bg-white/75'
-                }`}
-                aria-label={`Go to slide ${index + 1}`}
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Thumbnail Strip */}
+      {/* Thumbnail Strip - Centered */}
       {shouldShowThumbnails && carouselData.slides.length > 1 && (
-        <div className="absolute bottom-4 left-4 right-16">
-          <div className="flex space-x-2 overflow-x-auto scrollbar-hide">
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+          <div className="flex space-x-2 justify-center">
             {carouselData.slides.map((slide, index) => (
               <button
                 key={slide.id}
