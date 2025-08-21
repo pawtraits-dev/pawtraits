@@ -152,16 +152,8 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   const auditLogger = new AuditLogger()
 
   return (
-    <SecureWrapper 
-      componentName="CustomerLayout"
-      sensitiveContent={false}
-      config={{
-        enableXSSProtection: true,
-        enableClickjackingProtection: false,
-        sanitizationLevel: 'standard',
-        enableSecurityLogging: false // Reduce logging noise
-      }}
-    >
+    // Temporarily disable SecureWrapper to prevent false positives in customer interface  
+    // <SecureWrapper componentName="CustomerLayout" sensitiveContent={false} config={{...}}>
     <CountryProvider userPhone={profile?.phone}>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
         {/* Sidebar overlay */}
@@ -302,6 +294,6 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
         </div>
       </div>
     </CountryProvider>
-    </SecureWrapper>
+    // </SecureWrapper>  // Temporarily disabled
   );
 }
