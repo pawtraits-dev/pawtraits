@@ -30,6 +30,10 @@ import { SupabaseService } from '@/lib/supabase';
 import { CountryProvider } from '@/lib/country-context';
 import CountrySelector from '@/components/CountrySelector';
 
+// Security imports
+import { SecureWrapper } from '@/components/security/SecureWrapper';
+import { AuditLogger } from '@/lib/audit-logger';
+
 interface PartnerLayoutProps {
   children: React.ReactNode;
 }
@@ -138,7 +142,20 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
     return null;
   }
 
+  // Initialize audit logging for partner actions
+  const auditLogger = new AuditLogger()
+
   return (
+    <SecureWrapper 
+      componentName="PartnerLayout"
+      sensitiveContent={true}
+      config={{
+        enableXSSProtection: true,
+        enableClickjackingProtection: true,
+        sanitizationLevel: 'standard',
+        enableSecurityLogging: true
+      }}
+    >
     <CountryProvider userPhone={userProfile?.phone || partner?.phone}>
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
         {/* Sidebar overlay */}
@@ -287,5 +304,6 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
         </div>
       </div>
     </CountryProvider>
+    </SecureWrapper>
   );
 }

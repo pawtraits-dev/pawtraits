@@ -36,6 +36,11 @@ import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
 import { PawSpinner } from '@/components/ui/paw-spinner';
 
+// Security imports
+import { SecureWrapper } from '@/components/security/SecureWrapper';
+import { ClickjackingProtection } from '@/components/security/ClickjackingProtection';
+import { AuditLogger } from '@/lib/audit-logger';
+
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
@@ -162,8 +167,22 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return null;
   }
 
+  // Initialize audit logging for admin actions
+  const auditLogger = new AuditLogger()
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <SecureWrapper 
+      componentName="AdminLayout"
+      sensitiveContent={true}
+      config={{
+        enableXSSProtection: true,
+        enableClickjackingProtection: true,
+        sanitizationLevel: 'strict',
+        enableSecurityLogging: true
+      }}
+    >
+      <ClickjackingProtection sensitiveAction={true}>
+        <div className="min-h-screen bg-gray-50">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div 
@@ -284,5 +303,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </main>
       </div>
     </div>
+      </ClickjackingProtection>
+    </SecureWrapper>
   );
 }

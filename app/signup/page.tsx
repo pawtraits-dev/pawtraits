@@ -9,59 +9,69 @@ import { CheckCircle, Heart, Star, Camera, Gift, ArrowRight, Mail, User } from '
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
 
-interface FormData {
-  email: string;
-  password: string;
-  confirmPassword: string;
-  firstName: string;
-  lastName: string;
-}
+// Security imports
+import { SecureWrapper } from '@/components/security/SecureWrapper';
+import { SecureForm, FormField } from '@/components/security/SecureForm';
 
 export default function CustomerSignupPage() {
-  const [formData, setFormData] = useState<FormData>({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    firstName: '',
-    lastName: ''
-  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const supabaseService = new SupabaseService();
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+  // Define secure form fields
+  const signupFields: FormField[] = [
+    {
+      name: 'firstName',
+      type: 'text',
+      label: 'First Name',
+      placeholder: 'Sarah',
+      required: true,
+      maxLength: 50
+    },
+    {
+      name: 'lastName',
+      type: 'text',
+      label: 'Last Name',
+      placeholder: 'Johnson',
+      required: true,
+      maxLength: 50
+    },
+    {
+      name: 'email',
+      type: 'email',
+      label: 'Email Address',
+      placeholder: 'sarah@email.com',
+      required: true,
+      maxLength: 254
+    },
+    {
+      name: 'password',
+      type: 'password',
+      label: 'Password',
+      placeholder: '••••••••',
+      required: true,
+      sensitive: true,
+      maxLength: 128
+    },
+    {
+      name: 'confirmPassword',
+      type: 'password',
+      label: 'Confirm Password',
+      placeholder: '••••••••',
+      required: true,
+      sensitive: true,
+      maxLength: 128
     }
-  };
+  ];
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Invalid email format';
-    
-    if (!formData.password) newErrors.password = 'Password is required';
-    else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
-    
-    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
-    
-    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
-    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) return;
+  const handleSecureSubmit = async (formData: Record<string, any>, securityInfo: any) => {
+    // Additional validation for password confirmation
+    if (formData.password !== formData.confirmPassword) {
+      setErrors({ confirmPassword: 'Passwords do not match' });
+      return;
+    }
 
     setLoading(true);
 
@@ -82,6 +92,11 @@ export default function CustomerSignupPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSecurityViolation = (violation: any) => {
+    console.warn('Security violation detected:', violation);
+    setErrors({ submit: 'Security violation detected. Please try again.' });
   };
 
   if (success) {
@@ -109,7 +124,17 @@ export default function CustomerSignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
+    <SecureWrapper 
+      componentName="CustomerSignup"
+      sensitiveContent={true}
+      config={{
+        enableXSSProtection: true,
+        enableClickjackingProtection: true,
+        sanitizationLevel: 'strict',
+        enableSecurityLogging: true
+      }}
+    >
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-pink-600 to-purple-600 text-white py-20">
         <div className="max-w-4xl mx-auto px-8 text-center">
@@ -159,87 +184,27 @@ export default function CustomerSignupPage() {
             </CardHeader>
             
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name *</Label>
-                    <Input
-                      id="firstName"
-                      value={formData.firstName}
-                      onChange={(e) => handleInputChange('firstName', e.target.value)}
-                      className={errors.firstName ? 'border-red-500' : ''}
-                      placeholder="Sarah"
-                    />
-                    {errors.firstName && <p className="text-sm text-red-600">{errors.firstName}</p>}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name *</Label>
-                    <Input
-                      id="lastName"
-                      value={formData.lastName}
-                      onChange={(e) => handleInputChange('lastName', e.target.value)}
-                      className={errors.lastName ? 'border-red-500' : ''}
-                      placeholder="Johnson"
-                    />
-                    {errors.lastName && <p className="text-sm text-red-600">{errors.lastName}</p>}
-                  </div>
+              {errors.submit && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-red-700">{errors.submit}</p>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    className={errors.email ? 'border-red-500' : ''}
-                    placeholder="sarah@email.com"
-                  />
-                  {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    className={errors.password ? 'border-red-500' : ''}
-                    placeholder="••••••••"
-                  />
-                  {errors.password && <p className="text-sm text-red-600">{errors.password}</p>}
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password *</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    value={formData.confirmPassword}
-                    onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                    className={errors.confirmPassword ? 'border-red-500' : ''}
-                    placeholder="••••••••"
-                  />
-                  {errors.confirmPassword && <p className="text-sm text-red-600">{errors.confirmPassword}</p>}
-                </div>
-
-                {errors.submit && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p className="text-sm text-red-700">{errors.submit}</p>
-                  </div>
-                )}
-
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700"
-                  disabled={loading}
-                >
-                  {loading ? 'Creating Account...' : 'Create Account'}
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </form>
+              )}
+              
+              <SecureForm
+                fields={signupFields}
+                onSubmit={handleSecureSubmit}
+                onSecurityViolation={handleSecurityViolation}
+                config={{
+                  enableCSRFProtection: true,
+                  enableRateLimiting: true,
+                  maxSubmissionsPerMinute: 3,
+                  requiredSecurityLevel: 'high',
+                  sanitizeInputs: true
+                }}
+                submitButtonText={loading ? 'Creating Account...' : 'Create Account'}
+                submitButtonClassName="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700"
+                className="space-y-4"
+              />
 
               <div className="space-y-4 mt-6 pt-6 border-t">
                 <div className="text-center">
@@ -288,5 +253,6 @@ export default function CustomerSignupPage() {
         </div>
       </div>
     </div>
+    </SecureWrapper>
   );
 }

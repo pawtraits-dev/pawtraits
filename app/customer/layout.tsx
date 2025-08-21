@@ -29,6 +29,10 @@ import { getSupabaseClient } from '@/lib/supabase-client';
 import { CountryProvider } from '@/lib/country-context';
 import CountrySelector from '@/components/CountrySelector';
 
+// Security imports
+import { SecureWrapper } from '@/components/security/SecureWrapper';
+import { AuditLogger } from '@/lib/audit-logger';
+
 interface CustomerLayoutProps {
   children: React.ReactNode;
 }
@@ -144,7 +148,20 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
     );
   }
 
+  // Initialize audit logging for customer actions
+  const auditLogger = new AuditLogger()
+
   return (
+    <SecureWrapper 
+      componentName="CustomerLayout"
+      sensitiveContent={false}
+      config={{
+        enableXSSProtection: true,
+        enableClickjackingProtection: false,
+        sanitizationLevel: 'standard',
+        enableSecurityLogging: true
+      }}
+    >
     <CountryProvider userPhone={profile?.phone}>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
         {/* Sidebar overlay */}
@@ -285,5 +302,6 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
         </div>
       </div>
     </CountryProvider>
+    </SecureWrapper>
   );
 }

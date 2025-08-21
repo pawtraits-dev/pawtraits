@@ -16,46 +16,77 @@ import { Separator } from "@/components/ui/separator"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import Link from "next/link"
 
+// Security imports
+import { SecureWrapper } from '@/components/security/SecureWrapper'
+import { SecureForm, FormField } from '@/components/security/SecureForm'
+import { clientSanitizer } from '@/lib/client-data-sanitizer'
+
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [rememberMe, setRememberMe] = useState(false)
+  const [loginAttempts, setLoginAttempts] = useState(0)
+  const [lastAttemptTime, setLastAttemptTime] = useState<number>(0)
   
   const supabaseService = new SupabaseService()
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {}
-
-    if (!email.trim()) {
-      newErrors.email = "Email is required"
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = "Please enter a valid email address"
+  // Rate limiting check
+  const checkRateLimit = () => {
+    const now = Date.now()
+    const timeSinceLastAttempt = now - lastAttemptTime
+    
+    // Allow 5 attempts per 15 minutes
+    if (loginAttempts >= 5 && timeSinceLastAttempt < 15 * 60 * 1000) {
+      const remainingTime = Math.ceil((15 * 60 * 1000 - timeSinceLastAttempt) / 1000 / 60)
+      setErrors({ general: `Too many login attempts. Please try again in ${remainingTime} minutes.` })
+      return false
     }
-
-    if (!password.trim()) {
-      newErrors.password = "Password is required"
+    
+    // Reset counter if enough time has passed
+    if (timeSinceLastAttempt > 15 * 60 * 1000) {
+      setLoginAttempts(0)
     }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    
+    return true
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Define secure form fields
+  const loginFields: FormField[] = [
+    {
+      name: 'email',
+      type: 'email',
+      label: 'Email Address',
+      placeholder: 'your@email.com',
+      required: true,
+      maxLength: 254
+    },
+    {
+      name: 'password',
+      type: 'password',
+      label: 'Password',
+      placeholder: 'Enter your password',
+      required: true,
+      sensitive: true,
+      maxLength: 128
+    }
+  ]
 
-    if (!validateForm()) return
+  const handleSecureSubmit = async (formData: Record<string, any>, securityInfo: any) => {
+    // Check rate limiting
+    if (!checkRateLimit()) {
+      return
+    }
 
     setIsLoading(true)
+    setLoginAttempts(prev => prev + 1)
+    setLastAttemptTime(Date.now())
 
     try {
-      console.log("Attempting login with email:", email)
+      const { email, password } = formData
+      
+      console.log("Attempting secure login with email:", email)
       
       const data = await supabaseService.signIn(email, password)
-
       console.log("Login successful:", data)
       
       // Clear any previous errors
@@ -103,6 +134,9 @@ export default function LoginPage() {
       
       console.log("Login - Final redirect URL:", redirectUrl);
       
+      // Reset login attempts on successful login
+      setLoginAttempts(0)
+      
       // Force a page reload to ensure fresh session state
       window.location.href = redirectUrl;
     } catch (error: any) {
@@ -121,104 +155,70 @@ export default function LoginPage() {
     }
   }
 
+  const handleSecurityViolation = (violation: any) => {
+    console.warn('Security violation detected:', violation)
+    // Could add additional security measures here
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-emerald-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <Card className="shadow-xl">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Welcome Back</CardTitle>
-            <CardDescription>Sign in to your Pawtraits Partner account</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+    <SecureWrapper 
+      componentName="LoginPage"
+      sensitiveContent={true}
+      config={{
+        enableXSSProtection: true,
+        enableClickjackingProtection: true,
+        sanitizationLevel: 'strict'
+      }}
+    >
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-emerald-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <Card className="shadow-xl">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl">Welcome Back</CardTitle>
+              <CardDescription>Sign in to your Pawtraits account</CardDescription>
+            </CardHeader>
+            <CardContent>
               {errors.general && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
                   <p className="text-sm text-red-600">{errors.general}</p>
                 </div>
               )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={errors.email ? "border-red-500" : ""}
-                  placeholder="your@email.com"
-                />
-                {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className={errors.password ? "border-red-500 pr-10" : "pr-10"}
-                    placeholder="Enter your password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                {errors.password && <p className="text-sm text-red-600">{errors.password}</p>}
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <input
-                    id="remember"
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <Label htmlFor="remember" className="text-sm text-gray-600">
-                    Remember me
-                  </Label>
-                </div>
-                <Link href="/auth/forgot-password" className="text-sm text-indigo-600 hover:text-indigo-700">
-                  Forgot password?
-                </Link>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-gradient-to-r from-indigo-600 to-emerald-600 hover:from-indigo-700 hover:to-emerald-700"
-                disabled={isLoading}
+              <SecureForm
+                fields={loginFields}
+                onSubmit={handleSecureSubmit}
+                onSecurityViolation={handleSecurityViolation}
+                config={{
+                  enableCSRFProtection: true,
+                  enableRateLimiting: true,
+                  maxSubmissionsPerMinute: 5,
+                  requiredSecurityLevel: 'high',
+                  sanitizeInputs: true
+                }}
+                submitButtonText={isLoading ? "Signing In..." : "Sign In"}
+                className="space-y-4"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Signing In...
-                  </>
-                ) : (
-                  "Sign In"
-                )}
-              </Button>
-            </form>
+                <div className="flex items-center justify-between">
+                  <Link href="/auth/forgot-password" className="text-sm text-indigo-600 hover:text-indigo-700">
+                    Forgot password?
+                  </Link>
+                </div>
+              </SecureForm>
 
-            <Separator className="my-6" />
+              <Separator className="my-6" />
 
-            <div className="text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{" "}
-                <Link href="/" className="text-indigo-600 hover:text-indigo-700 font-medium">
-                  Sign up here
-                </Link>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="text-center">
+                <p className="text-sm text-gray-600">
+                  Don't have an account?{" "}
+                  <Link href="/" className="text-indigo-600 hover:text-indigo-700 font-medium">
+                    Sign up here
+                  </Link>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
+    </SecureWrapper>
   )
 }
