@@ -310,6 +310,33 @@ export class AuditLogger {
   }
 
   /**
+   * Log security violations
+   */
+  async logSecurityViolation(violation: {
+    violation_type: string
+    component: string
+    details: any
+  }): Promise<void> {
+    try {
+      await this.logEvent({
+        eventType: 'SECURITY_INCIDENT',
+        severity: 'HIGH',
+        action: 'SECURITY_VIOLATION',
+        resource: violation.component,
+        details: {
+          violationType: violation.violation_type,
+          component: violation.component,
+          ...violation.details
+        },
+        outcome: 'BLOCKED'
+      })
+    } catch (error) {
+      console.error('Failed to log security violation:', error)
+      throw error
+    }
+  }
+
+  /**
    * Query audit events
    */
   async queryEvents(query: AuditQuery): Promise<AuditEvent[]> {

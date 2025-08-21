@@ -16,17 +16,31 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Log security violation
-    await auditLogger.logSecurityViolation({
-      violation_type: type || 'unknown',
-      component: component || 'unknown',
-      details: {
-        violation: violation || 'No details provided',
+    try {
+      await auditLogger.logSecurityViolation({
+        violation_type: type || 'unknown',
+        component: component || 'unknown',
+        details: {
+          violation: violation || 'No details provided',
+          userAgent: userAgent || request.headers.get('user-agent'),
+          url: url || request.url,
+          timestamp: timestamp || new Date().toISOString(),
+          ip: request.headers.get('x-forwarded-for') || 'unknown'
+        }
+      })
+    } catch (dbError) {
+      // If database tables don't exist yet, log to console but don't fail
+      console.warn('Audit database tables not ready, logging to console:', {
+        type,
+        component,
+        violation,
         userAgent: userAgent || request.headers.get('user-agent'),
         url: url || request.url,
         timestamp: timestamp || new Date().toISOString(),
-        ip: request.headers.get('x-forwarded-for') || 'unknown'
-      }
-    })
+        ip: request.headers.get('x-forwarded-for') || 'unknown',
+        error: dbError
+      })
+    }
 
     return NextResponse.json({ 
       success: true, 
