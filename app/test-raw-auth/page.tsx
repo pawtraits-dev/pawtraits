@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseClient } from '@/lib/supabase-client'
 
 export default function TestRawAuthPage() {
   const [result, setResult] = useState<any>(null)
@@ -10,14 +10,9 @@ export default function TestRawAuthPage() {
   const testRawAuth = async () => {
     setLoading(true)
     try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      console.log('Creating Supabase client...')
       
-      console.log('Creating raw Supabase client...')
-      console.log('URL:', supabaseUrl)
-      console.log('Key prefix:', supabaseKey.substring(0, 20))
-      
-      const supabase = createClient(supabaseUrl, supabaseKey)
+      const supabase = getSupabaseClient()
       
       console.log('Client created, testing auth...')
       

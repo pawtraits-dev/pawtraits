@@ -60,10 +60,7 @@ export class RateLimiter {
   private storage = new Map<string, ClientRateLimitData>()
   private rules: RateLimitRule[] = []
   private abuseConfig: AbuseDetectionConfig
-  private supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  private supabase: any = null
 
   constructor(abuseConfig?: Partial<AbuseDetectionConfig>) {
     this.abuseConfig = {
@@ -79,6 +76,17 @@ export class RateLimiter {
     
     // Start cleanup interval
     setInterval(() => this.cleanup(), 5 * 60 * 1000) // Clean up every 5 minutes
+  }
+
+  private getSupabaseClient() {
+    if (!this.supabase && typeof window === 'undefined') {
+      // Only create client on server side
+      this.supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+    }
+    return this.supabase
   }
 
   /**
@@ -305,21 +313,24 @@ export class RateLimiter {
    */
   private async logAbuseIncident(clientKey: string, requestsPerMinute: number) {
     try {
-      await this.supabase
-        .from('security_events')
-        .insert({
-          event_type: 'RATE_LIMIT_ABUSE',
-          severity: 'HIGH',
-          user_id: null,
-          session_id: null,
-          event_details: {
-            client_key: clientKey,
-            requests_per_minute: requestsPerMinute,
-            threshold: this.abuseConfig.blockThreshold,
-            auto_blocked: true
-          },
-          timestamp: new Date().toISOString()
-        })
+      const supabase = this.getSupabaseClient()
+      if (supabase) {
+        await supabase
+          .from('security_events')
+          .insert({
+            event_type: 'RATE_LIMIT_ABUSE',
+            severity: 'HIGH',
+            user_id: null,
+            session_id: null,
+            event_details: {
+              client_key: clientKey,
+              requests_per_minute: requestsPerMinute,
+              threshold: this.abuseConfig.blockThreshold,
+              auto_blocked: true
+            },
+            timestamp: new Date().toISOString()
+          })
+      }
     } catch (error) {
       console.error('Failed to log abuse incident:', error)
     }

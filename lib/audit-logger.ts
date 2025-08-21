@@ -97,10 +97,18 @@ export interface AuditReport {
 }
 
 export class AuditLogger {
-  private supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  private supabase: any = null
+
+  private getSupabaseClient() {
+    if (!this.supabase && typeof window === 'undefined') {
+      // Only create client on server side
+      this.supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+    }
+    return this.supabase
+  }
 
   private rules: AuditRule[] = []
   private retentionPeriodDays = 2555 // 7 years default for compliance
@@ -122,7 +130,7 @@ export class AuditLogger {
       }
 
       // Store in database
-      const { data, error } = await this.supabase
+      const { data, error } = await this.getSupabaseClient()
         .from('audit_events')
         .insert({
           event_type: auditEvent.eventType,
@@ -341,7 +349,7 @@ export class AuditLogger {
    */
   async queryEvents(query: AuditQuery): Promise<AuditEvent[]> {
     try {
-      let supabaseQuery = this.supabase
+      let supabaseQuery = this.getSupabaseClient()
         .from('audit_events')
         .select('*')
         .order('timestamp', { ascending: false })
@@ -478,7 +486,7 @@ export class AuditLogger {
       const cutoffDate = new Date()
       cutoffDate.setDate(cutoffDate.getDate() - this.retentionPeriodDays)
 
-      const { data, error } = await this.supabase
+      const { data, error } = await this.getSupabaseClient()
         .from('audit_events')
         .delete()
         .lt('timestamp', cutoffDate.toISOString())

@@ -44,10 +44,18 @@ export interface DataProtectionPolicy {
 }
 
 export class DataEncryptionService {
-  private supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  private supabase: any = null
+
+  private getSupabaseClient() {
+    if (!this.supabase && typeof window === 'undefined') {
+      // Only create client on server side
+      this.supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+    }
+    return this.supabase
+  }
 
   private readonly config: EncryptionConfig = {
     algorithm: 'aes-256-gcm',
@@ -371,7 +379,9 @@ export class DataEncryptionService {
       const tables = ['user_profiles', 'orders', 'pets', 'interactions']
       
       for (const table of tables) {
-        const { data, error } = await this.supabase
+        const supabase = this.getSupabaseClient()
+        if (!supabase) return key // Return original if no DB
+        const { data, error } = await supabase
           .from(table)
           .select('*')
           .eq('user_id', userId)
@@ -561,18 +571,21 @@ export class DataEncryptionService {
     userId?: string
   ): Promise<void> {
     try {
-      await this.supabase
-        .from('security_events')
-        .insert({
-          event_type: `DATA_${eventType}`,
-          severity: eventType === 'EXPORT' ? 'HIGH' : 'MEDIUM',
-          user_id: userId,
-          event_details: {
-            field_name: fieldName,
-            data_action: eventType.toLowerCase()
-          },
-          timestamp: new Date().toISOString()
-        })
+      const supabase = this.getSupabaseClient()
+      if (supabase) {
+        await supabase
+          .from('security_events')
+          .insert({
+            event_type: `DATA_${eventType}`,
+            severity: eventType === 'EXPORT' ? 'HIGH' : 'MEDIUM',
+            user_id: userId,
+            event_details: {
+              field_name: fieldName,
+              data_action: eventType.toLowerCase()
+            },
+            timestamp: new Date().toISOString()
+          })
+      }
     } catch (error) {
       console.error('Failed to log data event:', error)
     }
