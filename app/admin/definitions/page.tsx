@@ -66,10 +66,7 @@ export default function DefinitionsAdmin() {
   const [generatedPrompts, setGeneratedPrompts] = useState<any[]>([]);
 
   const supabase = createClientComponentClient();
-  const promptGenerator = new EnhancedPromptGenerator(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const promptGenerator = new EnhancedPromptGenerator(supabase);
 
   useEffect(() => {
     loadAllDefinitions();

@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Heart, X, Upload, Camera, Trash2, ImageIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '@/lib/supabase-client';
 import type { UserProfile } from '@/lib/user-types';
 import type { Breed, Coat, AnimalType } from '@/lib/types';
 
@@ -58,10 +58,7 @@ export default function AddPetPage() {
     special_notes: ''
   });
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
     loadInitialData();

@@ -79,8 +79,8 @@ interface GenerationCriteria {
 export class EnhancedPromptGenerator {
   private supabase: SupabaseClient;
 
-  constructor(supabaseUrl: string, supabaseKey: string) {
-    this.supabase = createClient(supabaseUrl, supabaseKey);
+  constructor(supabase: SupabaseClient) {
+    this.supabase = supabase;
   }
 
   /**
