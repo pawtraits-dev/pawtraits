@@ -59,9 +59,14 @@ export class DLPIntegration {
 
       // Check if path is exempt
       const pathname = req.nextUrl.pathname
-      if (this.config.exemptPaths.some(exemptPath => pathname.startsWith(exemptPath))) {
+      const isExempt = this.config.exemptPaths.some(exemptPath => pathname.startsWith(exemptPath))
+      
+      if (isExempt) {
+        console.log(`[DLP] Skipping scan for exempt path: ${pathname}`)
         return null // Skip DLP scanning for exempt paths
       }
+      
+      console.log(`[DLP] Scanning path: ${pathname}`)
 
       try {
         // Scan incoming request
@@ -70,6 +75,8 @@ export class DLPIntegration {
         if (requestScanResult.hasViolations) {
           // Handle violations based on severity and config
           const shouldBlock = this.config.blockOnViolation && this.shouldBlockRequest(requestScanResult)
+          
+          console.log(`[DLP] Violation detected - blockOnViolation: ${this.config.blockOnViolation}, shouldBlock: ${shouldBlock}, riskScore: ${requestScanResult.riskScore}`)
           
           if (shouldBlock) {
             await this.handleViolationBlocked(req, requestScanResult)
