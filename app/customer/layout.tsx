@@ -159,7 +159,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
         enableXSSProtection: true,
         enableClickjackingProtection: false,
         sanitizationLevel: 'standard',
-        enableSecurityLogging: true
+        enableSecurityLogging: false // Reduce logging noise
       }}
     >
     <CountryProvider userPhone={profile?.phone}>

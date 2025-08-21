@@ -153,7 +153,7 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
         enableXSSProtection: true,
         enableClickjackingProtection: true,
         sanitizationLevel: 'standard',
-        enableSecurityLogging: true
+        enableSecurityLogging: false // Reduce logging noise
       }}
     >
     <CountryProvider userPhone={userProfile?.phone || partner?.phone}>

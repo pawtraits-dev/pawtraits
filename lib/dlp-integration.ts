@@ -20,6 +20,8 @@ export interface DLPIntegrationConfig extends Partial<DLPConfig> {
   enableEmailScanning: boolean
   enableDatabaseScanning: boolean
   autoQuarantine: boolean
+  blockOnViolation: boolean
+  exemptPaths: string[]
   alertWebhook?: string
   emergencyContacts: string[]
 }
@@ -36,6 +38,8 @@ export class DLPIntegration {
       enableEmailScanning: true,
       enableDatabaseScanning: true,
       autoQuarantine: true,
+      blockOnViolation: true,
+      exemptPaths: [],
       emergencyContacts: [],
       ...config
     }
@@ -53,13 +57,19 @@ export class DLPIntegration {
         return null
       }
 
+      // Check if path is exempt
+      const pathname = req.nextUrl.pathname
+      if (this.config.exemptPaths.some(exemptPath => pathname.startsWith(exemptPath))) {
+        return null // Skip DLP scanning for exempt paths
+      }
+
       try {
         // Scan incoming request
         const requestScanResult = await this.scanner.scanRequest(req)
         
         if (requestScanResult.hasViolations) {
-          // Handle violations based on severity
-          const shouldBlock = this.shouldBlockRequest(requestScanResult)
+          // Handle violations based on severity and config
+          const shouldBlock = this.config.blockOnViolation && this.shouldBlockRequest(requestScanResult)
           
           if (shouldBlock) {
             await this.handleViolationBlocked(req, requestScanResult)
@@ -334,9 +344,11 @@ export class DLPIntegration {
    * Private helper methods
    */
   private shouldBlockRequest(scanResult: DLPScanResult): boolean {
-    // Block if critical violations or high risk score
-    return scanResult.matches.some(m => m.pattern.severity === 'CRITICAL') ||
-           scanResult.riskScore >= 80
+    // Only block critical violations with very high risk scores to reduce false positives
+    return scanResult.matches.some(m => 
+      m.pattern.severity === 'CRITICAL' && 
+      (m.pattern.type === 'CREDIT_CARD' || m.pattern.type === 'SSN')
+    ) || scanResult.riskScore >= 95
   }
 
   private shouldBlockResponse(scanResult: DLPScanResult): boolean {

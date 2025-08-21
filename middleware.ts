@@ -12,13 +12,21 @@ const rateLimiter = new RateLimiter({
   enableAutoBlock: true
 })
 
-// Initialize DLP middleware
+// Initialize DLP middleware with less aggressive settings
 const dlpMiddleware = createDLPMiddleware({
   enableAPIProtection: true,
   enableFileUploadScanning: true,
-  blockOnViolation: true,
+  blockOnViolation: false, // Log violations but don't block legitimate admin operations
   redactSensitiveData: true,
-  exemptPaths: ['/api/health', '/api/status', '/api/monitoring']
+  exemptPaths: [
+    '/api/health', 
+    '/api/status', 
+    '/api/monitoring',
+    '/api/admin/',     // Exempt admin API routes
+    '/api/partners/',  // Exempt partner API routes  
+    '/api/customers/', // Exempt customer API routes
+    '/api/security/',  // Exempt security API routes to prevent feedback loops
+  ]
 })
 
 export async function middleware(req: NextRequest) {
