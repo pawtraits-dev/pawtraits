@@ -74,7 +74,7 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest): void 
     `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://maps.googleapis.com https://vercel.live`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https://res.cloudinary.com https://lh3.googleusercontent.com https://images.unsplash.com",
+    "img-src 'self' data: blob: https://res.cloudinary.com https://lh3.googleusercontent.com https://images.unsplash.com https://*.supabase.co",
     "connect-src 'self' https://api.stripe.com https://upload.stripe.com https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://vercel.live wss://ws-us3.pusher.com",
     "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
     "object-src 'none'",
