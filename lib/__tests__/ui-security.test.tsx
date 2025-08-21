@@ -10,11 +10,12 @@
  * - Authentication component security
  */
 
+import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { SecureWrapper } from '../components/security/SecureWrapper'
-import { SecureForm } from '../components/security/SecureForm'
-import { xssProtector } from '../lib/xss-protection'
-import { clientSanitizer } from '../lib/client-data-sanitizer'
+import { SecureWrapper } from '@/components/security/SecureWrapper'
+import { SecureForm } from '@/components/security/SecureForm'
+import { xssProtector } from '@/lib/xss-protection'
+import { clientSanitizer } from '@/lib/client-data-sanitizer'
 
 describe('UI Security Test Suite', () => {
   
