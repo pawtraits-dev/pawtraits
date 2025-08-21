@@ -16,10 +16,10 @@ import { Separator } from "@/components/ui/separator"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import Link from "next/link"
 
-// Security imports
-import { SecureWrapper } from '@/components/security/SecureWrapper'
-import { SecureForm, FormField } from '@/components/security/SecureForm'
-import { clientSanitizer } from '@/lib/client-data-sanitizer'
+// Security imports temporarily disabled for debugging
+// import { SecureWrapper } from '@/components/security/SecureWrapper'
+// import { SecureForm, FormField } from '@/components/security/SecureForm'
+// import { clientSanitizer } from '@/lib/client-data-sanitizer'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -50,26 +50,8 @@ export default function LoginPage() {
     return true
   }
 
-  // Define secure form fields
-  const loginFields: FormField[] = [
-    {
-      name: 'email',
-      type: 'email',
-      label: 'Email Address',
-      placeholder: 'your@email.com',
-      required: true,
-      maxLength: 254
-    },
-    {
-      name: 'password',
-      type: 'password',
-      label: 'Password',
-      placeholder: 'Enter your password',
-      required: true,
-      sensitive: true,
-      maxLength: 128
-    }
-  ]
+  // Secure form fields temporarily disabled for debugging
+  // const loginFields: FormField[] = [...]
 
   const handleSecureSubmit = async (formData: Record<string, any>, securityInfo: any) => {
     // Check rate limiting
@@ -161,16 +143,7 @@ export default function LoginPage() {
   }
 
   return (
-    <SecureWrapper 
-      componentName="LoginPage"
-      sensitiveContent={true}
-      config={{
-        enableXSSProtection: true,
-        enableClickjackingProtection: true,
-        sanitizationLevel: 'strict'
-      }}
-    >
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-emerald-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-emerald-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <Card className="shadow-xl">
             <CardHeader className="text-center">
@@ -184,26 +157,51 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <SecureForm
-                fields={loginFields}
-                onSubmit={handleSecureSubmit}
-                onSecurityViolation={handleSecurityViolation}
-                config={{
-                  enableCSRFProtection: true,
-                  enableRateLimiting: true,
-                  maxSubmissionsPerMinute: 5,
-                  requiredSecurityLevel: 'high',
-                  sanitizeInputs: true
-                }}
-                submitButtonText={isLoading ? "Signing In..." : "Sign In"}
-                className="space-y-4"
-              >
+              <form onSubmit={(e) => {
+                e.preventDefault()
+                const formData = new FormData(e.currentTarget)
+                handleSecureSubmit({
+                  email: formData.get('email') as string,
+                  password: formData.get('password') as string
+                }, {})
+              }} className="space-y-4">
+                
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    required
+                    placeholder="your@email.com"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    required
+                    placeholder="Enter your password"
+                  />
+                </div>
+
                 <div className="flex items-center justify-between">
                   <Link href="/auth/forgot-password" className="text-sm text-indigo-600 hover:text-indigo-700">
                     Forgot password?
                   </Link>
                 </div>
-              </SecureForm>
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Signing In..." : "Sign In"}
+                </Button>
+              </form>
 
               <Separator className="my-6" />
 
@@ -219,6 +217,5 @@ export default function LoginPage() {
           </Card>
         </div>
       </div>
-    </SecureWrapper>
   )
 }
