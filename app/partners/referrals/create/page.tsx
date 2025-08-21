@@ -12,11 +12,14 @@ import { ArrowLeft, QrCode, Mail, Download, Copy, Check, Loader2, AlertCircle } 
 import Link from "next/link"
 import { PartnerOnly } from '@/components/user-access-control'
 import type { Referral, Breed, Coat } from '@/lib/types'
-import { supabase } from '@/lib/supabase-client'
+import { getSupabaseClient } from '@/lib/supabase-client'
 
 function CreateReferralPageContent() {
   const [breeds, setBreeds] = useState<Breed[]>([])
   const [coats, setCoats] = useState<Coat[]>([])
+
+  // Create supabase client instance
+  const supabase = getSupabaseClient()
 
   useEffect(() => {
     loadBreedAndCoatData()

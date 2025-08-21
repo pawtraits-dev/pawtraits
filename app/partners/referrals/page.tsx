@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from '@/lib/supabase-client'
+import { getSupabaseClient } from '@/lib/supabase-client'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,6 +21,8 @@ function ReferralsPageContent() {
   const [referrals, setReferrals] = useState<Referral[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+
+  const supabase = getSupabaseClient()
 
   // Fetch real referral data
   useEffect(() => {

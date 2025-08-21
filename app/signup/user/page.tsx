@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, ArrowLeft, ArrowRight, Heart, Upload, X } from 'lucide-react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase-client';
+import { getSupabaseClient } from '@/lib/supabase-client';
 import type { Breed, Coat } from '@/lib/types';
 
 interface FormData {
@@ -69,7 +69,8 @@ function UserSignupContent() {
   const [petPhotoPreview, setPetPhotoPreview] = useState<string | null>(null);
   const [referralData, setReferralData] = useState<any>(null);
 
-  // Using singleton supabase client imported above
+  // Create supabase client instance
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
     loadBreedAndCoatData();

@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Camera, Users, ArrowRight, Heart, Star, Gift, Search, ShoppingCart, Filter } from 'lucide-react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase-client';
+import { getSupabaseClient } from '@/lib/supabase-client';
 import type { Breed, Coat, Theme, ImageCatalogWithDetails, AnimalType } from '@/lib/types';
 
 export default function PublicHomepage() {
@@ -23,7 +23,8 @@ export default function PublicHomepage() {
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<string[]>([]);
 
-  // Using singleton supabase client imported above
+  // Create supabase client instance  
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
     loadData();
