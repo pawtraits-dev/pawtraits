@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SupabaseService } from '@/lib/supabase';
+import { SecureFileValidator } from '@/lib/secure-file-validation';
 
 const supabaseService = new SupabaseService();
 
@@ -39,28 +40,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
+    // SECURITY: Comprehensive file validation with magic number checking
+    const validationResult = await SecureFileValidator.validateFile(file);
+    
+    if (!validationResult.isValid) {
+      console.error('File validation failed:', validationResult.errors);
       return NextResponse.json(
-        { error: 'File must be an image' },
+        { 
+          error: 'File validation failed',
+          details: validationResult.errors,
+          fileHash: validationResult.fileHash 
+        },
         { status: 400 }
       );
     }
 
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      return NextResponse.json(
-        { error: 'File size must be less than 10MB' },
-        { status: 400 }
-      );
+    // Log warnings but continue
+    if (validationResult.warnings.length > 0) {
+      console.warn('File validation warnings:', validationResult.warnings);
     }
 
     try {
-      // Generate unique filename
-      const timestamp = Date.now();
-      const fileExtension = file.name.split('.').pop() || 'jpg';
-      const fileName = `pet-photos/${userId}/${petId}/${timestamp}.${fileExtension}`;
+      // Generate secure filename using our validator
+      const secureFileName = SecureFileValidator.generateSecureFilename(file.name, userId, petId);
+      const fileName = `pet-photos/${secureFileName}`;
 
       // Convert file to buffer
       const buffer = Buffer.from(await file.arrayBuffer());
@@ -69,8 +72,15 @@ export async function POST(request: NextRequest) {
       const { data, error } = await storageClient.storage
         .from('pet-photos')
         .upload(fileName, buffer, {
-          contentType: file.type,
-          upsert: false
+          contentType: validationResult.detectedMimeType || file.type, // Use detected MIME type
+          upsert: false,
+          // Additional security metadata
+          metadata: {
+            fileHash: validationResult.fileHash,
+            originalName: file.name.substring(0, 100), // Truncate for safety
+            uploadedBy: userId,
+            validationPassed: 'true'
+          }
         });
 
       if (error) {
@@ -134,8 +144,11 @@ export async function POST(request: NextRequest) {
           url: publicUrl,
           path: fileName,
           size: file.size,
-          type: file.type,
-          photo_id: photoRecord?.id
+          type: validationResult.detectedMimeType || file.type,
+          photo_id: photoRecord?.id,
+          fileHash: validationResult.fileHash,
+          warnings: validationResult.warnings,
+          securityValidated: true
         });
 
       } catch (dbInsertError) {
@@ -145,7 +158,10 @@ export async function POST(request: NextRequest) {
           url: publicUrl,
           path: fileName,
           size: file.size,
-          type: file.type
+          type: validationResult.detectedMimeType || file.type,
+          fileHash: validationResult.fileHash,
+          warnings: validationResult.warnings,
+          securityValidated: true
         });
       }
 

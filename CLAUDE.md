@@ -352,3 +352,43 @@ When installing new dependencies, always use `npm install --legacy-peer-deps` du
 - Client-side cart state management with React Context
 - Cart operations integrated with Stripe payment intents
 - Supports both authenticated and guest user sessions
+
+### Carousel System
+The application features a comprehensive carousel management system for displaying hero content across different page types:
+
+**Database Tables:**
+- `carousels`: Main carousel configuration with page type association, auto-play settings
+- `carousel_slides`: Individual slides with images, text overlays, and CTA buttons
+
+**Core Features:**
+- **Page-Specific Carousels**: Separate carousels for `home`, `dogs`, `cats`, and `themes` pages
+- **Rich Content Overlays**: Title, subtitle, description text with configurable positioning
+- **Individual Text Colors**: Each text element can have different colors including gold option
+- **CTA Integration**: Call-to-action buttons with customizable styles (primary, secondary, outline)
+- **Image Management**: Cloudinary integration with automatic compression for Vercel compatibility
+- **Visual Enhancements**: Cropped edge previews of adjacent slides, centered thumbnails
+- **Responsive Design**: Adaptive layouts with mobile-optimized controls
+
+**API Structure:**
+- `/api/carousel/[pageType]`: Public API for fetching active carousel data
+- `/api/admin/carousels`: Admin CRUD operations for carousel management
+- `/api/admin/carousel-slides`: Admin CRUD operations for slide management
+- `/api/admin/carousel-upload`: Cloudinary image upload with compression
+
+**Key Files:**
+- `/lib/carousel-types.ts`: Complete type definitions for carousel system
+- `/components/EnhancedHeroCarousel.tsx`: Main display component with keyboard navigation
+- `/app/admin/carousels/`: Admin interface for carousel management
+- `/db/carousel-schema.sql`: Database schema and RLS policies
+
+**Text Positioning Options:**
+- Center, left, right positioning
+- Corner positioning: top-left, top-right, bottom-left, bottom-right, bottom-center
+- Each slide can position text independently
+
+**Display Settings:**
+- Auto-play intervals (configurable per carousel)
+- Thumbnail navigation (can be disabled)
+- Overlay opacity control for text readability
+- Aspect ratio maintained at 16:9 with object-contain
+- Cropped edge previews show partial adjacent slides at full height

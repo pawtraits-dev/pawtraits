@@ -47,18 +47,44 @@ export async function POST(request: NextRequest) {
       `CREATE POLICY "Allow interaction inserts" ON user_interactions
        FOR INSERT WITH CHECK (true);`,
       
-      // Temporary permissive policy for testing
-      `CREATE POLICY "Temporary test access" ON user_interactions
-       FOR ALL USING (true) WITH CHECK (true);`,
+      // SECURITY: Secure policy with proper user isolation
+      `CREATE POLICY "user_interactions_secure_access" ON user_interactions
+       FOR ALL USING (
+         auth.uid() = user_id OR
+         EXISTS (
+           SELECT 1 FROM user_profiles 
+           WHERE id = auth.uid() 
+           AND user_type = 'admin'
+         )
+       ) WITH CHECK (
+         auth.uid() = user_id OR
+         EXISTS (
+           SELECT 1 FROM user_profiles 
+           WHERE id = auth.uid() 
+           AND user_type = 'admin'
+         )
+       );`,
       
-      // Analytics policies
+      // Analytics policies - SECURITY: Admin only access
       `DROP POLICY IF EXISTS "Analytics are viewable by everyone" ON interaction_analytics;`,
-      `CREATE POLICY "Public analytics access" ON interaction_analytics
-       FOR SELECT USING (true);`,
+      `CREATE POLICY "interaction_analytics_admin_only" ON interaction_analytics
+       FOR SELECT USING (
+         EXISTS (
+           SELECT 1 FROM user_profiles 
+           WHERE id = auth.uid() 
+           AND user_type = 'admin'
+         )
+       );`,
        
       `DROP POLICY IF EXISTS "Platform analytics are viewable by everyone" ON platform_analytics;`,
-      `CREATE POLICY "Public platform analytics access" ON platform_analytics
-       FOR SELECT USING (true);`
+      `CREATE POLICY "platform_analytics_admin_only" ON platform_analytics
+       FOR SELECT USING (
+         EXISTS (
+           SELECT 1 FROM user_profiles 
+           WHERE id = auth.uid() 
+           AND user_type = 'admin'
+         )
+       );`
     ];
 
     const results = [];
