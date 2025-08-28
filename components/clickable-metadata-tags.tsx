@@ -96,45 +96,50 @@ export default function ClickableMetadataTags({
   } : null);
 
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="space-y-1">
       {breedData && (
-        <Badge 
-          variant="outline" 
-          className="text-xs cursor-pointer hover:bg-purple-50 hover:border-purple-300 transition-colors"
-          onClick={() => handleTagClick('breed', breedData.id)}
-          title={`Filter by ${breedData.name} breed`}
-        >
-          {breedData.animal_type === 'cat' ? '🐱' : '🐕'} {breedData.name}
-        </Badge>
+        <div>
+          <Badge 
+            variant="outline" 
+            className="text-xs cursor-pointer hover:bg-purple-50 hover:border-purple-300 transition-colors"
+            onClick={() => handleTagClick('breed', breedData.id)}
+            title={`Filter by ${breedData.name} breed`}
+          >
+            {breedData.animal_type === 'cat' ? '🐱' : '🐕'} {breedData.name}
+          </Badge>
+        </div>
       )}
       
       {themeData && (
-        <Badge 
-          variant="outline" 
-          className="text-xs cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-colors"
-          onClick={() => handleTagClick('theme', themeData.id)}
-          title={`Filter by ${themeData.name} theme`}
-        >
-          🎨 {themeData.name}
-        </Badge>
+        <div>
+          <Badge 
+            variant="outline" 
+            className="text-xs cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-colors"
+            onClick={() => handleTagClick('theme', themeData.id)}
+            title={`Filter by ${themeData.name} theme`}
+          >
+            🎨 {themeData.name}
+          </Badge>
+        </div>
       )}
       
-      
       {coatData && (
-        <Badge 
-          variant="outline" 
-          className="text-xs cursor-pointer hover:bg-green-50 hover:border-green-300 transition-colors flex items-center space-x-1"
-          onClick={() => handleTagClick('coat', coatData.id)}
-          title={`Filter by ${coatData.name} coat`}
-        >
-          {coatData.hex_color && (
-            <div 
-              className="w-2 h-2 rounded-full border border-gray-300"
-              style={{ backgroundColor: coatData.hex_color }}
-            />
-          )}
-          <span>{coatData.name}</span>
-        </Badge>
+        <div>
+          <Badge 
+            variant="outline" 
+            className="text-xs cursor-pointer hover:bg-green-50 hover:border-green-300 transition-colors flex items-center space-x-1"
+            onClick={() => handleTagClick('coat', coatData.id)}
+            title={`Filter by ${coatData.name} coat`}
+          >
+            {coatData.hex_color && (
+              <div 
+                className="w-2 h-2 rounded-full border border-gray-300"
+                style={{ backgroundColor: coatData.hex_color }}
+              />
+            )}
+            <span>{coatData.name}</span>
+          </Badge>
+        </div>
       )}
     </div>
   );
