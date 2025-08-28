@@ -191,44 +191,31 @@ export default function EnhancedHeroCarousel({
   const shouldShowThumbnails = showThumbnails !== undefined ? showThumbnails : carouselData.carousel?.show_thumbnails;
 
   return (
-    <div className={`relative w-full aspect-video overflow-hidden ${className}`}>
-      {/* Previous Slide Preview (Cropped Right Edge) */}
-      {carouselData.slides.length > 1 && (
-        <div className="absolute left-0 top-0 w-16 sm:w-24 md:w-32 lg:w-40 h-full z-10 overflow-hidden">
-          <div className="relative w-full h-full">
+    <div className={`relative w-full overflow-hidden ${className}`}>
+      {/* Container with 5-card width system */}
+      <div className="flex w-full h-full">
+        {/* Previous Slide Preview (1/5 width - masked) */}
+        {carouselData.slides.length > 1 && (
+          <div className="w-1/5 h-full relative overflow-hidden">
             <img
               src={carouselData.slides[(currentIndex - 1 + carouselData.slides.length) % carouselData.slides.length].image_url}
               alt="Previous slide preview"
-              className="w-full h-full object-cover object-right opacity-70 blur-[1px]"
+              className="w-full h-full object-cover opacity-40 grayscale"
             />
-            <div className="absolute inset-0 bg-black/30" />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/50" />
+            <div className="absolute inset-0 backdrop-blur-[2px]" />
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Next Slide Preview (Cropped Left Edge) */}
-      {carouselData.slides.length > 1 && (
-        <div className="absolute right-0 top-0 w-16 sm:w-24 md:w-32 lg:w-40 h-full z-10 overflow-hidden">
-          <div className="relative w-full h-full">
-            <img
-              src={carouselData.slides[(currentIndex + 1) % carouselData.slides.length].image_url}
-              alt="Next slide preview"
-              className="w-full h-full object-cover object-left opacity-70 blur-[1px]"
-            />
-            <div className="absolute inset-0 bg-black/30" />
-          </div>
-        </div>
-      )}
-
-      {/* Main Image Display */}
-      <div className="relative w-full h-full bg-gradient-to-br from-gray-100 to-gray-200">
-        <img
-          key={currentSlide.id}
-          src={currentSlide.image_url}
-          alt={currentSlide.image_alt || 'Carousel image'}
-          className="w-full h-full object-contain transition-opacity duration-500"
-          loading="lazy"
-        />
+        {/* Main Current Image Display (3/5 width) */}
+        <div className={`relative h-full bg-gradient-to-br from-gray-100 to-gray-200 ${carouselData.slides.length > 1 ? 'w-3/5' : 'w-full'}`}>
+          <img
+            key={currentSlide.id}
+            src={currentSlide.image_url}
+            alt={currentSlide.image_alt || 'Carousel image'}
+            className="w-full h-full object-contain transition-opacity duration-500"
+            loading="lazy"
+          />
         
         {/* Overlay for text readability */}
         {currentSlide.show_overlay && (
@@ -241,28 +228,28 @@ export default function EnhancedHeroCarousel({
         {/* Content Overlay */}
         {(currentSlide.title || currentSlide.subtitle || currentSlide.description || currentSlide.cta_text) && (
           <div className={`absolute inset-0 flex ${getTextPositionClasses(currentSlide.text_position)}`}>
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="max-w-2xl mx-auto px-2 sm:px-4 lg:px-6">
               {currentSlide.title && (
-                <h1 className={`text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg font-[family-name:var(--font-life-savers)] ${getTextColorClasses(currentSlide.title_color || currentSlide.text_color)}`}>
+                <h1 className={`text-2xl md:text-4xl font-bold mb-2 md:mb-4 drop-shadow-lg font-[family-name:var(--font-life-savers)] ${getTextColorClasses(currentSlide.title_color || currentSlide.text_color)}`}>
                   {currentSlide.title}
                 </h1>
               )}
               
               {currentSlide.subtitle && (
-                <h2 className={`text-2xl md:text-3xl font-semibold mb-4 drop-shadow-lg ${getTextColorClasses(currentSlide.subtitle_color || currentSlide.text_color)}`}>
+                <h2 className={`text-lg md:text-2xl font-semibold mb-2 md:mb-4 drop-shadow-lg ${getTextColorClasses(currentSlide.subtitle_color || currentSlide.text_color)}`}>
                   {currentSlide.subtitle}
                 </h2>
               )}
               
               {currentSlide.description && (
-                <p className={`text-lg md:text-xl mb-8 max-w-3xl drop-shadow-lg opacity-90 leading-relaxed ${getTextColorClasses(currentSlide.description_color || currentSlide.text_color)}`}>
+                <p className={`text-sm md:text-lg mb-4 md:mb-8 max-w-2xl drop-shadow-lg opacity-90 leading-relaxed ${getTextColorClasses(currentSlide.description_color || currentSlide.text_color)}`}>
                   {currentSlide.description}
                 </p>
               )}
               
               {currentSlide.cta_text && (
                 <Button 
-                  size="lg"
+                  size="default"
                   onClick={() => handleCTAClick(currentSlide)}
                   className={getCTAButtonClasses(currentSlide.cta_style, currentSlide.text_color)}
                 >
@@ -270,6 +257,20 @@ export default function EnhancedHeroCarousel({
                 </Button>
               )}
             </div>
+          </div>
+        )}
+        </div>
+
+        {/* Next Slide Preview (1/5 width - masked) */}
+        {carouselData.slides.length > 1 && (
+          <div className="w-1/5 h-full relative overflow-hidden">
+            <img
+              src={carouselData.slides[(currentIndex + 1) % carouselData.slides.length].image_url}
+              alt="Next slide preview"
+              className="w-full h-full object-cover opacity-40 grayscale"
+            />
+            <div className="absolute inset-0 bg-gradient-to-l from-transparent to-black/50" />
+            <div className="absolute inset-0 backdrop-blur-[2px]" />
           </div>
         )}
       </div>
