@@ -53,6 +53,7 @@ function HomePageContent() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [activeFilter, setActiveFilter] = useState('popular');
   const [images, setImages] = useState<ImageCatalogWithDetails[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [pricing, setPricing] = useState<ProductPricing[]>([]);
@@ -479,84 +480,79 @@ function HomePageContent() {
       <section className="relative">
         <EnhancedHeroCarousel 
           pageType="home"
-          className="h-[600px] md:h-[700px]"
+          className="h-[40vh] md:h-[45vh]"
           showControls={true}
         />
       </section>
 
-      {/* Gallery Section */}
-      <section id="gallery" className="py-20 bg-white">
+      {/* Filter Bar Section */}
+      <section className="py-6 bg-white border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
-              Discover Amazing Pet Portraits
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Browse our collection of AI-generated pet portraits in various styles and themes
-            </p>
+          <div className="flex justify-center">
+            <div className="flex space-x-4">
+              <button 
+                onClick={() => setActiveFilter('new')}
+                className={`px-6 py-2 rounded-full border transition-all ${
+                  activeFilter === 'new' 
+                    ? 'border-primary bg-primary text-primary-foreground' 
+                    : 'border-gray-300 text-gray-700 hover:border-primary hover:text-primary'
+                }`}
+              >
+                new
+              </button>
+              <button 
+                onClick={() => setActiveFilter('featured')}
+                className={`px-6 py-2 rounded-full border transition-all ${
+                  activeFilter === 'featured' 
+                    ? 'border-primary bg-primary text-primary-foreground' 
+                    : 'border-gray-300 text-gray-700 hover:border-primary hover:text-primary'
+                }`}
+              >
+                featured
+              </button>
+              <button 
+                onClick={() => setActiveFilter('popular')}
+                className={`px-6 py-2 rounded-full border transition-all ${
+                  activeFilter === 'popular' 
+                    ? 'border-primary bg-primary text-primary-foreground' 
+                    : 'border-gray-300 text-gray-700 hover:border-primary hover:text-primary'
+                }`}
+              >
+                popular
+              </button>
+            </div>
           </div>
+        </div>
+      </section>
 
-          <Tabs defaultValue="popular" className="space-y-8">
-            <TabsList className="grid w-full max-w-md mx-auto grid-cols-3">
-              <TabsTrigger value="popular" className="font-[family-name:var(--font-life-savers)]">
-                Popular ({popularImages.length})
-              </TabsTrigger>
-              <TabsTrigger value="new" className="font-[family-name:var(--font-life-savers)]">
-                New ({newImages.length})
-              </TabsTrigger>
-              <TabsTrigger value="featured" className="font-[family-name:var(--font-life-savers)]">
-                Featured ({featuredImages.length})
-              </TabsTrigger>
-            </TabsList>
+      {/* Gallery Section */}
+      <section id="gallery" className="py-12 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {(() => {
+            const currentImages = activeFilter === 'popular' ? popularImages : 
+                                 activeFilter === 'new' ? newImages : featuredImages;
+            const badgeType = activeFilter as 'popular' | 'new' | 'featured';
 
-            <TabsContent value="popular" className="space-y-6">
-              {popularImages.length === 0 ? (
-                <div className="text-center py-12">
-                  <Star className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-600">Popular images coming soon...</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {popularImages.map((image) => renderImageCard(image, 'popular'))}
-                </div>
-              )}
-            </TabsContent>
+            return currentImages.length === 0 ? (
+              <div className="text-center py-12">
+                <Star className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-600">{activeFilter} images coming soon...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {currentImages.map((image) => renderImageCard(image, badgeType))}
+              </div>
+            );
+          })()}
 
-            <TabsContent value="new" className="space-y-6">
-              {newImages.length === 0 ? (
-                <div className="text-center py-12">
-                  <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-600">New images coming soon...</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {newImages.map((image) => renderImageCard(image, 'new'))}
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="featured" className="space-y-6">
-              {featuredImages.length === 0 ? (
-                <div className="text-center py-12">
-                  <Star className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-600">Featured images coming soon...</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {featuredImages.map((image) => renderImageCard(image, 'featured'))}
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-
-          <div className="text-center mt-12">
+          <div className="text-center mt-8">
             <Button 
-              size="lg"
+              size="default"
+              variant="outline"
               onClick={() => router.push('/customer/gallery')}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+              className="rounded-full px-8"
             >
-              View Full Gallery
-              <ArrowRight className="w-5 h-5 ml-2" />
+              see all
             </Button>
           </div>
         </div>
