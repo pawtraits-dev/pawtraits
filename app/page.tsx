@@ -477,12 +477,14 @@ function HomePageContent() {
       <PublicNavigation />
 
       {/* Hero Carousel Section */}
-      <section className="relative">
-        <EnhancedHeroCarousel 
-          pageType="home"
-          className="h-[40vh] md:h-[45vh]"
-          showControls={true}
-        />
+      <section className="relative bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <EnhancedHeroCarousel 
+            pageType="home"
+            className="h-[40vh] md:h-[45vh]"
+            showControls={true}
+          />
+        </div>
       </section>
 
       {/* Filter Bar Section */}
