@@ -841,6 +841,11 @@ export default function CustomerShopPage() {
                   placeholder="Search images, tags, descriptions..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      loadImages();
+                    }
+                  }}
                   className="pl-10"
                 />
               </div>
@@ -896,18 +901,22 @@ export default function CustomerShopPage() {
                   ))}
                 </select>
 
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="featured"
-                    checked={featuredOnly}
-                    onChange={(e) => setFeaturedOnly(e.target.checked)}
-                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                  />
-                  <label htmlFor="featured" className="text-sm text-gray-700">
-                    Featured only
-                  </label>
-                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setSearchTerm('');
+                    setAnimalType('');
+                    setSelectedBreed('');
+                    setSelectedCoat('');
+                    setSelectedTheme('');
+                    setFeaturedOnly(false);
+                    loadImages();
+                  }}
+                  className="w-full"
+                >
+                  Clear Filters
+                </Button>
               </div>
 
               {/* Filter Actions */}

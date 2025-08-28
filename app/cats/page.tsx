@@ -364,10 +364,11 @@ function CatsPageContent() {
                   type="text"
                   placeholder="Search cat images..."
                   value={searchTerm}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setSearchTerm(value);
-                    updateUrlParams({ search: value || null });
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      updateUrlParams({ search: searchTerm || null });
+                    }
                   }}
                   className="pl-10"
                 />
@@ -403,23 +404,23 @@ function CatsPageContent() {
                 ))}
               </select>
               
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="featured"
-                  checked={featuredOnly}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setFeaturedOnly(checked);
-                    updateUrlParams({ featured: checked ? 'true' : null });
-                  }}
-                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                />
-                <label htmlFor="featured" className="text-sm text-gray-700">Featured only</label>
-              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setSearchTerm('');
+                  setSelectedBreed('');
+                  setSelectedTheme('');
+                  setFeaturedOnly(false);
+                  updateUrlParams({ search: null, breed: null, theme: null, featured: null });
+                }}
+                className="w-full"
+              >
+                Clear Filters
+              </Button>
             </div>
             
-            {(searchTerm || selectedBreed || selectedTheme || featuredOnly) && (
+            {(searchTerm || selectedBreed || selectedTheme) && (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-gray-600">Active filters:</span>
                 {searchTerm && (
@@ -455,31 +456,6 @@ function CatsPageContent() {
                     </button>
                   </Badge>
                 )}
-                {featuredOnly && (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    Featured
-                    <button onClick={() => {
-                      setFeaturedOnly(false);
-                      updateUrlParams({ featured: null });
-                    }} className="ml-1 hover:text-red-600">
-                      ×
-                    </button>
-                  </Badge>
-                )}
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => {
-                    setSearchTerm('');
-                    setSelectedBreed('');
-                    setSelectedTheme('');
-                    setFeaturedOnly(false);
-                    updateUrlParams({ search: null, breed: null, theme: null, featured: null });
-                  }}
-                  className="text-xs"
-                >
-                  Clear all
-                </Button>
               </div>
             )}
           </Card>

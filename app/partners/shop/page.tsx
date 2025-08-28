@@ -537,18 +537,22 @@ export default function PartnerShopPage() {
                 </select>
 
 
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="featured"
-                    checked={featuredOnly}
-                    onChange={(e) => setFeaturedOnly(e.target.checked)}
-                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                  />
-                  <label htmlFor="featured" className="text-sm text-gray-700">
-                    Featured only
-                  </label>
-                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setSearchTerm('');
+                    setAnimalType('');
+                    setSelectedBreed('');
+                    setSelectedCoat('');
+                    setSelectedTheme('');
+                    setFeaturedOnly(false);
+                    loadImages();
+                  }}
+                  className="w-full"
+                >
+                  Clear Filters
+                </Button>
               </div>
 
               {/* Filter Actions */}
