@@ -191,7 +191,7 @@ export default function EnhancedHeroCarousel({
   const shouldShowThumbnails = showThumbnails !== undefined ? showThumbnails : carouselData.carousel?.show_thumbnails;
 
   return (
-    <div className={`relative w-full overflow-hidden ${className}`}>
+    <div className={`relative w-full aspect-video overflow-hidden ${className}`}>
       {/* Container with 5-card width system */}
       <div className="flex w-full h-full">
         {/* Previous Slide Preview (1/5 width - masked) */}
