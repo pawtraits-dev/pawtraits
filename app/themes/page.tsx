@@ -143,12 +143,14 @@ function ThemesPageContent() {
       <PublicNavigation />
 
       {/* Hero Carousel Section */}
-      <section className="relative">
-        <EnhancedHeroCarousel 
-          pageType="themes"
-          className="h-[400px] md:h-[500px]"
-          showControls={true}
-        />
+      <section className="relative bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <EnhancedHeroCarousel 
+            pageType="themes"
+            className="h-[40vh] md:h-[45vh]"
+            showControls={true}
+          />
+        </div>
       </section>
 
       {/* Search and Filter Section */}
@@ -220,7 +222,7 @@ function ThemesPageContent() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {filteredThemes.map((theme) => {
                 const imageCount = getImagesForTheme(theme.id).length;
                 const themeProductInfo = getThemeProductInfo(theme.id);
