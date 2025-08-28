@@ -243,15 +243,6 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
               )}
             </div>
 
-            {/* About - Only show on home page */}
-            {typeof window !== 'undefined' && (window.location.pathname === '/' || window.location.pathname === '') && (
-              <button 
-                onClick={() => scrollToSection('about')} 
-                className="text-gray-700 hover:text-purple-600 transition-colors"
-              >
-                About
-              </button>
-            )}
 
             {/* Sign Up - Only show on home page */}
             {typeof window !== 'undefined' && (window.location.pathname === '/' || window.location.pathname === '') && (

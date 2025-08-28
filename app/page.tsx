@@ -667,62 +667,6 @@ function HomePageContent() {
         </div>
       </section>
 
-      {/* About Section */}
-      <section id="about" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-6 font-[family-name:var(--font-life-savers)]">
-              About Pawtraits
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              We're passionate about celebrating the special bond between pets and their families through beautiful, AI-generated artwork
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div className="text-center">
-              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Sparkles className="w-8 h-8 text-purple-600" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">AI-Powered Technology</h3>
-              <p className="text-gray-600">
-                Our advanced AI technology creates unique, personalized portraits that capture your pet's personality and charm
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Heart className="w-8 h-8 text-blue-600" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Made with Love</h3>
-              <p className="text-gray-600">
-                Every portrait is crafted with care and attention to detail, ensuring your pet's unique characteristics shine through
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Star className="w-8 h-8 text-green-600" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Premium Quality</h3>
-              <p className="text-gray-600">
-                High-resolution artwork suitable for printing on canvas, paper, or digital sharing across all platforms
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <ShoppingCart className="w-8 h-8 text-orange-600" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Multiple Options</h3>
-              <p className="text-gray-600">
-                Choose from various styles, themes, and formats to create the perfect portrait for your space and budget
-              </p>
-            </div>
-        
-          </div>
-        </div>
-      </section>
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12">
