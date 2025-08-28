@@ -919,19 +919,6 @@ export default function CustomerShopPage() {
                 </Button>
               </div>
 
-              {/* Filter Actions */}
-              <div className="flex justify-between items-center">
-                <Button variant="outline" onClick={clearFilters} size="sm">
-                  <Filter className="w-4 h-4 mr-2" />
-                  Clear Filters
-                </Button>
-                <p className="text-sm text-gray-600">
-                  Showing {images.filter((image) => {
-                    const productInfo = getImageProductInfo(image.id);
-                    return productInfo.productCount > 0;
-                  }).length} images
-                </p>
-              </div>
             </div>
           </CardContent>
         </Card>
