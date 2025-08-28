@@ -192,11 +192,11 @@ export default function EnhancedHeroCarousel({
 
   return (
     <div className={`relative w-full aspect-video overflow-hidden ${className}`}>
-      {/* Container with 5-card width system */}
-      <div className="flex w-full h-full">
-        {/* Previous Slide Preview (1/5 width - masked) */}
+      {/* Grid system matching product cards: 5 columns with gap-4 */}
+      <div className="grid grid-cols-5 gap-4 w-full h-full">
+        {/* Previous Slide Preview (1 card width) */}
         {carouselData.slides.length > 1 && (
-          <div className="w-1/5 h-full relative overflow-hidden">
+          <div className="relative overflow-hidden">
             <img
               src={carouselData.slides[(currentIndex - 1 + carouselData.slides.length) % carouselData.slides.length].image_url}
               alt="Previous slide preview"
@@ -207,8 +207,8 @@ export default function EnhancedHeroCarousel({
           </div>
         )}
 
-        {/* Main Current Image Display (3/5 width) */}
-        <div className={`relative h-full bg-gradient-to-br from-gray-100 to-gray-200 ${carouselData.slides.length > 1 ? 'w-3/5' : 'w-full'}`}>
+        {/* Main Current Image Display (3 card widths spanning cols 2-4) */}
+        <div className={`relative bg-gradient-to-br from-gray-100 to-gray-200 ${carouselData.slides.length > 1 ? 'col-span-3' : 'col-span-5'}`}>
           <img
             key={currentSlide.id}
             src={currentSlide.image_url}
@@ -261,9 +261,9 @@ export default function EnhancedHeroCarousel({
         )}
         </div>
 
-        {/* Next Slide Preview (1/5 width - masked) */}
+        {/* Next Slide Preview (1 card width) */}
         {carouselData.slides.length > 1 && (
-          <div className="w-1/5 h-full relative overflow-hidden">
+          <div className="relative overflow-hidden">
             <img
               src={carouselData.slides[(currentIndex + 1) % carouselData.slides.length].image_url}
               alt="Next slide preview"
