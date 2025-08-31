@@ -81,6 +81,11 @@ export default function NewProductPage() {
   const [gelatoSearchTerm, setGelatoSearchTerm] = useState('');
   const [gelatoUnitFilter, setGelatoUnitFilter] = useState<'mm' | 'inches'>('mm');
   const [productPricing, setProductPricing] = useState<{[key: string]: any}>({});
+  
+  // SKU dropdown state
+  const [availableSkus, setAvailableSkus] = useState<any[]>([]);
+  const [loadingSkus, setLoadingSkus] = useState(false);
+  const [showSkuDropdown, setShowSkuDropdown] = useState(false);
 
   const supabaseService = new AdminSupabaseService();
 
@@ -347,12 +352,102 @@ export default function NewProductPage() {
         setSelectedVariantValues({});
         // Clear any existing pricing data
         setProductPricing({});
+        
+        // Fetch available SKUs for this catalog
+        await fetchAvailableSkus(product.uid);
       } else {
         alert('Failed to fetch product details: ' + result.error);
       }
     } catch (error) {
       console.error('Error selecting Gelato product:', error);
       alert('Failed to load product details');
+    }
+  };
+
+  const fetchAvailableSkus = async (catalogUid: string) => {
+    try {
+      setLoadingSkus(true);
+      console.log('Fetching SKUs for catalog:', catalogUid);
+      
+      const response = await fetch(`/api/admin/gelato-products?action=get-skus&uid=${catalogUid}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setAvailableSkus(result.skus || []);
+        setShowSkuDropdown(true);
+        console.log(`Loaded ${result.skus?.length || 0} SKUs`);
+      } else {
+        console.error('Failed to fetch SKUs:', result.error);
+        setAvailableSkus([]);
+        setShowSkuDropdown(false);
+      }
+    } catch (error) {
+      console.error('Error fetching SKUs:', error);
+      setAvailableSkus([]);
+      setShowSkuDropdown(false);
+    } finally {
+      setLoadingSkus(false);
+    }
+  };
+
+  const selectSkuDirectly = async (sku: any) => {
+    try {
+      console.log('Selected SKU:', sku);
+      
+      // Set the gelato_sku to the selected SKU UID
+      setFormData(prev => ({
+        ...prev,
+        gelato_sku: sku.uid
+      }));
+      
+      // Try to extract information from the SKU
+      if (sku.dimensions) {
+        const dims = sku.dimensions;
+        const updates: Partial<ProductFormData> = {};
+        
+        if (dims.Width?.value && dims.Height?.value) {
+          const widthMm = dims.Width.value;
+          const heightMm = dims.Height.value;
+          
+          updates.width_cm = (widthMm / 10).toString();
+          updates.height_cm = (heightMm / 10).toString();
+          updates.width_inches = (widthMm / 25.4).toFixed(1);
+          updates.height_inches = (heightMm / 25.4).toFixed(1);
+          
+          // Determine format based on dimensions
+          const determinedFormat = determineFormatFromDimensions(widthMm, heightMm);
+          if (determinedFormat) {
+            updates.format_id = determinedFormat.id;
+          }
+        }
+        
+        if (dims.Weight?.value) {
+          updates.product_weight_g = dims.Weight.value;
+        }
+        
+        setFormData(prev => ({ ...prev, ...updates }));
+      }
+      
+      // Auto-generate description if we have enough information
+      if (sku.title) {
+        const selectedFormat = formats.find(f => f.id === formData.format_id);
+        const selectedMedium = media.find(m => m.id === formData.medium_id);
+        
+        if (selectedFormat && selectedMedium) {
+          setFormData(prev => ({
+            ...prev,
+            description: generateDescription(sku.title, selectedFormat.name, selectedMedium.name),
+            size_name: sku.title
+          }));
+        }
+      }
+      
+      // Close the modal
+      setShowGelatoSearch(false);
+      
+    } catch (error) {
+      console.error('Error selecting SKU:', error);
+      alert('Failed to apply SKU details');
     }
   };
 
@@ -1166,12 +1261,14 @@ export default function NewProductPage() {
                   </div>
                 </div>
 
-                {/* Variant Selection */}
+                {/* Variant Selection or SKU Selection */}
                 <div className="space-y-4 overflow-y-auto">
                   {selectedGelatoProduct && (
                     <>
                       <div className="sticky top-0 bg-white py-2 border-b space-y-3">
-                        <h3 className="font-semibold text-gray-900">Product Configuration</h3>
+                        <h3 className="font-semibold text-gray-900">
+                          {showSkuDropdown ? 'Available SKUs' : 'Product Configuration'}
+                        </h3>
                         
                         {/* Unit Selector */}
                         <div className="flex items-center space-x-4">
@@ -1209,11 +1306,101 @@ export default function NewProductPage() {
                             <div className="font-mono text-sm text-green-700 break-all">{formData.gelato_sku}</div>
                           </div>
                         )}
+                        
+                        {/* Toggle between SKU selection and variant configuration */}
+                        {showSkuDropdown && (
+                          <div className="flex items-center space-x-4">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={showSkuDropdown ? "default" : "outline"}
+                              onClick={() => setShowSkuDropdown(true)}
+                            >
+                              Choose SKU Directly
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={!showSkuDropdown ? "default" : "outline"}
+                              onClick={() => setShowSkuDropdown(false)}
+                            >
+                              Configure Variants
+                            </Button>
+                          </div>
+                        )}
                       </div>
                       
                       <div className="space-y-4">
-                        {/* Variant Selection Interface */}
-                        {selectedGelatoProduct?.variants && selectedGelatoProduct.variants.length > 0 ? (
+                        {/* SKU Selection Interface */}
+                        {showSkuDropdown && availableSkus.length > 0 ? (
+                          <div className="space-y-3">
+                            {loadingSkus ? (
+                              <div className="text-center py-4">
+                                <PawSpinner size="sm" className="mx-auto" />
+                                <p className="text-sm text-gray-600 mt-2">Loading available SKUs...</p>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-sm text-gray-600 mb-3">
+                                  Found {availableSkus.length} available SKUs. Select one to automatically populate product details.
+                                </p>
+                                <div className="max-h-96 overflow-y-auto space-y-2">
+                                  {availableSkus.map((sku, index) => (
+                                    <div
+                                      key={sku.uid || index}
+                                      className="p-3 border rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                                      onClick={() => selectSkuDirectly(sku)}
+                                    >
+                                      <div className="flex justify-between items-start">
+                                        <div className="flex-1">
+                                          <div className="font-medium text-gray-900 mb-1">
+                                            {sku.title || sku.uid}
+                                          </div>
+                                          <div className="text-xs font-mono text-blue-600 mb-2 break-all">
+                                            {sku.uid}
+                                          </div>
+                                          {sku.dimensions && (
+                                            <div className="text-sm text-gray-600 space-y-1">
+                                              {sku.dimensions.Width && sku.dimensions.Height && (
+                                                <div>
+                                                  📐 {sku.dimensions.Width.value}×{sku.dimensions.Height.value} {sku.dimensions.Width.unit || 'mm'}
+                                                  {' '}({(sku.dimensions.Width.value / 25.4).toFixed(1)}×{(sku.dimensions.Height.value / 25.4).toFixed(1)} inches)
+                                                </div>
+                                              )}
+                                              {sku.dimensions.Weight && (
+                                                <div>⚖️ {sku.dimensions.Weight.value}g</div>
+                                              )}
+                                            </div>
+                                          )}
+                                          {sku.description && (
+                                            <div className="text-xs text-gray-500 mt-2">
+                                              {sku.description.slice(0, 100)}{sku.description.length > 100 ? '...' : ''}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ) : showSkuDropdown ? (
+                          <div className="text-center py-8 text-gray-500">
+                            <p>No SKUs available for this product type.</p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setShowSkuDropdown(false)}
+                              className="mt-2"
+                            >
+                              Configure Variants Instead
+                            </Button>
+                          </div>
+                        ) : (
+                          /* Variant Selection Interface */
+                          selectedGelatoProduct?.variants && selectedGelatoProduct.variants.length > 0 ? (
                           (() => {
                             // Process all variants including "Unified" formats
                             const processedVariants = selectedGelatoProduct.variants
@@ -1311,7 +1498,7 @@ export default function NewProductPage() {
                           <div className="text-center py-4 text-gray-500">
                             {selectedGelatoProduct ? 'No variants available for this product' : 'Select a product to see variants'}
                           </div>
-                        )}
+                        ))}
                       </div>
                     </>
                   )}

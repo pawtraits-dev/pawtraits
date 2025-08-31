@@ -144,14 +144,52 @@ export async function GET(request: NextRequest) {
           error: 'Use POST method for product UID search'
         }, { status: 405 });
 
+      case 'get-skus':
+        if (!productUid) {
+          return NextResponse.json(
+            { success: false, error: 'Product catalog UID required' },
+            { status: 400 }
+          );
+        }
+
+        console.log('Fetching available SKUs for catalog:', productUid);
+        try {
+          // Use the searchProducts method to get all products for this catalog
+          const allProducts = await gelatoService.searchProducts(productUid, {});
+          
+          // Extract SKUs and their details
+          const skus = allProducts.map((product: any) => ({
+            uid: product.uid,
+            title: product.title || product.name,
+            dimensions: product.dimensions,
+            attributes: product.attributes,
+            description: product.description
+          }));
+
+          console.log(`Found ${skus.length} SKUs for catalog ${productUid}`);
+          
+          return NextResponse.json({
+            success: true,
+            catalogUid: productUid,
+            skus: skus
+          });
+        } catch (error) {
+          console.error('Error fetching SKUs:', error);
+          return NextResponse.json({
+            success: false,
+            error: 'Failed to fetch SKUs'
+          }, { status: 500 });
+        }
+
       default:
         return NextResponse.json({
           success: false,
           error: 'Invalid action',
-          availableActions: ['search', 'details', 'pricing', 'multi-country-pricing', 'base-cost', 'search-product-uid (POST)'],
+          availableActions: ['search', 'details', 'pricing', 'multi-country-pricing', 'base-cost', 'get-skus', 'search-product-uid (POST)'],
           examples: [
             '/api/admin/gelato-products?action=search',
             '/api/admin/gelato-products?action=details&uid=canvas',
+            '/api/admin/gelato-products?action=get-skus&uid=canvas',
             '/api/admin/gelato-products?action=pricing&uid=canvas_300x450-mm_canvas_wood-fsc-slim_ver&country=GB',
             '/api/admin/gelato-products?action=multi-country-pricing&uid=canvas_300x450-mm_canvas_wood-fsc-slim_ver&countries=GB,US,DE',
             '/api/admin/gelato-products?action=base-cost&uid=canvas_300x450-mm_canvas_wood-fsc-slim_ver&country=GB',
