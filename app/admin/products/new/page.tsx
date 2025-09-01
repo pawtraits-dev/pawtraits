@@ -604,21 +604,31 @@ export default function NewProductPage() {
 
       const pricingPromises = countries.map(async ({ code, currency, flag, name }) => {
         try {
-          console.log(`🔍 Fetching pricing for ${name} (${code}) with UID: ${productUid}`);
-          const response = await fetch(`/api/admin/gelato-products?action=base-cost&uid=${productUid}&country=${code}`);
+          console.log(`🔍 Fetching pricing for ${name} (${code}) with UID: ${productUid}, converting to ${currency}`);
+          // Use enhanced API with automatic currency conversion
+          const response = await fetch(`/api/admin/gelato-products?action=base-cost&uid=${productUid}&country=${code}&currency=${currency}`);
           const result = await response.json();
           
           console.log(`📊 ${name} (${code}) pricing result:`, result);
           
           if (result.success && result.baseCost) {
             console.log(`✅ ${name} (${code}) pricing successful:`, result.baseCost);
+            
+            if (result.baseCost.originalCurrency !== result.baseCost.currency) {
+              console.log(`💱 Currency conversion: ${result.baseCost.originalPrice?.toFixed(2)} ${result.baseCost.originalCurrency} → ${result.baseCost.price.toFixed(2)} ${result.baseCost.currency} (${result.baseCost.conversionSource})`);
+            }
+            
             return {
               country: code,
               countryName: name,
               flag: flag,
-              currency: result.baseCost.currency || currency, // Use actual currency from API, fallback to expected
+              currency: result.baseCost.currency,
               price: result.baseCost.price,
               quantity: result.baseCost.quantity,
+              originalPrice: result.baseCost.originalPrice,
+              originalCurrency: result.baseCost.originalCurrency,
+              conversionRate: result.baseCost.conversionRate,
+              conversionSource: result.baseCost.conversionSource,
               success: true
             };
           }
@@ -637,71 +647,8 @@ export default function NewProductPage() {
       console.log('✅ Successful pricing results:', successfulPricing);
 
       if (successfulPricing.length > 0) {
-        // Convert USD pricing to local currencies (Gelato returns all prices in USD)
-        const convertedPricing = await Promise.all(successfulPricing.map(async (pricing) => {
-          // For US, keep USD as-is
-          if (pricing.country === 'US') {
-            return pricing;
-          }
-          
-          // For other countries, convert USD to local currency
-          const country = countries.find(c => c.code === pricing.country);
-          if (!country) return pricing;
-          
-          try {
-            // Simple conversion rate lookup (in production, you'd use a real API)
-            const conversionRates: Record<string, number> = {
-              // Major Gelato Markets
-              'GBP': 0.79, // 1 USD = 0.79 GBP
-              'EUR': 0.92, // 1 USD = 0.92 EUR
-              'CAD': 1.35, // 1 USD = 1.35 CAD
-              'AUD': 1.52, // 1 USD = 1.52 AUD
-              'JPY': 149.5, // 1 USD = 149.5 JPY
-              'SGD': 1.34, // 1 USD = 1.34 SGD
-              'BRL': 5.02, // 1 USD = 5.02 BRL
-              'CHF': 0.88, // 1 USD = 0.88 CHF
-              'NZD': 1.64, // 1 USD = 1.64 NZD
-              
-              // Scandinavian
-              'SEK': 10.5, // 1 USD = 10.5 SEK
-              'NOK': 10.8, // 1 USD = 10.8 NOK
-              'DKK': 6.85, // 1 USD = 6.85 DKK
-              'ISK': 138.2, // 1 USD = 138.2 ISK
-              
-              // Eastern European
-              'PLN': 4.03, // 1 USD = 4.03 PLN
-              'CZK': 22.7, // 1 USD = 22.7 CZK
-              'HUF': 361.0, // 1 USD = 361 HUF
-              
-              // Asia-Pacific
-              'KRW': 1320, // 1 USD = 1,320 KRW
-              'HKD': 7.81, // 1 USD = 7.81 HKD
-              'MYR': 4.48, // 1 USD = 4.48 MYR
-              'THB': 35.8, // 1 USD = 35.8 THB
-              'INR': 83.2, // 1 USD = 83.2 INR
-              
-              // Other Major Markets
-              'MXN': 17.1, // 1 USD = 17.1 MXN
-              'ZAR': 18.4, // 1 USD = 18.4 ZAR
-              'TRY': 30.5, // 1 USD = 30.5 TRY
-            };
-            
-            const rate = conversionRates[country.currency];
-            if (rate) {
-              const convertedPrice = pricing.baseCost * rate;
-              return {
-                ...pricing,
-                currency: country.currency,
-                baseCost: Math.round(convertedPrice * 100) / 100, // Round to 2 decimal places
-                originalUsdPrice: pricing.baseCost // Keep original for reference
-              };
-            }
-          } catch (error) {
-            console.warn(`Currency conversion failed for ${country.currency}:`, error);
-          }
-          
-          return pricing; // Return original if conversion fails
-        }));
+        // Currency conversion is now handled automatically by the enhanced API
+        const convertedPricing = successfulPricing;
         
         const filteredPricing = convertedPricing;
         

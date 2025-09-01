@@ -191,37 +191,20 @@ export default function PricingManagementPage() {
 
     try {
       setLoadingGelatoPricing(true);
-      console.log(`🔍 Fetching Gelato pricing for ${product.name} in ${country.name}...`);
+      console.log(`🔍 Fetching Gelato pricing for ${product.name} in ${country.name} (${country.currency_code})...`);
       
-      // Get product pricing (base cost) via API
-      const baseCostResponse = await fetch(`/api/admin/gelato-products?action=base-cost&uid=${encodeURIComponent(product.gelato_sku)}&country=${countryCode}`);
+      // Get product pricing (base cost) via API with automatic currency conversion
+      const baseCostResponse = await fetch(
+        `/api/admin/gelato-products?action=base-cost&uid=${encodeURIComponent(product.gelato_sku)}&country=${countryCode}&currency=${country.currency_code}`
+      );
       const baseCostResult = await baseCostResponse.json();
       const baseCost = baseCostResult.success ? baseCostResult.baseCost : null;
       
-      // For now, we'll estimate shipping as 0 (can be enhanced later)
-      const shippingMethods = null;
-      
       if (baseCost) {
-        console.log(`✅ Gelato base cost: ${baseCost.currency} ${baseCost.price}`);
+        console.log(`✅ Gelato base cost: ${baseCost.currency} ${baseCost.price.toFixed(2)}`);
         
-        // Convert USD to local currency if needed (same logic as in products page)
-        let convertedCost = baseCost.price;
-        if (baseCost.currency === 'USD' && country.currency_code !== 'USD') {
-          // Simple conversion rates (same as in products page)
-          const conversionRates: Record<string, number> = {
-            'GBP': 0.79, 'EUR': 0.92, 'CAD': 1.35, 'AUD': 1.52,
-            'JPY': 149.5, 'SGD': 1.34, 'BRL': 5.02, 'CHF': 0.88,
-            'NZD': 1.64, 'SEK': 10.5, 'NOK': 10.8, 'DKK': 6.85,
-            'ISK': 138.2, 'PLN': 4.03, 'CZK': 22.7, 'HUF': 361.0,
-            'KRW': 1320, 'HKD': 7.81, 'MYR': 4.48, 'THB': 35.8,
-            'INR': 83.2, 'MXN': 17.1, 'ZAR': 18.4, 'TRY': 30.5,
-          };
-          
-          const rate = conversionRates[country.currency_code];
-          if (rate) {
-            convertedCost = baseCost.price * rate;
-            console.log(`💱 Converted ${baseCost.price} USD to ${convertedCost.toFixed(2)} ${country.currency_code}`);
-          }
+        if (baseCost.originalCurrency !== baseCost.currency) {
+          console.log(`💱 Currency conversion applied: ${baseCost.originalPrice.toFixed(2)} ${baseCost.originalCurrency} → ${baseCost.price.toFixed(2)} ${baseCost.currency} (rate: ${baseCost.conversionRate.toFixed(4)}, source: ${baseCost.conversionSource})`);
         }
         
         // Estimate shipping cost (default to 0 for now - can be enhanced later)
@@ -229,7 +212,7 @@ export default function PricingManagementPage() {
         // TODO: Implement shipping cost estimation via API if needed
         
         // Update form with fetched costs if in form mode, or update existing pricing if refreshing
-        const roundedProductCost = (Math.round(convertedCost * 100) / 100);
+        const roundedProductCost = (Math.round(baseCost.price * 100) / 100);
         const roundedShippingCost = (Math.round(estimatedShipping * 100) / 100);
         
         if (existingPricingId) {
@@ -481,37 +464,26 @@ export default function PricingManagementPage() {
         const product = products.find(p => p.id === pricingItem.product_id);
         if (!product?.gelato_sku) continue;
         
-        // Fetch updated Gelato pricing using server-side API
+        // Fetch updated Gelato pricing using server-side API with automatic currency conversion
         try {
-          const baseCostResponse = await fetch(`/api/admin/gelato-products?action=base-cost&uid=${encodeURIComponent(product.gelato_sku)}&country=${pricingItem.country_code}`);
+          const country = countries.find(c => c.code === pricingItem.country_code);
+          const baseCostResponse = await fetch(
+            `/api/admin/gelato-products?action=base-cost&uid=${encodeURIComponent(product.gelato_sku)}&country=${pricingItem.country_code}&currency=${country?.currency_code || pricingItem.currency_code}`
+          );
           const baseCostResult = await baseCostResponse.json();
           
           if (baseCostResult.success && baseCostResult.baseCost) {
             const baseCost = baseCostResult.baseCost;
-            const country = countries.find(c => c.code === pricingItem.country_code);
-            let convertedCost = baseCost.price;
             
-            // Convert USD to local currency if needed
-            if (baseCost.currency === 'USD' && country?.currency_code !== 'USD') {
-              const conversionRates: Record<string, number> = {
-                'GBP': 0.79, 'EUR': 0.92, 'CAD': 1.35, 'AUD': 1.52,
-                'JPY': 149.5, 'SGD': 1.34, 'BRL': 5.02, 'CHF': 0.88,
-                'NZD': 1.64, 'SEK': 10.5, 'NOK': 10.8, 'DKK': 6.85,
-                'ISK': 138.2, 'PLN': 4.03, 'CZK': 22.7, 'HUF': 361.0,
-                'KRW': 1320, 'HKD': 7.81, 'MYR': 4.48, 'THB': 35.8,
-                'INR': 83.2, 'MXN': 17.1, 'ZAR': 18.4, 'TRY': 30.5,
-              };
-              
-              const rate = conversionRates[country.currency_code];
-              if (rate) {
-                convertedCost = baseCost.price * rate;
-              }
+            console.log(`✅ Refreshed pricing for ${product.name}: ${baseCost.currency} ${baseCost.price.toFixed(2)}`);
+            
+            if (baseCost.originalCurrency !== baseCost.currency) {
+              console.log(`💱 Currency conversion: ${baseCost.originalPrice.toFixed(2)} ${baseCost.originalCurrency} → ${baseCost.price.toFixed(2)} ${baseCost.currency} (${baseCost.conversionSource})`);
             }
             
-            // For now, keep existing shipping cost (can be enhanced later to fetch from Gelato)
-            // Update the pricing entry with new product cost
+            // Update the pricing entry with new product cost (already converted to local currency)
             await supabaseService.updateProductPricing(pricingId, {
-              product_cost: Math.round(convertedCost * 100) // Convert to minor units
+              product_cost: Math.round(baseCost.price * 100) // Convert to minor units
             });
           } else {
             console.warn(`Failed to fetch Gelato pricing for ${product.name}:`, baseCostResult.error);

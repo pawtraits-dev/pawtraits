@@ -5,6 +5,8 @@
  * This service handles order creation, status tracking, and webhook handling
  */
 
+import { currencyConverter } from './currency-converter';
+
 export interface GelatoAddress {
   firstName: string;
   lastName: string;
@@ -614,6 +616,83 @@ export class GelatoService {
       };
     } catch (error) {
       console.error('Error getting base cost:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get base cost with automatic currency conversion
+   * Converts USD prices from Gelato to the target country's currency
+   */
+  async getBaseCostWithConversion(
+    productUid: string, 
+    country: string = 'GB', 
+    targetCurrency?: string
+  ): Promise<{
+    price: number;
+    originalPrice: number;
+    currency: string;
+    originalCurrency: string;
+    quantity: number;
+    conversionRate: number;
+    conversionSource: 'api' | 'fallback';
+  } | null> {
+    try {
+      const baseCost = await this.getBaseCost(productUid, country);
+      
+      if (!baseCost) {
+        return null;
+      }
+
+      // If target currency not specified, try to determine from country
+      let targetCurrencyCode = targetCurrency;
+      if (!targetCurrencyCode) {
+        // Map common countries to currencies
+        const countryToCurrency: Record<string, string> = {
+          'GB': 'GBP', 'US': 'USD', 'DE': 'EUR', 'FR': 'EUR', 'IT': 'EUR', 'ES': 'EUR',
+          'CA': 'CAD', 'AU': 'AUD', 'JP': 'JPY', 'SG': 'SGD', 'BR': 'BRL',
+          'CH': 'CHF', 'NZ': 'NZD', 'SE': 'SEK', 'NO': 'NOK', 'DK': 'DKK',
+          'IS': 'ISK', 'PL': 'PLN', 'CZ': 'CZK', 'HU': 'HUF', 'KR': 'KRW',
+          'HK': 'HKD', 'MY': 'MYR', 'TH': 'THB', 'IN': 'INR', 'MX': 'MXN',
+          'ZA': 'ZAR', 'TR': 'TRY', 'IL': 'ILS', 'CN': 'CNY', 'RU': 'RUB'
+        };
+        targetCurrencyCode = countryToCurrency[country] || baseCost.currency;
+      }
+
+      // Convert currency if needed
+      if (baseCost.currency === targetCurrencyCode) {
+        // No conversion needed
+        return {
+          price: baseCost.price,
+          originalPrice: baseCost.price,
+          currency: targetCurrencyCode,
+          originalCurrency: baseCost.currency,
+          quantity: baseCost.quantity,
+          conversionRate: 1.0,
+          conversionSource: 'fallback'
+        };
+      }
+
+      // Convert using our currency converter
+      const conversion = await currencyConverter.convert(
+        baseCost.price,
+        baseCost.currency,
+        targetCurrencyCode
+      );
+
+      console.log(`💱 Currency conversion: ${baseCost.price} ${baseCost.currency} → ${conversion.toAmount.toFixed(2)} ${targetCurrencyCode} (rate: ${conversion.rate.toFixed(4)}, source: ${conversion.source})`);
+
+      return {
+        price: conversion.toAmount,
+        originalPrice: baseCost.price,
+        currency: targetCurrencyCode,
+        originalCurrency: baseCost.currency,
+        quantity: baseCost.quantity,
+        conversionRate: conversion.rate,
+        conversionSource: conversion.source
+      };
+    } catch (error) {
+      console.error('Error getting base cost with conversion:', error);
       return null;
     }
   }

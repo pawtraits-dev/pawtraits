@@ -119,9 +119,11 @@ export async function GET(request: NextRequest) {
         }
 
         const baseCostCountry = searchParams.get('country') || 'GB';
-        console.log('Fetching base cost for:', productUid, baseCostCountry);
+        const targetCurrency = searchParams.get('currency'); // Optional target currency
+        console.log('Fetching base cost for:', productUid, baseCostCountry, targetCurrency ? `(convert to ${targetCurrency})` : '');
         
-        const baseCost = await gelatoService.getBaseCost(productUid, baseCostCountry);
+        // Use new method with currency conversion
+        const baseCost = await gelatoService.getBaseCostWithConversion(productUid, baseCostCountry, targetCurrency);
 
         if (!baseCost) {
           return NextResponse.json(
@@ -134,7 +136,16 @@ export async function GET(request: NextRequest) {
           success: true,
           productUid,
           country: baseCostCountry,
-          baseCost
+          targetCurrency: baseCost.currency,
+          baseCost: {
+            price: baseCost.price,
+            currency: baseCost.currency,
+            quantity: baseCost.quantity,
+            originalPrice: baseCost.originalPrice,
+            originalCurrency: baseCost.originalCurrency,
+            conversionRate: baseCost.conversionRate,
+            conversionSource: baseCost.conversionSource
+          }
         });
 
       case 'search-product-uid':

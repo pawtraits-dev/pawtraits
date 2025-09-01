@@ -83,7 +83,8 @@ export default function MediaManagementPage() {
     'paper',
     'wood',
     'ceramic',
-    'fabric'
+    'fabric',
+    'foam'
   ];
 
   const materialTypes = [
@@ -95,7 +96,8 @@ export default function MediaManagementPage() {
     'wood',
     'ceramic',
     'fabric',
-    'glass'
+    'glass',
+    'foam'
   ];
 
   const finishTypes = [
