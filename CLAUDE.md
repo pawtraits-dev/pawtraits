@@ -60,6 +60,9 @@ CLOUDINARY_API_SECRET=your_api_secret
 
 # Claude AI
 CLAUDE_API_KEY=your_claude_api_key
+
+# Google GenAI (for image variations)
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
 ### Stripe Webhook Configuration

@@ -11,6 +11,7 @@ import { Copy, Wand2, RefreshCw, Download, Upload, Image, X, Star, Eye, Sparkles
 import { generateImageMetadata } from '@/lib/metadata-generator';
 import { useImageDescription } from '@/hooks/useImageDescription';
 import { uploadImagesDirectBatch } from '@/lib/cloudinary-client';
+import { VariationsSelector } from '@/components/VariationsSelector';
 import type { Breed, Theme, Style, Format, Coat, Outfit, BreedCoatDetail } from '@/lib/types';
 
 export default function GeneratePromptsPage() {
@@ -42,6 +43,11 @@ export default function GeneratePromptsPage() {
   const [isImageFeatured, setIsImageFeatured] = useState(false);
   const [isImagePublic, setIsImagePublic] = useState(true);
   const [uploadResults, setUploadResults] = useState<any[]>([]);
+  
+  // Variations states
+  const [isGeneratingVariations, setIsGeneratingVariations] = useState(false);
+  const [variationResults, setVariationResults] = useState<any[]>([]);
+  const [showVariationsSection, setShowVariationsSection] = useState(false);
 
   // AI Description Generation
   const { 
@@ -315,6 +321,8 @@ export default function GeneratePromptsPage() {
     setIsImageFeatured(false);
     setUploadResults([]);
     setDescription(''); // Clear AI description
+    setShowVariationsSection(false);
+    setVariationResults([]);
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -330,6 +338,7 @@ export default function GeneratePromptsPage() {
     // Auto-generate metadata when first image is uploaded
     if (validFiles.length > 0 && uploadedImages.length === 0) {
       generateMetadata();
+      setShowVariationsSection(true);
     }
   };
 
@@ -589,6 +598,60 @@ export default function GeneratePromptsPage() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleGenerateVariations = async (config: {
+    breeds: string[];
+    coats: string[];
+    outfits: string[];
+    formats: string[];
+  }) => {
+    if (!uploadedImages.length || !generatedPrompt) return;
+    
+    setIsGeneratingVariations(true);
+    setVariationResults([]);
+    
+    try {
+      const firstImage = uploadedImages[0];
+      const imageData = await fileToBase64(firstImage);
+      
+      const response = await fetch('/api/admin/generate-variations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          originalImageData: imageData,
+          originalPrompt: generatedPrompt,
+          currentBreed: selectedBreed,
+          variationConfig: config
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Variation generation failed: ${response.statusText}`);
+      }
+      
+      const results = await response.json();
+      setVariationResults(results);
+      
+    } catch (error) {
+      console.error('Variation generation error:', error);
+      alert(`Failed to generate variations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsGeneratingVariations(false);
+    }
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
+    });
   };
 
   if (loading) {
@@ -1118,6 +1181,59 @@ export default function GeneratePromptsPage() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Variations Section */}
+        {showVariationsSection && (
+          <VariationsSelector
+            originalImage={uploadedImages[0] || null}
+            originalPrompt={generatedPrompt}
+            currentBreed={selectedBreed}
+            breeds={breeds}
+            availableCoats={availableCoats}
+            outfits={outfits}
+            formats={formats}
+            onGenerateVariations={handleGenerateVariations}
+            isGenerating={isGeneratingVariations}
+          />
+        )}
+
+        {/* Variation Results */}
+        {variationResults.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Generated Variations</CardTitle>
+              <p className="text-sm text-gray-600">
+                {variationResults.length} variation{variationResults.length > 1 ? 's' : ''} generated and uploaded to catalog
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {variationResults.map((result, index) => (
+                  <div key={index} className="space-y-2">
+                    <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
+                      {result.cloudinary_url ? (
+                        <img
+                          src={result.cloudinary_url}
+                          alt={`Variation ${index + 1}`}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      ) : (
+                        <div className="text-gray-400 text-sm">Generated</div>
+                      )}
+                    </div>
+                    <div className="text-xs space-y-1">
+                      <p className="font-medium">{result.variation_type}</p>
+                      {result.breed_name && <p>Breed: {result.breed_name}</p>}
+                      {result.coat_name && <p>Coat: {result.coat_name}</p>}
+                      {result.outfit_name && <p>Outfit: {result.outfit_name}</p>}
+                      {result.format_name && <p>Format: {result.format_name}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         )}
