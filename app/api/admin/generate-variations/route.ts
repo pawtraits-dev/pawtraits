@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
-import { SupabaseService } from '@/lib/supabase';
-import { uploadImagesDirectBatch } from '@/lib/cloudinary-client';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function POST(request: NextRequest) {
   try {
-    const supabaseService = new SupabaseService();
-    
-    // Check admin authentication
-    const admin = await supabaseService.getCurrentAdmin();
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Use service role for admin operations
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
 
     const body = await request.json();
     const { originalImageData, originalPrompt, currentBreed, variationConfig } = body;
@@ -33,13 +32,29 @@ export async function POST(request: NextRequest) {
     const geminiService = new GeminiVariationService();
     const results = [];
 
-    // Load data for variations
-    const [breedsData, coatsData, outfitsData, formatsData] = await Promise.all([
-      fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/breeds`).then(r => r.json()).catch(() => []),
-      fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/breed-coats?breed_id=${currentBreed}`).then(r => r.json()).catch(() => []),
-      fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/outfits`).then(r => r.json()).catch(() => []),
-      fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/formats`).then(r => r.json()).catch(() => [])
+    // Load data for variations directly from database
+    const [breedsResult, coatsResult, outfitsResult, formatsResult] = await Promise.all([
+      supabase.from('breeds').select('*').eq('is_active', true),
+      supabase.from('breed_coats').select(`
+        id,
+        breeds!inner(id, name, slug, animal_type),
+        coats!inner(id, name, slug, hex_color, pattern_type, rarity)
+      `).eq('breeds.id', currentBreed),
+      supabase.from('outfits').select('*').eq('is_active', true),
+      supabase.from('formats').select('*').eq('is_active', true)
     ]);
+
+    const breedsData = breedsResult.data || [];
+    const coatsData = (coatsResult.data || []).map((item: any) => ({
+      id: item.coats.id,
+      coat_name: item.coats.name,
+      coat_slug: item.coats.slug,
+      hex_color: item.coats.hex_color,
+      pattern_type: item.coats.pattern_type,
+      rarity: item.coats.rarity
+    }));
+    const outfitsData = outfitsResult.data || [];
+    const formatsData = formatsResult.data || [];
 
     // Generate breed variations
     if (variationConfig.breeds?.length > 0) {
@@ -133,11 +148,10 @@ export async function POST(request: NextRequest) {
         
         if (uploadResult) {
           
-          // Save to database
-          const dbResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/images/cloudinary`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+          // Save to database directly
+          const { data: dbResult, error: dbError } = await supabase
+            .from('image_catalog')
+            .insert({
               cloudinary_public_id: uploadResult.public_id,
               cloudinary_secure_url: uploadResult.secure_url,
               cloudinary_signature: uploadResult.signature,
@@ -149,18 +163,18 @@ export async function POST(request: NextRequest) {
               prompt_text: variation.metadata.prompt,
               description: `Generated variation: ${variation.metadata.variation_type}`,
               tags: variation.metadata.tags,
-              breed_id: variation.metadata.breed_id,
-              coat_id: variation.metadata.coat_id,
-              outfit_id: variation.metadata.outfit_id,
-              format_id: variation.metadata.format_id,
+              breed_id: variation.metadata.breed_id || null,
+              coat_id: variation.metadata.coat_id || null,
+              outfit_id: variation.metadata.outfit_id || null,
+              format_id: variation.metadata.format_id || null,
               is_public: true,
               is_featured: false,
               rating: 4 // Auto-rate variations as 4 stars
             })
-          });
+            .select()
+            .single();
           
-          if (dbResponse.ok) {
-            const dbResult = await dbResponse.json();
+          if (!dbError && dbResult) {
             uploadResults.push({
               success: true,
               variation_type: variation.metadata.variation_type,
@@ -174,7 +188,7 @@ export async function POST(request: NextRequest) {
           } else {
             uploadResults.push({
               success: false,
-              error: 'Database save failed',
+              error: `Database save failed: ${dbError?.message || 'Unknown error'}`,
               variation_type: variation.metadata.variation_type
             });
           }

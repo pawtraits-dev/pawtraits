@@ -125,7 +125,24 @@ export function VariationsSelector({
       <CardContent className="space-y-6">
         {/* Breed Variations */}
         <div>
-          <h3 className="font-medium text-gray-700 mb-3">Breed Variations</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-medium text-gray-700">Breed Variations</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const availableBreedIds = breeds.filter(breed => breed.id !== currentBreed).map(breed => breed.id);
+                const allSelected = availableBreedIds.every(id => selectedBreeds.includes(id));
+                if (allSelected) {
+                  setSelectedBreeds([]);
+                } else {
+                  setSelectedBreeds(availableBreedIds);
+                }
+              }}
+            >
+              {breeds.filter(breed => breed.id !== currentBreed).every(breed => selectedBreeds.includes(breed.id)) ? 'Deselect All' : 'Select All'}
+            </Button>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {breeds.filter(breed => breed.id !== currentBreed).map(breed => (
               <div key={breed.id} className="flex items-center space-x-2 p-2 border rounded-lg">
@@ -148,7 +165,24 @@ export function VariationsSelector({
         {/* Coat Variations */}
         {availableCoats.length > 0 && (
           <div>
-            <h3 className="font-medium text-gray-700 mb-3">Coat Variations</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium text-gray-700">Coat Variations</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const allCoatIds = availableCoats.map(coat => coat.id);
+                  const allSelected = allCoatIds.every(id => selectedCoats.includes(id));
+                  if (allSelected) {
+                    setSelectedCoats([]);
+                  } else {
+                    setSelectedCoats(allCoatIds);
+                  }
+                }}
+              >
+                {availableCoats.every(coat => selectedCoats.includes(coat.id)) ? 'Deselect All' : 'Select All'}
+              </Button>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {availableCoats.map(coat => (
                 <div key={coat.id} className="flex items-center space-x-2 p-2 border rounded-lg">
@@ -174,7 +208,24 @@ export function VariationsSelector({
 
         {/* Outfit Variations */}
         <div>
-          <h3 className="font-medium text-gray-700 mb-3">Outfit Variations</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-medium text-gray-700">Outfit Variations</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const allOutfitIds = outfits.map(outfit => outfit.id);
+                const allSelected = allOutfitIds.every(id => selectedOutfits.includes(id));
+                if (allSelected) {
+                  setSelectedOutfits([]);
+                } else {
+                  setSelectedOutfits(allOutfitIds);
+                }
+              }}
+            >
+              {outfits.every(outfit => selectedOutfits.includes(outfit.id)) ? 'Deselect All' : 'Select All'}
+            </Button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {outfits.map(outfit => (
               <div key={outfit.id} className="flex items-center space-x-2 p-2 border rounded-lg">
@@ -205,7 +256,24 @@ export function VariationsSelector({
 
         {/* Format Variations */}
         <div>
-          <h3 className="font-medium text-gray-700 mb-3">Format Variations</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-medium text-gray-700">Format Variations</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const allFormatIds = formats.map(format => format.id);
+                const allSelected = allFormatIds.every(id => selectedFormats.includes(id));
+                if (allSelected) {
+                  setSelectedFormats([]);
+                } else {
+                  setSelectedFormats(allFormatIds);
+                }
+              }}
+            >
+              {formats.every(format => selectedFormats.includes(format.id)) ? 'Deselect All' : 'Select All'}
+            </Button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {formats.map(format => (
               <div key={format.id} className="flex items-center space-x-2 p-2 border rounded-lg">
