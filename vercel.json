@@ -1,0 +1,9 @@
+{
+  "functions": {
+    "app/api/admin/generate-variations/route.ts": {
+      "maxDuration": 300,
+      "memory": 512
+    }
+  },
+  "regions": ["cle1"]
+}

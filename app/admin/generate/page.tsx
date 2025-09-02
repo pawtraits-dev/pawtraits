@@ -12,6 +12,7 @@ import { generateImageMetadata } from '@/lib/metadata-generator';
 import { useImageDescription } from '@/hooks/useImageDescription';
 import { uploadImagesDirectBatch } from '@/lib/cloudinary-client';
 import { VariationsSelector } from '@/components/VariationsSelector';
+import { compressImage } from '@/lib/image-compression';
 import type { Breed, Theme, Style, Format, Coat, Outfit, BreedCoatDetail } from '@/lib/types';
 
 export default function GeneratePromptsPage() {
@@ -613,7 +614,16 @@ export default function GeneratePromptsPage() {
     
     try {
       const firstImage = uploadedImages[0];
-      const imageData = await fileToBase64(firstImage);
+      
+      // Compress image for API transmission (max 1MB)
+      const compressedImage = await compressImage(firstImage, {
+        maxWidth: 800,
+        maxHeight: 600,
+        quality: 0.7,
+        maxSizeKB: 1024 // 1MB max
+      });
+      
+      const imageData = await fileToBase64(compressedImage);
       
       const response = await fetch('/api/admin/generate-variations', {
         method: 'POST',
@@ -627,7 +637,11 @@ export default function GeneratePromptsPage() {
       });
       
       if (!response.ok) {
-        throw new Error(`Variation generation failed: ${response.statusText}`);
+        if (response.status === 413) {
+          throw new Error('Image too large for processing. Please use a smaller image (under 2MB).');
+        }
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(`Variation generation failed: ${errorData.error || response.statusText}`);
       }
       
       const results = await response.json();

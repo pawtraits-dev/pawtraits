@@ -20,6 +20,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required data' }, { status: 400 });
     }
 
+    // Validate image data size (should be compressed on client)
+    const imageSizeBytes = (originalImageData.length * 3) / 4; // Approximate base64 to bytes
+    console.log(`Processing image of size: ${Math.round(imageSizeBytes / 1024)}KB`);
+    
+    if (imageSizeBytes > 2 * 1024 * 1024) { // 2MB limit
+      return NextResponse.json({ 
+        error: 'Image too large. Please compress image to under 2MB.' 
+      }, { status: 413 });
+    }
+
     const geminiService = new GeminiVariationService();
     const results = [];
 
