@@ -14,7 +14,7 @@ import { AdminSupabaseService } from '@/lib/admin-supabase';
 import type { ImageCatalogWithDetails, Breed, Theme, Style, Format, AnimalType, BreedCoatDetail, Outfit } from '@/lib/types';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import { extractDescriptionTitle } from '@/lib/utils';
-import CloudinaryVariantsTest from '@/components/CloudinaryVariantsTest';
+import ImageVariantGenerationModal from '@/components/ImageVariantGenerationModal';
 import { VariationsSelector } from '@/components/VariationsSelector';
 
 export default function AdminCatalogPage() {
@@ -40,6 +40,8 @@ export default function AdminCatalogPage() {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [selectedImageForDetail, setSelectedImageForDetail] = useState<ImageCatalogWithDetails | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedImageForVariation, setSelectedImageForVariation] = useState<ImageCatalogWithDetails | null>(null);
+  const [showVariationModal, setShowVariationModal] = useState(false);
 
   const supabaseService = new SupabaseService();
   const adminSupabaseService = new AdminSupabaseService();
@@ -543,13 +545,22 @@ export default function AdminCatalogPage() {
                   )}
                 </div>
 
-                {/* View Variants Button - only show for Cloudinary images */}
-                {image.cloudinary_public_id && (
+                {/* Generate Variants Button - only show for images with prompts */}
+                {image.prompt_text && (
                   <div className="pt-3 border-t">
-                    <CloudinaryVariantsTest
-                      publicId={image.cloudinary_public_id}
-                      filename={image.original_filename}
-                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedImageForVariation(image);
+                        setShowVariationModal(true);
+                      }}
+                    >
+                      <Wand2 className="w-4 h-4 mr-2" />
+                      Generate Variants
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -601,6 +612,20 @@ export default function AdminCatalogPage() {
           outfits={outfits}
           formats={formats}
           availableCoats={availableCoats}
+        />
+
+        {/* Image Variant Generation Modal */}
+        <ImageVariantGenerationModal
+          image={selectedImageForVariation}
+          isOpen={showVariationModal}
+          onClose={() => {
+            setShowVariationModal(false);
+            setSelectedImageForVariation(null);
+          }}
+          onVariationsGenerated={() => {
+            // Refresh the images list to show new variations
+            loadImages();
+          }}
         />
       </div>
     </div>
