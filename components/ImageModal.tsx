@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Download, Share2, ShoppingCart, Heart, Star } from 'lucide-react';
+import { X, Download, Share2, ShoppingCart, Heart, Star, Wand2, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CloudinaryImageDisplay } from '@/components/CloudinaryImageDisplay';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
+import { VariationsSelector } from '@/components/VariationsSelector';
 import ReactMarkdown from 'react-markdown';
 import type { Product, ProductPricing } from '@/lib/product-types';
+import type { Breed, Outfit, Format, BreedCoatDetail } from '@/lib/types';
 
 interface ImageModalProps {
   isOpen: boolean;
@@ -37,6 +39,12 @@ interface ImageModalProps {
   showActions?: boolean;
   products?: Product[];
   pricing?: ProductPricing[];
+  isAdminMode?: boolean;
+  breeds?: Breed[];
+  availableCoats?: BreedCoatDetail[];
+  outfits?: Outfit[];
+  formats?: Format[];
+  onVariationsGenerated?: () => void;
 }
 
 export default function ImageModal({
@@ -53,10 +61,19 @@ export default function ImageModal({
   isPurchased = false,
   showActions = true,
   products = [],
-  pricing = []
+  pricing = [],
+  isAdminMode = false,
+  breeds = [],
+  availableCoats = [],
+  outfits = [],
+  formats = [],
+  onVariationsGenerated
 }: ImageModalProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
+  const [showVariations, setShowVariations] = useState(false);
+  const [isGeneratingVariations, setIsGeneratingVariations] = useState(false);
+  const [variationResults, setVariationResults] = useState<any[]>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -92,6 +109,83 @@ export default function ImageModal({
         ))}
       </div>
     );
+  };
+
+  const handleGenerateVariations = async (config: {
+    breeds: string[];
+    coats: string[];
+    outfits: string[];
+    formats: string[];
+  }) => {
+    if (!imageData?.prompt_text || !imageId) return;
+    
+    setIsGeneratingVariations(true);
+    setVariationResults([]);
+    
+    try {
+      // Download the original image to get base64 data
+      const imageResponse = await fetch(`/api/images/${imageId}/download`);
+      if (!imageResponse.ok) {
+        throw new Error('Failed to download original image');
+      }
+      
+      const imageBlob = await imageResponse.blob();
+      const imageData64 = await blobToBase64(imageBlob);
+      
+      const response = await fetch('/api/admin/generate-variations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          originalImageData: imageData64,
+          originalPrompt: imageData.prompt_text,
+          currentBreed: '', // Will extract from prompt
+          currentTheme: '', // Will extract from prompt  
+          currentStyle: '', // Will extract from prompt
+          variationConfig: config
+        })
+      });
+      
+      if (!response.ok) {
+        if (response.status === 413) {
+          throw new Error('Image too large for processing. Please use a smaller image.');
+        }
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(`Variation generation failed: ${errorData.error || response.statusText}`);
+      }
+      
+      const results = await response.json();
+      setVariationResults(results);
+      
+      if (onVariationsGenerated) {
+        onVariationsGenerated();
+      }
+      
+    } catch (error) {
+      console.error('Variation generation error:', error);
+      alert(`Failed to generate variations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsGeneratingVariations(false);
+    }
+  };
+
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const copyPromptToClipboard = () => {
+    if (imageData?.prompt_text) {
+      navigator.clipboard.writeText(imageData.prompt_text);
+      alert('Prompt copied to clipboard!');
+    }
   };
 
   return (
@@ -218,6 +312,28 @@ export default function ImageModal({
                 </div>
               )}
 
+              {/* Admin-only: Prompt Display */}
+              {isAdminMode && imageData?.prompt_text && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-gray-900">Midjourney Prompt</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={copyPromptToClipboard}
+                      className="p-1 h-auto"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-700 font-mono break-words">
+                      {imageData.prompt_text}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Actions */}
               {showActions && (
                 <div className="pt-4 border-t space-y-3">
@@ -271,6 +387,69 @@ export default function ImageModal({
                       Buy Now
                     </Button>
                   )}
+
+                  {/* Admin-only: Generate Variations */}
+                  {isAdminMode && imageData?.prompt_text && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setShowVariations(!showVariations)}
+                    >
+                      <Wand2 className="w-4 h-4 mr-2" />
+                      {showVariations ? 'Hide' : 'Generate'} Variations
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Admin-only: Variations Section */}
+              {isAdminMode && showVariations && (
+                <div className="pt-4 border-t">
+                  <div className="max-h-96 overflow-y-auto">
+                    <VariationsSelector
+                      originalImage={null} // We'll get it from the existing image
+                      originalPrompt={imageData?.prompt_text || ''}
+                      currentBreed={''} // Will extract from metadata
+                      breeds={breeds}
+                      availableCoats={availableCoats}
+                      outfits={outfits}
+                      formats={formats}
+                      onGenerateVariations={handleGenerateVariations}
+                      isGenerating={isGeneratingVariations}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Variation Results */}
+              {variationResults.length > 0 && (
+                <div className="pt-4 border-t">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Generated Variations</h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {variationResults.map((result, index) => (
+                      <div key={index} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                        <div className="w-12 h-12 bg-gray-200 rounded flex-shrink-0">
+                          {result.cloudinary_url && (
+                            <img
+                              src={result.cloudinary_url}
+                              alt={`Variation ${index + 1}`}
+                              className="w-full h-full object-cover rounded"
+                            />
+                          )}
+                        </div>
+                        <div className="flex-1 text-xs space-y-1">
+                          <p className="font-medium">{result.variation_type}</p>
+                          {result.breed_name && <p>Breed: {result.breed_name}</p>}
+                          {result.coat_name && <p>Coat: {result.coat_name}</p>}
+                          {result.outfit_name && <p>Outfit: {result.outfit_name}</p>}
+                          {result.format_name && <p>Format: {result.format_name}</p>}
+                          <p className={result.success ? 'text-green-600' : 'text-red-600'}>
+                            {result.success ? 'Uploaded to catalog' : result.error}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

@@ -7,14 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Filter, Star, Eye, Download, Tag, Calendar, User, Trash2, X, EyeOff } from 'lucide-react';
+import { Search, Filter, Star, Eye, Download, Tag, Calendar, User, Trash2, X, EyeOff, Wand2, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
-import type { ImageCatalogWithDetails, Breed, Theme, Style, Format, AnimalType } from '@/lib/types';
+import type { ImageCatalogWithDetails, Breed, Theme, Style, Format, AnimalType, BreedCoatDetail, Outfit } from '@/lib/types';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import { extractDescriptionTitle } from '@/lib/utils';
 import CloudinaryVariantsTest from '@/components/CloudinaryVariantsTest';
+import { VariationsSelector } from '@/components/VariationsSelector';
 
 export default function AdminCatalogPage() {
   const [images, setImages] = useState<ImageCatalogWithDetails[]>([]);
@@ -22,6 +23,8 @@ export default function AdminCatalogPage() {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [styles, setStyles] = useState<Style[]>([]);
   const [formats, setFormats] = useState<Format[]>([]);
+  const [outfits, setOutfits] = useState<Outfit[]>([]);
+  const [availableCoats, setAvailableCoats] = useState<BreedCoatDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [animalType, setAnimalType] = useState<AnimalType | ''>('');
@@ -65,17 +68,19 @@ export default function AdminCatalogPage() {
 
   const loadData = async () => {
     try {
-      const [breedsData, themesData, stylesData, formatsData] = await Promise.all([
+      const [breedsData, themesData, stylesData, formatsData, outfitsData] = await Promise.all([
         supabaseService.getBreeds(),
         supabaseService.getThemes(),
         supabaseService.getStyles(),
-        supabaseService.getFormats()
+        supabaseService.getFormats(),
+        supabaseService.getOutfits()
       ]);
 
       setBreeds(breedsData?.filter((b: any) => b.is_active) || []);
       setThemes(themesData?.filter((t: any) => t.is_active) || []);
       setStyles(stylesData?.filter((s: any) => s.is_active) || []);
       setFormats(formatsData?.filter((f: any) => f.is_active) || []);
+      setOutfits(outfitsData?.filter((o: any) => o.is_active) || []);
     } catch (error) {
       console.error('Error loading filter data:', error);
     }
@@ -218,9 +223,19 @@ export default function AdminCatalogPage() {
     }
   };
 
-  const handleCardClick = (image: ImageCatalogWithDetails) => {
+  const handleCardClick = async (image: ImageCatalogWithDetails) => {
     setSelectedImageForDetail(image);
     setShowDetailModal(true);
+    
+    // Load coats for the image's breed
+    if (image.breed_id) {
+      try {
+        const coatsData = await supabaseService.getBreedCoats(image.breed_id);
+        setAvailableCoats(coatsData || []);
+      } catch (error) {
+        console.error('Error loading breed coats:', error);
+      }
+    }
   };
 
   const renderStars = (rating: number) => {
@@ -582,6 +597,10 @@ export default function AdminCatalogPage() {
               img.id === updatedImage.id ? updatedImage : img
             ));
           }}
+          breeds={breeds}
+          outfits={outfits}
+          formats={formats}
+          availableCoats={availableCoats}
         />
       </div>
     </div>
@@ -593,17 +612,28 @@ function ImageDetailModal({
   image, 
   isOpen, 
   onClose, 
-  onUpdate 
+  onUpdate,
+  breeds,
+  outfits,
+  formats,
+  availableCoats
 }: {
   image: ImageCatalogWithDetails | null;
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (image: ImageCatalogWithDetails) => void;
+  breeds: Breed[];
+  outfits: Outfit[];
+  formats: Format[];
+  availableCoats: BreedCoatDetail[];
 }) {
   const [editedDescription, setEditedDescription] = useState('');
   const [editedTags, setEditedTags] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showVariations, setShowVariations] = useState(false);
+  const [isGeneratingVariations, setIsGeneratingVariations] = useState(false);
+  const [variationResults, setVariationResults] = useState<any[]>([]);
 
   useEffect(() => {
     if (image) {
@@ -644,6 +674,75 @@ function ImageDetailModal({
       alert('Failed to update image. Please try again.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleGenerateVariations = async (config: {
+    breeds: string[];
+    coats: string[];
+    outfits: string[];
+    formats: string[];
+  }) => {
+    if (!image?.prompt_text || !image?.id) return;
+    
+    setIsGeneratingVariations(true);
+    setVariationResults([]);
+    
+    try {
+      // Get the Cloudinary URL for the image
+      const imageResponse = await fetch(image.public_url || '');
+      const imageBlob = await imageResponse.blob();
+      const imageData64 = await blobToBase64(imageBlob);
+      
+      const response = await fetch('/api/admin/generate-variations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          originalImageData: imageData64,
+          originalPrompt: image.prompt_text,
+          currentBreed: image.breed_id || '',
+          currentTheme: image.theme_id || '',
+          currentStyle: image.style_id || '',
+          variationConfig: config
+        })
+      });
+      
+      if (!response.ok) {
+        if (response.status === 413) {
+          throw new Error('Image too large for processing. Please use a smaller image.');
+        }
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(`Variation generation failed: ${errorData.error || response.statusText}`);
+      }
+      
+      const results = await response.json();
+      setVariationResults(results);
+      
+    } catch (error) {
+      console.error('Variation generation error:', error);
+      alert(`Failed to generate variations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsGeneratingVariations(false);
+    }
+  };
+
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const copyPromptToClipboard = () => {
+    if (image?.prompt_text) {
+      navigator.clipboard.writeText(image.prompt_text);
+      alert('Prompt copied to clipboard!');
     }
   };
 
@@ -783,10 +882,80 @@ function ImageDetailModal({
 
             {/* Prompt */}
             <div>
-              <label className="text-sm font-medium block mb-2">AI Prompt</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium">AI Prompt</label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={copyPromptToClipboard}
+                  className="p-1 h-auto"
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </div>
               <div className="bg-gray-50 p-3 rounded font-mono text-xs text-gray-600 max-h-32 overflow-y-auto">
                 {image.prompt_text}
               </div>
+            </div>
+
+            {/* Generate Variations */}
+            <div className="pt-4 border-t">
+              <Button
+                variant="outline"
+                className="w-full mb-4"
+                onClick={() => setShowVariations(!showVariations)}
+              >
+                <Wand2 className="w-4 h-4 mr-2" />
+                {showVariations ? 'Hide' : 'Generate'} Variations
+              </Button>
+              
+              {showVariations && (
+                <div className="space-y-4">
+                  <VariationsSelector
+                    originalImage={null}
+                    originalPrompt={image.prompt_text || ''}
+                    currentBreed={image.breed_id || ''}
+                    breeds={breeds}
+                    availableCoats={availableCoats}
+                    outfits={outfits}
+                    formats={formats}
+                    onGenerateVariations={handleGenerateVariations}
+                    isGenerating={isGeneratingVariations}
+                  />
+                  
+                  {/* Variation Results */}
+                  {variationResults.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">Generated Variations</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {variationResults.map((result, index) => (
+                          <div key={index} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                            <div className="w-12 h-12 bg-gray-200 rounded flex-shrink-0">
+                              {result.cloudinary_url && (
+                                <img
+                                  src={result.cloudinary_url}
+                                  alt={`Variation ${index + 1}`}
+                                  className="w-full h-full object-cover rounded"
+                                />
+                              )}
+                            </div>
+                            <div className="flex-1 text-xs space-y-1">
+                              <p className="font-medium">{result.variation_type}</p>
+                              {result.breed_name && <p>Breed: {result.breed_name}</p>}
+                              {result.coat_name && <p>Coat: {result.coat_name}</p>}
+                              {result.outfit_name && <p>Outfit: {result.outfit_name}</p>}
+                              {result.format_name && <p>Format: {result.format_name}</p>}
+                              <p className={result.success ? 'text-green-600' : 'text-red-600'}>
+                                {result.success ? 'Uploaded to catalog' : result.error}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Metadata */}
