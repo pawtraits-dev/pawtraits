@@ -49,15 +49,52 @@ export default function ImageVariantGenerationModal({
     
     setLoading(true);
     try {
-      const [breedsData, outfitsData, formatsData] = await Promise.all([
-        supabaseService.getBreeds(),
-        supabaseService.getOutfits(),
-        supabaseService.getFormats()
+      // Use API endpoints with proper error handling like admin generate page
+      const [breedsRes, outfitsRes, formatsRes] = await Promise.all([
+        fetch(`/api/breeds${image.breed_animal_type ? `?animal_type=${image.breed_animal_type}` : ''}`).catch((error) => {
+          console.error('Failed to fetch breeds:', error);
+          return { ok: false, json: () => [] };
+        }),
+        fetch('/api/outfits').catch((error) => {
+          console.error('Failed to fetch outfits:', error);
+          return { ok: false, json: () => [] };
+        }),
+        fetch('/api/formats').catch((error) => {
+          console.error('Failed to fetch formats:', error);
+          return { ok: false, json: () => [] };
+        })
       ]);
 
-      // Filter breeds by animal type if available
+      let breedsData = [];
+      let outfitsData = [];
+      let formatsData = [];
+
+      try {
+        breedsData = breedsRes.ok ? await breedsRes.json() : [];
+      } catch (e) {
+        console.error('Error parsing breeds data:', e);
+        breedsData = [];
+      }
+
+      try {
+        outfitsData = outfitsRes.ok ? await outfitsRes.json() : [];
+      } catch (e) {
+        console.error('Error parsing outfits data:', e);
+        outfitsData = [];
+      }
+
+      try {
+        formatsData = formatsRes.ok ? await formatsRes.json() : [];
+      } catch (e) {
+        console.error('Error parsing formats data:', e);
+        formatsData = [];
+      }
+
+      console.log('Loaded data:', { breedsData, outfitsData, formatsData });
+
+      // Filter breeds by active status and exclude current breed
       const filteredBreeds = breedsData?.filter((breed: any) => 
-        breed.is_active && breed.animal_type === image.breed_animal_type
+        breed.is_active && breed.id !== image.breed_id
       ) || [];
       
       setBreeds(filteredBreeds);
@@ -66,8 +103,29 @@ export default function ImageVariantGenerationModal({
 
       // Load coats for the current breed
       if (image.breed_id) {
-        const coatsData = await supabaseService.getBreedCoats(image.breed_id);
-        setAvailableCoats(coatsData || []);
+        try {
+          const coatsResponse = await fetch(`/api/breed-coats?breed_id=${image.breed_id}`);
+          if (coatsResponse.ok) {
+            const coatsData = await coatsResponse.json();
+            
+            // Transform API data to match BreedCoatDetail interface
+            const transformedCoats = coatsData?.map((item: any) => ({
+              id: item.coat_id,
+              breed_id: item.breed_id,
+              coat_id: item.coat_id,
+              coat_name: item.coats?.name || '',
+              hex_color: item.coats?.hex_color || '#000000',
+              popularity_rank: item.popularity_rank,
+              is_common: item.is_common,
+              is_standard: item.is_standard
+            })) || [];
+            
+            console.log('Loaded coats:', transformedCoats);
+            setAvailableCoats(transformedCoats);
+          }
+        } catch (error) {
+          console.error('Error loading coats:', error);
+        }
       }
     } catch (error) {
       console.error('Error loading data:', error);
