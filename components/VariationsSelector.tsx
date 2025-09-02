@@ -86,9 +86,9 @@ export function VariationsSelector({
     });
   };
 
-  const isDisabled = !originalImage || !originalPrompt || getTotalVariations() === 0 || isGenerating;
+  const isDisabled = !originalPrompt || getTotalVariations() === 0 || isGenerating;
 
-  if (!originalImage || !originalPrompt) {
+  if (!originalPrompt) {
     return (
       <Card>
         <CardHeader>
@@ -99,7 +99,7 @@ export function VariationsSelector({
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-gray-500">
-            <p>Upload an image and generate a prompt first to create variations</p>
+            <p>No prompt available for variation generation</p>
           </div>
         </CardContent>
       </Card>
