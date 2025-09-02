@@ -5,6 +5,8 @@ import type { Breed, Coat, Outfit, Format, BreedCoatDetail } from '@/lib/types';
 export interface VariationConfig {
   originalImageData: string; // base64
   originalPrompt: string;
+  currentTheme?: any;
+  currentStyle?: any;
   variations: {
     breeds?: Breed[];
     coats?: BreedCoatDetail[];
@@ -40,13 +42,15 @@ export class GeminiVariationService {
   async generateBreedVariations(
     originalImageData: string,
     originalPrompt: string,
-    targetBreeds: Breed[]
+    targetBreeds: Breed[],
+    currentTheme?: any,
+    currentStyle?: any
   ): Promise<GeneratedVariation[]> {
     const variations: GeneratedVariation[] = [];
 
     for (const breed of targetBreeds) {
       try {
-        const variationPrompt = this.createBreedVariationPrompt(originalPrompt, breed);
+        const variationPrompt = this.createBreedVariationPrompt(originalPrompt, breed, currentTheme, currentStyle);
         
         const prompt = [
           { text: variationPrompt },
@@ -92,13 +96,15 @@ export class GeminiVariationService {
     originalImageData: string,
     originalPrompt: string,
     breed: Breed,
-    targetCoats: BreedCoatDetail[]
+    targetCoats: BreedCoatDetail[],
+    currentTheme?: any,
+    currentStyle?: any
   ): Promise<GeneratedVariation[]> {
     const variations: GeneratedVariation[] = [];
 
     for (const coat of targetCoats) {
       try {
-        const variationPrompt = this.createCoatVariationPrompt(originalPrompt, breed, coat);
+        const variationPrompt = this.createCoatVariationPrompt(originalPrompt, breed, coat, currentTheme, currentStyle);
         
         const prompt = [
           { text: variationPrompt },
@@ -144,13 +150,15 @@ export class GeminiVariationService {
   async generateOutfitVariations(
     originalImageData: string,
     originalPrompt: string,
-    targetOutfits: Outfit[]
+    targetOutfits: Outfit[],
+    currentTheme?: any,
+    currentStyle?: any
   ): Promise<GeneratedVariation[]> {
     const variations: GeneratedVariation[] = [];
 
     for (const outfit of targetOutfits) {
       try {
-        const variationPrompt = this.createOutfitVariationPrompt(originalPrompt, outfit);
+        const variationPrompt = this.createOutfitVariationPrompt(originalPrompt, outfit, currentTheme, currentStyle);
         
         const prompt = [
           { text: variationPrompt },
@@ -195,13 +203,15 @@ export class GeminiVariationService {
   async generateFormatVariations(
     originalImageData: string,
     originalPrompt: string,
-    targetFormats: Format[]
+    targetFormats: Format[],
+    currentTheme?: any,
+    currentStyle?: any
   ): Promise<GeneratedVariation[]> {
     const variations: GeneratedVariation[] = [];
 
     for (const format of targetFormats) {
       try {
-        const variationPrompt = this.createFormatVariationPrompt(originalPrompt, format);
+        const variationPrompt = this.createFormatVariationPrompt(originalPrompt, format, currentTheme, currentStyle);
         
         const prompt = [
           { text: variationPrompt },
@@ -295,35 +305,120 @@ export class GeminiVariationService {
   }
 
   /**
-   * Create breed variation prompt
+   * Parse original Midjourney prompt to extract components
    */
-  private createBreedVariationPrompt(originalPrompt: string, targetBreed: Breed): string {
-    return `Using the provided image as reference, create a new image with the same composition, pose, and lighting, but change the dog/cat to be a ${targetBreed.name.toLowerCase()}. Maintain the same scene, background, and overall aesthetic. The ${targetBreed.name.toLowerCase()} should have typical characteristics of the breed: ${targetBreed.personality_traits?.join(', ')}. ${originalPrompt}`;
-  }
-
-  /**
-   * Create coat variation prompt
-   */
-  private createCoatVariationPrompt(originalPrompt: string, breed: Breed, targetCoat: BreedCoatDetail): string {
-    return `Using the provided image as reference, create a new image with the same ${breed.name.toLowerCase()}, same composition, pose, and scene, but change the coat color to ${targetCoat.coat_name.toLowerCase()}. The coat should have a ${targetCoat.pattern_type} pattern. Maintain all other aspects of the image including lighting, background, and pose. ${originalPrompt}`;
-  }
-
-  /**
-   * Create outfit variation prompt
-   */
-  private createOutfitVariationPrompt(originalPrompt: string, targetOutfit: Outfit): string {
-    if (targetOutfit.name === 'No Outfit') {
-      return `Using the provided image as reference, create a new image with the same pet, same composition, pose, and scene, but remove any clothing or accessories. The pet should appear natural without any outfits. Maintain all other aspects including lighting and background. ${originalPrompt}`;
+  private parseOriginalPrompt(originalPrompt: string): {
+    breed: string;
+    coat: string;
+    outfit: string;
+    theme: string;
+    style: string;
+    aspectRatio: string;
+  } {
+    // Extract aspect ratio
+    const arMatch = originalPrompt.match(/--ar\s+(\d+:\d+)/);
+    const aspectRatio = arMatch ? arMatch[1] : '1:1';
+    
+    // Remove aspect ratio from prompt for parsing
+    const promptWithoutAR = originalPrompt.replace(/--ar\s+\d+:\d+/, '').trim();
+    
+    // Try to parse the standard format: "A [BREED] with [COAT] fur, wearing [OUTFIT], [THEME], [STYLE]"
+    const standardMatch = promptWithoutAR.match(/^A\s+(.+?)\s+with\s+(.+?)\s+fur,\s+wearing\s+(.+?),\s+(.+?),\s+(.+)$/i);
+    
+    if (standardMatch) {
+      return {
+        breed: standardMatch[1],
+        coat: standardMatch[2],
+        outfit: standardMatch[3],
+        theme: standardMatch[4],
+        style: standardMatch[5],
+        aspectRatio
+      };
     }
-
-    return `Using the provided image as reference, create a new image with the same pet, same composition, pose, and scene, but change the outfit to: ${targetOutfit.clothing_description}. The outfit should fit naturally and look appropriate for the pet. Maintain all other aspects including lighting and background. ${originalPrompt}`;
+    
+    // Fallback parsing for non-standard prompts
+    return {
+      breed: 'dog',
+      coat: 'natural',
+      outfit: 'no outfit',
+      theme: promptWithoutAR,
+      style: '',
+      aspectRatio
+    };
   }
 
   /**
-   * Create format variation prompt
+   * Create breed variation prompt using standardized Midjourney format
    */
-  private createFormatVariationPrompt(originalPrompt: string, targetFormat: Format): string {
-    return `Using the provided image as reference, create a new image with the same pet and scene, but adjust the composition for a ${targetFormat.aspect_ratio} aspect ratio format suitable for ${targetFormat.use_case}. ${targetFormat.prompt_adjustments}. Maintain the same pet, lighting quality, and overall aesthetic. ${originalPrompt}`;
+  private createBreedVariationPrompt(
+    originalPrompt: string, 
+    targetBreed: Breed, 
+    currentTheme?: any, 
+    currentStyle?: any
+  ): string {
+    const { coat, outfit, aspectRatio } = this.parseOriginalPrompt(originalPrompt);
+    
+    const themePrompt = currentTheme?.base_prompt_template || '';
+    const stylePrompt = currentStyle?.prompt_suffix || '';
+    
+    return `A ${targetBreed.name.toLowerCase()} with ${coat} fur, wearing ${outfit}, ${themePrompt}, ${stylePrompt}, --ar ${aspectRatio}`.replace(/,\s*,/g, ',').trim();
+  }
+
+  /**
+   * Create coat variation prompt using standardized Midjourney format
+   */
+  private createCoatVariationPrompt(
+    originalPrompt: string, 
+    breed: Breed, 
+    targetCoat: BreedCoatDetail,
+    currentTheme?: any,
+    currentStyle?: any
+  ): string {
+    const { outfit, aspectRatio } = this.parseOriginalPrompt(originalPrompt);
+    
+    const themePrompt = currentTheme?.base_prompt_template || '';
+    const stylePrompt = currentStyle?.prompt_suffix || '';
+    
+    return `A ${breed.name.toLowerCase()} with ${targetCoat.coat_name.toLowerCase()} fur, wearing ${outfit}, ${themePrompt}, ${stylePrompt}, --ar ${aspectRatio}`.replace(/,\s*,/g, ',').trim();
+  }
+
+  /**
+   * Create outfit variation prompt using standardized Midjourney format
+   */
+  private createOutfitVariationPrompt(
+    originalPrompt: string, 
+    targetOutfit: Outfit,
+    currentTheme?: any,
+    currentStyle?: any
+  ): string {
+    const { breed, coat, aspectRatio } = this.parseOriginalPrompt(originalPrompt);
+    
+    const outfitText = targetOutfit.name === 'No Outfit' ? 'no outfit' : targetOutfit.clothing_description || targetOutfit.name.toLowerCase();
+    const themePrompt = currentTheme?.base_prompt_template || '';
+    const stylePrompt = currentStyle?.prompt_suffix || '';
+    
+    return `A ${breed} with ${coat} fur, wearing ${outfitText}, ${themePrompt}, ${stylePrompt}, --ar ${aspectRatio}`.replace(/,\s*,/g, ',').trim();
+  }
+
+  /**
+   * Create format variation prompt using standardized Midjourney format
+   */
+  private createFormatVariationPrompt(
+    originalPrompt: string, 
+    targetFormat: Format,
+    currentTheme?: any,
+    currentStyle?: any
+  ): string {
+    const { breed, coat, outfit } = this.parseOriginalPrompt(originalPrompt);
+    
+    const themePrompt = currentTheme?.base_prompt_template || '';
+    const stylePrompt = currentStyle?.prompt_suffix || '';
+    
+    // Apply format-specific adjustments to theme
+    const adjustedTheme = targetFormat.prompt_adjustments ? 
+      `${themePrompt}, ${targetFormat.prompt_adjustments}` : themePrompt;
+    
+    return `A ${breed} with ${coat} fur, wearing ${outfit}, ${adjustedTheme}, ${stylePrompt}, --ar ${targetFormat.aspect_ratio}`.replace(/,\s*,/g, ',').trim();
   }
 
   /**

@@ -632,6 +632,8 @@ export default function GeneratePromptsPage() {
           originalImageData: imageData,
           originalPrompt: generatedPrompt,
           currentBreed: selectedBreed,
+          currentTheme: selectedTheme,
+          currentStyle: selectedStyle,
           variationConfig: config
         })
       });

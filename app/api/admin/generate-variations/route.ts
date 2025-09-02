@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     });
 
     const body = await request.json();
-    const { originalImageData, originalPrompt, currentBreed, variationConfig } = body;
+    const { originalImageData, originalPrompt, currentBreed, currentTheme, currentStyle, variationConfig } = body;
 
     if (!originalImageData || !originalPrompt) {
       return NextResponse.json({ error: 'Missing required data' }, { status: 400 });
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const results = [];
 
     // Load data for variations directly from database
-    const [breedsResult, coatsResult, outfitsResult, formatsResult] = await Promise.all([
+    const [breedsResult, coatsResult, outfitsResult, formatsResult, themesResult, stylesResult] = await Promise.all([
       supabase.from('breeds').select('*').eq('is_active', true),
       supabase.from('breed_coats').select(`
         id,
@@ -41,20 +41,36 @@ export async function POST(request: NextRequest) {
         coats!inner(id, name, slug, hex_color, pattern_type, rarity)
       `).eq('breeds.id', currentBreed),
       supabase.from('outfits').select('*').eq('is_active', true),
-      supabase.from('formats').select('*').eq('is_active', true)
+      supabase.from('formats').select('*').eq('is_active', true),
+      supabase.from('themes').select('*').eq('is_active', true),
+      supabase.from('styles').select('*').eq('is_active', true)
     ]);
 
     const breedsData = breedsResult.data || [];
     const coatsData = (coatsResult.data || []).map((item: any) => ({
       id: item.coats.id,
+      breed_coat_id: item.id,
+      breed_name: item.breeds.name,
       coat_name: item.coats.name,
       coat_slug: item.coats.slug,
       hex_color: item.coats.hex_color,
       pattern_type: item.coats.pattern_type,
-      rarity: item.coats.rarity
+      rarity: item.coats.rarity,
+      breed_slug: item.breeds.slug,
+      coat_description: item.coats.description || '',
+      is_common: item.coats.rarity === 'common',
+      popularity_rank: 1,
+      is_standard: true,
+      notes: ''
     }));
     const outfitsData = outfitsResult.data || [];
     const formatsData = formatsResult.data || [];
+    const themesData = themesResult.data || [];
+    const stylesData = stylesResult.data || [];
+
+    // Get current theme and style data for context
+    const currentThemeData = themesData.find((t: any) => t.id === currentTheme);
+    const currentStyleData = stylesData.find((s: any) => s.id === currentStyle);
 
     // Generate breed variations
     if (variationConfig.breeds?.length > 0) {
@@ -65,7 +81,9 @@ export async function POST(request: NextRequest) {
       const breedVariations = await geminiService.generateBreedVariations(
         originalImageData,
         originalPrompt,
-        targetBreeds
+        targetBreeds,
+        currentThemeData,
+        currentStyleData
       );
       
       results.push(...breedVariations);
@@ -83,7 +101,9 @@ export async function POST(request: NextRequest) {
           originalImageData,
           originalPrompt,
           currentBreedData,
-          targetCoats
+          targetCoats,
+          currentThemeData,
+          currentStyleData
         );
         
         results.push(...coatVariations);
@@ -99,7 +119,9 @@ export async function POST(request: NextRequest) {
       const outfitVariations = await geminiService.generateOutfitVariations(
         originalImageData,
         originalPrompt,
-        targetOutfits
+        targetOutfits,
+        currentThemeData,
+        currentStyleData
       );
       
       results.push(...outfitVariations);
@@ -114,7 +136,9 @@ export async function POST(request: NextRequest) {
       const formatVariations = await geminiService.generateFormatVariations(
         originalImageData,
         originalPrompt,
-        targetFormats
+        targetFormats,
+        currentThemeData,
+        currentStyleData
       );
       
       results.push(...formatVariations);
