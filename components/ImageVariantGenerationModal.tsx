@@ -152,16 +152,16 @@ function VariationPreviewStep({
                     </div>
                   )}
                   
-                  {(variation.metadata?.gemini_prompt || variation.prompt) && (
+                  {variation.gemini_prompt && (
                     <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
-                      <p className="font-medium text-blue-800 mb-1">Gemini Prompt:</p>
-                      <p className="text-blue-700 font-mono text-xs break-all">
-                        {variation.metadata?.gemini_prompt || variation.prompt}
+                      <p className="font-medium text-blue-800 mb-1">Gemini Prompt (actual):</p>
+                      <p className="text-blue-700 font-mono text-xs break-words">
+                        {variation.gemini_prompt}
                       </p>
                     </div>
                   )}
                   
-                  {variation.prompt && variation.metadata?.gemini_prompt && (
+                  {variation.prompt && (
                     <div className="mt-2 p-2 bg-green-50 rounded text-xs">
                       <p className="font-medium text-green-800 mb-1">Midjourney Prompt (for catalog):</p>
                       <p className="text-green-700 font-mono text-xs break-all">{variation.prompt}</p>
@@ -780,11 +780,26 @@ export default function ImageVariantGenerationModal({
 
             {/* Generate Button */}
             <div className="flex items-center justify-between pt-4 border-t">
-              <div className="text-sm text-gray-600">
+              <div className="flex items-center gap-3 text-sm text-gray-600">
                 {getTotalVariations() > 0 && (
                   <span>
                     Will generate {getTotalVariations()} variation{getTotalVariations() > 1 ? 's' : ''}
                   </span>
+                )}
+                {getTotalVariations() > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedBreeds([]);
+                      setSelectedCoats([]);
+                      setSelectedOutfits([]);
+                      setSelectedFormats([]);
+                    }}
+                    className="text-xs"
+                  >
+                    Deselect All
+                  </Button>
                 )}
               </div>
               <Button

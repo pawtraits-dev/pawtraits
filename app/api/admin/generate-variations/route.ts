@@ -153,6 +153,7 @@ export async function POST(request: NextRequest) {
       imageData: variation.imageBuffer.toString('base64'),
       filename: variation.filename,
       prompt: variation.metadata.prompt,
+      gemini_prompt: variation.metadata.gemini_prompt, // Include Gemini prompt for display
       metadata: variation.metadata,
       variation_type: variation.metadata.variation_type,
       breed_name: results.find(r => r.metadata.breed?.id === variation.metadata.breed_id)?.metadata.breed?.name,

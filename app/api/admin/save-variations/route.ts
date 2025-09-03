@@ -52,6 +52,16 @@ export async function POST(request: NextRequest) {
           
           // Save directly to database using the service (same as original admin generate flow)
           try {
+            console.log('Attempting to save variation to database:', {
+              cloudinary_public_id: cloudinaryResult.public_id,
+              original_filename: variation.filename,
+              breed_id: variation.metadata.breed_id,
+              theme_id: variation.theme_id,
+              style_id: variation.style_id,
+              format_id: variation.metadata.format_id,
+              coat_id: variation.metadata.coat_id
+            });
+            
             const { data: dbResult, error: dbError } = await supabase
               .from('image_catalog')
               .insert({
