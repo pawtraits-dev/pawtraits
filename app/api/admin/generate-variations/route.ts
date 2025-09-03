@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     });
 
     const body = await request.json();
-    const { originalImageData, originalPrompt, currentBreed, currentTheme, currentStyle, variationConfig } = body;
+    const { originalImageData, originalPrompt, currentBreed, currentTheme, currentStyle, currentFormat, variationConfig } = body;
 
     if (!originalImageData || !originalPrompt) {
       return NextResponse.json({ error: 'Missing required data' }, { status: 400 });
@@ -68,9 +68,10 @@ export async function POST(request: NextRequest) {
     const themesData = themesResult.data || [];
     const stylesData = stylesResult.data || [];
 
-    // Get current theme and style data for context
+    // Get current theme, style, and format data for context
     const currentThemeData = themesData.find((t: any) => t.id === currentTheme);
     const currentStyleData = stylesData.find((s: any) => s.id === currentStyle);
+    const originalFormatData = formatsData.find((f: any) => f.id === currentFormat);
 
     // Generate breed variations
     if (variationConfig.breeds?.length > 0) {
@@ -116,7 +117,8 @@ export async function POST(request: NextRequest) {
                   targetBreed,
                   selectedCoat,
                   currentThemeData,
-                  currentStyleData
+                  currentStyleData,
+                  originalFormatData // Pass original format for inheritance
                 );
                 
                 if (breedVariation) {
@@ -147,7 +149,8 @@ export async function POST(request: NextRequest) {
           currentBreedData,
           targetCoats,
           currentThemeData,
-          currentStyleData
+          currentStyleData,
+          originalFormatData // Pass original format for inheritance
         );
         
         results.push(...coatVariations);
@@ -165,7 +168,8 @@ export async function POST(request: NextRequest) {
         originalPrompt,
         targetOutfits,
         currentThemeData,
-        currentStyleData
+        currentStyleData,
+        originalFormatData
       );
       
       results.push(...outfitVariations);

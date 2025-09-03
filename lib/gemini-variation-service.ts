@@ -102,7 +102,8 @@ export class GeminiVariationService {
     breed: Breed,
     targetCoats: BreedCoatDetail[],
     currentTheme?: any,
-    currentStyle?: any
+    currentStyle?: any,
+    originalFormat?: any
   ): Promise<GeneratedVariation[]> {
     const variations: GeneratedVariation[] = [];
 
@@ -137,7 +138,11 @@ export class GeminiVariationService {
                 metadata: {
                   breed,
                   coat,
+                  format: originalFormat, // Inherit original format for coat variations
                   variation_type: 'coat',
+                  breed_id: breed.id,
+                  coat_id: coat.id,
+                  format_id: originalFormat?.id || null,
                   gemini_prompt: variationPrompt // Store Gemini prompt for reference
                 }
               });
@@ -160,7 +165,8 @@ export class GeminiVariationService {
     originalPrompt: string,
     targetOutfits: Outfit[],
     currentTheme?: any,
-    currentStyle?: any
+    currentStyle?: any,
+    originalFormat?: any
   ): Promise<GeneratedVariation[]> {
     const variations: GeneratedVariation[] = [];
 
@@ -194,7 +200,10 @@ export class GeminiVariationService {
                 prompt: midjourneyPrompt, // Store Midjourney prompt for catalog
                 metadata: {
                   outfit,
+                  format: originalFormat, // Inherit original format for outfit variations
                   variation_type: 'outfit',
+                  outfit_id: outfit.id,
+                  format_id: originalFormat?.id || null,
                   gemini_prompt: variationPrompt // Store Gemini prompt for reference
                 }
               });
@@ -252,6 +261,7 @@ export class GeminiVariationService {
                 metadata: {
                   format,
                   variation_type: 'format',
+                  format_id: format.id, // Use the new target format for format variations
                   gemini_prompt: variationPrompt // Store Gemini prompt for reference
                 }
               });
@@ -372,7 +382,8 @@ export class GeminiVariationService {
     targetBreed: Breed,
     validCoat: any,
     currentTheme?: any,
-    currentStyle?: any
+    currentStyle?: any,
+    originalFormat?: any
   ): Promise<GeneratedVariation | null> {
     try {
       const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle);
@@ -404,9 +415,11 @@ export class GeminiVariationService {
               metadata: {
                 breed: targetBreed,
                 coat: validCoat,
+                format: originalFormat, // Inherit original format for breed variations
                 variation_type: 'breed',
                 breed_id: targetBreed.id,
                 coat_id: validCoat.id,
+                format_id: originalFormat?.id || null,
                 gemini_prompt: variationPrompt
               }
             };

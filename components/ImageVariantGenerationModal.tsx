@@ -433,6 +433,7 @@ export default function ImageVariantGenerationModal({
           currentBreed: image.breed_id || '',
           currentTheme: image.theme_id || '',
           currentStyle: image.style_id || '',
+          currentFormat: image.format_id || '', // Pass original format for inheritance
           variationConfig: {
             breeds: selectedBreeds,
             coats: selectedCoats,
