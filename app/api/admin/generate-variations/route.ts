@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     });
 
     const body = await request.json();
-    const { originalImageData, originalPrompt, currentBreed, currentTheme, currentStyle, currentFormat, variationConfig } = body;
+    const { originalImageData, originalPrompt, currentBreed, currentCoat, currentTheme, currentStyle, currentFormat, variationConfig } = body;
 
     if (!originalImageData || !originalPrompt) {
       return NextResponse.json({ error: 'Missing required data' }, { status: 400 });
@@ -163,13 +163,19 @@ export async function POST(request: NextRequest) {
         variationConfig.outfits.includes(outfit.id)
       );
       
+      // Get original breed and coat data for inheritance
+      const originalBreedData = breedsData.find((breed: any) => breed.id === currentBreed);
+      const originalCoatData = coatsData.find((coat: any) => coat.id === currentCoat);
+      
       const outfitVariations = await geminiService.generateOutfitVariations(
         originalImageData,
         originalPrompt,
         targetOutfits,
         currentThemeData,
         currentStyleData,
-        originalFormatData
+        originalFormatData,
+        originalBreedData,
+        originalCoatData
       );
       
       results.push(...outfitVariations);
@@ -181,12 +187,18 @@ export async function POST(request: NextRequest) {
         variationConfig.formats.includes(format.id)
       );
       
+      // Get original breed and coat data for inheritance
+      const originalBreedData = breedsData.find((breed: any) => breed.id === currentBreed);
+      const originalCoatData = coatsData.find((coat: any) => coat.id === currentCoat);
+      
       const formatVariations = await geminiService.generateFormatVariations(
         originalImageData,
         originalPrompt,
         targetFormats,
         currentThemeData,
-        currentStyleData
+        currentStyleData,
+        originalBreedData,
+        originalCoatData
       );
       
       results.push(...formatVariations);

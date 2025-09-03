@@ -457,6 +457,7 @@ export default function ImageVariantGenerationModal({
           originalImageData: imageData64,
           originalPrompt: image.prompt_text,
           currentBreed: image.breed_id || '',
+          currentCoat: image.coat_id || '', // Pass original coat for inheritance
           currentTheme: image.theme_id || '',
           currentStyle: image.style_id || '',
           currentFormat: image.format_id || '', // Pass original format for inheritance
