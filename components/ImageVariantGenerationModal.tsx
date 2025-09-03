@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Wand2, RefreshCw, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Wand2, RefreshCw, X, Search } from 'lucide-react';
 import { SupabaseService } from '@/lib/supabase';
 import type { ImageCatalogWithDetails, Breed, Outfit, Format, BreedCoatDetail } from '@/lib/types';
 import { Textarea } from '@/components/ui/textarea';
@@ -270,7 +271,32 @@ export default function ImageVariantGenerationModal({
   const [selectedOutfits, setSelectedOutfits] = useState<string[]>([]);
   const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
   
+  // Search states for filtering
+  const [breedSearch, setBreedSearch] = useState('');
+  const [coatSearch, setCoatSearch] = useState('');
+  const [outfitSearch, setOutfitSearch] = useState('');
+  const [formatSearch, setFormatSearch] = useState('');
+  
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Filtered arrays based on search
+  const filteredBreeds = breeds.filter(breed => 
+    breed.id !== image?.breed_id && 
+    breed.name.toLowerCase().includes(breedSearch.toLowerCase())
+  );
+  
+  const filteredCoats = availableCoats.filter(coat =>
+    coat.coat_name.toLowerCase().includes(coatSearch.toLowerCase())
+  );
+  
+  const filteredOutfits = outfits.filter(outfit =>
+    outfit.name.toLowerCase().includes(outfitSearch.toLowerCase()) ||
+    (outfit.clothing_description && outfit.clothing_description.toLowerCase().includes(outfitSearch.toLowerCase()))
+  );
+  
+  const filteredFormats = formats.filter(format =>
+    format.name.toLowerCase().includes(formatSearch.toLowerCase())
+  );
   const [generatedVariations, setGeneratedVariations] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [isSavingToCategory, setIsSavingToCategory] = useState(false);
@@ -755,7 +781,7 @@ export default function ImageVariantGenerationModal({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const availableBreedIds = breeds.filter(breed => breed.id !== image.breed_id).map(breed => breed.id);
+                    const availableBreedIds = filteredBreeds.map(breed => breed.id);
                     const allSelected = availableBreedIds.every(id => selectedBreeds.includes(id));
                     if (allSelected) {
                       setSelectedBreeds([]);
@@ -764,11 +790,23 @@ export default function ImageVariantGenerationModal({
                     }
                   }}
                 >
-                  {breeds.filter(breed => breed.id !== image.breed_id).every(breed => selectedBreeds.includes(breed.id)) ? 'Deselect All' : 'Select All'}
+                  {filteredBreeds.every(breed => selectedBreeds.includes(breed.id)) ? 'Deselect All' : 'Select All'}
                 </Button>
               </div>
+              
+              {/* Breed Search */}
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Search breeds..."
+                  value={breedSearch}
+                  onChange={(e) => setBreedSearch(e.target.value)}
+                  className="pl-10 text-sm"
+                />
+              </div>
+              
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-32 overflow-y-auto">
-                {breeds.filter(breed => breed.id !== image.breed_id).map(breed => (
+                {filteredBreeds.map(breed => (
                   <div key={breed.id} className="flex items-center space-x-2 p-2 border rounded-lg">
                     <Checkbox
                       id={`breed-${breed.id}`}
@@ -792,7 +830,7 @@ export default function ImageVariantGenerationModal({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      const allCoatIds = availableCoats.map(coat => coat.id);
+                      const allCoatIds = filteredCoats.map(coat => coat.id);
                       const allSelected = allCoatIds.every(id => selectedCoats.includes(id));
                       if (allSelected) {
                         setSelectedCoats([]);
@@ -801,11 +839,23 @@ export default function ImageVariantGenerationModal({
                       }
                     }}
                   >
-                    {availableCoats.every(coat => selectedCoats.includes(coat.id)) ? 'Deselect All' : 'Select All'}
+                    {filteredCoats.every(coat => selectedCoats.includes(coat.id)) ? 'Deselect All' : 'Select All'}
                   </Button>
                 </div>
+                
+                {/* Coat Search */}
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder="Search coat colors..."
+                    value={coatSearch}
+                    onChange={(e) => setCoatSearch(e.target.value)}
+                    className="pl-10 text-sm"
+                  />
+                </div>
+                
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-32 overflow-y-auto">
-                  {availableCoats.map(coat => (
+                  {filteredCoats.map(coat => (
                     <div key={coat.id} className="flex items-center space-x-2 p-2 border rounded-lg">
                       <Checkbox
                         id={`coat-${coat.id}`}
@@ -835,7 +885,7 @@ export default function ImageVariantGenerationModal({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const allOutfitIds = outfits.map(outfit => outfit.id);
+                    const allOutfitIds = filteredOutfits.map(outfit => outfit.id);
                     const allSelected = allOutfitIds.every(id => selectedOutfits.includes(id));
                     if (allSelected) {
                       setSelectedOutfits([]);
@@ -844,11 +894,23 @@ export default function ImageVariantGenerationModal({
                     }
                   }}
                 >
-                  {outfits.every(outfit => selectedOutfits.includes(outfit.id)) ? 'Deselect All' : 'Select All'}
+                  {filteredOutfits.every(outfit => selectedOutfits.includes(outfit.id)) ? 'Deselect All' : 'Select All'}
                 </Button>
               </div>
+              
+              {/* Outfit Search */}
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Search outfits (e.g. pyjamas)..."
+                  value={outfitSearch}
+                  onChange={(e) => setOutfitSearch(e.target.value)}
+                  className="pl-10 text-sm"
+                />
+              </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                {outfits.map(outfit => (
+                {filteredOutfits.map(outfit => (
                   <div key={outfit.id} className="flex items-center space-x-2 p-2 border rounded-lg">
                     <Checkbox
                       id={`outfit-${outfit.id}`}
@@ -876,7 +938,7 @@ export default function ImageVariantGenerationModal({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const allFormatIds = formats.map(format => format.id);
+                    const allFormatIds = filteredFormats.map(format => format.id);
                     const allSelected = allFormatIds.every(id => selectedFormats.includes(id));
                     if (allSelected) {
                       setSelectedFormats([]);
@@ -885,11 +947,23 @@ export default function ImageVariantGenerationModal({
                     }
                   }}
                 >
-                  {formats.every(format => selectedFormats.includes(format.id)) ? 'Deselect All' : 'Select All'}
+                  {filteredFormats.every(format => selectedFormats.includes(format.id)) ? 'Deselect All' : 'Select All'}
                 </Button>
               </div>
+              
+              {/* Format Search */}
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Search formats..."
+                  value={formatSearch}
+                  onChange={(e) => setFormatSearch(e.target.value)}
+                  className="pl-10 text-sm"
+                />
+              </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                {formats.map(format => (
+                {filteredFormats.map(format => (
                   <div key={format.id} className="flex items-center space-x-2 p-2 border rounded-lg">
                     <Checkbox
                       id={`format-${format.id}`}
