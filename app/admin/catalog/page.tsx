@@ -61,10 +61,10 @@ export default function AdminCatalogPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Reset page when filters change
+  // Reset page when filters change (but not when page size changes)
   useEffect(() => {
     setPage(1);
-  }, [animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, visibleOnly, visibilityFilter, ratingFilter, debouncedSearchTerm, pageSize]);
+  }, [animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, visibleOnly, visibilityFilter, ratingFilter, debouncedSearchTerm]);
 
   useEffect(() => {
     loadImages();

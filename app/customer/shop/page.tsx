@@ -188,7 +188,7 @@ export default function CustomerShopPage() {
     if (!isInitialLoad) {
       updateUrlWithFilters();
     }
-  }, [animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm, pageSize, isInitialLoad]);
+  }, [animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm, isInitialLoad]);
 
   // Reset breed and coat when animal type changes
   useEffect(() => {
