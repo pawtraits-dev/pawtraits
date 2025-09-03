@@ -19,6 +19,7 @@ import { useServerCart } from '@/lib/server-cart-context';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
+import StickyFilterHeader from '@/components/StickyFilterHeader';
 
 interface GalleryImage {
   id: string;
@@ -589,109 +590,114 @@ export default function MyPawtraitsGallery() {
   const purchasedImages = getImagesByType('purchased');
   const basketImages = getImagesByType('in_basket');
 
+  // Configure sticky header filters - simpler for gallery
+  const stickyHeaderFilters: any[] = []; // No filters needed for gallery, just search
+
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Pawtraits Gallery</h1>
-        <p className="text-gray-600">
-          Your personal collection of loved, shared, and purchased Pawtraits
-        </p>
-      </div>
-
-      {/* Search */}
-      <div className="mb-6">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            placeholder="Search your gallery..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
+      {/* Sticky Filter Header */}
+      <StickyFilterHeader
+        searchTerm={searchQuery}
+        onSearchTermChange={setSearchQuery}
+        onSearchSubmit={() => {}} // Simple search, no URL updates needed
+        searchPlaceholder="Search your gallery..."
+        filters={stickyHeaderFilters}
+        onClearFilters={() => {
+          setSearchQuery('');
+        }}
+      />
+      
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">My Pawtraits Gallery</h1>
+          <p className="text-gray-600">
+            Your personal collection of loved, shared, and purchased Pawtraits
+          </p>
         </div>
-      </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="all" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="all">
-            All ({filteredImages.length})
-          </TabsTrigger>
-          <TabsTrigger value="liked">
-            Liked ({likedImages.length})
-          </TabsTrigger>
-          <TabsTrigger value="shared">
-            Shared ({sharedImages.length})
-          </TabsTrigger>
-          <TabsTrigger value="in_basket">
-            In Basket ({basketImages.length})
-          </TabsTrigger>
-          <TabsTrigger value="purchased">
-            Purchased ({purchasedImages.length})
-          </TabsTrigger>
-        </TabsList>
+        {/* Tabs */}
+        <Tabs defaultValue="all" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="all">
+              All ({filteredImages.length})
+            </TabsTrigger>
+            <TabsTrigger value="liked">
+              Liked ({likedImages.length})
+            </TabsTrigger>
+            <TabsTrigger value="shared">
+              Shared ({sharedImages.length})
+            </TabsTrigger>
+            <TabsTrigger value="in_basket">
+              In Basket ({basketImages.length})
+            </TabsTrigger>
+            <TabsTrigger value="purchased">
+              Purchased ({purchasedImages.length})
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="all" className="space-y-6">
-          {filteredImages.length === 0 ? (
-            <EmptyState type="all" />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredImages.map((image) => (
-                <ImageCard key={image.id} image={image} />
-              ))}
-            </div>
-          )}
-        </TabsContent>
+            <TabsContent value="all" className="space-y-6">
+            {filteredImages.length === 0 ? (
+              <EmptyState type="all" />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {filteredImages.map((image) => (
+                  <ImageCard key={image.id} image={image} />
+                ))}
+              </div>
+            )}
+            </TabsContent>
 
-        <TabsContent value="in_basket" className="space-y-6">
+          <TabsContent value="in_basket" className="space-y-6">
           {basketImages.length === 0 ? (
             <EmptyState type="in_basket" />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {basketImages.map((image) => (
                 <ImageCard key={image.id} image={image} />
               ))}
             </div>
           )}
-        </TabsContent>
+          </TabsContent>
 
-        <TabsContent value="purchased" className="space-y-6">
+          <TabsContent value="purchased" className="space-y-6">
           {purchasedImages.length === 0 ? (
             <EmptyState type="purchased" />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {purchasedImages.map((image) => (
                 <ImageCard key={image.id} image={image} />
               ))}
             </div>
           )}
-        </TabsContent>
+          </TabsContent>
 
-        <TabsContent value="liked" className="space-y-6">
+          <TabsContent value="liked" className="space-y-6">
           {likedImages.length === 0 ? (
             <EmptyState type="liked" />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {likedImages.map((image) => (
                 <ImageCard key={image.id} image={image} />
               ))}
             </div>
           )}
-        </TabsContent>
+          </TabsContent>
 
-        <TabsContent value="shared" className="space-y-6">
+          <TabsContent value="shared" className="space-y-6">
           {sharedImages.length === 0 ? (
             <EmptyState type="shared" />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {sharedImages.map((image) => (
                 <ImageCard key={image.id} image={image} />
               ))}
             </div>
           )}
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+        </Tabs>
+
+      </div>
 
       {/* Product Selection Modal */}
       {selectedImage && (

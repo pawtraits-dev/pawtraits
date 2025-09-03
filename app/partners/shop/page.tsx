@@ -23,6 +23,7 @@ import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import { extractDescriptionTitle } from '@/lib/utils';
+import StickyFilterHeader from '@/components/StickyFilterHeader';
 
 export const dynamic = 'force-dynamic';
 
@@ -443,8 +444,57 @@ export default function PartnerShopPage() {
     );
   }
 
+  // Configure sticky header filters
+  const stickyHeaderFilters = [
+    {
+      value: animalType,
+      onChange: setAnimalType,
+      options: [
+        { value: 'dog', label: '🐕 Dogs' },
+        { value: 'cat', label: '🐱 Cats' }
+      ],
+      placeholder: 'All Animals'
+    },
+    {
+      value: selectedBreed,
+      onChange: setSelectedBreed,
+      options: filteredBreeds.map(breed => ({ value: breed.id, label: breed.name })),
+      placeholder: 'All Breeds'
+    },
+    {
+      value: selectedCoat,
+      onChange: setSelectedCoat,
+      options: filteredCoats.map(coat => ({ value: coat.id, label: coat.name })),
+      placeholder: 'All Coats'
+    },
+    {
+      value: selectedTheme,
+      onChange: setSelectedTheme,
+      options: themes.map(theme => ({ value: theme.id, label: theme.name })),
+      placeholder: 'All Themes'
+    }
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 p-8">
+      {/* Sticky Filter Header */}
+      <StickyFilterHeader
+        searchTerm={searchTerm}
+        onSearchTermChange={setSearchTerm}
+        onSearchSubmit={loadImages}
+        searchPlaceholder="Search images, tags, descriptions..."
+        filters={stickyHeaderFilters}
+        onClearFilters={() => {
+          setSearchTerm('');
+          setAnimalType('');
+          setSelectedBreed('');
+          setSelectedCoat('');
+          setSelectedTheme('');
+          setFeaturedOnly(false);
+          loadImages();
+        }}
+      />
+      
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
@@ -470,94 +520,6 @@ export default function PartnerShopPage() {
           <CartIcon />
         </div>
 
-        {/* Filters */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Search images, tags, descriptions..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* Filter Row */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <select
-                  value={animalType}
-                  onChange={(e) => setAnimalType(e.target.value as AnimalType | '')}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                >
-                  <option value="">All Animals</option>
-                  <option value="dog">🐕 Dogs</option>
-                  <option value="cat">🐱 Cats</option>
-                </select>
-
-                <select
-                  value={selectedBreed}
-                  onChange={(e) => setSelectedBreed(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                >
-                  <option value="">All Breeds</option>
-                  {filteredBreeds.map(breed => (
-                    <option key={breed.id} value={breed.id}>
-                      {breed.name}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={selectedCoat}
-                  onChange={(e) => setSelectedCoat(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                >
-                  <option value="">All Coats</option>
-                  {filteredCoats.map(coat => (
-                    <option key={coat.id} value={coat.id}>
-                      {coat.name}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={selectedTheme}
-                  onChange={(e) => setSelectedTheme(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                >
-                  <option value="">All Themes</option>
-                  {themes.map(theme => (
-                    <option key={theme.id} value={theme.id}>
-                      {theme.name}
-                    </option>
-                  ))}
-                </select>
-
-
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => {
-                    setSearchTerm('');
-                    setAnimalType('');
-                    setSelectedBreed('');
-                    setSelectedCoat('');
-                    setSelectedTheme('');
-                    setFeaturedOnly(false);
-                    loadImages();
-                  }}
-                  className="w-full"
-                >
-                  Clear Filters
-                </Button>
-              </div>
-
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Breed Description */}
         {showBreedDescription && selectedBreedData && (

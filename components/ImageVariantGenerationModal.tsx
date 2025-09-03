@@ -10,6 +10,7 @@ import { SupabaseService } from '@/lib/supabase';
 import type { ImageCatalogWithDetails, Breed, Outfit, Format, BreedCoatDetail } from '@/lib/types';
 import { Textarea } from '@/components/ui/textarea';
 import { Copy, ArrowLeft, CheckCircle, Brain } from 'lucide-react';
+import { uploadImagesDirectBatch } from '@/lib/cloudinary-client';
 
 interface ImageVariantGenerationModalProps {
   image: ImageCatalogWithDetails | null;
@@ -21,24 +22,28 @@ interface ImageVariantGenerationModalProps {
 interface VariationPreviewStepProps {
   image: ImageCatalogWithDetails;
   variations: any[];
-  onGenerateAIDescription: (variation: any) => void;
+  onGenerateAIDescriptions: (selectedIds: string[]) => void;
   onUpdateVariation: (updatedVariation: any) => void;
   onApproveAll: () => void;
   onApproveSelected: (selectedIds: string[]) => void;
   onBackToSelection: () => void;
+  onClose: () => void;
   isSaving: boolean;
+  isGeneratingDescriptions: boolean;
   saveResults: any[];
 }
 
 function VariationPreviewStep({
   image,
   variations,
-  onGenerateAIDescription,
+  onGenerateAIDescriptions,
   onUpdateVariation,
   onApproveAll,
   onApproveSelected,
   onBackToSelection,
+  onClose,
   isSaving,
+  isGeneratingDescriptions,
   saveResults
 }: VariationPreviewStepProps) {
   const [selectedVariations, setSelectedVariations] = useState<string[]>([]);
@@ -143,41 +148,32 @@ function VariationPreviewStep({
                   
                   {variation.aiDescription && (
                     <div className="mt-2">
+                      <label className="text-xs font-medium text-gray-700 block mb-1">
+                        AI Description (editable):
+                      </label>
                       <Textarea
                         value={variation.aiDescription}
-                        readOnly
+                        onChange={(e) => {
+                          const updatedVariation = { ...variation, aiDescription: e.target.value };
+                          onUpdateVariation(updatedVariation);
+                        }}
                         className="text-xs"
                         rows={3}
+                        placeholder="AI description will appear here..."
                       />
                     </div>
                   )}
                   
-                  {variation.gemini_prompt && (
+                  {(variation.gemini_prompt || variation.metadata?.gemini_prompt) && (
                     <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
                       <p className="font-medium text-blue-800 mb-1">Gemini Prompt (actual):</p>
                       <p className="text-blue-700 font-mono text-xs break-words">
-                        {variation.gemini_prompt}
+                        {variation.gemini_prompt || variation.metadata?.gemini_prompt}
                       </p>
                     </div>
                   )}
                   
-                  {variation.prompt && (
-                    <div className="mt-2 p-2 bg-green-50 rounded text-xs">
-                      <p className="font-medium text-green-800 mb-1">Midjourney Prompt (for catalog):</p>
-                      <p className="text-green-700 font-mono text-xs break-all">{variation.prompt}</p>
-                    </div>
-                  )}
-                  
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onGenerateAIDescription(variation)}
-                      className="text-xs"
-                    >
-                      <Brain className="w-3 h-3 mr-1" />
-                      AI Description
-                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -210,6 +206,23 @@ function VariationPreviewStep({
         </div>
         
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => onGenerateAIDescriptions(selectedVariations)}
+            disabled={selectedVariations.length === 0 || isGeneratingDescriptions || isSaving}
+          >
+            {isGeneratingDescriptions ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Brain className="w-4 h-4 mr-2" />
+                Generate AI Description ({selectedVariations.length})
+              </>
+            )}
+          </Button>
           <Button
             variant="outline"
             onClick={() => onApproveSelected(selectedVariations)}
@@ -261,6 +274,7 @@ export default function ImageVariantGenerationModal({
   const [generatedVariations, setGeneratedVariations] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [isSavingToCategory, setIsSavingToCategory] = useState(false);
+  const [isGeneratingDescriptions, setIsGeneratingDescriptions] = useState(false);
   const [saveResults, setSaveResults] = useState<any[]>([]);
 
   const supabaseService = new SupabaseService();
@@ -461,28 +475,54 @@ export default function ImageVariantGenerationModal({
     });
   };
 
-  const generateAIDescription = async (variation: any) => {
+  const generateAIDescriptions = async (selectedIds: string[]) => {
+    if (selectedIds.length === 0) return;
+    
+    setIsGeneratingDescriptions(true);
+    
     try {
-      const response = await fetch('/api/generate-description/base64', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageData: variation.imageData,
-          breedName: variation.breed_name || image?.breed_name || ''
-        })
+      // Generate descriptions for selected variations in parallel
+      const selectedVariations = generatedVariations.filter(v => selectedIds.includes(v.id));
+      
+      const descriptionPromises = selectedVariations.map(async (variation) => {
+        try {
+          const response = await fetch('/api/generate-description/base64', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageData: variation.imageData,
+              breedName: variation.breed_name || image?.breed_name || ''
+            })
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            return { ...variation, aiDescription: result.description };
+          } else {
+            console.error('AI description generation failed for variation:', variation.id);
+            return variation; // Return unchanged if failed
+          }
+        } catch (error) {
+          console.error('Error generating AI description for variation:', variation.id, error);
+          return variation; // Return unchanged if failed
+        }
       });
       
-      if (response.ok) {
-        const result = await response.json();
-        const updatedVariations = generatedVariations.map(v => 
-          v.id === variation.id ? { ...v, aiDescription: result.description } : v
-        );
-        setGeneratedVariations(updatedVariations);
-      } else {
-        console.error('AI description generation failed:', await response.text());
-      }
+      const updatedVariations = await Promise.all(descriptionPromises);
+      
+      // Update the full variations array with new descriptions
+      const newGeneratedVariations = generatedVariations.map(v => {
+        const updated = updatedVariations.find(uv => uv.id === v.id);
+        return updated || v;
+      });
+      
+      setGeneratedVariations(newGeneratedVariations);
+      
     } catch (error) {
-      console.error('Error generating AI description:', error);
+      console.error('Error generating AI descriptions:', error);
+      alert(`Failed to generate AI descriptions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsGeneratingDescriptions(false);
     }
   };
 
@@ -517,23 +557,109 @@ export default function ImageVariantGenerationModal({
     setSaveResults([]);
 
     try {
-      const response = await fetch('/api/admin/save-variations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ variations })
+      // First, convert base64 data to File objects for Cloudinary upload
+      const filesToUpload = variations.map(variation => {
+        const imageBuffer = Buffer.from(variation.imageData, 'base64');
+        const file = new File([imageBuffer], variation.filename, { type: 'image/png' });
+        return file;
       });
 
-      if (response.ok) {
-        const results = await response.json();
-        setSaveResults(results);
-        
-        if (onVariationsGenerated) {
-          onVariationsGenerated();
+      console.log(`Uploading ${filesToUpload.length} variations to Cloudinary...`);
+
+      // Upload to Cloudinary using the same method as admin generate
+      const cloudinaryResults = await uploadImagesDirectBatch(
+        filesToUpload,
+        {
+          tags: ['variation', 'gemini-generated', 'admin-upload'].filter(Boolean)
+        },
+        (uploaded, total, current) => {
+          console.log(`📤 Variation upload progress: ${uploaded}/${total} - ${current}`);
         }
-      } else {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error);
+      );
+
+      console.log('✅ All variations uploaded to Cloudinary successfully');
+
+      // Now save metadata to database for each uploaded variation
+      const results = [];
+      for (let i = 0; i < cloudinaryResults.length; i++) {
+        const cloudinaryResult = cloudinaryResults[i];
+        const variation = variations[i];
+        
+        try {
+          console.log(`💾 Saving metadata for variation ${i + 1}/${variations.length}: ${variation.filename}`);
+          
+          const response = await fetch('/api/images/cloudinary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cloudinary_public_id: cloudinaryResult.public_id,
+              cloudinary_secure_url: cloudinaryResult.secure_url,
+              cloudinary_signature: cloudinaryResult.signature,
+              original_filename: variation.filename,
+              file_size: cloudinaryResult.bytes,
+              mime_type: 'image/png',
+              width: cloudinaryResult.width,
+              height: cloudinaryResult.height,
+              prompt_text: variation.prompt,
+              description: variation.description || `Generated variation: ${variation.variation_type}`,
+              tags: variation.metadata?.tags || ['variation', 'gemini-generated'],
+              breed_id: variation.metadata?.breed_id || undefined,
+              theme_id: variation.theme_id || undefined,
+              style_id: variation.style_id || undefined,
+              format_id: variation.metadata?.format_id || undefined,
+              coat_id: variation.metadata?.coat_id || undefined,
+              rating: variation.rating || 4,
+              is_featured: variation.is_featured || false,
+              is_public: variation.is_public !== false
+            })
+          });
+          
+          if (response.ok) {
+            const dbResult = await response.json();
+            results.push({
+              success: true,
+              variation_type: variation.variation_type,
+              breed_name: variation.breed_name,
+              coat_name: variation.coat_name,
+              outfit_name: variation.outfit_name,
+              format_name: variation.format_name,
+              cloudinary_url: cloudinaryResult.secure_url,
+              database_id: dbResult.id
+            });
+            console.log(`✅ Variation ${i + 1} saved successfully: ID ${dbResult.id}`);
+          } else {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            results.push({
+              success: false,
+              error: `Database save failed: ${errorData.error}`,
+              variation_type: variation.variation_type
+            });
+            console.error(`❌ Database save failed for variation ${i + 1}:`, errorData.error);
+          }
+        } catch (variationError) {
+          results.push({
+            success: false,
+            error: `Save error: ${variationError instanceof Error ? variationError.message : 'Unknown error'}`,
+            variation_type: variation.variation_type
+          });
+          console.error(`❌ Error saving variation ${i + 1}:`, variationError);
+        }
       }
+
+      setSaveResults(results);
+      
+      // Close modal after successful save (after a brief delay to show results)
+      const successfulSaves = results.filter(r => r.success).length;
+      if (successfulSaves > 0) {
+        setTimeout(() => {
+          onClose();
+        }, 2000); // 2 second delay to show success message
+      }
+      
+      if (onVariationsGenerated) {
+        onVariationsGenerated();
+      }
+      
     } catch (error) {
       console.error('Error saving variations:', error);
       alert(`Failed to save variations: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -573,7 +699,7 @@ export default function ImageVariantGenerationModal({
           <VariationPreviewStep 
             image={image}
             variations={generatedVariations}
-            onGenerateAIDescription={generateAIDescription}
+            onGenerateAIDescriptions={generateAIDescriptions}
             onUpdateVariation={(updatedVariation) => {
               const updatedVariations = generatedVariations.map(v => 
                 v.id === updatedVariation.id ? updatedVariation : v
@@ -583,7 +709,9 @@ export default function ImageVariantGenerationModal({
             onApproveAll={handleApproveAll}
             onApproveSelected={handleApproveSelected}
             onBackToSelection={handleBackToSelection}
+            onClose={onClose}
             isSaving={isSavingToCategory}
+            isGeneratingDescriptions={isGeneratingDescriptions}
             saveResults={saveResults}
           />
         ) : (

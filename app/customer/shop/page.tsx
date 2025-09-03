@@ -24,6 +24,7 @@ import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
+import StickyFilterHeader from '@/components/StickyFilterHeader';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,8 +56,6 @@ export default function CustomerShopPage() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImage, setModalImage] = useState<ImageCatalogWithDetails | null>(null);
-  const [isScrolling, setIsScrolling] = useState(false);
-  const [scrollHistory, setScrollHistory] = useState<{position: number, timestamp: number}[]>([]);
 
   const supabaseService = new SupabaseService();
   const { addToCart } = useServerCart();
@@ -76,367 +75,6 @@ export default function CustomerShopPage() {
     initializeData();
   }, []);
 
-  // Smooth scroll to row functionality
-  useEffect(() => {
-    let scrollTimeout: NodeJS.Timeout;
-    let lastScrollTime = 0;
-    
-    const handleScroll = () => {
-      if (isScrolling) return;
-      
-      const now = Date.now();
-      const currentPosition = window.scrollY;
-      
-      // Track scroll history for velocity calculation
-      setScrollHistory(prev => {
-        const newHistory = [...prev, { position: currentPosition, timestamp: now }];
-        // Keep only last 10 entries and entries from last 200ms
-        const filtered = newHistory
-          .filter(entry => now - entry.timestamp <= 200)
-          .slice(-10);
-        return filtered;
-      });
-      
-      // Clear existing timeout
-      if (scrollTimeout) {
-        clearTimeout(scrollTimeout);
-      }
-      
-      // Check if scroll is slowing down instead of completely stopped
-      scrollTimeout = setTimeout(() => {
-        // Get fresh scroll history at timeout execution
-        setScrollHistory(currentHistory => {
-          if (currentHistory.length < 2) {
-            snapToNearestRow();
-            return currentHistory;
-          }
-          
-          // Calculate current scroll velocity
-          const recent = currentHistory.slice(-3); // Last 3 entries
-          if (recent.length < 2) {
-            snapToNearestRow();
-            return currentHistory;
-          }
-          
-          const velocities = [];
-          for (let i = 1; i < recent.length; i++) {
-            const deltaPos = recent[i].position - recent[i-1].position;
-            const deltaTime = recent[i].timestamp - recent[i-1].timestamp;
-            if (deltaTime > 0) {
-              velocities.push(Math.abs(deltaPos / deltaTime));
-            }
-          }
-          
-          if (velocities.length === 0) {
-            snapToNearestRow();
-            return currentHistory;
-          }
-          
-          const avgVelocity = velocities.reduce((sum, v) => sum + v, 0) / velocities.length;
-          const scrollDirection = recent[recent.length - 1].position > recent[0].position ? 1 : -1;
-          
-          // If velocity is low enough (scroll is slowing down), initiate smooth continuation
-          if (avgVelocity < 2.0) { // pixels per ms - adjust threshold as needed
-            smoothContinueToRow(avgVelocity, scrollDirection);
-          }
-          
-          return currentHistory;
-        });
-      }, 50); // Check every 50ms instead of waiting for complete stop
-      
-      lastScrollTime = now;
-    };
-
-    const smoothContinueToRow = (currentVelocity: number, direction: number) => {
-      const imageCards = document.querySelectorAll('[data-image-card]');
-      if (imageCards.length === 0) return;
-
-      const scrollTop = window.scrollY;
-      const viewportHeight = window.innerHeight;
-      
-      // Look for cards that are partially visible in the viewport
-      const visibleCards = Array.from(imageCards).filter((card) => {
-        const rect = card.getBoundingClientRect();
-        return rect.top < viewportHeight && rect.bottom > 0;
-      });
-
-      if (visibleCards.length === 0) return;
-
-      // Group cards by rows
-      const rows: Element[][] = [];
-      const tolerance = 20;
-
-      visibleCards.forEach((card) => {
-        const rect = card.getBoundingClientRect();
-        const cardTop = rect.top + scrollTop;
-        
-        let foundRow = false;
-        for (const row of rows) {
-          const firstCardInRow = row[0];
-          const firstCardRect = firstCardInRow.getBoundingClientRect();
-          const firstCardTop = firstCardRect.top + scrollTop;
-          
-          if (Math.abs(cardTop - firstCardTop) <= tolerance) {
-            row.push(card);
-            foundRow = true;
-            break;
-          }
-        }
-        
-        if (!foundRow) {
-          rows.push([card]);
-        }
-      });
-
-      // Find the next row in the scroll direction
-      let targetRow: Element[] | null = null;
-      const currentScrollCenter = scrollTop + viewportHeight / 2;
-
-      // Sort rows by position
-      const sortedRows = rows.sort((a, b) => {
-        const aTop = a[0].getBoundingClientRect().top + scrollTop;
-        const bTop = b[0].getBoundingClientRect().top + scrollTop;
-        return aTop - bTop;
-      });
-
-      // Find the target row based on direction
-      if (direction > 0) {
-        // Scrolling down - find next row below current center
-        targetRow = sortedRows.find(row => {
-          const rowTop = row[0].getBoundingClientRect().top + scrollTop;
-          return rowTop > currentScrollCenter;
-        }) || null;
-      } else {
-        // Scrolling up - find next row above current center
-        const reverseRows = [...sortedRows].reverse();
-        targetRow = reverseRows.find(row => {
-          const rowTop = row[0].getBoundingClientRect().top + scrollTop;
-          return rowTop < currentScrollCenter;
-        }) || null;
-      }
-
-      if (targetRow && targetRow.length > 0) {
-        setIsScrolling(true);
-        
-        const targetCard = targetRow[0];
-        const targetRect = targetCard.getBoundingClientRect();
-        const targetTop = targetRect.top + scrollTop;
-        
-        // Calculate gap and buffer
-        let rowGap = 24;
-        const otherRows = rows.filter(row => row !== targetRow);
-        if (otherRows.length > 0) {
-          let closestRowTop = null;
-          let minDistance = Infinity;
-          
-          otherRows.forEach(row => {
-            const firstCard = row[0];
-            const rect = firstCard.getBoundingClientRect();
-            const rowTop = rect.top + scrollTop;
-            const distance = Math.abs(rowTop - targetTop);
-            
-            if (distance > 0 && distance < minDistance) {
-              minDistance = distance;
-              closestRowTop = rowTop;
-            }
-          });
-          
-          if (closestRowTop !== null) {
-            const cardHeight = targetRect.height;
-            if (closestRowTop > targetTop) {
-              rowGap = closestRowTop - (targetTop + cardHeight);
-            } else {
-              rowGap = targetTop - (closestRowTop + cardHeight);
-            }
-            rowGap = Math.max(16, Math.min(rowGap, 64));
-          }
-        }
-        
-        const buffer = Math.round(rowGap / 2);
-        const targetScrollTop = targetTop - buffer;
-        const currentScrollTop = window.scrollY;
-        const distance = Math.abs(targetScrollTop - currentScrollTop);
-        
-        // Calculate duration based on current velocity and distance
-        // Slower for short distances, respecting the current scroll momentum
-        const baseVelocity = Math.max(currentVelocity, 0.5); // Minimum velocity
-        const duration = Math.min(Math.max(distance / (baseVelocity * 2), 300), 1200); // 300ms to 1200ms
-        
-        // Use smooth scroll with calculated duration
-        const startTime = Date.now();
-        const startPosition = currentScrollTop;
-        const scrollDistance = targetScrollTop - startPosition;
-        
-        const animateScroll = () => {
-          const elapsed = Date.now() - startTime;
-          const progress = Math.min(elapsed / duration, 1);
-          
-          // Easing function for smooth deceleration
-          const easeOut = 1 - Math.pow(1 - progress, 3);
-          const currentPosition = startPosition + (scrollDistance * easeOut);
-          
-          window.scrollTo(0, currentPosition);
-          
-          if (progress < 1) {
-            requestAnimationFrame(animateScroll);
-          } else {
-            setIsScrolling(false);
-            setScrollHistory([]); // Clear history after animation
-          }
-        };
-        
-        requestAnimationFrame(animateScroll);
-      }
-    };
-
-    const snapToNearestRow = () => {
-      const imageCards = document.querySelectorAll('[data-image-card]');
-      if (imageCards.length === 0) return;
-
-      const viewportHeight = window.innerHeight;
-      const scrollTop = window.scrollY;
-      
-      // Look for cards that are partially visible in the viewport
-      const visibleCards = Array.from(imageCards).filter((card) => {
-        const rect = card.getBoundingClientRect();
-        return rect.top < viewportHeight && rect.bottom > 0;
-      });
-
-      if (visibleCards.length === 0) return;
-
-      // Group cards by rows (cards with similar top positions)
-      const rows: Element[][] = [];
-      const tolerance = 20; // pixels tolerance for grouping cards in same row
-
-      visibleCards.forEach((card) => {
-        const rect = card.getBoundingClientRect();
-        const cardTop = rect.top + scrollTop;
-        
-        // Find existing row with similar top position
-        let foundRow = false;
-        for (const row of rows) {
-          const firstCardInRow = row[0];
-          const firstCardRect = firstCardInRow.getBoundingClientRect();
-          const firstCardTop = firstCardRect.top + scrollTop;
-          
-          if (Math.abs(cardTop - firstCardTop) <= tolerance) {
-            row.push(card);
-            foundRow = true;
-            break;
-          }
-        }
-        
-        // Create new row if no matching row found
-        if (!foundRow) {
-          rows.push([card]);
-        }
-      });
-
-      // Find the row that's closest to center of viewport
-      let targetRow: Element[] | null = null;
-      let closestDistance = Infinity;
-      const viewportCenter = scrollTop + viewportHeight / 2;
-
-      rows.forEach((row) => {
-        const firstCard = row[0];
-        const rect = firstCard.getBoundingClientRect();
-        const rowTop = rect.top + scrollTop;
-        const rowBottom = rowTop + rect.height;
-        const rowCenter = (rowTop + rowBottom) / 2;
-        const distance = Math.abs(rowCenter - viewportCenter);
-
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          targetRow = row;
-        }
-      });
-
-      // Scroll to the target row
-      if (targetRow && targetRow.length > 0) {
-        setIsScrolling(true);
-        
-        // Sort cards in row by horizontal position and pick the leftmost
-        const sortedRow = targetRow.sort((a, b) => {
-          const aRect = a.getBoundingClientRect();
-          const bRect = b.getBoundingClientRect();
-          return aRect.left - bRect.left;
-        });
-
-        const targetCard = sortedRow[0];
-        
-        // Calculate the gap between rows to determine buffer
-        let rowGap = 24; // Default fallback gap (6 * 4px = 24px from gap-6 class)
-        
-        // Try to calculate actual gap by finding the next row
-        const targetRect = targetCard.getBoundingClientRect();
-        const targetTop = targetRect.top + scrollTop;
-        
-        // Find the next row to calculate gap
-        const otherRows = rows.filter(row => row !== targetRow);
-        if (otherRows.length > 0) {
-          let nextRowTop = null;
-          let minDistance = Infinity;
-          
-          otherRows.forEach(row => {
-            const firstCard = row[0];
-            const rect = firstCard.getBoundingClientRect();
-            const rowTop = rect.top + scrollTop;
-            const distance = Math.abs(rowTop - targetTop);
-            
-            // Find closest row (either above or below)
-            if (distance > 0 && distance < minDistance) {
-              minDistance = distance;
-              nextRowTop = rowTop;
-            }
-          });
-          
-          // Calculate gap if we found another row
-          if (nextRowTop !== null) {
-            const cardHeight = targetRect.height;
-            if (nextRowTop > targetTop) {
-              // Next row is below - gap = nextRowTop - (targetTop + cardHeight)
-              rowGap = nextRowTop - (targetTop + cardHeight);
-            } else {
-              // Next row is above - gap = targetTop - (nextRowTop + cardHeight)  
-              // Estimate card height for the other row (assume similar height)
-              rowGap = targetTop - (nextRowTop + cardHeight);
-            }
-            
-            // Ensure reasonable gap bounds
-            rowGap = Math.max(16, Math.min(rowGap, 64));
-          }
-        }
-        
-        // Calculate buffer as half the gap
-        const buffer = Math.round(rowGap / 2);
-        
-        // Calculate target scroll position with buffer
-        const targetScrollTop = targetTop - buffer;
-        
-        // Smooth scroll to calculated position
-        window.scrollTo({
-          top: targetScrollTop,
-          behavior: 'smooth'
-        });
-
-        // Reset scrolling flag after animation completes
-        setTimeout(() => {
-          setIsScrolling(false);
-        }, 800);
-      }
-    };
-
-    // Add scroll event listener with passive option for better performance
-    window.addEventListener('scroll', handleScroll, { passive: true });
-
-    // Cleanup
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      if (scrollTimeout) {
-        clearTimeout(scrollTimeout);
-      }
-    };
-  }, [isScrolling]);
 
   // Watch for URL parameter changes and update filters accordingly
   useEffect(() => {
@@ -825,103 +463,60 @@ export default function CustomerShopPage() {
     );
   }
 
+  // Configure sticky header filters
+  const stickyHeaderFilters = [
+    {
+      value: animalType,
+      onChange: setAnimalType,
+      options: [
+        { value: 'dog', label: '🐕 Dogs' },
+        { value: 'cat', label: '🐱 Cats' }
+      ],
+      placeholder: 'All Animals'
+    },
+    {
+      value: selectedBreed,
+      onChange: setSelectedBreed,
+      options: filteredBreeds.map(breed => ({ value: breed.id, label: breed.name })),
+      placeholder: 'All Breeds'
+    },
+    {
+      value: selectedCoat,
+      onChange: setSelectedCoat,
+      options: filteredCoats.map(coat => ({ value: coat.id, label: coat.name })),
+      placeholder: 'All Coats'
+    },
+    {
+      value: selectedTheme,
+      onChange: setSelectedTheme,
+      options: themes.map(theme => ({ value: theme.id, label: theme.name })),
+      placeholder: 'All Themes'
+    }
+  ];
+
   return (
-    <div className={`min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8 ${isScrolling ? 'scroll-smooth' : ''}`}>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
+      {/* Sticky Filter Header */}
+      <StickyFilterHeader
+        searchTerm={searchTerm}
+        onSearchTermChange={setSearchTerm}
+        onSearchSubmit={loadImages}
+        searchPlaceholder="Search images, tags, descriptions..."
+        filters={stickyHeaderFilters}
+        onClearFilters={() => {
+          setSearchTerm('');
+          setAnimalType('');
+          setSelectedBreed('');
+          setSelectedCoat('');
+          setSelectedTheme('');
+          setFeaturedOnly(false);
+          loadImages();
+        }}
+      />
+      
       <div className="max-w-7xl mx-auto space-y-6">
         
 
-        {/* Filters */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Search images, tags, descriptions..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      loadImages();
-                    }
-                  }}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* Filter Row */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <select
-                  value={animalType}
-                  onChange={(e) => setAnimalType(e.target.value as AnimalType | '')}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-                >
-                  <option value="">All Animals</option>
-                  <option value="dog">🐕 Dogs</option>
-                  <option value="cat">🐱 Cats</option>
-                </select>
-
-                <select
-                  value={selectedBreed}
-                  onChange={(e) => setSelectedBreed(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-                >
-                  <option value="">All Breeds</option>
-                  {filteredBreeds.map(breed => (
-                    <option key={breed.id} value={breed.id}>
-                      {breed.name}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={selectedCoat}
-                  onChange={(e) => setSelectedCoat(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-                >
-                  <option value="">All Coats</option>
-                  {filteredCoats.map(coat => (
-                    <option key={coat.id} value={coat.id}>
-                      {coat.name}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={selectedTheme}
-                  onChange={(e) => setSelectedTheme(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-                >
-                  <option value="">All Themes</option>
-                  {themes.map(theme => (
-                    <option key={theme.id} value={theme.id}>
-                      {theme.name}
-                    </option>
-                  ))}
-                </select>
-
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => {
-                    setSearchTerm('');
-                    setAnimalType('');
-                    setSelectedBreed('');
-                    setSelectedCoat('');
-                    setSelectedTheme('');
-                    setFeaturedOnly(false);
-                    loadImages();
-                  }}
-                  className="w-full"
-                >
-                  Clear Filters
-                </Button>
-              </div>
-
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Breed Description */}
         {showBreedDescription && selectedBreedData && (
@@ -1112,7 +707,7 @@ export default function CustomerShopPage() {
             const isPortrait = image.aspect_ratio === '2:3' || image.aspect_ratio === '9:16';
             
             return (
-            <Card key={image.id} data-image-card className="group hover:shadow-lg transition-shadow overflow-hidden">
+            <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
               {/* Image Container - Different layouts based on aspect ratio */}
               {isSquare ? (
                 // Square images: Show full image with content below

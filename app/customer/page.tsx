@@ -1,669 +1,1136 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { 
-  ShoppingBag, 
-  Image, 
-  Heart, 
-  Package,
-  Plus,
-  Eye,
-  ShoppingCart,
-  Star,
-  TrendingUp,
-  Clock,
-  CheckCircle,
-  ArrowRight,
-  Sparkles,
-  Camera,
-  Palette,
-  PaintBucket,
-  Crown,
-  Gift,
-  Users,
-  Mail
-} from 'lucide-react';
-import Link from 'next/link';
+import { Search, Filter, Star, ShoppingCart, Heart, Share2, ShoppingBag } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { SupabaseService } from '@/lib/supabase';
+// Removed AdminSupabaseService - will use regular service with public access
+import type { ImageCatalogWithDetails, Breed, Theme, AnimalType, Coat } from '@/lib/types';
+import type { Product, ProductPricing } from '@/lib/product-types';
+import { formatPrice } from '@/lib/product-types';
+import ProductSelectionModal from '@/components/ProductSelectionModal';
+import CartIcon from '@/components/cart-icon';
 import { useServerCart } from '@/lib/server-cart-context';
+import UserInteractionsService from '@/lib/user-interactions';
+import ShareModal from '@/components/share-modal';
+import { useCountryPricing } from '@/lib/country-context';
 import { getSupabaseClient } from '@/lib/supabase-client';
+import ClickableMetadataTags from '@/components/clickable-metadata-tags';
+import { CatalogImage } from '@/components/CloudinaryImageDisplay';
+import ImageModal from '@/components/ImageModal';
+import { extractDescriptionTitle } from '@/lib/utils';
+import StickyFilterHeader from '@/components/StickyFilterHeader';
 
-interface CustomerStats {
-  totalOrders: number;
-  totalSpent: number;
-  favoriteImages: number;
-  totalPets: number;
-  recentOrders: any[];
-  recommendedImages: any[];
-}
+export const dynamic = 'force-dynamic';
 
-// Marketing Landing Page Component for Non-Logged In Users
-function CustomerMarketingPage() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-3">
-              <Sparkles className="w-8 h-8 text-purple-600" />
-              <span className="text-2xl font-bold text-gray-900">Pawtraits</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link href="/auth/login?redirect=/customer">
-                <Button variant="ghost">Sign In</Button>
-              </Link>
-              <Link href="/signup/user">
-                <Button className="bg-purple-600 hover:bg-purple-700">Get Started</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero Section */}
-      <section className="relative py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="mb-8">
-            <Badge className="bg-purple-100 text-purple-800 mb-4">
-              ✨ Transform Your Pet Photos with AI
-            </Badge>
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-              Turn Your Pet Into
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600"> Art</span>
-            </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              Create stunning, personalized portraits of your beloved pets using cutting-edge AI technology. 
-              Transform memories into beautiful artwork perfect for your home or as gifts.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/signup/user">
-                <Button size="lg" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-4 text-lg">
-                  <Camera className="w-5 h-5 mr-2" />
-                  Start Creating
-                </Button>
-              </Link>
-              <Link href="/customer/shop" className="sm:inline-block">
-                <Button size="lg" variant="outline" className="px-8 py-4 text-lg">
-                  <Eye className="w-5 h-5 mr-2" />
-                  View Gallery
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Choose Pawtraits?</h2>
-            <p className="text-xl text-gray-600">Discover what makes our AI pet portraits special</p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center p-8 rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Sparkles className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">AI-Powered Magic</h3>
-              <p className="text-gray-600">
-                Our advanced AI creates stunning, unique portraits that capture your pet's personality perfectly.
-              </p>
-            </div>
-            
-            <div className="text-center p-8 rounded-2xl bg-gradient-to-br from-purple-50 to-pink-50">
-              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Palette className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Multiple Styles</h3>
-              <p className="text-gray-600">
-                Choose from dozens of artistic styles - from classical paintings to modern digital art.
-              </p>
-            </div>
-            
-            <div className="text-center p-8 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50">
-              <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Crown className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Premium Quality</h3>
-              <p className="text-gray-600">
-                High-resolution artwork perfect for printing, framing, and sharing with friends and family.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-gray-50 to-blue-50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
-            <p className="text-xl text-gray-600">Get your pet portrait in three simple steps</p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-6 text-white text-2xl font-bold">
-                1
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Upload Photos</h3>
-              <p className="text-gray-600">
-                Sign up and upload high-quality photos of your pet. The more photos, the better the result!
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-6 text-white text-2xl font-bold">
-                2
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Choose Style</h3>
-              <p className="text-gray-600">
-                Browse our gallery and select your favorite artistic style and format for your portrait.
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-6 text-white text-2xl font-bold">
-                3
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Get Your Art</h3>
-              <p className="text-gray-600">
-                Receive your beautiful AI-generated portrait ready to download, print, or share!
-              </p>
-            </div>
-          </div>
-          
-          <div className="text-center mt-12">
-            <Link href="/signup/user">
-              <Button size="lg" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-12 py-4 text-lg">
-                <Gift className="w-5 h-5 mr-2" />
-                Create Your First Portrait
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Social Proof */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-white">
-        <div className="max-w-7xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">Join Thousands of Happy Pet Parents</h2>
-          <p className="text-xl text-gray-600 mb-12">See what our customers are saying about Pawtraits</p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-6 bg-gray-50 rounded-2xl">
-              <div className="flex items-center mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                ))}
-              </div>
-              <p className="text-gray-700 mb-4">
-                "Absolutely amazing! The portrait of my golden retriever looks like a masterpiece. 
-                Perfect for our living room!"
-              </p>
-              <p className="font-semibold text-gray-900">- Sarah M.</p>
-            </div>
-            
-            <div className="p-6 bg-gray-50 rounded-2xl">
-              <div className="flex items-center mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                ))}
-              </div>
-              <p className="text-gray-700 mb-4">
-                "The AI captured my cat's personality perfectly. The quality is incredible and 
-                the process was so easy!"
-              </p>
-              <p className="font-semibold text-gray-900">- Mike R.</p>
-            </div>
-            
-            <div className="p-6 bg-gray-50 rounded-2xl">
-              <div className="flex items-center mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                ))}
-              </div>
-              <p className="text-gray-700 mb-4">
-                "Made the perfect memorial portrait of our beloved dog. The team was so thoughtful 
-                and the result was beautiful."
-              </p>
-              <p className="font-semibold text-gray-900">- Jennifer L.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-purple-600 to-pink-600">
-        <div className="max-w-4xl mx-auto text-center text-white">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            Ready to Transform Your Pet Into Art?
-          </h2>
-          <p className="text-xl mb-8 opacity-90">
-            Join thousands of pet parents who have created beautiful memories with Pawtraits
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/signup/user">
-              <Button size="lg" className="bg-white text-purple-600 hover:bg-gray-100 px-12 py-4 text-lg font-semibold">
-                <Users className="w-5 h-5 mr-2" />
-                Sign Up Now
-              </Button>
-            </Link>
-            <Link href="mailto:hello@pawtraits.com">
-              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 px-12 py-4 text-lg">
-                <Mail className="w-5 h-5 mr-2" />
-                Contact Us
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-12 px-4 sm:px-6 lg:px-8 bg-gray-900 text-white">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="flex items-center justify-center space-x-3 mb-4">
-            <Sparkles className="w-8 h-8 text-purple-400" />
-            <span className="text-2xl font-bold">Pawtraits</span>
-          </div>
-          <p className="text-gray-400">
-            Transform your pet photos into beautiful artwork with AI
-          </p>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-export default function CustomerDashboard() {
-  const [stats, setStats] = useState<CustomerStats>({
-    totalOrders: 0,
-    totalSpent: 0,
-    favoriteImages: 0,
-    totalPets: 0,
-    recentOrders: [],
-    recommendedImages: []
-  });
+export default function CustomerHomePage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [images, setImages] = useState<ImageCatalogWithDetails[]>([]);
+  const [breeds, setBreeds] = useState<Breed[]>([]);
+  const [coats, setCoats] = useState<Coat[]>([]);
+  const [themes, setThemes] = useState<Theme[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [pricing, setPricing] = useState<ProductPricing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const { cart } = useServerCart();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [animalType, setAnimalType] = useState<AnimalType | ''>('');
+  const [selectedBreed, setSelectedBreed] = useState('');
+  const [selectedCoat, setSelectedCoat] = useState('');
+  const [selectedTheme, setSelectedTheme] = useState('');
+  const [featuredOnly, setFeaturedOnly] = useState(false);
+  const [page, setPage] = useState(1);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [selectedImage, setSelectedImage] = useState<ImageCatalogWithDetails | null>(null);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [likedImages, setLikedImages] = useState<Set<string>>(new Set());
+  const [sharedImages, setSharedImages] = useState<Set<string>>(new Set());
+  const [purchasedImages, setPurchasedImages] = useState<Set<string>>(new Set());
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [imageToShare, setImageToShare] = useState<ImageCatalogWithDetails | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [modalImage, setModalImage] = useState<ImageCatalogWithDetails | null>(null);
 
   const supabaseService = new SupabaseService();
+  const { addToCart } = useServerCart();
+  const { selectedCountry, selectedCountryData, getCountryPricing, getLowestPrice } = useCountryPricing();
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
-    checkAuthAndLoadStats();
+    const initializeData = async () => {
+      console.log('[INIT] Starting initialization...');
+      await loadData(); // Wait for products/pricing to load first
+      console.log('[INIT] loadData completed, loading user interactions...');
+      loadLikedImages();
+      loadSharedImages();
+      loadPurchasedImages();
+      console.log('[INIT] Initialization complete');
+    };
+    initializeData();
   }, []);
 
-  const checkAuthAndLoadStats = async () => {
+
+  // Watch for URL parameter changes and update filters accordingly
+  useEffect(() => {
+    if (!isInitialLoad) {
+      // Apply new filters from URL parameters when they change
+      applyFiltersFromUrl();
+    }
+  }, [searchParams, isInitialLoad]);
+
+  const applyFiltersFromUrl = () => {
+    const animalParam = searchParams.get('animal');
+    const breedParam = searchParams.get('breed');
+    const coatParam = searchParams.get('coat');
+    const themeParam = searchParams.get('theme');
+    const searchParam = searchParams.get('search');
+    const featuredParam = searchParams.get('featured');
+    
+    // Update filter states based on URL parameters
+    setAnimalType((animalParam as AnimalType) || '');
+    setSelectedBreed(breedParam || '');
+    setSelectedCoat(coatParam || '');
+    setSelectedTheme(themeParam || '');
+    setSearchTerm(searchParam || '');
+    setFeaturedOnly(featuredParam === 'true');
+  };
+
+  const loadInitialFilters = () => {
+    // Load filter values from URL parameters
+    const animalParam = searchParams.get('animal');
+    const breedParam = searchParams.get('breed');
+    const coatParam = searchParams.get('coat');
+    const themeParam = searchParams.get('theme');
+    const searchParam = searchParams.get('search');
+    const featuredParam = searchParams.get('featured');
+    
+    if (animalParam) setAnimalType(animalParam as AnimalType);
+    if (breedParam) setSelectedBreed(breedParam);
+    if (coatParam) setSelectedCoat(coatParam);
+    if (themeParam) setSelectedTheme(themeParam);
+    if (searchParam) setSearchTerm(searchParam);
+    if (featuredParam === 'true') setFeaturedOnly(true);
+    
+    // Mark initial load as complete
+    setIsInitialLoad(false);
+  };
+
+  const loadLikedImages = () => {
+    // Load liked images from localStorage
+    const likedImageIds = UserInteractionsService.getLikedImageIds();
+    setLikedImages(likedImageIds);
+  };
+
+  const loadSharedImages = () => {
+    // Load shared images from localStorage
+    const sharedImageIds = UserInteractionsService.getSharedImageIds();
+    setSharedImages(sharedImageIds);
+  };
+
+  const loadPurchasedImages = async () => {
     try {
-      const { data: { user } } = await supabaseService.getClient().auth.getUser();
-      
-      if (!user) {
-        setIsAuthenticated(false);
-        setLoading(false);
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
         return;
       }
 
-      const userProfile = await supabaseService.getCurrentUserProfile();
+      // Fetch orders from the shop orders API
+      const response = await fetch(`/api/shop/orders?email=${encodeURIComponent(user.email)}`);
       
-      if (!userProfile || userProfile.user_type !== 'customer') {
-        setIsAuthenticated(false);
-        setLoading(false);
+      if (!response.ok) {
+        console.error('Failed to fetch orders:', response.status);
         return;
       }
-
-      setUser(user);
-      setIsAuthenticated(true);
-      await loadCustomerStats();
+      
+      const orders = await response.json();
+      
+      // Extract image IDs from order items
+      const purchasedImageIds = new Set<string>();
+      if (Array.isArray(orders) && orders.length > 0) {
+        orders.forEach((order: any) => {
+          if (order.order_items && Array.isArray(order.order_items)) {
+            order.order_items.forEach((item: any) => {
+              if (item.image_id) {
+                purchasedImageIds.add(item.image_id);
+              }
+            });
+          }
+        });
+      }
+      
+      setPurchasedImages(purchasedImageIds);
     } catch (error) {
-      console.error('Error checking auth:', error);
-      setIsAuthenticated(false);
-      setLoading(false);
+      console.error('Error loading purchased images:', error);
     }
   };
 
-  const loadCustomerStats = async () => {
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset page when filters change and update URL
+  useEffect(() => {
+    setPage(1);
+    // Only update URL after initial load to prevent overwriting incoming URL parameters
+    if (!isInitialLoad) {
+      updateUrlWithFilters();
+    }
+  }, [animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm, isInitialLoad]);
+
+  // Reset breed and coat when animal type changes
+  useEffect(() => {
+    if (animalType) {
+      setSelectedBreed('');
+      setSelectedCoat('');
+    }
+  }, [animalType]);
+
+  const updateUrlWithFilters = () => {
+    const params = new URLSearchParams();
+    
+    if (animalType) params.set('animal', animalType);
+    if (selectedBreed) params.set('breed', selectedBreed);
+    if (selectedCoat) params.set('coat', selectedCoat);
+    if (selectedTheme) params.set('theme', selectedTheme);
+    if (debouncedSearchTerm) params.set('search', debouncedSearchTerm);
+    if (featuredOnly) params.set('featured', 'true');
+    
+    const queryString = params.toString();
+    const newUrl = queryString ? `/customer?${queryString}` : '/customer';
+    
+    // Update URL without triggering a navigation
+    window.history.replaceState(null, '', newUrl);
+  };
+
+  // Load images only after products and pricing are loaded  
+  useEffect(() => {
+    if (products.length > 0 && pricing.length > 0) {
+      console.log('[INIT] Products and pricing loaded, now loading images...');
+      loadImages();
+    }
+  }, [products, pricing]);
+
+  useEffect(() => {
+    // Load images when filters change, but only if products and pricing are already loaded
+    if (products.length > 0 && pricing.length > 0) {
+      loadImages();
+    }
+  }, [page, animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm]);
+
+  const loadData = async () => {
+    try {
+      console.log('[LOAD_DATA] Starting data load...');
+      const [breedsData, coatsData, themesData, productsData, pricingData] = await Promise.all([
+        supabaseService.getBreeds(),
+        supabaseService.getCoats(),
+        supabaseService.getThemes(),
+        supabaseService.getPublicProducts(),  // Use public method to bypass RLS
+        supabaseService.getPublicProductPricing()  // Use public method to bypass RLS
+      ]);
+
+      const filteredProducts = productsData?.filter((p: any) => p.is_active) || [];
+      const filteredPricing = pricingData || [];
+      
+      console.log('[LOAD_DATA] Data loaded: Products:', filteredProducts.length, 'Pricing:', filteredPricing.length);
+
+      setBreeds(breedsData?.filter((b: any) => b.is_active) || []);
+      setCoats(coatsData?.filter((c: any) => c.is_active) || []);
+      setThemes(themesData?.filter((t: any) => t.is_active) || []);
+      setProducts(filteredProducts);
+      setPricing(filteredPricing);
+      
+      // Load initial filters after reference data is loaded
+      loadInitialFilters();
+    } catch (error) {
+      console.error('[LOAD_DATA] Error loading filter data:', error);
+    }
+  };
+
+  const loadImages = async () => {
     try {
       setLoading(true);
-      
-      // Load customer-specific stats
-      const customer = await supabaseService.getCurrentCustomer();
-      if (customer) {
-        // Get pets count using service method
-        const pets = await supabaseService.getCustomerPets();
-        
-        setStats({
-          totalOrders: 0, // Implement when orders data is available
-          totalSpent: 0,
-          favoriteImages: 0, // Implement when favorites are available
-          totalPets: pets?.length || 0,
-          recentOrders: [],
-          recommendedImages: []
-        });
+      const imageData = await supabaseService.getImages({
+        page,
+        limit: 40,
+        breedId: selectedBreed || null,
+        coatId: selectedCoat || null,
+        themeId: selectedTheme || null,
+        featured: featuredOnly,
+        publicOnly: true,
+        search: debouncedSearchTerm || undefined
+      });
+
+      let filteredImages = imageData;
+
+      // Client-side filtering for animal type
+      if (animalType) {
+        filteredImages = filteredImages.filter(img => img.breed_animal_type === animalType);
       }
 
+      setImages(filteredImages);
     } catch (error) {
-      console.error('Error loading customer stats:', error);
+      console.error('Error loading images:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const quickStats = [
-    {
-      title: 'Total Orders',
-      value: stats.totalOrders,
-      icon: Package,
-      color: 'bg-blue-500',
-      href: '/customer/orders'
-    },
-    {
-      title: 'Amount Spent',
-      value: `£${(stats.totalSpent / 100).toLocaleString()}`,
-      icon: ShoppingCart,
-      color: 'bg-green-500',
-      href: '/customer/orders'
-    },
-    {
-      title: 'Favorite Images',
-      value: stats.favoriteImages,
-      icon: Heart,
-      color: 'bg-red-500',
-      href: '/customer/gallery'
-    },
-    {
-      title: 'My Pets',
-      value: stats.totalPets,
-      icon: Heart,
-      color: 'bg-purple-500',
-      href: '/customer/pets'
-    }
-  ];
+  const clearFilters = () => {
+    setSearchTerm('');
+    setAnimalType('');
+    setSelectedBreed('');
+    setSelectedCoat('');
+    setSelectedTheme('');
+    setFeaturedOnly(false);
+    setPage(1);
+  };
 
-  const quickActions = [
-    {
-      title: 'Browse Shop',
-      description: 'Discover AI-generated pet portraits',
-      icon: ShoppingBag,
-      href: '/customer/shop',
-      color: 'from-blue-500 to-cyan-500'
-    },
-    {
-      title: 'Add My Pet',
-      description: 'Upload photos of your beloved pet',
-      icon: Plus,
-      href: '/customer/pets/add',
-      color: 'from-purple-500 to-pink-500'
-    },
-    {
-      title: 'View Gallery',
-      description: 'See your purchased portraits',
-      icon: Image,
-      href: '/customer/gallery',
-      color: 'from-green-500 to-emerald-500'
-    },
-    {
-      title: 'Check Cart',
-      description: `${cart.totalItems} items ready for checkout`,
-      icon: ShoppingCart,
-      href: '/customer/cart',
-      color: 'from-orange-500 to-red-500',
-      badge: cart.totalItems > 0 ? cart.totalItems : undefined
-    }
-  ];
+  // Get filtered breeds and coats based on animal type
+  const filteredBreeds = animalType ? breeds.filter(b => b.animal_type === animalType) : breeds;
+  const filteredCoats = animalType ? coats.filter(c => c.animal_type === animalType) : coats;
 
-  // Show loading spinner while checking authentication
-  if (loading) {
+  // Get selected breed for description display
+  const selectedBreedData = selectedBreed ? breeds.find(b => b.id === selectedBreed) : null;
+  
+  // Get selected coat for description display
+  const selectedCoatData = selectedCoat ? coats.find(c => c.id === selectedCoat) : null;
+  
+  // Get selected theme for description display
+  const selectedThemeData = selectedTheme ? themes.find(t => t.id === selectedTheme) : null;
+  
+  // Check if only breed filter is selected (and no other filters)
+  const showBreedDescription = selectedBreedData && 
+    !selectedCoat && 
+    !selectedTheme && 
+    !searchTerm.trim() && 
+    !featuredOnly;
+
+  // Check if only coat filter is selected (and no other filters)
+  const showCoatDescription = selectedCoatData && 
+    !selectedBreed && 
+    !selectedTheme && 
+    !searchTerm.trim() && 
+    !featuredOnly;
+
+  // Check if only theme filter is selected (and no other filters)
+  const showThemeDescription = selectedThemeData && 
+    !selectedBreed && 
+    !selectedCoat && 
+    !searchTerm.trim() && 
+    !featuredOnly;
+
+  // Check if only animal type is selected (and no other filters)
+  const showAnimalDescription = animalType && 
+    !selectedBreed && 
+    !selectedCoat && 
+    !selectedTheme && 
+    !searchTerm.trim() && 
+    !featuredOnly;
+
+  const getImageProductInfo = (imageId: string) => {
+    const image = images.find(img => img.id === imageId);
+    
+    if (!image || !image.format_id) {
+      return { productCount: 0, lowestPrice: null, currency: null };
+    }
+
+    // Add null safety for products and pricing arrays
+    const availableProducts = (products || []).filter(p => 
+      p.is_active && p.format_id === image.format_id
+    );
+    
+    if (availableProducts.length === 0) {
+      return { productCount: 0, lowestPrice: null, currency: null };
+    }
+
+    const countryPricing = getCountryPricing(pricing || []).filter(p => 
+      availableProducts.some(product => product.id === p.product_id)
+    );
+
+    if (countryPricing.length === 0) {
+      return { productCount: availableProducts.length, lowestPrice: null, currency: null };
+    }
+
+    const lowestPricing = countryPricing.reduce((lowest, current) => 
+      current.sale_price < lowest.sale_price ? current : lowest
+    );
+
+    return {
+      productCount: availableProducts.length,
+      lowestPrice: lowestPricing.sale_price,
+      currency: lowestPricing.currency_code,
+      currencySymbol: lowestPricing.currency_symbol
+    };
+  };
+
+  const handleBuyClick = (image: ImageCatalogWithDetails) => {
+    setSelectedImage(image);
+    setShowProductModal(true);
+  };
+
+  const handleAddToCart = (productId: string, quantity: number) => {
+    if (!selectedImage) return;
+
+    const product = products.find(p => p.id === productId);
+    const productPricing = pricing.find(p => p.product_id === productId && p.country_code === selectedCountry);
+    
+    if (!product || !productPricing) {
+      alert('Product information not found');
+      return;
+    }
+
+    addToCart({
+      imageId: selectedImage.id,
+      productId: productId,
+      imageUrl: selectedImage.image_variants?.thumbnail?.url || selectedImage.image_variants?.mid_size?.url || selectedImage.public_url,
+      imageTitle: selectedImage.description || 'Pet Portrait',
+      product: product,
+      pricing: productPricing,
+      quantity: quantity
+    });
+
+    setShowProductModal(false);
+    setSelectedImage(null);
+  };
+
+  const handleLike = (imageId: string) => {
+    const image = images.find(img => img.id === imageId);
+    const isNowLiked = UserInteractionsService.toggleLikeSync(imageId, image);
+    
+    setLikedImages(prev => {
+      const newLiked = new Set(prev);
+      if (isNowLiked) {
+        newLiked.add(imageId);
+      } else {
+        newLiked.delete(imageId);
+      }
+      return newLiked;
+    });
+  };
+
+  const handleShare = (image: ImageCatalogWithDetails) => {
+    setImageToShare(image);
+    setShowShareModal(true);
+  };
+
+  const handleImageClick = (image: ImageCatalogWithDetails) => {
+    setModalImage(image);
+    setShowImageModal(true);
+  };
+
+  const handleShareComplete = (platform: string) => {
+    if (imageToShare) {
+      UserInteractionsService.recordShare(imageToShare.id, platform, imageToShare);
+      setSharedImages(prev => new Set(prev).add(imageToShare.id));
+      console.log(`Image shared on ${platform}:`, imageToShare.id);
+    }
+  };
+
+  const renderStars = (rating: number) => {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      <div className="flex items-center">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star
+            key={star}
+            className={`w-3 h-3 ${
+              star <= rating ? 'text-yellow-500 fill-current' : 'text-gray-300'
+            }`}
+          />
+        ))}
       </div>
     );
-  }
+  };
 
-  // Show marketing page if not authenticated or not a customer
-  if (isAuthenticated === false) {
-    return <CustomerMarketingPage />;
-  }
-
-  // Show loading for authenticated users while stats load
-  if (isAuthenticated === true && loading) {
+  if (loading && page === 1) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-              </CardContent>
-            </Card>
-          ))}
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
         </div>
       </div>
     );
   }
 
+  // Configure sticky header filters
+  const stickyHeaderFilters = [
+    {
+      value: animalType,
+      onChange: setAnimalType,
+      options: [
+        { value: 'dog', label: '🐕 Dogs' },
+        { value: 'cat', label: '🐱 Cats' }
+      ],
+      placeholder: 'All Animals'
+    },
+    {
+      value: selectedBreed,
+      onChange: setSelectedBreed,
+      options: filteredBreeds.map(breed => ({ value: breed.id, label: breed.name })),
+      placeholder: 'All Breeds'
+    },
+    {
+      value: selectedCoat,
+      onChange: setSelectedCoat,
+      options: filteredCoats.map(coat => ({ value: coat.id, label: coat.name })),
+      placeholder: 'All Coats'
+    },
+    {
+      value: selectedTheme,
+      onChange: setSelectedTheme,
+      options: themes.map(theme => ({ value: theme.id, label: theme.name })),
+      placeholder: 'All Themes'
+    }
+  ];
+
   return (
-    <div className="space-y-8">
-      {/* Welcome Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Welcome Back!</h1>
-        <p className="text-gray-600 mt-2">
-          Ready to create some beautiful memories of your pets? Let's get started!
-        </p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
+      {/* Sticky Filter Header */}
+      <StickyFilterHeader
+        searchTerm={searchTerm}
+        onSearchTermChange={setSearchTerm}
+        onSearchSubmit={loadImages}
+        searchPlaceholder="Search images, tags, descriptions..."
+        filters={stickyHeaderFilters}
+        onClearFilters={() => {
+          setSearchTerm('');
+          setAnimalType('');
+          setSelectedBreed('');
+          setSelectedCoat('');
+          setSelectedTheme('');
+          setFeaturedOnly(false);
+          loadImages();
+        }}
+      />
+      
+      <div className="max-w-7xl mx-auto space-y-6">
+        
 
-      {/* Quick Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {quickStats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Link key={stat.title} href={stat.href}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                      <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                    </div>
-                    <div className={`p-3 rounded-full ${stat.color} text-white`}>
-                      <Icon className="w-6 h-6" />
-                    </div>
+        {/* Breed Description */}
+        {showBreedDescription && selectedBreedData && (
+          <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                {selectedBreedData.animal_type === 'dog' ? '🐕' : '🐱'} {selectedBreedData.name}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* Hero Image */}
+                {selectedBreedData.hero_image_url && (
+                  <div className="lg:w-1/3 flex-shrink-0">
+                    <img 
+                      src={selectedBreedData.hero_image_url}
+                      alt={selectedBreedData.hero_image_alt || `${selectedBreedData.name} hero image`}
+                      className="w-full h-48 lg:h-64 object-contain bg-gray-50 rounded-lg shadow-md"
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
+                )}
+                
+                {/* Content */}
+                <div className="flex-1">
+                  <div className="text-gray-700 text-lg leading-relaxed prose prose-gray max-w-none">
+                    <ReactMarkdown>{selectedBreedData.description}</ReactMarkdown>
+                  </div>
+                  {selectedBreedData.personality_traits && selectedBreedData.personality_traits.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="font-semibold text-gray-900 mb-2">Personality Traits:</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedBreedData.personality_traits.map((trait, index) => (
+                          <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-800">
+                            {trait}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Sparkles className="w-5 h-5" />
-            <span>Quick Actions</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {quickActions.map((action) => {
-              const Icon = action.icon;
-              return (
-                <Link key={action.title} href={action.href}>
-                  <div className={`p-6 rounded-lg bg-gradient-to-br ${action.color} text-white hover:shadow-lg transition-shadow cursor-pointer group relative`}>
-                    {action.badge && (
-                      <Badge className="absolute -top-2 -right-2 bg-red-500 text-white">
-                        {action.badge}
+        {/* Coat Description */}
+        {showCoatDescription && selectedCoatData && (
+          <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <div 
+                  className="w-6 h-6 rounded-full border-2 border-gray-300"
+                  style={{ backgroundColor: selectedCoatData.hex_color }}
+                  title={selectedCoatData.hex_color}
+                ></div>
+                {selectedCoatData.name}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* Hero Image */}
+                {selectedCoatData.hero_image_url && (
+                  <div className="lg:w-1/3 flex-shrink-0">
+                    <img 
+                      src={selectedCoatData.hero_image_url}
+                      alt={selectedCoatData.hero_image_alt || `${selectedCoatData.name} coat hero image`}
+                      className="w-full h-48 lg:h-32 object-cover rounded-lg shadow-md"
+                    />
+                  </div>
+                )}
+                
+                {/* Content */}
+                <div className="flex-1">
+                  <p className="text-gray-700 text-lg leading-relaxed">
+                    {selectedCoatData.description}
+                  </p>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">Pattern:</span>
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                        {selectedCoatData.pattern_type}
                       </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">Rarity:</span>
+                      <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                        {selectedCoatData.rarity}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">Color:</span>
+                      <span className="text-sm text-gray-600">{selectedCoatData.hex_color}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Theme Description */}
+        {showThemeDescription && selectedThemeData && (
+          <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                🎨 {selectedThemeData.name}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* Hero Image */}
+                {selectedThemeData.hero_image_url && (
+                  <div className="lg:w-1/3 flex-shrink-0">
+                    <img 
+                      src={selectedThemeData.hero_image_url}
+                      alt={selectedThemeData.hero_image_alt || `${selectedThemeData.name} theme hero image`}
+                      className="w-full h-48 lg:h-32 object-cover rounded-lg shadow-md"
+                    />
+                  </div>
+                )}
+                
+                {/* Content */}
+                <div className="flex-1">
+                  <p className="text-gray-700 text-lg leading-relaxed">
+                    {selectedThemeData.description}
+                  </p>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">Difficulty:</span>
+                      <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                        {selectedThemeData.difficulty_level}/5
+                      </Badge>
+                    </div>
+                    {selectedThemeData.style_keywords && selectedThemeData.style_keywords.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-900">Keywords:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedThemeData.style_keywords.slice(0, 3).map((keyword, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {keyword}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                    <div className="flex items-center justify-between mb-4">
-                      <Icon className="w-8 h-8" />
-                      <ArrowRight className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <h3 className="font-semibold text-lg mb-2">{action.title}</h3>
-                    <p className="text-white/80 text-sm">{action.description}</p>
                   </div>
-                </Link>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Content Sections */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Getting Started */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Star className="w-5 h-5 text-yellow-500" />
-              <span>Getting Started</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg">
-                <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                  1
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900">Add Your Pet</h4>
-                  <p className="text-sm text-gray-600">Upload photos and details of your beloved pet</p>
-                  <Link href="/customer/pets/add">
-                    <Button size="sm" className="mt-2">Add Pet</Button>
-                  </Link>
-                </div>
+        {/* Animal Type Description */}
+        {showAnimalDescription && (
+          <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                {animalType === 'dog' ? '🐕' : '🐱'} {animalType === 'dog' ? 'Dogs' : 'Cats'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-700 text-lg leading-relaxed">
+                {animalType === 'dog' 
+                  ? "Man's best friend and professional treat inspectors! Dogs have mastered the art of looking adorable while simultaneously plotting to steal your sandwich. From tiny ankle-biters who think they're lions to gentle giants who believe they're lap dogs, every dog is convinced they're the main character in your life story - and honestly, they're probably right!"
+                  : "Independent contractors and professional nap specialists! Cats have perfected the balance between regal aloofness and demanding attention exactly when you're busiest. Masters of selective hearing who can ignore their name for hours but appear instantly at the sound of a can opener, cats graciously allow humans to share their homes while providing occasional purrs as payment."
+                }
+              </p>
+              <div className="mt-4">
+                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                  {filteredBreeds.length} available breeds
+                </Badge>
               </div>
-              
-              <div className="flex items-start space-x-3 p-3 bg-purple-50 rounded-lg">
-                <div className="flex-shrink-0 w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                  2
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900">Browse Portraits</h4>
-                  <p className="text-sm text-gray-600">Explore our AI-generated pet portrait gallery</p>
-                  <Link href="/customer/shop">
-                    <Button size="sm" className="mt-2">Browse Shop</Button>
-                  </Link>
-                </div>
-              </div>
-              
-              <div className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg">
-                <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                  3
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900">Order & Enjoy</h4>
-                  <p className="text-sm text-gray-600">Choose your favorite format and place your order</p>
-                  <Link href="/customer/cart">
-                    <Button size="sm" className="mt-2">View Cart</Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Clock className="w-5 h-5 text-blue-500" />
-              <span>Your Activity</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <Eye className="w-4 h-4 text-gray-500" />
-                  <div>
-                    <span className="text-sm font-medium">Recent Browsing</span>
-                    <p className="text-xs text-gray-500">View your browsing history</p>
-                  </div>
-                </div>
-                <Link href="/customer/shop">
-                  <Button variant="outline" size="sm">Browse</Button>
-                </Link>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <Heart className="w-4 h-4 text-red-500" />
-                  <div>
-                    <span className="text-sm font-medium">Favorite Images</span>
-                    <p className="text-xs text-gray-500">Images you've liked</p>
-                  </div>
-                </div>
-                <Link href="/customer/gallery">
-                  <Button variant="outline" size="sm">View All</Button>
-                </Link>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <Package className="w-4 h-4 text-blue-500" />
-                  <div>
-                    <span className="text-sm font-medium">Order History</span>
-                    <p className="text-xs text-gray-500">Track your purchases</p>
-                  </div>
-                </div>
-                <Link href="/customer/orders">
-                  <Button variant="outline" size="sm">View Orders</Button>
-                </Link>
-              </div>
+        {/* Images Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {images.map((image) => {
+            // Show all images temporarily - debugging sequential loading
+            const productInfo = getImageProductInfo(image.id);
+            const isLiked = likedImages.has(image.id);
+            const isShared = sharedImages.has(image.id);
+            const isPurchased = purchasedImages.has(image.id);
+            
+            // Determine image aspect ratio and layout
+            const isSquare = image.aspect_ratio === '1:1';
+            const isPortrait = image.aspect_ratio === '2:3' || image.aspect_ratio === '9:16';
+            
+            return (
+            <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
+              {/* Image Container - Different layouts based on aspect ratio */}
+              {isSquare ? (
+                // Square images: Show full image with content below
+                <>
+                  <div 
+                    className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
+                    onClick={() => handleImageClick(image)}
+                  >
+                    <CatalogImage
+                      imageId={image.id}
+                      alt={image.description || 'Generated image'}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      fallbackUrl={image.image_url || image.public_url}
+                    />
+                    {image.rating && image.rating > 0 && (
+                      <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                        {renderStars(image.rating)}
+                      </div>
+                    )}
+                    
+                    {/* Top right action buttons */}
+                    <div className="absolute top-2 right-2 flex space-x-1">
+                      <button
+                        onClick={() => handleLike(image.id)}
+                        className={`p-2 rounded-full transition-all ${
+                          isLiked 
+                            ? 'bg-red-500 text-white' 
+                            : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
+                        }`}
+                        title={isLiked ? 'Unlike' : 'Like'}
+                      >
+                        <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                      </button>
+                      
+                      <button
+                        onClick={() => handleShare(image)}
+                        className={`p-2 rounded-full transition-all ${
+                          isShared 
+                            ? 'bg-blue-500 text-white' 
+                            : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
+                        }`}
+                        title={isShared ? 'Shared' : 'Share'}
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </button>
+                      
+                      {isPurchased && (
+                        <div className="bg-green-500 text-white p-2 rounded-full" title="Purchased">
+                          <ShoppingBag className="w-4 h-4 fill-current" />
+                        </div>
+                      )}
 
-              {cart.totalItems > 0 && (
-                <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200">
-                  <div className="flex items-center space-x-3">
-                    <ShoppingCart className="w-4 h-4 text-orange-500" />
-                    <div>
-                      <span className="text-sm font-medium">Items in Cart</span>
-                      <p className="text-xs text-orange-600">{cart.totalItems} items ready to checkout</p>
+                      {image.is_featured && (
+                        <div className="bg-yellow-500 text-white p-2 rounded-full">
+                          <Star className="w-4 h-4 fill-current" />
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <Link href="/customer/checkout">
-                    <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
-                      Checkout
-                    </Button>
-                  </Link>
+
+                  <CardContent className="p-4 space-y-3">
+                    {/* Metadata Tags - Clickable */}
+                    <ClickableMetadataTags
+                      breed_id={image.breed_id}
+                      breed_name={image.breed_name}
+                      breed_animal_type={image.breed_animal_type}
+                      theme_id={image.theme_id}
+                      theme_name={image.theme_name}
+                      style_id={image.style_id}
+                      style_name={image.style_name}
+                      coat_id={image.coat_id}
+                      coat_name={image.coat_name}
+                      coat_hex_color={image.coat_hex_color}
+                      coat_animal_type={image.coat_animal_type}
+                    />
+
+                    {/* Description Title */}
+                    {image.description && (
+                      <p className="text-sm text-gray-900 font-medium line-clamp-2">
+                        {extractDescriptionTitle(image.description)}
+                      </p>
+                    )}
+
+                    {/* Buy Section */}
+                    <div className="pt-3 border-t">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm text-gray-600">
+                          {productInfo.productCount > 0 ? (
+                            <>
+                              {productInfo.productCount} product{productInfo.productCount > 1 ? 's' : ''} from{' '}
+                              {productInfo.lowestPrice && productInfo.currencySymbol ? 
+                                formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol) : 
+                                'Price TBC'
+                              }
+                            </>
+                          ) : (
+                            'No products available'
+                          )}
+                        </div>
+                      </div>
+                      <Button 
+                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                        disabled={productInfo.productCount === 0}
+                        onClick={() => handleBuyClick(image)}
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        Buy Now
+                      </Button>
+                    </div>
+                  </CardContent>
+                </>
+              ) : isPortrait ? (
+                // Portrait images: Show full image with overlay content at bottom
+                <div 
+                  className={`relative overflow-hidden bg-gray-100 cursor-pointer ${
+                    image.aspect_ratio === '2:3' ? 'aspect-[2/3]' : 'aspect-[9/16]'
+                  }`}
+                  onClick={() => handleImageClick(image)}
+                >
+                  <CatalogImage
+                    imageId={image.id}
+                    alt={image.description || 'Generated image'}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    fallbackUrl={image.image_url || image.public_url}
+                  />
+                  
+                  {/* Top overlay elements */}
+                  {image.rating && image.rating > 0 && (
+                    <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                      {renderStars(image.rating)}
+                    </div>
+                  )}
+                  
+                  {/* Top right action buttons */}
+                  <div className="absolute top-2 right-2 flex space-x-1">
+                    <button
+                      onClick={() => handleLike(image.id)}
+                      className={`p-2 rounded-full transition-all ${
+                        isLiked 
+                          ? 'bg-red-500 text-white' 
+                          : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
+                      }`}
+                      title={isLiked ? 'Unlike' : 'Like'}
+                    >
+                      <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                    </button>
+                    
+                    <button
+                      onClick={() => handleShare(image)}
+                      className={`p-2 rounded-full transition-all ${
+                        isShared 
+                          ? 'bg-blue-500 text-white' 
+                          : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
+                      }`}
+                      title={isShared ? 'Shared' : 'Share'}
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </button>
+                    
+                    {isPurchased && (
+                      <div className="bg-green-500 text-white p-2 rounded-full" title="Purchased">
+                        <ShoppingBag className="w-4 h-4 fill-current" />
+                      </div>
+                    )}
+
+                    {image.is_featured && (
+                      <div className="bg-yellow-500 text-white p-2 rounded-full">
+                        <Star className="w-4 h-4 fill-current" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bottom overlay with translucent background - only covers bottom third */}
+                  <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/95 via-black/70 via-50% to-transparent p-3 flex flex-col justify-end space-y-2">
+                    {/* Compact Metadata Tags */}
+                    <div className="flex flex-wrap gap-1">
+                      {image.breed_name && (
+                        <span className="px-2 py-1 bg-white/20 backdrop-blur-sm text-white text-xs rounded-md">
+                          {image.breed_name}
+                        </span>
+                      )}
+                      {image.theme_name && (
+                        <span className="px-2 py-1 bg-white/20 backdrop-blur-sm text-white text-xs rounded-md">
+                          {image.theme_name}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Description Title - Single line */}
+                    {image.description && (
+                      <p className="text-sm text-white font-medium line-clamp-1 leading-tight">
+                        {extractDescriptionTitle(image.description)}
+                      </p>
+                    )}
+
+                    {/* Compact Buy Section */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs text-white/90 font-medium">
+                        {productInfo.productCount > 0 && productInfo.lowestPrice && productInfo.currencySymbol ? 
+                          `from ${formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol)}` : 
+                          'Price TBC'
+                        }
+                      </div>
+                      <Button 
+                        size="sm"
+                        className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border-white/30 px-3 py-1 h-8 text-xs"
+                        disabled={productInfo.productCount === 0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleBuyClick(image);
+                        }}
+                      >
+                        <ShoppingCart className="w-3 h-3 mr-1" />
+                        Buy
+                      </Button>
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                // Fallback for other aspect ratios - use square layout
+                <>
+                  <div 
+                    className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
+                    onClick={() => handleImageClick(image)}
+                  >
+                    <CatalogImage
+                      imageId={image.id}
+                      alt={image.description || 'Generated image'}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      fallbackUrl={image.image_url || image.public_url}
+                    />
+                    {image.rating && image.rating > 0 && (
+                      <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                        {renderStars(image.rating)}
+                      </div>
+                    )}
+                    
+                    {/* Top right action buttons */}
+                    <div className="absolute top-2 right-2 flex space-x-1">
+                      <button
+                        onClick={() => handleLike(image.id)}
+                        className={`p-2 rounded-full transition-all ${
+                          isLiked 
+                            ? 'bg-red-500 text-white' 
+                            : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
+                        }`}
+                        title={isLiked ? 'Unlike' : 'Like'}
+                      >
+                        <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                      </button>
+                      
+                      <button
+                        onClick={() => handleShare(image)}
+                        className={`p-2 rounded-full transition-all ${
+                          isShared 
+                            ? 'bg-blue-500 text-white' 
+                            : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
+                        }`}
+                        title={isShared ? 'Shared' : 'Share'}
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </button>
+                      
+                      {isPurchased && (
+                        <div className="bg-green-500 text-white p-2 rounded-full" title="Purchased">
+                          <ShoppingBag className="w-4 h-4 fill-current" />
+                        </div>
+                      )}
+
+                      {image.is_featured && (
+                        <div className="bg-yellow-500 text-white p-2 rounded-full">
+                          <Star className="w-4 h-4 fill-current" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <CardContent className="p-4 space-y-3">
+                    {/* Metadata Tags - Clickable */}
+                    <ClickableMetadataTags
+                      breed_id={image.breed_id}
+                      breed_name={image.breed_name}
+                      breed_animal_type={image.breed_animal_type}
+                      theme_id={image.theme_id}
+                      theme_name={image.theme_name}
+                      style_id={image.style_id}
+                      style_name={image.style_name}
+                      coat_id={image.coat_id}
+                      coat_name={image.coat_name}
+                      coat_hex_color={image.coat_hex_color}
+                      coat_animal_type={image.coat_animal_type}
+                    />
+
+                    {/* Description Title */}
+                    {image.description && (
+                      <p className="text-sm text-gray-900 font-medium line-clamp-2">
+                        {extractDescriptionTitle(image.description)}
+                      </p>
+                    )}
+
+                    {/* Buy Section */}
+                    <div className="pt-3 border-t">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm text-gray-600">
+                          {productInfo.productCount > 0 ? (
+                            <>
+                              {productInfo.productCount} product{productInfo.productCount > 1 ? 's' : ''} from{' '}
+                              {productInfo.lowestPrice && productInfo.currencySymbol ? 
+                                formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol) : 
+                                'Price TBC'
+                              }
+                            </>
+                          ) : (
+                            'No products available'
+                          )}
+                        </div>
+                      </div>
+                      <Button 
+                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                        disabled={productInfo.productCount === 0}
+                        onClick={() => handleBuyClick(image)}
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        Buy Now
+                      </Button>
+                    </div>
+                  </CardContent>
+                </>
               )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </Card>
+            );
+          })}
+        </div>
 
-      {/* Featured Content */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <TrendingUp className="w-5 h-5 text-green-500" />
-            <span>Popular This Week</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-gray-500">
-            <Camera className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>Discover trending pet portraits and popular styles</p>
-            <Link href="/customer/shop">
-              <Button className="mt-4">
-                <Palette className="w-4 h-4 mr-2" />
-                Explore Gallery
-              </Button>
-            </Link>
+        {/* Empty State */}
+        {images.length === 0 && !loading && (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No images found</h3>
+            <p className="text-gray-600 mb-4">Try adjusting your search or filter criteria</p>
+            <Button onClick={clearFilters} variant="outline">
+              Clear all filters
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+        )}
+
+        {/* Load More Button */}
+        {images.length > 0 && images.length % 20 === 0 && (
+          <div className="text-center pt-6">
+            <Button
+              onClick={() => setPage(prev => prev + 1)}
+              disabled={loading}
+              variant="outline"
+            >
+              {loading ? 'Loading...' : 'Load More Images'}
+            </Button>
+          </div>
+        )}
+
+        {/* Product Selection Modal */}
+        {selectedImage && (
+          <ProductSelectionModal
+            isOpen={showProductModal}
+            onClose={() => {
+              setShowProductModal(false);
+              setSelectedImage(null);
+            }}
+            image={selectedImage}
+            products={products}
+            pricing={pricing}
+            onAddToBasket={handleAddToCart}
+          />
+        )}
+
+        {/* Share Modal */}
+        {imageToShare && (
+          <ShareModal
+            isOpen={showShareModal}
+            onClose={() => {
+              setShowShareModal(false);
+              setImageToShare(null);
+            }}
+            image={imageToShare as any}
+            onShare={handleShareComplete}
+          />
+        )}
+
+        {/* Image Modal */}
+        {modalImage && (
+          <ImageModal
+            isOpen={showImageModal}
+            onClose={() => {
+              setShowImageModal(false);
+              setModalImage(null);
+            }}
+            imageId={modalImage.id}
+            imageData={{
+              id: modalImage.id,
+              description: modalImage.description,
+              prompt_text: modalImage.prompt_text,
+              breed_name: modalImage.breed_name,
+              theme_name: modalImage.theme_name,
+              style_name: modalImage.style_name,
+              coat_name: modalImage.coat_name,
+              is_featured: modalImage.is_featured,
+              rating: modalImage.rating,
+              tags: modalImage.tags,
+              public_url: modalImage.public_url,
+              image_url: modalImage.image_url
+            }}
+            onBuyClick={() => handleBuyClick(modalImage)}
+            onLikeClick={() => handleLike(modalImage.id)}
+            onShareClick={() => handleShare(modalImage)}
+            isLiked={likedImages.has(modalImage.id)}
+            isShared={sharedImages.has(modalImage.id)}
+            isPurchased={purchasedImages.has(modalImage.id)}
+            showActions={true}
+            products={products}
+            pricing={pricing}
+          />
+        )}
+      </div>
     </div>
   );
 }

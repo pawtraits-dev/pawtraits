@@ -1,0 +1,28 @@
+{
+    "mcpServers": {
+      "filesystem": {
+        "command": "npx",
+        "args": ["@modelcontextprotocol/server-filesystem", "."],
+        "env": {
+          "NODE_PATH": "./node_modules"
+        }
+      },
+      "playwright": {
+        "command": "npx", 
+        "args": ["@modelcontextprotocol/server-playwright"],
+        "env": {
+          "NODE_PATH": "./node_modules"
+        }
+      },
+      "git": {
+        "command": "npx",
+        "args": ["@modelcontextprotocol/server-git", "--repository", "."]
+      }
+    },
+    "globalShortcuts": {
+      "claude": "Cmd+Shift+Space"
+    },
+    "updater": {
+      "enabled": true
+    }
+  }

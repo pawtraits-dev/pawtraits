@@ -34,6 +34,8 @@ import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import EnhancedHeroCarousel from '@/components/EnhancedHeroCarousel';
+import StickyFilterHeader from '@/components/StickyFilterHeader';
 
 
 function CatsPageContent() {
@@ -316,10 +318,48 @@ function CatsPageContent() {
     );
   }
 
+  // Configure sticky header filters
+  const stickyHeaderFilters = [
+    {
+      value: selectedBreed,
+      onChange: (value: string) => {
+        setSelectedBreed(value);
+        updateUrlParams({ breed: value || null });
+      },
+      options: breeds.map(breed => ({ value: breed.id, label: breed.name })),
+      placeholder: 'All Cat Breeds'
+    },
+    {
+      value: selectedTheme,
+      onChange: (value: string) => {
+        setSelectedTheme(value);
+        updateUrlParams({ theme: value || null });
+      },
+      options: themes.map(theme => ({ value: theme.id, label: theme.name })),
+      placeholder: 'All Themes'
+    }
+  ];
+
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation Header */}
       <PublicNavigation />
+      
+      {/* Sticky Filter Header */}
+      <StickyFilterHeader
+        searchTerm={searchTerm}
+        onSearchTermChange={setSearchTerm}
+        onSearchSubmit={() => updateUrlParams({ search: searchTerm || null })}
+        searchPlaceholder="Search cat images..."
+        filters={stickyHeaderFilters}
+        onClearFilters={() => {
+          setSearchTerm('');
+          setSelectedBreed('');
+          setSelectedTheme('');
+          setFeaturedOnly(false);
+          updateUrlParams({ search: null, breed: null, theme: null, featured: null });
+        }}
+      />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-purple-50 to-blue-50 py-20">

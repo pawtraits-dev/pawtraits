@@ -35,6 +35,7 @@ import EnhancedHeroCarousel from '@/components/EnhancedHeroCarousel';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
+import StickyFilterHeader from '@/components/StickyFilterHeader';
 
 function ThemesPageContent() {
   const router = useRouter();
@@ -137,10 +138,36 @@ function ThemesPageContent() {
     );
   }
 
+  // Configure sticky header filters - simpler for themes page
+  const stickyHeaderFilters = [
+    {
+      value: sortBy,
+      onChange: setSortBy,
+      options: [
+        { value: 'name', label: 'Sort by Name' },
+        { value: 'popular', label: 'Most Popular' }
+      ],
+      placeholder: 'Sort by'
+    }
+  ];
+
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation Header */}
       <PublicNavigation />
+      
+      {/* Sticky Filter Header */}
+      <StickyFilterHeader
+        searchTerm={searchTerm}
+        onSearchTermChange={setSearchTerm}
+        onSearchSubmit={() => {}} // Simple search, no URL updates needed
+        searchPlaceholder="Search themes..."
+        filters={stickyHeaderFilters}
+        onClearFilters={() => {
+          setSearchTerm('');
+          setSortBy('name');
+        }}
+      />
 
       {/* Hero Carousel Section */}
       <section className="relative bg-gray-50">
