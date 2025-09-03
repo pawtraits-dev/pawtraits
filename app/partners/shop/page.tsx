@@ -44,6 +44,7 @@ export default function PartnerShopPage() {
   const [selectedTheme, setSelectedTheme] = useState('');
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [selectedImage, setSelectedImage] = useState<ImageCatalogWithDetails | null>(null);
   const [showProductModal, setShowProductModal] = useState(false);
@@ -182,7 +183,7 @@ export default function PartnerShopPage() {
     if (!isInitialLoad) {
       updateUrlWithFilters();
     }
-  }, [animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm, isInitialLoad]);
+  }, [animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm, pageSize, isInitialLoad]);
 
   // Reset breed and coat when animal type changes
   useEffect(() => {
@@ -211,7 +212,7 @@ export default function PartnerShopPage() {
   useEffect(() => {
     // Load images when filters change, regardless of products status for now  
     loadImages();
-  }, [page, animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm]);
+  }, [page, pageSize, animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm]);
 
   const loadData = async () => {
     try {
@@ -245,7 +246,7 @@ export default function PartnerShopPage() {
       setLoading(true);
       const imageData = await supabaseService.getImages({
         page,
-        limit: 20,
+        limit: pageSize,
         breedId: selectedBreed || null,
         coatId: selectedCoat || null,
         themeId: selectedTheme || null,
@@ -838,16 +839,45 @@ export default function PartnerShopPage() {
           </div>
         )}
 
-        {/* Load More Button */}
-        {images.length > 0 && images.length % 20 === 0 && (
-          <div className="text-center pt-6">
-            <Button
-              onClick={() => setPage(prev => prev + 1)}
-              disabled={loading}
-              variant="outline"
-            >
-              {loading ? 'Loading...' : 'Load More Images'}
-            </Button>
+        {/* Pagination Controls */}
+        {images.length > 0 && (
+          <div className="flex justify-between items-center pt-6 border-t bg-white p-4 rounded-lg">
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">
+                Page {page} • {images.length} images
+              </span>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="text-sm border border-gray-300 rounded px-3 py-1"
+              >
+                <option value={10}>10 per page</option>
+                <option value={20}>20 per page</option>
+                <option value={50}>50 per page</option>
+                <option value={100}>100 per page</option>
+                <option value={1000}>Load All</option>
+              </select>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Button
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1 || loading}
+                variant="outline"
+                size="sm"
+              >
+                ← Previous
+              </Button>
+              
+              <Button
+                onClick={() => setPage(page + 1)}
+                disabled={loading || images.length < pageSize}
+                variant="outline"
+                size="sm"
+              >
+                Next →
+              </Button>
+            </div>
           </div>
         )}
 
