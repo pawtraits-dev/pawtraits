@@ -364,6 +364,63 @@ export class GeminiVariationService {
   }
 
   /**
+   * Generate single breed variation with valid coat color
+   */
+  async generateSingleBreedVariationWithCoat(
+    originalImageData: string,
+    originalPrompt: string,
+    targetBreed: Breed,
+    validCoat: any,
+    currentTheme?: any,
+    currentStyle?: any
+  ): Promise<GeneratedVariation | null> {
+    try {
+      const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle);
+      
+      const prompt = [
+        { text: variationPrompt },
+        {
+          inlineData: {
+            mimeType: "image/png",
+            data: originalImageData,
+          },
+        },
+      ];
+
+      const response = await this.ai.models.generateContent({
+        model: "gemini-2.5-flash-image-preview",
+        contents: prompt,
+      });
+
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData?.data) {
+            // Generate Midjourney prompt for catalog storage with valid coat
+            const midjourneyPrompt = this.createMidjourneyPromptForBreedWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle);
+            
+            return {
+              imageData: part.inlineData.data,
+              prompt: midjourneyPrompt,
+              metadata: {
+                breed: targetBreed,
+                coat: validCoat,
+                variation_type: 'breed',
+                breed_id: targetBreed.id,
+                coat_id: validCoat.id,
+                gemini_prompt: variationPrompt
+              }
+            };
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to generate breed variation for ${targetBreed.name} with ${validCoat.coat_name}:`, error);
+    }
+    
+    return null;
+  }
+
+  /**
    * Generate breed variations with valid coat colors (multiple coats per breed)
    */
   async generateBreedVariationsWithValidCoat(
@@ -377,47 +434,17 @@ export class GeminiVariationService {
     const variations: GeneratedVariation[] = [];
 
     for (const breed of targetBreeds) {
-      try {
-        const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, breed, validCoat, currentTheme, currentStyle);
-        
-        const prompt = [
-          { text: variationPrompt },
-          {
-            inlineData: {
-              mimeType: "image/png",
-              data: originalImageData,
-            },
-          },
-        ];
-
-        const response = await this.ai.models.generateContent({
-          model: "gemini-2.5-flash-image-preview",
-          contents: prompt,
-        });
-
-        if (response.candidates?.[0]?.content?.parts) {
-          for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData?.data) {
-              // Generate Midjourney prompt for catalog storage with valid coat
-              const midjourneyPrompt = this.createMidjourneyPromptForBreedWithCoat(originalPrompt, breed, validCoat, currentTheme, currentStyle);
-              
-              variations.push({
-                imageData: part.inlineData.data,
-                prompt: midjourneyPrompt,
-                metadata: {
-                  breed,
-                  coat: validCoat,
-                  variation_type: 'breed',
-                  breed_id: breed.id,
-                  coat_id: validCoat.id,
-                  gemini_prompt: variationPrompt
-                }
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`Failed to generate breed variation for ${breed.name} with ${validCoat.coat_name}:`, error);
+      const variation = await this.generateSingleBreedVariationWithCoat(
+        originalImageData,
+        originalPrompt,
+        breed,
+        validCoat,
+        currentTheme,
+        currentStyle
+      );
+      
+      if (variation) {
+        variations.push(variation);
       }
     }
 

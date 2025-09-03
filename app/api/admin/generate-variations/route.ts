@@ -110,16 +110,18 @@ export async function POST(request: NextRequest) {
 
             for (const selectedCoat of selectedCoats) {
               try {
-                const breedVariations = await geminiService.generateBreedVariationsWithValidCoat(
+                const breedVariation = await geminiService.generateSingleBreedVariationWithCoat(
                   originalImageData,
                   originalPrompt,
-                  [targetBreed],
+                  targetBreed,
                   selectedCoat,
                   currentThemeData,
                   currentStyleData
                 );
                 
-                results.push(...breedVariations);
+                if (breedVariation) {
+                  results.push(breedVariation);
+                }
               } catch (error) {
                 console.error(`Error generating ${targetBreed.name} with ${selectedCoat.coat_name}:`, error);
               }
