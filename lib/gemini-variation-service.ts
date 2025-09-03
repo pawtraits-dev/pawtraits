@@ -374,7 +374,12 @@ export class GeminiVariationService {
   ): string {
     const { breed, coat, outfit } = this.parseOriginalPrompt(originalPrompt);
     
-    return `Using the provided image of a ${breed.toLowerCase()} wearing ${outfit}, change the breed to a ${targetBreed.name.toLowerCase()}. Keep the same ${coat} fur color, clothing, pose, lighting, and overall composition. Only change the dog/cat breed characteristics like head shape, ear type, body size, and facial features to match a ${targetBreed.name.toLowerCase()}.`;
+    // Get fur length instruction for the target breed
+    const breedPhysicalTraits = targetBreed.physical_traits as any || {};
+    const breedCoatLength = breedPhysicalTraits.coat;
+    const furLengthInstruction = this.getFurLengthInstruction(targetBreed.name, breedCoatLength);
+    
+    return `Using the provided image of a ${breed.toLowerCase()} wearing ${outfit}, change the breed to a ${targetBreed.name.toLowerCase()}. Keep the same ${coat} fur color throughout ALL body parts (face, legs, paws, body, tail), clothing, pose, lighting, and overall composition.\n\n${furLengthInstruction}\n\nOnly change the dog/cat breed characteristics like head shape, ear type, body size, facial features, and fur length to match a ${targetBreed.name.toLowerCase()}. Ensure fur color remains consistent across all visible areas.`;
   }
 
   /**
@@ -389,7 +394,71 @@ export class GeminiVariationService {
   ): string {
     const { coat, outfit } = this.parseOriginalPrompt(originalPrompt);
     
-    return `Using the provided image of a ${breed.name.toLowerCase()} with ${coat} fur wearing ${outfit}, change the fur color to ${targetCoat.coat_name.toLowerCase()}. Keep the same breed, clothing, pose, lighting, and overall composition. Only change the fur/coat color and pattern to match ${targetCoat.coat_name.toLowerCase()} coloring.`;
+    // Determine appropriate fur length based on breed characteristics
+    const breedPhysicalTraits = breed.physical_traits as any || {};
+    const breedCoatLength = breedPhysicalTraits.coat;
+    
+    // Create fur length instruction based on breed
+    const furLengthInstruction = this.getFurLengthInstruction(breed.name, breedCoatLength);
+    
+    return `Using the provided image of a ${breed.name.toLowerCase()} with ${coat} fur wearing ${outfit}, change the fur color throughout the ENTIRE body to ${targetCoat.coat_name.toLowerCase()}. This includes:
+- Face and head fur
+- Body and torso fur  
+- All four legs completely
+- All four paws and feet
+- Tail fur
+- Any visible undercoat or inner fur
+
+${furLengthInstruction}
+
+Ensure the ${targetCoat.coat_name.toLowerCase()} coloring is consistent across ALL visible fur areas. Keep the same breed characteristics, clothing, pose, lighting, and overall composition. Only change the fur/coat color, pattern, and length as specified.`;
+  }
+
+  /**
+   * Get appropriate fur length instruction based on breed characteristics
+   */
+  private getFurLengthInstruction(breedName: string, breedCoatLength?: string): string {
+    // Use breed data if available
+    if (breedCoatLength) {
+      switch (breedCoatLength.toLowerCase()) {
+        case 'short':
+          return 'Make sure the fur length is SHORT and close to the body, especially on the legs and paws.';
+        case 'long':
+          return 'Make sure the fur length is LONG and flowing, especially around the legs and paws.';
+        case 'medium':
+          return 'Make sure the fur length is MEDIUM length, not too short but not overly long.';
+        default:
+          break;
+      }
+    }
+    
+    // Fallback to breed-specific knowledge for common breeds
+    const shortHairedBreeds = [
+      'beagle', 'boxer', 'bulldog', 'chihuahua', 'dachshund', 'doberman', 
+      'french bulldog', 'german shorthaired pointer', 'greyhound', 'jack russell',
+      'labrador', 'pit bull', 'pug', 'rottweiler', 'whippet', 'weimaraner',
+      'boston terrier', 'staffordshire', 'pointer', 'vizsla'
+    ];
+    
+    const longHairedBreeds = [
+      'afghan hound', 'australian shepherd', 'bernese mountain dog', 'border collie',
+      'collie', 'cocker spaniel', 'golden retriever', 'irish setter', 'newfoundland',
+      'old english sheepdog', 'pomeranian', 'shih tzu', 'tibetan mastiff', 'yorkshire terrier',
+      'maltese', 'lhasa apso', 'pekingese', 'chow chow'
+    ];
+    
+    const breedLower = breedName.toLowerCase();
+    
+    if (shortHairedBreeds.some(breed => breedLower.includes(breed))) {
+      return 'Make sure the fur length is SHORT and close to the body, especially on the legs and paws. This breed should not have long or fluffy fur.';
+    }
+    
+    if (longHairedBreeds.some(breed => breedLower.includes(breed))) {
+      return 'Make sure the fur length is appropriately LONG for this breed, especially around the legs and paws.';
+    }
+    
+    // Default instruction
+    return 'Adjust the fur length to be appropriate for this breed type.';
   }
 
   /**
