@@ -10,6 +10,7 @@ import { SupabaseService } from '@/lib/supabase';
 import type { ImageCatalogWithDetails, Breed, Outfit, Format, BreedCoatDetail } from '@/lib/types';
 import { Textarea } from '@/components/ui/textarea';
 import { Copy, ArrowLeft, CheckCircle, Brain } from 'lucide-react';
+import { uploadImagesDirectBatch } from '@/lib/cloudinary-client';
 
 interface ImageVariantGenerationModalProps {
   image: ImageCatalogWithDetails | null;
@@ -517,23 +518,101 @@ export default function ImageVariantGenerationModal({
     setSaveResults([]);
 
     try {
-      const response = await fetch('/api/admin/save-variations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ variations })
+      // First, convert base64 data to File objects for Cloudinary upload
+      const filesToUpload = variations.map(variation => {
+        const imageBuffer = Buffer.from(variation.imageData, 'base64');
+        const file = new File([imageBuffer], variation.filename, { type: 'image/png' });
+        return file;
       });
 
-      if (response.ok) {
-        const results = await response.json();
-        setSaveResults(results);
-        
-        if (onVariationsGenerated) {
-          onVariationsGenerated();
+      console.log(`Uploading ${filesToUpload.length} variations to Cloudinary...`);
+
+      // Upload to Cloudinary using the same method as admin generate
+      const cloudinaryResults = await uploadImagesDirectBatch(
+        filesToUpload,
+        {
+          tags: ['variation', 'gemini-generated', 'admin-upload'].filter(Boolean)
+        },
+        (uploaded, total, current) => {
+          console.log(`📤 Variation upload progress: ${uploaded}/${total} - ${current}`);
         }
-      } else {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error);
+      );
+
+      console.log('✅ All variations uploaded to Cloudinary successfully');
+
+      // Now save metadata to database for each uploaded variation
+      const results = [];
+      for (let i = 0; i < cloudinaryResults.length; i++) {
+        const cloudinaryResult = cloudinaryResults[i];
+        const variation = variations[i];
+        
+        try {
+          console.log(`💾 Saving metadata for variation ${i + 1}/${variations.length}: ${variation.filename}`);
+          
+          const response = await fetch('/api/images/cloudinary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cloudinary_public_id: cloudinaryResult.public_id,
+              cloudinary_secure_url: cloudinaryResult.secure_url,
+              cloudinary_signature: cloudinaryResult.signature,
+              original_filename: variation.filename,
+              file_size: cloudinaryResult.bytes,
+              mime_type: 'image/png',
+              width: cloudinaryResult.width,
+              height: cloudinaryResult.height,
+              prompt_text: variation.prompt,
+              description: variation.description || `Generated variation: ${variation.variation_type}`,
+              tags: variation.metadata?.tags || ['variation', 'gemini-generated'],
+              breed_id: variation.metadata?.breed_id || undefined,
+              theme_id: variation.theme_id || undefined,
+              style_id: variation.style_id || undefined,
+              format_id: variation.metadata?.format_id || undefined,
+              coat_id: variation.metadata?.coat_id || undefined,
+              rating: variation.rating || 4,
+              is_featured: variation.is_featured || false,
+              is_public: variation.is_public !== false
+            })
+          });
+          
+          if (response.ok) {
+            const dbResult = await response.json();
+            results.push({
+              success: true,
+              variation_type: variation.variation_type,
+              breed_name: variation.breed_name,
+              coat_name: variation.coat_name,
+              outfit_name: variation.outfit_name,
+              format_name: variation.format_name,
+              cloudinary_url: cloudinaryResult.secure_url,
+              database_id: dbResult.id
+            });
+            console.log(`✅ Variation ${i + 1} saved successfully: ID ${dbResult.id}`);
+          } else {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            results.push({
+              success: false,
+              error: `Database save failed: ${errorData.error}`,
+              variation_type: variation.variation_type
+            });
+            console.error(`❌ Database save failed for variation ${i + 1}:`, errorData.error);
+          }
+        } catch (variationError) {
+          results.push({
+            success: false,
+            error: `Save error: ${variationError instanceof Error ? variationError.message : 'Unknown error'}`,
+            variation_type: variation.variation_type
+          });
+          console.error(`❌ Error saving variation ${i + 1}:`, variationError);
+        }
       }
+
+      setSaveResults(results);
+      
+      if (onVariationsGenerated) {
+        onVariationsGenerated();
+      }
+      
     } catch (error) {
       console.error('Error saving variations:', error);
       alert(`Failed to save variations: ${error instanceof Error ? error.message : 'Unknown error'}`);
