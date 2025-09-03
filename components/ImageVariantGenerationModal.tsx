@@ -78,12 +78,12 @@ function VariationPreviewStep({
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {saveResults.map((result, index) => (
             <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
-              <div className="w-12 h-12 bg-gray-200 rounded flex-shrink-0">
+              <div className="w-12 bg-gray-200 rounded flex-shrink-0" style={{ aspectRatio: '1:1' }}>
                 {result.cloudinary_url && (
                   <img
                     src={result.cloudinary_url}
                     alt={`Saved variation ${index + 1}`}
-                    className="w-full h-full object-cover rounded"
+                    className="w-full h-full object-contain rounded"
                   />
                 )}
               </div>

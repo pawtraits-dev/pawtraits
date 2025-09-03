@@ -432,11 +432,11 @@ export default function AdminCatalogPage() {
           {images.map((image) => (
             <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden cursor-pointer" onClick={() => handleCardClick(image)}>
               {/* Image */}
-              <div className="relative aspect-square overflow-hidden bg-gray-100">
+              <div className="relative overflow-hidden bg-gray-100 rounded-t-lg" style={{ aspectRatio: image.format_aspect_ratio || '1:1' }}>
                 <CatalogImage
                   imageId={image.id}
                   alt={image.description || 'Generated image'}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                 />
                 {image.rating && image.rating > 0 && (
                   <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
@@ -786,11 +786,11 @@ function ImageDetailModal({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left side - Image */}
           <div className="space-y-4">
-            <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
+            <div className="overflow-hidden rounded-lg bg-gray-100" style={{ aspectRatio: image.format_aspect_ratio || '1:1' }}>
               <CatalogImage
                 imageId={image.id}
                 alt={image.description || 'Generated image'}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
             </div>
             
