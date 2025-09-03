@@ -70,12 +70,16 @@ export class GeminiVariationService {
         if (response.candidates?.[0]?.content?.parts) {
           for (const part of response.candidates[0].content.parts) {
             if (part.inlineData?.data) {
+              // Generate Midjourney prompt for catalog storage
+              const midjourneyPrompt = this.createMidjourneyPromptForBreed(originalPrompt, breed, currentTheme, currentStyle);
+              
               variations.push({
                 imageData: part.inlineData.data,
-                prompt: variationPrompt,
+                prompt: midjourneyPrompt, // Store Midjourney prompt for catalog
                 metadata: {
                   breed,
-                  variation_type: 'breed'
+                  variation_type: 'breed',
+                  gemini_prompt: variationPrompt // Store Gemini prompt for reference
                 }
               });
             }
@@ -124,13 +128,17 @@ export class GeminiVariationService {
         if (response.candidates?.[0]?.content?.parts) {
           for (const part of response.candidates[0].content.parts) {
             if (part.inlineData?.data) {
+              // Generate Midjourney prompt for catalog storage
+              const midjourneyPrompt = this.createMidjourneyPromptForCoat(originalPrompt, breed, coat, currentTheme, currentStyle);
+              
               variations.push({
                 imageData: part.inlineData.data,
-                prompt: variationPrompt,
+                prompt: midjourneyPrompt, // Store Midjourney prompt for catalog
                 metadata: {
                   breed,
                   coat,
-                  variation_type: 'coat'
+                  variation_type: 'coat',
+                  gemini_prompt: variationPrompt // Store Gemini prompt for reference
                 }
               });
             }
@@ -178,12 +186,16 @@ export class GeminiVariationService {
         if (response.candidates?.[0]?.content?.parts) {
           for (const part of response.candidates[0].content.parts) {
             if (part.inlineData?.data) {
+              // Generate Midjourney prompt for catalog storage
+              const midjourneyPrompt = this.createMidjourneyPromptForOutfit(originalPrompt, outfit, currentTheme, currentStyle);
+              
               variations.push({
                 imageData: part.inlineData.data,
-                prompt: variationPrompt,
+                prompt: midjourneyPrompt, // Store Midjourney prompt for catalog
                 metadata: {
                   outfit,
-                  variation_type: 'outfit'
+                  variation_type: 'outfit',
+                  gemini_prompt: variationPrompt // Store Gemini prompt for reference
                 }
               });
             }
@@ -231,12 +243,16 @@ export class GeminiVariationService {
         if (response.candidates?.[0]?.content?.parts) {
           for (const part of response.candidates[0].content.parts) {
             if (part.inlineData?.data) {
+              // Generate Midjourney prompt for catalog storage
+              const midjourneyPrompt = this.createMidjourneyPromptForFormat(originalPrompt, format, currentTheme, currentStyle);
+              
               variations.push({
                 imageData: part.inlineData.data,
-                prompt: variationPrompt,
+                prompt: midjourneyPrompt, // Store Midjourney prompt for catalog
                 metadata: {
                   format,
-                  variation_type: 'format'
+                  variation_type: 'format',
+                  gemini_prompt: variationPrompt // Store Gemini prompt for reference
                 }
               });
             }
@@ -348,9 +364,73 @@ export class GeminiVariationService {
   }
 
   /**
-   * Create breed variation prompt using standardized Midjourney format
+   * Create breed variation prompt for Gemini image editing
    */
   private createBreedVariationPrompt(
+    originalPrompt: string, 
+    targetBreed: Breed, 
+    currentTheme?: any, 
+    currentStyle?: any
+  ): string {
+    const { breed, coat, outfit } = this.parseOriginalPrompt(originalPrompt);
+    
+    return `Using the provided image of a ${breed.toLowerCase()} wearing ${outfit}, change the breed to a ${targetBreed.name.toLowerCase()}. Keep the same ${coat} fur color, clothing, pose, lighting, and overall composition. Only change the dog/cat breed characteristics like head shape, ear type, body size, and facial features to match a ${targetBreed.name.toLowerCase()}.`;
+  }
+
+  /**
+   * Create coat variation prompt for Gemini image editing
+   */
+  private createCoatVariationPrompt(
+    originalPrompt: string, 
+    breed: Breed, 
+    targetCoat: BreedCoatDetail,
+    currentTheme?: any,
+    currentStyle?: any
+  ): string {
+    const { coat, outfit } = this.parseOriginalPrompt(originalPrompt);
+    
+    return `Using the provided image of a ${breed.name.toLowerCase()} with ${coat} fur wearing ${outfit}, change the fur color to ${targetCoat.coat_name.toLowerCase()}. Keep the same breed, clothing, pose, lighting, and overall composition. Only change the fur/coat color and pattern to match ${targetCoat.coat_name.toLowerCase()} coloring.`;
+  }
+
+  /**
+   * Create outfit variation prompt using standardized Midjourney format
+   */
+  private createOutfitVariationPrompt(
+    originalPrompt: string, 
+    targetOutfit: Outfit,
+    currentTheme?: any,
+    currentStyle?: any
+  ): string {
+    const { breed, coat, outfit } = this.parseOriginalPrompt(originalPrompt);
+    
+    const outfitText = targetOutfit.name === 'No Outfit' ? 'no outfit' : targetOutfit.clothing_description || targetOutfit.name.toLowerCase();
+    
+    return `Using the provided image of a ${breed} with ${coat} fur wearing ${outfit}, change the clothing/outfit to ${outfitText}. Keep the same breed, fur color, pose, lighting, and overall composition. Only change what the pet is wearing.`;
+  }
+
+  /**
+   * Create format variation prompt for Gemini image editing
+   */
+  private createFormatVariationPrompt(
+    originalPrompt: string, 
+    targetFormat: Format,
+    currentTheme?: any,
+    currentStyle?: any
+  ): string {
+    const { breed, coat, outfit } = this.parseOriginalPrompt(originalPrompt);
+    
+    const aspectInstructions = targetFormat.aspect_ratio === '1:1' ? 'square format' :
+                              targetFormat.aspect_ratio === '2:3' ? 'portrait format (2:3 aspect ratio)' :
+                              targetFormat.aspect_ratio === '3:2' ? 'landscape format (3:2 aspect ratio)' :
+                              `${targetFormat.aspect_ratio} aspect ratio`;
+    
+    return `Using the provided image of a ${breed} with ${coat} fur wearing ${outfit}, reframe and adjust the composition for ${aspectInstructions}. ${targetFormat.prompt_adjustments || ''}. Keep the same breed, fur color, clothing, pose, and lighting. Only change the aspect ratio and composition to fit the ${aspectInstructions}.`;
+  }
+
+  /**
+   * Create Midjourney prompt for breed variation (for catalog storage)
+   */
+  private createMidjourneyPromptForBreed(
     originalPrompt: string, 
     targetBreed: Breed, 
     currentTheme?: any, 
@@ -365,9 +445,9 @@ export class GeminiVariationService {
   }
 
   /**
-   * Create coat variation prompt using standardized Midjourney format
+   * Create Midjourney prompt for coat variation (for catalog storage)
    */
-  private createCoatVariationPrompt(
+  private createMidjourneyPromptForCoat(
     originalPrompt: string, 
     breed: Breed, 
     targetCoat: BreedCoatDetail,
@@ -383,9 +463,9 @@ export class GeminiVariationService {
   }
 
   /**
-   * Create outfit variation prompt using standardized Midjourney format
+   * Create Midjourney prompt for outfit variation (for catalog storage)
    */
-  private createOutfitVariationPrompt(
+  private createMidjourneyPromptForOutfit(
     originalPrompt: string, 
     targetOutfit: Outfit,
     currentTheme?: any,
@@ -401,9 +481,9 @@ export class GeminiVariationService {
   }
 
   /**
-   * Create format variation prompt using standardized Midjourney format
+   * Create Midjourney prompt for format variation (for catalog storage)
    */
-  private createFormatVariationPrompt(
+  private createMidjourneyPromptForFormat(
     originalPrompt: string, 
     targetFormat: Format,
     currentTheme?: any,

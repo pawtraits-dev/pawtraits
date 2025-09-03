@@ -152,10 +152,19 @@ function VariationPreviewStep({
                     </div>
                   )}
                   
-                  {variation.prompt && (
+                  {(variation.metadata?.gemini_prompt || variation.prompt) && (
                     <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
                       <p className="font-medium text-blue-800 mb-1">Gemini Prompt:</p>
-                      <p className="text-blue-700 font-mono text-xs break-all">{variation.prompt}</p>
+                      <p className="text-blue-700 font-mono text-xs break-all">
+                        {variation.metadata?.gemini_prompt || variation.prompt}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {variation.prompt && variation.metadata?.gemini_prompt && (
+                    <div className="mt-2 p-2 bg-green-50 rounded text-xs">
+                      <p className="font-medium text-green-800 mb-1">Midjourney Prompt (for catalog):</p>
+                      <p className="text-green-700 font-mono text-xs break-all">{variation.prompt}</p>
                     </div>
                   )}
                   
