@@ -130,11 +130,11 @@ function VariationPreviewStep({
                 onCheckedChange={() => toggleVariationSelection(variation.id)}
               />
               <div className="flex-1">
-                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-2">
+                <div className="bg-gray-100 rounded-lg overflow-hidden mb-2" style={{ aspectRatio: variation.metadata.format?.aspect_ratio || '1:1' }}>
                   <img
                     src={`data:image/png;base64,${variation.imageData}`}
                     alt={variation.variation_type}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                 </div>
                 <div className="space-y-2">
