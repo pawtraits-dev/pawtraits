@@ -144,90 +144,27 @@ export async function POST(request: NextRequest) {
       results.push(...formatVariations);
     }
 
-    // Process variations for upload
+    // Process variations for preview - just return the generated images with metadata
     const processedVariations = geminiService.processVariationsForUpload(results);
     
-    // Upload to Cloudinary and save to database
-    const uploadResults = [];
-    
-    for (const variation of processedVariations) {
-      try {
-        // Upload buffer directly to Cloudinary
-        const cloudinary = require('cloudinary').v2;
-        
-        const uploadResult = await new Promise((resolve, reject) => {
-          cloudinary.uploader.upload_stream(
-            {
-              resource_type: 'image',
-              public_id: variation.filename.replace('.png', ''),
-              tags: ['variation', 'gemini-generated', ...variation.metadata.tags],
-              context: `variation_type=${variation.metadata.variation_type}`
-            },
-            (error: any, result: any) => {
-              if (error) reject(error);
-              else resolve(result);
-            }
-          ).end(variation.imageBuffer);
-        }) as any;
-        
-        if (uploadResult) {
-          
-          // Save to database directly
-          const { data: dbResult, error: dbError } = await supabase
-            .from('image_catalog')
-            .insert({
-              cloudinary_public_id: uploadResult.public_id,
-              cloudinary_secure_url: uploadResult.secure_url,
-              cloudinary_signature: uploadResult.signature,
-              original_filename: variation.filename,
-              file_size: uploadResult.bytes,
-              mime_type: 'image/png',
-              width: uploadResult.width,
-              height: uploadResult.height,
-              prompt_text: variation.metadata.prompt,
-              description: `Generated variation: ${variation.metadata.variation_type}`,
-              tags: variation.metadata.tags,
-              breed_id: variation.metadata.breed_id || null,
-              coat_id: variation.metadata.coat_id || null,
-              outfit_id: variation.metadata.outfit_id || null,
-              format_id: variation.metadata.format_id || null,
-              is_public: true,
-              is_featured: false,
-              rating: 4 // Auto-rate variations as 4 stars
-            })
-            .select()
-            .single();
-          
-          if (!dbError && dbResult) {
-            uploadResults.push({
-              success: true,
-              variation_type: variation.metadata.variation_type,
-              breed_name: results.find(r => r.metadata.breed?.id === variation.metadata.breed_id)?.metadata.breed?.name,
-              coat_name: results.find(r => r.metadata.coat?.id === variation.metadata.coat_id)?.metadata.coat?.coat_name,
-              outfit_name: results.find(r => r.metadata.outfit?.id === variation.metadata.outfit_id)?.metadata.outfit?.name,
-              format_name: results.find(r => r.metadata.format?.id === variation.metadata.format_id)?.metadata.format?.name,
-              cloudinary_url: uploadResult.secure_url,
-              database_id: dbResult.id
-            });
-          } else {
-            uploadResults.push({
-              success: false,
-              error: `Database save failed: ${dbError?.message || 'Unknown error'}`,
-              variation_type: variation.metadata.variation_type
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error processing variation:', error);
-        uploadResults.push({
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          variation_type: variation.metadata.variation_type
-        });
-      }
-    }
+    // Convert image buffers to base64 for frontend preview
+    const previewResults = processedVariations.map((variation) => ({
+      id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      imageData: variation.imageBuffer.toString('base64'),
+      filename: variation.filename,
+      prompt: variation.metadata.prompt,
+      metadata: variation.metadata,
+      variation_type: variation.metadata.variation_type,
+      breed_name: results.find(r => r.metadata.breed?.id === variation.metadata.breed_id)?.metadata.breed?.name,
+      coat_name: results.find(r => r.metadata.coat?.id === variation.metadata.coat_id)?.metadata.coat?.coat_name,
+      outfit_name: results.find(r => r.metadata.outfit?.id === variation.metadata.outfit_id)?.metadata.outfit?.name,
+      format_name: results.find(r => r.metadata.format?.id === variation.metadata.format_id)?.metadata.format?.name,
+      theme_id: currentTheme,
+      style_id: currentStyle
+    }));
 
-    return NextResponse.json(uploadResults);
+    console.log(`Generated ${previewResults.length} variations for preview`);
+    return NextResponse.json(previewResults);
     
   } catch (error) {
     console.error('Variation generation error:', error);
