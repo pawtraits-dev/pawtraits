@@ -22,6 +22,7 @@ interface VariationPreviewStepProps {
   image: ImageCatalogWithDetails;
   variations: any[];
   onGenerateAIDescription: (variation: any) => void;
+  onUpdateVariation: (updatedVariation: any) => void;
   onApproveAll: () => void;
   onApproveSelected: (selectedIds: string[]) => void;
   onBackToSelection: () => void;
@@ -33,6 +34,7 @@ function VariationPreviewStep({
   image,
   variations,
   onGenerateAIDescription,
+  onUpdateVariation,
   onApproveAll,
   onApproveSelected,
   onBackToSelection,
@@ -143,15 +145,17 @@ function VariationPreviewStep({
                     <div className="mt-2">
                       <Textarea
                         value={variation.aiDescription}
-                        onChange={(e) => {
-                          const updatedVariations = variations.map(v => 
-                            v.id === variation.id ? { ...v, aiDescription: e.target.value } : v
-                          );
-                          // This would need to be passed back up to update state
-                        }}
+                        readOnly
                         className="text-xs"
                         rows={3}
                       />
+                    </div>
+                  )}
+                  
+                  {variation.prompt && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
+                      <p className="font-medium text-blue-800 mb-1">Gemini Prompt:</p>
+                      <p className="text-blue-700 font-mono text-xs break-all">{variation.prompt}</p>
                     </div>
                   )}
                   
@@ -561,6 +565,12 @@ export default function ImageVariantGenerationModal({
             image={image}
             variations={generatedVariations}
             onGenerateAIDescription={generateAIDescription}
+            onUpdateVariation={(updatedVariation) => {
+              const updatedVariations = generatedVariations.map(v => 
+                v.id === updatedVariation.id ? updatedVariation : v
+              );
+              setGeneratedVariations(updatedVariations);
+            }}
             onApproveAll={handleApproveAll}
             onApproveSelected={handleApproveSelected}
             onBackToSelection={handleBackToSelection}
