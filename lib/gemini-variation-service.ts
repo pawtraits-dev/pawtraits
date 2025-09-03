@@ -364,7 +364,68 @@ export class GeminiVariationService {
   }
 
   /**
-   * Create breed variation prompt for Gemini image editing
+   * Generate breed variations with valid coat colors (multiple coats per breed)
+   */
+  async generateBreedVariationsWithValidCoat(
+    originalImageData: string,
+    originalPrompt: string,
+    targetBreeds: Breed[],
+    validCoat: any,
+    currentTheme?: any,
+    currentStyle?: any
+  ): Promise<GeneratedVariation[]> {
+    const variations: GeneratedVariation[] = [];
+
+    for (const breed of targetBreeds) {
+      try {
+        const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, breed, validCoat, currentTheme, currentStyle);
+        
+        const prompt = [
+          { text: variationPrompt },
+          {
+            inlineData: {
+              mimeType: "image/png",
+              data: originalImageData,
+            },
+          },
+        ];
+
+        const response = await this.ai.models.generateContent({
+          model: "gemini-2.5-flash-image-preview",
+          contents: prompt,
+        });
+
+        if (response.candidates?.[0]?.content?.parts) {
+          for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData?.data) {
+              // Generate Midjourney prompt for catalog storage with valid coat
+              const midjourneyPrompt = this.createMidjourneyPromptForBreedWithCoat(originalPrompt, breed, validCoat, currentTheme, currentStyle);
+              
+              variations.push({
+                imageData: part.inlineData.data,
+                prompt: midjourneyPrompt,
+                metadata: {
+                  breed,
+                  coat: validCoat,
+                  variation_type: 'breed',
+                  breed_id: breed.id,
+                  coat_id: validCoat.id,
+                  gemini_prompt: variationPrompt
+                }
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to generate breed variation for ${breed.name} with ${validCoat.coat_name}:`, error);
+      }
+    }
+
+    return variations;
+  }
+
+  /**
+   * Create breed variation prompt for Gemini image editing (legacy method)
    */
   private createBreedVariationPrompt(
     originalPrompt: string, 
@@ -380,6 +441,26 @@ export class GeminiVariationService {
     const furLengthInstruction = this.getFurLengthInstruction(targetBreed.name, breedCoatLength);
     
     return `Using the provided image of a ${breed.toLowerCase()} wearing ${outfit}, change the breed to a ${targetBreed.name.toLowerCase()}. Keep the same ${coat} fur color throughout ALL body parts (face, legs, paws, body, tail), clothing, pose, lighting, and overall composition.\n\n${furLengthInstruction}\n\nOnly change the dog/cat breed characteristics like head shape, ear type, body size, facial features, and fur length to match a ${targetBreed.name.toLowerCase()}. Ensure fur color remains consistent across all visible areas.`;
+  }
+
+  /**
+   * Create breed variation prompt with valid coat color
+   */
+  private createBreedVariationPromptWithCoat(
+    originalPrompt: string, 
+    targetBreed: Breed, 
+    validCoat: any,
+    currentTheme?: any, 
+    currentStyle?: any
+  ): string {
+    const { breed, outfit } = this.parseOriginalPrompt(originalPrompt);
+    
+    // Get fur length instruction for the target breed
+    const breedPhysicalTraits = targetBreed.physical_traits as any || {};
+    const breedCoatLength = breedPhysicalTraits.coat;
+    const furLengthInstruction = this.getFurLengthInstruction(targetBreed.name, breedCoatLength);
+    
+    return `Using the provided image of a ${breed.toLowerCase()} wearing ${outfit}, change the breed to a ${targetBreed.name.toLowerCase()} and change the fur color to ${validCoat.coat_name.toLowerCase()}. Apply the ${validCoat.coat_name.toLowerCase()} coloring throughout ALL body parts:\n- Face and head fur\n- Body and torso fur\n- All four legs completely\n- All four paws and feet\n- Tail fur\n- Any visible undercoat\n\n${furLengthInstruction}\n\nChange the breed characteristics (head shape, ear type, body size, facial features) and ensure the ${validCoat.coat_name.toLowerCase()} fur color is realistic and consistent for this ${targetBreed.name.toLowerCase()} breed. Keep the same clothing, pose, lighting, and overall composition.`;
   }
 
   /**
@@ -511,6 +592,24 @@ Ensure the ${targetCoat.coat_name.toLowerCase()} coloring is consistent across A
     const stylePrompt = currentStyle?.prompt_suffix || '';
     
     return `A ${targetBreed.name.toLowerCase()} with ${coat} fur, wearing ${outfit}, ${themePrompt}, ${stylePrompt}, --ar ${aspectRatio}`.replace(/,\s*,/g, ',').trim();
+  }
+
+  /**
+   * Create Midjourney prompt for breed variation with valid coat (for catalog storage)
+   */
+  private createMidjourneyPromptForBreedWithCoat(
+    originalPrompt: string, 
+    targetBreed: Breed, 
+    validCoat: any,
+    currentTheme?: any, 
+    currentStyle?: any
+  ): string {
+    const { outfit, aspectRatio } = this.parseOriginalPrompt(originalPrompt);
+    
+    const themePrompt = currentTheme?.base_prompt_template || '';
+    const stylePrompt = currentStyle?.prompt_suffix || '';
+    
+    return `A ${targetBreed.name.toLowerCase()} with ${validCoat.coat_name.toLowerCase()} fur, wearing ${outfit}, ${themePrompt}, ${stylePrompt}, --ar ${aspectRatio}`.replace(/,\s*,/g, ',').trim();
   }
 
   /**

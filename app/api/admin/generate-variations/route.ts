@@ -78,15 +78,57 @@ export async function POST(request: NextRequest) {
         variationConfig.breeds.includes(breed.id)
       );
       
-      const breedVariations = await geminiService.generateBreedVariations(
-        originalImageData,
-        originalPrompt,
-        targetBreeds,
-        currentThemeData,
-        currentStyleData
-      );
-      
-      results.push(...breedVariations);
+      // For each breed, load valid coats and generate variations with appropriate colors
+      for (const targetBreed of targetBreeds) {
+        try {
+          // Get valid coats for this specific breed
+          const { data: breedCoatsData } = await supabase
+            .from('breed_coats')
+            .select(`
+              id,
+              breeds!inner(id, name, slug, animal_type),
+              coats!inner(id, name, slug, hex_color, pattern_type, rarity)
+            `)
+            .eq('breeds.id', targetBreed.id);
+
+          if (breedCoatsData && breedCoatsData.length > 0) {
+            const validCoats = breedCoatsData.map((item: any) => ({
+              id: item.coats.id,
+              breed_coat_id: item.id,
+              coat_name: item.coats.name,
+              coat_slug: item.coats.slug,
+              hex_color: item.coats.hex_color,
+              pattern_type: item.coats.pattern_type,
+              rarity: item.coats.rarity
+            }));
+
+            // Generate variations for multiple coat colors per breed
+            // Prioritize common coats first, then others (limit to 3-4 most common to avoid too many variations)
+            const commonCoats = validCoats.filter((c: any) => c.rarity === 'common');
+            const otherCoats = validCoats.filter((c: any) => c.rarity !== 'common');
+            const selectedCoats = [...commonCoats, ...otherCoats].slice(0, 4); // Max 4 coat variations per breed
+
+            for (const selectedCoat of selectedCoats) {
+              try {
+                const breedVariations = await geminiService.generateBreedVariationsWithValidCoat(
+                  originalImageData,
+                  originalPrompt,
+                  [targetBreed],
+                  selectedCoat,
+                  currentThemeData,
+                  currentStyleData
+                );
+                
+                results.push(...breedVariations);
+              } catch (error) {
+                console.error(`Error generating ${targetBreed.name} with ${selectedCoat.coat_name}:`, error);
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Error loading coats for breed ${targetBreed.name}:`, error);
+        }
+      }
     }
 
     // Generate coat variations
