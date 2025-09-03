@@ -32,8 +32,13 @@ export async function POST(request: NextRequest) {
             {
               resource_type: 'image',
               public_id: variation.filename.replace('.png', ''),
-              tags: ['variation', 'gemini-generated', ...variation.metadata.tags],
-              context: `variation_type=${variation.metadata.variation_type}`
+              tags: ['variation', 'gemini-generated', 'ai-upscaled', ...variation.metadata.tags],
+              context: `variation_type=${variation.metadata.variation_type}`,
+              // AI upscaling for print quality - target 4x upscale for print requirements
+              transformation: [
+                { effect: 'upscale', width: 4096, height: 4096, crop: 'limit' },
+                { quality: 'auto:good' }
+              ]
             },
             (error: any, result: any) => {
               if (error) reject(error);
