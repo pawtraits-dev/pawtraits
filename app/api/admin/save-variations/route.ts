@@ -43,50 +43,73 @@ export async function POST(request: NextRequest) {
         }) as any;
         
         if (cloudinaryResult) {
-          // Save to database using the same API endpoint as admin generate
-          const dbResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}/api/images/cloudinary`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              cloudinary_public_id: cloudinaryResult.public_id,
-              cloudinary_secure_url: cloudinaryResult.secure_url,
-              cloudinary_signature: cloudinaryResult.signature,
-              original_filename: variation.filename,
-              file_size: cloudinaryResult.bytes,
-              mime_type: 'image/png',
-              width: cloudinaryResult.width,
-              height: cloudinaryResult.height,
-              prompt_text: variation.prompt,
-              description: variation.description || `Generated variation: ${variation.metadata.variation_type}`,
-              tags: variation.metadata.tags || [],
-              breed_id: variation.metadata.breed_id || undefined,
-              theme_id: variation.theme_id || undefined,
-              style_id: variation.style_id || undefined,
-              format_id: variation.metadata.format_id || undefined,
-              coat_id: variation.metadata.coat_id || undefined,
-              rating: variation.rating || 4,
-              is_featured: variation.is_featured || false,
-              is_public: variation.is_public !== false
-            })
+          console.log('Cloudinary upload successful, saving to database:', {
+            public_id: cloudinaryResult.public_id,
+            secure_url: cloudinaryResult.secure_url,
+            width: cloudinaryResult.width,
+            height: cloudinaryResult.height
           });
           
-          if (dbResponse.ok) {
-            const dbResult = await dbResponse.json();
-            uploadResults.push({
-              success: true,
-              variation_type: variation.metadata.variation_type,
-              breed_name: variation.breed_name,
-              coat_name: variation.coat_name,
-              outfit_name: variation.outfit_name,
-              format_name: variation.format_name,
-              cloudinary_url: cloudinaryResult.secure_url,
-              database_id: dbResult.id
-            });
-          } else {
-            const errorData = await dbResponse.json().catch(() => ({ error: 'Unknown error' }));
+          // Save directly to database using the service (same as original admin generate flow)
+          try {
+            const { data: dbResult, error: dbError } = await supabase
+              .from('image_catalog')
+              .insert({
+                cloudinary_public_id: cloudinaryResult.public_id,
+                cloudinary_secure_url: cloudinaryResult.secure_url,
+                cloudinary_signature: cloudinaryResult.signature,
+                original_filename: variation.filename,
+                public_url: cloudinaryResult.secure_url, // Required field!
+                storage_path: `cloudinary:${cloudinaryResult.public_id}`,
+                file_size: cloudinaryResult.bytes,
+                mime_type: 'image/png',
+                width: cloudinaryResult.width,
+                height: cloudinaryResult.height,
+                prompt_text: variation.prompt,
+                description: variation.description || `Generated variation: ${variation.metadata.variation_type}`,
+                tags: variation.metadata.tags || [],
+                breed_id: variation.metadata.breed_id || null,
+                theme_id: variation.theme_id || null,
+                style_id: variation.style_id || null,
+                format_id: variation.metadata.format_id || null,
+                coat_id: variation.metadata.coat_id || null,
+                rating: variation.rating || 4,
+                is_featured: variation.is_featured || false,
+                is_public: variation.is_public !== false
+              })
+              .select()
+              .single();
+            
+            if (!dbError && dbResult) {
+              console.log('Successfully saved variation to database:', {
+                id: dbResult.id,
+                filename: variation.filename,
+                variation_type: variation.metadata.variation_type
+              });
+              
+              uploadResults.push({
+                success: true,
+                variation_type: variation.metadata.variation_type,
+                breed_name: variation.breed_name,
+                coat_name: variation.coat_name,
+                outfit_name: variation.outfit_name,
+                format_name: variation.format_name,
+                cloudinary_url: cloudinaryResult.secure_url,
+                database_id: dbResult.id
+              });
+            } else {
+              console.error('Database save failed:', dbError);
+              uploadResults.push({
+                success: false,
+                error: `Database save failed: ${dbError?.message || 'Unknown error'}`,
+                variation_type: variation.metadata.variation_type
+              });
+            }
+          } catch (dbSaveError) {
+            console.error('Database save error:', dbSaveError);
             uploadResults.push({
               success: false,
-              error: `Database save failed: ${errorData.error}`,
+              error: `Database save error: ${dbSaveError instanceof Error ? dbSaveError.message : 'Unknown error'}`,
               variation_type: variation.metadata.variation_type
             });
           }

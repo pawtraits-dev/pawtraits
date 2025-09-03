@@ -450,13 +450,12 @@ export default function ImageVariantGenerationModal({
 
   const generateAIDescription = async (variation: any) => {
     try {
-      const response = await fetch('/api/generate-description/file', {
+      const response = await fetch('/api/generate-description/base64', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageData: variation.imageData,
-          breedName: variation.breed_name || image?.breed_name || '',
-          generateAsFile: false
+          breedName: variation.breed_name || image?.breed_name || ''
         })
       });
       
@@ -466,6 +465,8 @@ export default function ImageVariantGenerationModal({
           v.id === variation.id ? { ...v, aiDescription: result.description } : v
         );
         setGeneratedVariations(updatedVariations);
+      } else {
+        console.error('AI description generation failed:', await response.text());
       }
     } catch (error) {
       console.error('Error generating AI description:', error);
