@@ -533,6 +533,18 @@ export default function ImageVariantGenerationModal({
       const imageBlob = await imageResponse.blob();
       const imageData64 = await blobToBase64(imageBlob);
       
+      const variationConfigToSend = {
+        breedCoats: getSelectedBreedCoatPairs().map(pair => ({
+          breedId: pair.breedId,
+          coatId: pair.coatId
+        })),
+        outfits: selectedOutfits,
+        formats: selectedFormats
+      };
+      
+      console.log('Sending variationConfig:', variationConfigToSend);
+      console.log('Breed-coat pairs:', getSelectedBreedCoatPairs());
+      
       const response = await fetch('/api/admin/generate-variations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -544,14 +556,7 @@ export default function ImageVariantGenerationModal({
           currentTheme: image.theme_id || '',
           currentStyle: image.style_id || '',
           currentFormat: image.format_id || '', // Pass original format for inheritance
-          variationConfig: {
-            breedCoats: getSelectedBreedCoatPairs().map(pair => ({
-              breedId: pair.breedId,
-              coatId: pair.coatId
-            })),
-            outfits: selectedOutfits,
-            formats: selectedFormats
-          }
+          variationConfig: variationConfigToSend
         })
       });
       

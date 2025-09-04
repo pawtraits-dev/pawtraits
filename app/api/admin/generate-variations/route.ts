@@ -14,6 +14,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { originalImageData, originalPrompt, currentBreed, currentCoat, currentTheme, currentStyle, currentFormat, variationConfig } = body;
+    
+    console.log('Received variationConfig:', JSON.stringify(variationConfig, null, 2));
 
     if (!originalImageData || !originalPrompt) {
       return NextResponse.json({ error: 'Missing required data' }, { status: 400 });
@@ -131,6 +133,11 @@ export async function POST(request: NextRequest) {
               originalFormatData
             );
             
+            if (breedVariation) {
+              console.log(`✅ Generated variation for ${targetBreed.name} with ${validCoat.coat_name}`);
+            } else {
+              console.log(`❌ Failed to generate variation for ${targetBreed.name} with ${validCoat.coat_name}`);
+            }
             return breedVariation;
           } catch (error) {
             console.error(`Error generating breed-coat variation ${breedCoat.breedId}-${breedCoat.coatId}:`, error);
@@ -140,6 +147,7 @@ export async function POST(request: NextRequest) {
         
         const batchResults = await Promise.all(batchPromises);
         const validResults = batchResults.filter(result => result !== null);
+        console.log(`Batch completed: ${validResults.length} valid results out of ${batchResults.length} attempts`);
         results.push(...validResults);
         
         // Add delay between batches to prevent API rate limiting
