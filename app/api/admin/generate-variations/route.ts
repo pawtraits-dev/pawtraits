@@ -31,6 +31,11 @@ export async function POST(request: NextRequest) {
       }, { status: 413 });
     }
 
+    // Check if Gemini API key is available
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 });
+    }
+    
     const geminiService = new GeminiVariationService();
     const results = [];
 

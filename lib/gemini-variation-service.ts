@@ -31,8 +31,12 @@ export class GeminiVariationService {
   private ai: GoogleGenAI;
 
   constructor(apiKey?: string) {
+    const key = apiKey || process.env.GEMINI_API_KEY;
+    if (!key) {
+      throw new Error('Gemini API key is required');
+    }
     this.ai = new GoogleGenAI({
-      apiKey: apiKey || process.env.GEMINI_API_KEY
+      apiKey: key
     });
   }
 
@@ -410,6 +414,9 @@ export class GeminiVariationService {
         },
       ];
 
+      console.log(`Attempting Gemini generation for ${targetBreed.name} with ${validCoat.coat_name}`);
+      console.log(`Image data size: ${Math.round((originalImageData.length * 3) / 4 / 1024)}KB`);
+      
       const response = await this.ai.models.generateContent({
         model: "gemini-2.5-flash-image-preview",
         contents: prompt,
@@ -440,6 +447,15 @@ export class GeminiVariationService {
       }
     } catch (error) {
       console.error(`Failed to generate breed variation for ${targetBreed.name} with ${validCoat.coat_name}:`, error);
+      
+      // Add specific error handling for common Gemini issues
+      if (error && typeof error === 'object') {
+        if ('status' in error && error.status === 500) {
+          console.error('Gemini API returned 500 - possible quota exceeded or service unavailable');
+        } else if ('message' in error) {
+          console.error('Gemini API error message:', error.message);
+        }
+      }
     }
     
     return null;
