@@ -72,19 +72,38 @@ export default function AdminCatalogPage() {
 
   const loadData = async () => {
     try {
-      const [breedsData, themesData, stylesData, formatsData, outfitsData] = await Promise.all([
-        supabaseService.getBreeds(),
-        supabaseService.getThemes(),
-        supabaseService.getStyles(),
-        supabaseService.getFormats(),
-        supabaseService.getOutfits()
+      console.log('Loading filter data via API endpoints...');
+      
+      // Use API endpoints instead of direct Supabase calls for better error handling
+      const [breedsRes, themesRes, stylesRes, formatsRes, outfitsRes] = await Promise.all([
+        fetch('/api/breeds').catch(err => ({ ok: false, error: err })),
+        fetch('/api/themes').catch(err => ({ ok: false, error: err })),
+        fetch('/api/styles').catch(err => ({ ok: false, error: err })),
+        fetch('/api/formats').catch(err => ({ ok: false, error: err })),
+        fetch('/api/outfits').catch(err => ({ ok: false, error: err }))
       ]);
+
+      const breedsData = breedsRes.ok ? await breedsRes.json().catch(() => []) : [];
+      const themesData = themesRes.ok ? await themesRes.json().catch(() => []) : [];
+      const stylesData = stylesRes.ok ? await stylesRes.json().catch(() => []) : [];
+      const formatsData = formatsRes.ok ? await formatsRes.json().catch(() => []) : [];
+      const outfitsData = outfitsRes.ok ? await outfitsRes.json().catch(() => []) : [];
+
+      console.log('Loaded filter data via API:', { breedsData, themesData, stylesData, formatsData, outfitsData });
 
       setBreeds(breedsData?.filter((b: any) => b.is_active) || []);
       setThemes(themesData?.filter((t: any) => t.is_active) || []);
       setStyles(stylesData?.filter((s: any) => s.is_active) || []);
       setFormats(formatsData?.filter((f: any) => f.is_active) || []);
       setOutfits(outfitsData?.filter((o: any) => o.is_active) || []);
+      
+      console.log('Set filter state:', { 
+        breeds: breedsData?.filter((b: any) => b.is_active)?.length || 0,
+        themes: themesData?.filter((t: any) => t.is_active)?.length || 0,
+        styles: stylesData?.filter((s: any) => s.is_active)?.length || 0,
+        formats: formatsData?.filter((f: any) => f.is_active)?.length || 0,
+        outfits: outfitsData?.filter((o: any) => o.is_active)?.length || 0
+      });
     } catch (error) {
       console.error('Error loading filter data:', error);
     }
