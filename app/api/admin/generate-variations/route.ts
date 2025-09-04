@@ -73,16 +73,90 @@ export async function POST(request: NextRequest) {
     const currentStyleData = stylesData.find((s: any) => s.id === currentStyle);
     const originalFormatData = formatsData.find((f: any) => f.id === currentFormat);
 
-    // Generate breed variations
+    // Generate breed-coat combinations with batching for performance
+    if (variationConfig.breedCoats?.length > 0) {
+      const batchSize = 5; // Process 5 at a time to prevent API overload
+      const breedCoatBatches = [];
+      
+      for (let i = 0; i < variationConfig.breedCoats.length; i += batchSize) {
+        breedCoatBatches.push(variationConfig.breedCoats.slice(i, i + batchSize));
+      }
+      
+      console.log(`Processing ${variationConfig.breedCoats.length} breed-coat combinations in ${breedCoatBatches.length} batches`);
+      
+      for (const batch of breedCoatBatches) {
+        const batchPromises = batch.map(async (breedCoat: any) => {
+          try {
+            // Get breed data
+            const targetBreed = breedsData.find((breed: any) => breed.id === breedCoat.breedId);
+            if (!targetBreed) {
+              console.error(`Breed not found: ${breedCoat.breedId}`);
+              return null;
+            }
+            
+            // Get coat data with breed relationship validation
+            const { data: breedCoatData } = await supabase
+              .from('breed_coats')
+              .select(`
+                id,
+                breeds!inner(id, name, slug, animal_type),
+                coats!inner(id, name, slug, hex_color, pattern_type, rarity)
+              `)
+              .eq('breeds.id', breedCoat.breedId)
+              .eq('coats.id', breedCoat.coatId)
+              .single();
+              
+            if (!breedCoatData) {
+              console.error(`Invalid breed-coat combination: ${breedCoat.breedId}-${breedCoat.coatId}`);
+              return null;
+            }
+            
+            const validCoat = {
+              id: breedCoatData.coats.id,
+              breed_coat_id: breedCoatData.id,
+              coat_name: breedCoatData.coats.name,
+              coat_slug: breedCoatData.coats.slug,
+              hex_color: breedCoatData.coats.hex_color,
+              pattern_type: breedCoatData.coats.pattern_type,
+              rarity: breedCoatData.coats.rarity
+            };
+            
+            const breedVariation = await geminiService.generateSingleBreedVariationWithCoat(
+              originalImageData,
+              originalPrompt,
+              targetBreed,
+              validCoat,
+              currentThemeData,
+              currentStyleData,
+              originalFormatData
+            );
+            
+            return breedVariation;
+          } catch (error) {
+            console.error(`Error generating breed-coat variation ${breedCoat.breedId}-${breedCoat.coatId}:`, error);
+            return null;
+          }
+        });
+        
+        const batchResults = await Promise.all(batchPromises);
+        const validResults = batchResults.filter(result => result !== null);
+        results.push(...validResults);
+        
+        // Add delay between batches to prevent API rate limiting
+        if (breedCoatBatches.indexOf(batch) < breedCoatBatches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+        }
+      }
+    }
+    
+    // Legacy breed variations (maintained for backward compatibility)
     if (variationConfig.breeds?.length > 0) {
       const targetBreeds = breedsData.filter((breed: any) => 
         variationConfig.breeds.includes(breed.id)
       );
       
-      // For each breed, load valid coats and generate variations with appropriate colors
       for (const targetBreed of targetBreeds) {
         try {
-          // Get valid coats for this specific breed
           const { data: breedCoatsData } = await supabase
             .from('breed_coats')
             .select(`
@@ -103,11 +177,9 @@ export async function POST(request: NextRequest) {
               rarity: item.coats.rarity
             }));
 
-            // Generate variations for multiple coat colors per breed
-            // Prioritize common coats first, then others (limit to 3-4 most common to avoid too many variations)
             const commonCoats = validCoats.filter((c: any) => c.rarity === 'common');
             const otherCoats = validCoats.filter((c: any) => c.rarity !== 'common');
-            const selectedCoats = [...commonCoats, ...otherCoats].slice(0, 4); // Max 4 coat variations per breed
+            const selectedCoats = [...commonCoats, ...otherCoats].slice(0, 4);
 
             for (const selectedCoat of selectedCoats) {
               try {
@@ -118,7 +190,7 @@ export async function POST(request: NextRequest) {
                   selectedCoat,
                   currentThemeData,
                   currentStyleData,
-                  originalFormatData // Pass original format for inheritance
+                  originalFormatData
                 );
                 
                 if (breedVariation) {
@@ -135,7 +207,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate coat variations
+    // Legacy coat variations (maintained for backward compatibility)
     if (variationConfig.coats?.length > 0) {
       const currentBreedData = breedsData.find((breed: any) => breed.id === currentBreed);
       const targetCoats = coatsData.filter((coat: any) => 
@@ -150,7 +222,7 @@ export async function POST(request: NextRequest) {
           targetCoats,
           currentThemeData,
           currentStyleData,
-          originalFormatData // Pass original format for inheritance
+          originalFormatData
         );
         
         results.push(...coatVariations);

@@ -266,28 +266,26 @@ export default function ImageVariantGenerationModal({
   const [formats, setFormats] = useState<Format[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [selectedBreeds, setSelectedBreeds] = useState<string[]>([]);
-  const [selectedCoats, setSelectedCoats] = useState<string[]>([]);
+  const [selectedBreedCoats, setSelectedBreedCoats] = useState<{[breedId: string]: string[]}>({});
+  const [expandedBreeds, setExpandedBreeds] = useState<string[]>([]);
+  const [breedCoatsData, setBreedCoatsData] = useState<{[breedId: string]: BreedCoatDetail[]}>({});
   const [selectedOutfits, setSelectedOutfits] = useState<string[]>([]);
   const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
   
   // Search states for filtering
   const [breedSearch, setBreedSearch] = useState('');
-  const [coatSearch, setCoatSearch] = useState('');
   const [outfitSearch, setOutfitSearch] = useState('');
   const [formatSearch, setFormatSearch] = useState('');
   
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Filtered arrays based on search
-  const filteredBreeds = breeds.filter(breed => 
-    breed.id !== image?.breed_id && 
-    breed.name.toLowerCase().includes(breedSearch.toLowerCase())
-  );
-  
-  const filteredCoats = availableCoats.filter(coat =>
-    coat.coat_name.toLowerCase().includes(coatSearch.toLowerCase())
-  );
+  // Filtered arrays based on search - sort breeds alphabetically
+  const filteredBreeds = breeds
+    .filter(breed => 
+      breed.id !== image?.breed_id && 
+      breed.name.toLowerCase().includes(breedSearch.toLowerCase())
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
   
   const filteredOutfits = outfits.filter(outfit =>
     outfit.name.toLowerCase().includes(outfitSearch.toLowerCase()) ||
@@ -401,20 +399,77 @@ export default function ImageVariantGenerationModal({
     }
   };
 
-  const handleBreedToggle = (breedId: string) => {
-    setSelectedBreeds(prev => 
+  const toggleBreedExpansion = (breedId: string) => {
+    setExpandedBreeds(prev => 
       prev.includes(breedId) 
         ? prev.filter(id => id !== breedId)
         : [...prev, breedId]
     );
   };
 
-  const handleCoatToggle = (coatId: string) => {
-    setSelectedCoats(prev => 
-      prev.includes(coatId) 
-        ? prev.filter(id => id !== coatId)
-        : [...prev, coatId]
-    );
+  const loadBreedCoats = async (breedId: string) => {
+    if (breedCoatsData[breedId]) return; // Already loaded
+    
+    try {
+      const response = await fetch(`/api/breed-coats?breed_id=${breedId}`);
+      if (response.ok) {
+        const coatsData = await response.json();
+        const transformedCoats = coatsData?.map((item: any) => ({
+          id: item.coat_id,
+          breed_id: item.breed_id,
+          coat_id: item.coat_id,
+          coat_name: item.coats?.name || '',
+          hex_color: item.coats?.hex_color || '#000000',
+          popularity_rank: item.popularity_rank,
+          is_common: item.is_common,
+          is_standard: item.is_standard
+        })) || [];
+        
+        setBreedCoatsData(prev => ({
+          ...prev,
+          [breedId]: transformedCoats
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading breed coats:', error);
+    }
+  };
+
+  const handleBreedCoatToggle = (breedId: string, coatId: string) => {
+    setSelectedBreedCoats(prev => {
+      const currentCoats = prev[breedId] || [];
+      const newCoats = currentCoats.includes(coatId)
+        ? currentCoats.filter(id => id !== coatId)
+        : [...currentCoats, coatId];
+      
+      if (newCoats.length === 0) {
+        const { [breedId]: removed, ...rest } = prev;
+        return rest;
+      }
+      
+      return {
+        ...prev,
+        [breedId]: newCoats
+      };
+    });
+  };
+
+  const handleBreedSelectAll = (breedId: string, allCoats: BreedCoatDetail[]) => {
+    const coatIds = allCoats.map(coat => coat.id);
+    const currentSelection = selectedBreedCoats[breedId] || [];
+    const allSelected = coatIds.every(id => currentSelection.includes(id));
+    
+    if (allSelected) {
+      setSelectedBreedCoats(prev => {
+        const { [breedId]: removed, ...rest } = prev;
+        return rest;
+      });
+    } else {
+      setSelectedBreedCoats(prev => ({
+        ...prev,
+        [breedId]: coatIds
+      }));
+    }
   };
 
   const handleOutfitToggle = (outfitId: string) => {
@@ -434,7 +489,35 @@ export default function ImageVariantGenerationModal({
   };
 
   const getTotalVariations = () => {
-    return selectedBreeds.length + selectedCoats.length + selectedOutfits.length + selectedFormats.length;
+    const breedCoatVariations = Object.values(selectedBreedCoats).reduce((sum, coats) => sum + coats.length, 0);
+    return breedCoatVariations + selectedOutfits.length + selectedFormats.length;
+  };
+
+  const getSelectedBreedCoatPairs = (): {breedId: string, coatId: string}[] => {
+    const pairs: {breedId: string, coatId: string}[] = [];
+    Object.entries(selectedBreedCoats).forEach(([breedId, coatIds]) => {
+      coatIds.forEach(coatId => {
+        pairs.push({ breedId, coatId });
+      });
+    });
+    return pairs;
+  };
+
+  const handleSelectAllBreedCoats = async () => {
+    // Load coat data for all breeds first
+    const loadPromises = filteredBreeds.map(breed => loadBreedCoats(breed.id));
+    await Promise.all(loadPromises);
+    
+    // Select all coats for all breeds
+    const allBreedCoats: {[breedId: string]: string[]} = {};
+    filteredBreeds.forEach(breed => {
+      const coats = breedCoatsData[breed.id] || [];
+      if (coats.length > 0) {
+        allBreedCoats[breed.id] = coats.map(coat => coat.id);
+      }
+    });
+    
+    setSelectedBreedCoats(allBreedCoats);
   };
 
   const handleGenerateVariations = async () => {
@@ -462,8 +545,10 @@ export default function ImageVariantGenerationModal({
           currentStyle: image.style_id || '',
           currentFormat: image.format_id || '', // Pass original format for inheritance
           variationConfig: {
-            breeds: selectedBreeds,
-            coats: selectedCoats,
+            breedCoats: getSelectedBreedCoatPairs().map(pair => ({
+              breedId: pair.breedId,
+              coatId: pair.coatId
+            })),
             outfits: selectedOutfits,
             formats: selectedFormats
           }
@@ -481,6 +566,13 @@ export default function ImageVariantGenerationModal({
       const results = await response.json();
       setGeneratedVariations(results);
       setShowPreview(true);
+      
+      // Auto-generate AI descriptions for all variations
+      if (results.length > 0) {
+        console.log(`Auto-generating AI descriptions for ${results.length} variations...`);
+        const allVariationIds = results.map((v: any) => v.id);
+        await generateAIDescriptions(allVariationIds);
+      }
       
     } catch (error) {
       console.error('Variation generation error:', error);
@@ -700,6 +792,11 @@ export default function ImageVariantGenerationModal({
     setShowPreview(false);
     setGeneratedVariations([]);
     setSaveResults([]);
+    // Reset selections for fresh start
+    setSelectedBreedCoats({});
+    setSelectedOutfits([]);
+    setSelectedFormats([]);
+    setExpandedBreeds([]);
   };
 
   if (!image) return null;
@@ -774,25 +871,28 @@ export default function ImageVariantGenerationModal({
               </div>
             </div>
 
-            {/* Breed Variations */}
+            {/* Breed & Coat Variations - Nested Structure */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-medium text-gray-700">Breed Variations</h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const availableBreedIds = filteredBreeds.map(breed => breed.id);
-                    const allSelected = availableBreedIds.every(id => selectedBreeds.includes(id));
-                    if (allSelected) {
-                      setSelectedBreeds([]);
-                    } else {
-                      setSelectedBreeds(availableBreedIds);
-                    }
-                  }}
-                >
-                  {filteredBreeds.every(breed => selectedBreeds.includes(breed.id)) ? 'Deselect All' : 'Select All'}
-                </Button>
+                <h3 className="font-medium text-gray-700">Breed & Coat Variations</h3>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSelectAllBreedCoats}
+                    className="text-xs"
+                  >
+                    Select All Breed/Coat Combinations
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedBreedCoats({})}
+                    className="text-xs"
+                  >
+                    Clear All
+                  </Button>
+                </div>
               </div>
               
               {/* Breed Search */}
@@ -806,77 +906,85 @@ export default function ImageVariantGenerationModal({
                 />
               </div>
               
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-32 overflow-y-auto">
-                {filteredBreeds.map(breed => (
-                  <div key={breed.id} className="flex items-center space-x-2 p-2 border rounded-lg">
-                    <Checkbox
-                      id={`breed-${breed.id}`}
-                      checked={selectedBreeds.includes(breed.id)}
-                      onCheckedChange={() => handleBreedToggle(breed.id)}
-                    />
-                    <label htmlFor={`breed-${breed.id}`} className="text-sm cursor-pointer flex-1">
-                      {breed.name}
-                    </label>
-                  </div>
-                ))}
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {filteredBreeds.map(breed => {
+                  const isExpanded = expandedBreeds.includes(breed.id);
+                  const breedCoats = breedCoatsData[breed.id] || [];
+                  const selectedCoatsForBreed = selectedBreedCoats[breed.id] || [];
+                  
+                  return (
+                    <div key={breed.id} className="border rounded-lg">
+                      <div 
+                        className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50"
+                        onClick={() => {
+                          toggleBreedExpansion(breed.id);
+                          if (!isExpanded) {
+                            loadBreedCoats(breed.id);
+                          }
+                        }}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <span className={`transform transition-transform ${
+                            isExpanded ? 'rotate-90' : ''
+                          }`}>▶</span>
+                          <span className="font-medium text-sm">{breed.name}</span>
+                          {selectedCoatsForBreed.length > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {selectedCoatsForBreed.length} coat{selectedCoatsForBreed.length > 1 ? 's' : ''}
+                            </Badge>
+                          )}
+                        </div>
+                        {breedCoats.length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleBreedSelectAll(breed.id, breedCoats);
+                            }}
+                            className="text-xs"
+                          >
+                            {breedCoats.every(coat => selectedCoatsForBreed.includes(coat.id)) ? 'None' : 'All'}
+                          </Button>
+                        )}
+                      </div>
+                      
+                      {isExpanded && (
+                        <div className="px-3 pb-3">
+                          {breedCoats.length === 0 ? (
+                            <p className="text-xs text-gray-500 italic">Loading coat colors...</p>
+                          ) : (
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-1 ml-6">
+                              {breedCoats.map(coat => (
+                                <div key={coat.id} className="flex items-center space-x-2 p-2 border rounded">
+                                  <Checkbox
+                                    id={`breed-${breed.id}-coat-${coat.id}`}
+                                    checked={selectedCoatsForBreed.includes(coat.id)}
+                                    onCheckedChange={() => handleBreedCoatToggle(breed.id, coat.id)}
+                                  />
+                                  <div className="flex items-center space-x-1 flex-1">
+                                    <div 
+                                      className="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0"
+                                      style={{ backgroundColor: coat.hex_color }}
+                                    />
+                                    <label 
+                                      htmlFor={`breed-${breed.id}-coat-${coat.id}`} 
+                                      className="text-xs cursor-pointer leading-tight"
+                                    >
+                                      {coat.coat_name}
+                                    </label>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
-
-            {/* Coat Variations */}
-            {availableCoats.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-medium text-gray-700">Coat Variations</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const allCoatIds = filteredCoats.map(coat => coat.id);
-                      const allSelected = allCoatIds.every(id => selectedCoats.includes(id));
-                      if (allSelected) {
-                        setSelectedCoats([]);
-                      } else {
-                        setSelectedCoats(allCoatIds);
-                      }
-                    }}
-                  >
-                    {filteredCoats.every(coat => selectedCoats.includes(coat.id)) ? 'Deselect All' : 'Select All'}
-                  </Button>
-                </div>
-                
-                {/* Coat Search */}
-                <div className="relative mb-3">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
-                    placeholder="Search coat colors..."
-                    value={coatSearch}
-                    onChange={(e) => setCoatSearch(e.target.value)}
-                    className="pl-10 text-sm"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-32 overflow-y-auto">
-                  {filteredCoats.map(coat => (
-                    <div key={coat.id} className="flex items-center space-x-2 p-2 border rounded-lg">
-                      <Checkbox
-                        id={`coat-${coat.id}`}
-                        checked={selectedCoats.includes(coat.id)}
-                        onCheckedChange={() => handleCoatToggle(coat.id)}
-                      />
-                      <div className="flex items-center space-x-2 flex-1">
-                        <div 
-                          className="w-3 h-3 rounded-full border border-gray-300"
-                          style={{ backgroundColor: coat.hex_color }}
-                        />
-                        <label htmlFor={`coat-${coat.id}`} className="text-sm cursor-pointer">
-                          {coat.coat_name}
-                        </label>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Outfit Variations */}
             <div>
@@ -995,8 +1103,7 @@ export default function ImageVariantGenerationModal({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      setSelectedBreeds([]);
-                      setSelectedCoats([]);
+                      setSelectedBreedCoats({});
                       setSelectedOutfits([]);
                       setSelectedFormats([]);
                     }}
