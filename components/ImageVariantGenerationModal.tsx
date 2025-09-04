@@ -123,7 +123,7 @@ function VariationPreviewStep({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-        {variations.map((variation) => (
+        {console.log('Rendering variations in preview:', variations) || variations.map((variation) => (
           <div key={variation.id} className="border rounded-lg p-3 space-y-3">
             <div className="flex items-start gap-3">
               <Checkbox
@@ -569,6 +569,9 @@ export default function ImageVariantGenerationModal({
       }
       
       const results = await response.json();
+      console.log('Received variations from API:', results);
+      console.log('Number of variations received:', results?.length || 0);
+      
       setGeneratedVariations(results);
       setShowPreview(true);
       
