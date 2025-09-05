@@ -123,7 +123,10 @@ function VariationPreviewStep({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-        {console.log('Rendering variations in preview:', variations) || variations.map((variation) => (
+        {console.log('🎨 Rendering variations in preview:', variations) || 
+         console.log('🔢 Variations count:', variations?.length) || 
+         console.log('📋 Variations type:', typeof variations) || 
+         variations.map((variation) => (
           <div key={variation.id} className="border rounded-lg p-3 space-y-3">
             <div className="flex items-start gap-3">
               <Checkbox
@@ -571,16 +574,26 @@ export default function ImageVariantGenerationModal({
       }
       
       const results = await response.json();
-      console.log('Received variations from API:', results);
-      console.log('Number of variations received:', results?.length || 0);
+      console.log('✅ Received variations from API:', results);
+      console.log('📊 Number of variations received:', results?.length || 0);
+      console.log('🔍 Results structure check:', {
+        isArray: Array.isArray(results),
+        hasLength: results?.length,
+        firstItem: results?.[0],
+        keys: results ? Object.keys(results) : 'null'
+      });
       
-      setGeneratedVariations(results);
+      // Ensure results is an array
+      const variationsArray = Array.isArray(results) ? results : [];
+      console.log('🎯 Setting variations array:', variationsArray);
+      
+      setGeneratedVariations(variationsArray);
       setShowPreview(true);
       
       // Auto-generate AI descriptions for all variations
-      if (results.length > 0) {
-        console.log(`Auto-generating AI descriptions for ${results.length} variations...`);
-        const allVariationIds = results.map((v: any) => v.id);
+      if (variationsArray.length > 0) {
+        console.log(`Auto-generating AI descriptions for ${variationsArray.length} variations...`);
+        const allVariationIds = variationsArray.map((v: any) => v.id);
         await generateAIDescriptions(allVariationIds);
       }
       
