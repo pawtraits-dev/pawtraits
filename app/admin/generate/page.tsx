@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -136,11 +137,12 @@ export default function GeneratePromptsPage() {
         outfitsData = [];
       }
 
-      setBreeds(breedsData?.filter((b: any) => b.is_active) || []);
-      setThemes(themesData?.filter((t: any) => t.is_active) || []);
-      setStyles(stylesData?.filter((s: any) => s.is_active) || []);
-      setFormats(formatsData?.filter((f: any) => f.is_active) || []);
-      setOutfits(outfitsData?.filter((o: any) => o.is_active) || []);
+      // Sort data alphabetically after filtering
+      setBreeds((breedsData?.filter((b: any) => b.is_active) || []).sort((a: any, b: any) => a.name.localeCompare(b.name)));
+      setThemes((themesData?.filter((t: any) => t.is_active) || []).sort((a: any, b: any) => a.name.localeCompare(b.name)));
+      setStyles((stylesData?.filter((s: any) => s.is_active) || []).sort((a: any, b: any) => a.name.localeCompare(b.name)));
+      setFormats((formatsData?.filter((f: any) => f.is_active) || []).sort((a: any, b: any) => a.name.localeCompare(b.name)));
+      setOutfits((outfitsData?.filter((o: any) => o.is_active) || []).sort((a: any, b: any) => a.name.localeCompare(b.name)));
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -708,21 +710,19 @@ export default function GeneratePromptsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Breed *
                 </label>
-                <Select value={selectedBreed} onValueChange={setSelectedBreed}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a breed..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {breeds.filter(breed => breed.id && breed.id.trim() !== '').map(breed => (
-                      <SelectItem key={breed.id} value={breed.id}>
-                        <span>
-                          {breed.name}
-                          {breed.popularity_rank && ` (#${breed.popularity_rank})`}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={breeds.filter(breed => breed.id && breed.id.trim() !== '').map(breed => ({
+                    value: breed.id,
+                    label: breed.name,
+                    subtitle: breed.popularity_rank ? `Popularity #${breed.popularity_rank}` : undefined,
+                    icon: breed.animal_type === 'cat' ? '🐱' : '🐕'
+                  }))}
+                  value={selectedBreed}
+                  onValueChange={setSelectedBreed}
+                  placeholder="Select a breed..."
+                  searchPlaceholder="Search breeds..."
+                  emptyText="No breeds found"
+                />
               </div>
 
               {/* Coat Selection */}
@@ -754,25 +754,19 @@ export default function GeneratePromptsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Outfit
                 </label>
-                <Select value={selectedOutfit} onValueChange={setSelectedOutfit}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an outfit..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {outfits.filter(outfit => outfit.id && outfit.id.trim() !== '').map(outfit => (
-                      <SelectItem key={outfit.id} value={outfit.id}>
-                        <div className="flex items-center justify-between w-full">
-                          <span>{outfit.name}</span>
-                          <span className="text-xs text-gray-500 ml-2">
-                            {outfit.animal_compatibility.map(animal => 
-                              animal === 'dog' ? '🐕' : '🐱'
-                            ).join(' ')}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={outfits.filter(outfit => outfit.id && outfit.id.trim() !== '').map(outfit => ({
+                    value: outfit.id,
+                    label: outfit.name,
+                    subtitle: outfit.clothing_description ? outfit.clothing_description.substring(0, 50) + '...' : undefined,
+                    icon: outfit.animal_compatibility.map(animal => animal === 'dog' ? '🐕' : '🐱').join('')
+                  }))}
+                  value={selectedOutfit}
+                  onValueChange={setSelectedOutfit}
+                  placeholder="Select an outfit..."
+                  searchPlaceholder="Search outfits..."
+                  emptyText="No outfits found"
+                />
               </div>
 
               {/* Theme Selection */}
@@ -780,20 +774,19 @@ export default function GeneratePromptsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Theme
                 </label>
-                <Select value={selectedTheme} onValueChange={setSelectedTheme}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a theme..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {themes.filter(theme => theme.id && theme.id.trim() !== '').map(theme => (
-                      <SelectItem key={theme.id} value={theme.id}>
-                        <span>
-                          {theme.name} (Level {theme.difficulty_level})
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={themes.filter(theme => theme.id && theme.id.trim() !== '').map(theme => ({
+                    value: theme.id,
+                    label: theme.name,
+                    subtitle: `Level ${theme.difficulty_level} - ${theme.description || 'Professional theme'}`,
+                    icon: theme.difficulty_level <= 2 ? '⭐' : theme.difficulty_level <= 4 ? '⭐⭐' : '⭐⭐⭐'
+                  }))}
+                  value={selectedTheme}
+                  onValueChange={setSelectedTheme}
+                  placeholder="Select a theme..."
+                  searchPlaceholder="Search themes..."
+                  emptyText="No themes found"
+                />
               </div>
 
               {/* Style Selection */}
@@ -801,18 +794,19 @@ export default function GeneratePromptsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Style
                 </label>
-                <Select value={selectedStyle} onValueChange={setSelectedStyle}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a style..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {styles.filter(style => style.id && style.id.trim() !== '').map(style => (
-                      <SelectItem key={style.id} value={style.id}>
-                        {style.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={styles.filter(style => style.id && style.id.trim() !== '').map(style => ({
+                    value: style.id,
+                    label: style.name,
+                    subtitle: style.description || style.prompt_suffix?.substring(0, 50) + '...' || 'Style option',
+                    icon: '🎨'
+                  }))}
+                  value={selectedStyle}
+                  onValueChange={setSelectedStyle}
+                  placeholder="Select a style..."
+                  searchPlaceholder="Search styles..."
+                  emptyText="No styles found"
+                />
               </div>
 
               {/* Format Selection */}
@@ -820,20 +814,19 @@ export default function GeneratePromptsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Format
                 </label>
-                <Select value={selectedFormat} onValueChange={setSelectedFormat}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a format..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {formats.filter(format => format.id && format.id.trim() !== '').map(format => (
-                      <SelectItem key={format.id} value={format.id}>
-                        <span>
-                          {format.name} ({format.aspect_ratio})
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={formats.filter(format => format.id && format.id.trim() !== '').map(format => ({
+                    value: format.id,
+                    label: format.name,
+                    subtitle: `${format.aspect_ratio} - ${format.description || 'Format option'}`,
+                    icon: format.aspect_ratio === '1:1' ? '⬜' : format.aspect_ratio === '16:9' ? '📱' : '📄'
+                  }))}
+                  value={selectedFormat}
+                  onValueChange={setSelectedFormat}
+                  placeholder="Select a format..."
+                  searchPlaceholder="Search formats..."
+                  emptyText="No formats found"
+                />
               </div>
 
               {/* Action Buttons */}
