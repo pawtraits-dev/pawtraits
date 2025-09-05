@@ -594,7 +594,7 @@ export default function ImageVariantGenerationModal({
       if (variationsArray.length > 0) {
         console.log(`Auto-generating AI descriptions for ${variationsArray.length} variations...`);
         const allVariationIds = variationsArray.map((v: any) => v.id);
-        await generateAIDescriptions(allVariationIds);
+        await generateAIDescriptions(allVariationIds, variationsArray);
       }
       
     } catch (error) {
@@ -618,14 +618,18 @@ export default function ImageVariantGenerationModal({
     });
   };
 
-  const generateAIDescriptions = async (selectedIds: string[]) => {
+  const generateAIDescriptions = async (selectedIds: string[], currentVariations?: any[]) => {
     if (selectedIds.length === 0) return;
     
     setIsGeneratingDescriptions(true);
     
     try {
+      // Use provided variations or fall back to state (for backward compatibility)
+      const variationsToUse = currentVariations || generatedVariations;
+      console.log('🔍 GenerateAIDescriptions - using variations:', variationsToUse);
+      
       // Generate descriptions for selected variations in parallel
-      const selectedVariations = generatedVariations.filter(v => selectedIds.includes(v.id));
+      const selectedVariations = variationsToUse.filter(v => selectedIds.includes(v.id));
       
       const descriptionPromises = selectedVariations.map(async (variation) => {
         try {
@@ -654,11 +658,12 @@ export default function ImageVariantGenerationModal({
       const updatedVariations = await Promise.all(descriptionPromises);
       
       // Update the full variations array with new descriptions
-      const newGeneratedVariations = generatedVariations.map(v => {
+      const newGeneratedVariations = variationsToUse.map(v => {
         const updated = updatedVariations.find(uv => uv.id === v.id);
         return updated || v;
       });
       
+      console.log('🔍 Updated variations with AI descriptions:', newGeneratedVariations);
       setGeneratedVariations(newGeneratedVariations);
       
     } catch (error) {
