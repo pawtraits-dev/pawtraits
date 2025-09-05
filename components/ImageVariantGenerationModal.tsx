@@ -542,8 +542,10 @@ export default function ImageVariantGenerationModal({
         formats: selectedFormats
       };
       
-      console.log('Sending variationConfig:', variationConfigToSend);
-      console.log('Breed-coat pairs:', getSelectedBreedCoatPairs());
+      console.log('🚀 Sending variationConfig:', variationConfigToSend);
+      console.log('🎯 Breed-coat pairs:', getSelectedBreedCoatPairs());
+      console.log('📊 Selected breed coats state:', selectedBreedCoats);
+      console.log('🗂️ Breed coats data cache:', breedCoatsData);
       
       const response = await fetch('/api/admin/generate-variations', {
         method: 'POST',

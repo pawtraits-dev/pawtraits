@@ -82,6 +82,9 @@ export async function POST(request: NextRequest) {
 
     // Generate breed-coat combinations with batching for performance
     if (variationConfig.breedCoats?.length > 0) {
+      console.log('🔍 Processing variationConfig.breedCoats:', variationConfig.breedCoats);
+      console.log('📊 Available breeds from database:', breedsData?.map(b => ({ id: b.id, name: b.name })) || []);
+      
       const batchSize = 5; // Process 5 at a time to prevent API overload
       const breedCoatBatches = [];
       
@@ -94,15 +97,22 @@ export async function POST(request: NextRequest) {
       for (const batch of breedCoatBatches) {
         const batchPromises = batch.map(async (breedCoat: any) => {
           try {
+            console.log(`🎯 Processing breed-coat pair:`, breedCoat);
+            
             // Get breed data
             const targetBreed = breedsData.find((breed: any) => breed.id === breedCoat.breedId);
             if (!targetBreed) {
-              console.error(`Breed not found: ${breedCoat.breedId}`);
+              console.error(`❌ Breed not found: ${breedCoat.breedId}`);
+              console.error('Available breed IDs:', breedsData?.map(b => b.id) || []);
               return null;
             }
             
+            console.log(`✅ Found target breed:`, { id: targetBreed.id, name: targetBreed.name });
+            
             // Get coat data with breed relationship validation
-            const { data: breedCoatData } = await supabase
+            console.log(`🎨 Looking up breed-coat relationship: breed=${breedCoat.breedId}, coat=${breedCoat.coatId}`);
+            
+            const { data: breedCoatData, error: breedCoatError } = await supabase
               .from('breed_coats')
               .select(`
                 id,
@@ -113,10 +123,29 @@ export async function POST(request: NextRequest) {
               .eq('coats.id', breedCoat.coatId)
               .single();
               
-            if (!breedCoatData) {
-              console.error(`Invalid breed-coat combination: ${breedCoat.breedId}-${breedCoat.coatId}`);
+            if (breedCoatError) {
+              console.error(`❌ Database error querying breed-coat:`, breedCoatError);
               return null;
             }
+              
+            if (!breedCoatData) {
+              console.error(`❌ Invalid breed-coat combination: ${breedCoat.breedId}-${breedCoat.coatId}`);
+              
+              // Debug: Check what breed-coat combinations exist
+              const { data: debugBreedCoats } = await supabase
+                .from('breed_coats')
+                .select('breeds(id, name), coats(id, name)')
+                .eq('breeds.id', breedCoat.breedId);
+              
+              console.error(`Available coats for breed ${breedCoat.breedId}:`, debugBreedCoats);
+              return null;
+            }
+            
+            console.log(`✅ Found breed-coat relationship:`, {
+              breedName: breedCoatData.breeds.name,
+              coatName: breedCoatData.coats.name,
+              coatColor: breedCoatData.coats.hex_color
+            });
             
             const validCoat = {
               id: breedCoatData.coats.id,
