@@ -709,6 +709,7 @@ export default function ImageAnalyticsPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Results Summary */}
       {viewMode === 'individual' && (
