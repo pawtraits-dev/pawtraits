@@ -9,20 +9,26 @@ import { Badge } from '@/components/ui/badge';
 import { Eye, Heart, Share2, ShoppingCart, Search, ArrowUpDown } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
+import { PawSpinner } from '@/components/ui/paw-spinner';
+import { CatalogImage } from '@/components/CloudinaryImageDisplay';
+import type { ImageCatalogWithDetails } from '@/lib/types';
 
 interface ImageAnalytics {
   id: string;
-  image_url: string;
+  public_url: string;
   prompt_text: string;
-  breed_name: string;
-  theme_name: string;
-  style_name: string;
+  breed_name?: string;
+  theme_name?: string;
+  style_name?: string;
   created_at: string;
   views: number;
   likes: number;
   shares: number;
   purchases: number;
   popularity_score: number;
+  description?: string;
+  tags: string[];
+  is_featured: boolean;
 }
 
 type SortField = 'created_at' | 'views' | 'likes' | 'shares' | 'purchases' | 'popularity_score';
@@ -37,6 +43,7 @@ export default function ImageAnalyticsPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [breedFilter, setBreedFilter] = useState<string>('all');
   const [themeFilter, setThemeFilter] = useState<string>('all');
+  const [featuredFilter, setFeaturedFilter] = useState<string>('all');
   
   const [breeds, setBreeds] = useState<{id: string, name: string}[]>([]);
   const [themes, setThemes] = useState<{id: string, name: string}[]>([]);
@@ -49,53 +56,47 @@ export default function ImageAnalyticsPage() {
 
   useEffect(() => {
     filterAndSortImages();
-  }, [images, searchTerm, sortField, sortDirection, breedFilter, themeFilter]);
+  }, [images, searchTerm, sortField, sortDirection, breedFilter, themeFilter, featuredFilter]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       
-      // Load image analytics data
-      const { data: imageData, error: imageError } = await supabaseService.getClient()
-        .from('image_catalog')
-        .select(`
-          id,
-          image_url,
-          prompt_text,
-          created_at,
-          breeds!inner(name),
-          themes!inner(name),
-          styles!inner(name)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(1000);
+      // Load image data with relationships using the service method
+      const imageData = await supabaseService.getImages({
+        limit: 1000,
+        publicOnly: false // Admin can see all images
+      }) as ImageCatalogWithDetails[];
 
-      if (imageError) throw imageError;
-
-      // Load interaction analytics
-      const { data: analyticsData, error: analyticsError } = await supabaseService.getClient()
-        .from('interaction_analytics')
+      // Load user interactions data
+      const { data: interactionsData, error: interactionsError } = await supabaseService.supabase
+        .from('user_interactions')
         .select('image_id, interaction_type, COUNT(*)')
-        .group('image_id, interaction_type');
+        .group(['image_id', 'interaction_type']);
 
-      if (analyticsError) console.warn('Analytics error:', analyticsError);
+      if (interactionsError) console.warn('Interactions error:', interactionsError);
 
-      // Load purchase data
-      const { data: purchaseData, error: purchaseError } = await supabaseService.getClient()
-        .from('order_items')
-        .select('image_id, COUNT(*)')
-        .group('image_id');
-
-      if (purchaseError) console.warn('Purchase error:', purchaseError);
+      // Load order items for purchase data (if table exists)
+      let purchaseData: any[] = [];
+      try {
+        const { data, error } = await supabaseService.supabase
+          .from('order_items')
+          .select('image_id, COUNT(*)')
+          .group(['image_id']);
+        
+        if (!error) purchaseData = data || [];
+      } catch (err) {
+        console.warn('Order items table not accessible:', err);
+      }
 
       // Process and combine data
-      const processedImages = imageData.map((image: any) => {
-        const analytics = analyticsData?.filter((a: any) => a.image_id === image.id) || [];
+      const processedImages = imageData.map((image: ImageCatalogWithDetails) => {
+        const interactions = interactionsData?.filter((a: any) => a.image_id === image.id) || [];
         const purchases = purchaseData?.find((p: any) => p.image_id === image.id);
         
-        const views = analytics.find((a: any) => a.interaction_type === 'view')?.count || 0;
-        const likes = analytics.find((a: any) => a.interaction_type === 'like')?.count || 0;
-        const shares = analytics.find((a: any) => a.interaction_type === 'share')?.count || 0;
+        const views = interactions.find((a: any) => a.interaction_type === 'view')?.count || 0;
+        const likes = interactions.find((a: any) => a.interaction_type === 'like')?.count || 0;
+        const shares = interactions.find((a: any) => a.interaction_type === 'share')?.count || 0;
         const purchaseCount = purchases?.count || 0;
         
         // Calculate popularity score: (likes × 3) + (shares × 5) + (views × 1) + (purchases × 10)
@@ -103,12 +104,15 @@ export default function ImageAnalyticsPage() {
 
         return {
           id: image.id,
-          image_url: image.image_url,
+          public_url: image.public_url,
           prompt_text: image.prompt_text,
-          breed_name: image.breeds?.name || 'Unknown',
-          theme_name: image.themes?.name || 'Unknown',
-          style_name: image.styles?.name || 'Unknown',
+          breed_name: image.breed_name || 'Unknown',
+          theme_name: image.theme_name || 'Unknown', 
+          style_name: image.style_name || 'Unknown',
           created_at: image.created_at,
+          description: image.description,
+          tags: image.tags,
+          is_featured: image.is_featured,
           views,
           likes,
           shares,
@@ -120,8 +124,8 @@ export default function ImageAnalyticsPage() {
       setImages(processedImages);
 
       // Load filter options
-      const uniqueBreeds = Array.from(new Set(processedImages.map((img: any) => img.breed_name))) as string[];
-      const uniqueThemes = Array.from(new Set(processedImages.map((img: any) => img.theme_name))) as string[];
+      const uniqueBreeds = Array.from(new Set(processedImages.map((img: any) => img.breed_name).filter(Boolean))) as string[];
+      const uniqueThemes = Array.from(new Set(processedImages.map((img: any) => img.theme_name).filter(Boolean))) as string[];
       
       setBreeds(uniqueBreeds.sort().map((name: string) => ({ id: name, name })));
       setThemes(uniqueThemes.sort().map((name: string) => ({ id: name, name })));
@@ -154,6 +158,14 @@ export default function ImageAnalyticsPage() {
     // Apply theme filter
     if (themeFilter !== 'all') {
       filtered = filtered.filter(image => image.theme_name === themeFilter);
+    }
+
+    // Apply featured filter
+    if (featuredFilter !== 'all') {
+      filtered = filtered.filter(image => 
+        featuredFilter === 'featured' ? image.is_featured : 
+        featuredFilter === 'not-featured' ? !image.is_featured : true
+      );
     }
 
     // Apply sorting
@@ -197,7 +209,7 @@ export default function ImageAnalyticsPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+          <PawSpinner size="xl" />
         </div>
       </div>
     );
@@ -218,7 +230,7 @@ export default function ImageAnalyticsPage() {
           <CardTitle>Filters & Search</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Search</label>
               <div className="relative">
@@ -262,6 +274,20 @@ export default function ImageAnalyticsPage() {
                       {theme.name}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Featured</label>
+              <Select value={featuredFilter} onValueChange={setFeaturedFilter}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Images</SelectItem>
+                  <SelectItem value="featured">Featured Only</SelectItem>
+                  <SelectItem value="not-featured">Not Featured</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -343,11 +369,20 @@ export default function ImageAnalyticsPage() {
                 <div className="flex items-start space-x-4">
                   {/* Image */}
                   <div className="flex-shrink-0 w-24 h-24 bg-gray-100 rounded-lg overflow-hidden">
-                    <Image
-                      src={image.image_url}
-                      alt="Generated image"
-                      width={96}
-                      height={96}
+                    <CatalogImage
+                      image={{
+                        id: image.id,
+                        public_url: image.public_url,
+                        filename: `${image.id}.jpg`,
+                        description: image.description,
+                        prompt_text: image.prompt_text,
+                        tags: image.tags,
+                        is_featured: image.is_featured,
+                        created_at: image.created_at,
+                        updated_at: image.created_at
+                      }}
+                      size="small"
+                      showWatermark={false}
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -372,6 +407,11 @@ export default function ImageAnalyticsPage() {
                           <Badge variant="outline" className="text-purple-600">
                             Score: {image.popularity_score}
                           </Badge>
+                          {image.is_featured && (
+                            <Badge className="bg-yellow-100 text-yellow-800">
+                              Featured
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       

@@ -219,7 +219,6 @@ export default function PartnerShopPage() {
     const { data: breedImages } = await supabaseService.supabase
       .from('image_catalog')
       .select('breed_id')
-      .eq('is_active', true)
       .not('breed_id', 'is', null);
 
     const breedIdsWithImages = new Set(breedImages?.map(img => img.breed_id) || []);
@@ -230,7 +229,6 @@ export default function PartnerShopPage() {
     const { data: themeImages } = await supabaseService.supabase
       .from('image_catalog')
       .select('theme_id')
-      .eq('is_active', true)
       .not('theme_id', 'is', null);
 
     const themeIdsWithImages = new Set(themeImages?.map(img => img.theme_id) || []);

@@ -37,7 +37,7 @@ export default function ThemesManagement() {
         .from('image_catalog')
         .select('theme_id')
         .in('theme_id', themeIds)
-        .eq('is_active', true);
+        .not('theme_id', 'is', null);
 
       if (error) throw error;
 

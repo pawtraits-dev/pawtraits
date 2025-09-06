@@ -38,7 +38,7 @@ export default function BreedsManagement() {
         .from('image_catalog')
         .select('breed_id')
         .in('breed_id', breedIds)
-        .eq('is_active', true);
+        .not('breed_id', 'is', null);
 
       if (error) throw error;
 
