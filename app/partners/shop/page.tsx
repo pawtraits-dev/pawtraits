@@ -257,9 +257,9 @@ export default function PartnerShopPage() {
       console.log(`Filtered breeds: ${breedsWithImages.length} out of ${activeBreeds.length} have images`);
       console.log(`Filtered themes: ${themesWithImages.length} out of ${activeThemes.length} have images`);
 
-      setBreeds(breedsWithImages);
-      setCoats(coatsData?.filter((c: any) => c.is_active) || []);
-      setThemes(themesWithImages);
+      setBreeds(breedsWithImages.sort((a, b) => a.name.localeCompare(b.name)));
+      setCoats((coatsData?.filter((c: any) => c.is_active) || []).sort((a, b) => a.name.localeCompare(b.name)));
+      setThemes(themesWithImages.sort((a, b) => a.name.localeCompare(b.name)));
       setProducts(productsData?.filter((p: any) => p.is_active) || []);
       setPricing(pricingData || []);
       setCurrentUser(currentUserData);

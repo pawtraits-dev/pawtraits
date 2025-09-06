@@ -286,9 +286,9 @@ export default function CustomerShopPage() {
         getThemesWithImages(activeThemes)
       ]);
 
-      setBreeds(breedsWithImages);
-      setCoats(coatsData?.filter((c: any) => c.is_active) || []);
-      setThemes(themesWithImages);
+      setBreeds(breedsWithImages.sort((a, b) => a.name.localeCompare(b.name)));
+      setCoats((coatsData?.filter((c: any) => c.is_active) || []).sort((a, b) => a.name.localeCompare(b.name)));
+      setThemes(themesWithImages.sort((a, b) => a.name.localeCompare(b.name)));
       setProducts(filteredProducts);
       setPricing(filteredPricing);
       

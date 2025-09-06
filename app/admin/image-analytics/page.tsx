@@ -63,18 +63,33 @@ export default function ImageAnalyticsPage() {
       setLoading(true);
       
       // Load image data with relationships using the service method
+      console.log('Loading image data...');
       const imageData = await supabaseService.getImages({
         limit: 1000,
         publicOnly: false // Admin can see all images
       }) as ImageCatalogWithDetails[];
+      
+      console.log(`Loaded ${imageData.length} images from database`);
 
-      // Load user interactions data
-      const { data: interactionsData, error: interactionsError } = await supabaseService.supabase
-        .from('user_interactions')
-        .select('image_id, interaction_type, COUNT(*)')
-        .group(['image_id', 'interaction_type']);
+      // Load user interactions data (handle policy issues gracefully)
+      let interactionsData: any[] = [];
+      try {
+        const { data, error } = await supabaseService.supabase
+          .from('user_interactions')
+          .select('image_id, interaction_type, COUNT(*)')
+          .group(['image_id', 'interaction_type']);
 
-      if (interactionsError) console.warn('Interactions error:', interactionsError);
+        if (error) {
+          console.warn('Interactions error (using fallback):', error.message);
+          // Fall back to using the built-in counters from image_catalog
+          interactionsData = [];
+        } else {
+          interactionsData = data || [];
+        }
+      } catch (err) {
+        console.warn('Interactions query failed, using image_catalog counters');
+        interactionsData = [];
+      }
 
       // Load order items for purchase data (if table exists)
       let purchaseData: any[] = [];
@@ -90,13 +105,23 @@ export default function ImageAnalyticsPage() {
       }
 
       // Process and combine data
-      const processedImages = imageData.map((image: ImageCatalogWithDetails) => {
-        const interactions = interactionsData?.filter((a: any) => a.image_id === image.id) || [];
-        const purchases = purchaseData?.find((p: any) => p.image_id === image.id);
+      const processedImages = imageData.map((image: any) => {
+        // Use built-in counters from image_catalog if interactions query failed
+        let views, likes, shares;
         
-        const views = interactions.find((a: any) => a.interaction_type === 'view')?.count || 0;
-        const likes = interactions.find((a: any) => a.interaction_type === 'like')?.count || 0;
-        const shares = interactions.find((a: any) => a.interaction_type === 'share')?.count || 0;
+        if (interactionsData.length > 0) {
+          const interactions = interactionsData.filter((a: any) => a.image_id === image.id) || [];
+          views = interactions.find((a: any) => a.interaction_type === 'view')?.count || 0;
+          likes = interactions.find((a: any) => a.interaction_type === 'like')?.count || 0;
+          shares = interactions.find((a: any) => a.interaction_type === 'share')?.count || 0;
+        } else {
+          // Fall back to built-in counters
+          views = image.view_count || 0;
+          likes = image.like_count || 0;
+          shares = image.share_count || 0;
+        }
+        
+        const purchases = purchaseData?.find((p: any) => p.image_id === image.id);
         const purchaseCount = purchases?.count || 0;
         
         // Calculate popularity score: (likes × 3) + (shares × 5) + (views × 1) + (purchases × 10)
@@ -121,11 +146,24 @@ export default function ImageAnalyticsPage() {
         };
       });
 
+      console.log(`Processed ${processedImages.length} images for display`);
+      if (processedImages.length > 0) {
+        console.log('Sample processed image:', {
+          breed_name: processedImages[0].breed_name,
+          theme_name: processedImages[0].theme_name,
+          views: processedImages[0].views,
+          likes: processedImages[0].likes
+        });
+      }
+      
       setImages(processedImages);
 
       // Load filter options
       const uniqueBreeds = Array.from(new Set(processedImages.map((img: any) => img.breed_name).filter(Boolean))) as string[];
       const uniqueThemes = Array.from(new Set(processedImages.map((img: any) => img.theme_name).filter(Boolean))) as string[];
+      
+      console.log(`Found ${uniqueBreeds.length} unique breeds:`, uniqueBreeds.slice(0, 5));
+      console.log(`Found ${uniqueThemes.length} unique themes:`, uniqueThemes.slice(0, 5));
       
       setBreeds(uniqueBreeds.sort().map((name: string) => ({ id: name, name })));
       setThemes(uniqueThemes.sort().map((name: string) => ({ id: name, name })));
