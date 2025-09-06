@@ -10,7 +10,6 @@ import { Eye, Heart, Share2, ShoppingCart, Search, ArrowUpDown, Edit3, Check, X 
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
 import { PawSpinner } from '@/components/ui/paw-spinner';
-import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import type { ImageCatalogWithDetails } from '@/lib/types';
 
 interface ImageAnalytics {
@@ -53,6 +52,7 @@ export default function ImageAnalyticsPage() {
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
   const [isEditing, setIsEditing] = useState(false);
   const [bulkThemeId, setBulkThemeId] = useState<string>('');
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const supabaseService = new SupabaseService();
 
@@ -254,6 +254,19 @@ export default function ImageAnalyticsPage() {
     });
   };
 
+  const extractBoldTitle = (description?: string) => {
+    if (!description) return 'Untitled';
+    
+    // Extract text between ** ** (bold markdown)
+    const boldMatch = description.match(/\*\*(.*?)\*\*/);
+    if (boldMatch && boldMatch[1]) {
+      return boldMatch[1];
+    }
+    
+    // Fallback to first line if no bold text found
+    return description.split('\n')[0] || 'Untitled';
+  };
+
   const handleImageSelect = (imageId: string, isSelected: boolean) => {
     const newSelection = new Set(selectedImages);
     if (isSelected) {
@@ -279,6 +292,7 @@ export default function ImageAnalyticsPage() {
     }
 
     try {
+      setIsUpdating(true);
       const response = await fetch('/api/admin/images/update-theme', {
         method: 'POST',
         headers: {
@@ -298,13 +312,15 @@ export default function ImageAnalyticsPage() {
         setBulkThemeId('');
         setIsEditing(false);
         // Reload data to show changes
-        loadData();
+        await loadData();
       } else {
         alert(`Error: ${result.error}`);
       }
     } catch (error) {
       console.error('Error updating themes:', error);
       alert('Failed to update themes');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -377,11 +393,20 @@ export default function ImageAnalyticsPage() {
               </Select>
               <Button 
                 onClick={handleBulkThemeUpdate}
-                disabled={selectedImages.size === 0 || !bulkThemeId}
+                disabled={selectedImages.size === 0 || !bulkThemeId || isUpdating}
                 className="bg-green-600 hover:bg-green-700"
               >
-                <Check className="w-4 h-4 mr-2" />
-                Update ({selectedImages.size})
+                {isUpdating ? (
+                  <>
+                    <PawSpinner size="sm" className="mr-2" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Update ({selectedImages.size})
+                  </>
+                )}
               </Button>
               <Button 
                 onClick={cancelEditing}
@@ -568,21 +593,13 @@ export default function ImageAnalyticsPage() {
                   )}
                   {/* Image */}
                   <div className="flex-shrink-0 w-24 h-24 bg-gray-100 rounded-lg overflow-hidden">
-                    <CatalogImage
-                      image={{
-                        id: image.id,
-                        public_url: image.public_url,
-                        filename: `${image.id}.jpg`,
-                        description: image.description,
-                        prompt_text: image.prompt_text,
-                        tags: image.tags,
-                        is_featured: image.is_featured,
-                        created_at: image.created_at,
-                        updated_at: image.created_at
-                      }}
-                      size="small"
-                      showWatermark={false}
+                    <Image
+                      src={image.public_url}
+                      alt={image.description ? image.description.split('\n')[0] : 'Generated pet portrait'}
+                      width={96}
+                      height={96}
                       className="w-full h-full object-cover"
+                      unoptimized
                     />
                   </div>
                   
@@ -591,7 +608,7 @@ export default function ImageAnalyticsPage() {
                     <div className="flex items-start justify-between">
                       <div className="space-y-2">
                         <p className="text-sm text-gray-900 font-medium truncate max-w-md">
-                          {image.prompt_text}
+                          {extractBoldTitle(image.description)}
                         </p>
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <span>{image.breed_name}</span>
