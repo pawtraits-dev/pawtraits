@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Download, Share2, ShoppingCart, Heart, Star, Wand2, Copy } from 'lucide-react';
+import { PawSpinner } from '@/components/ui/paw-spinner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CloudinaryImageDisplay } from '@/components/CloudinaryImageDisplay';
@@ -204,24 +205,25 @@ export default function ImageModal({
 
         <div className="flex flex-col lg:flex-row h-full max-h-[90vh]">
           {/* Image Section */}
-          <div className="flex-1 bg-gray-100 flex items-center justify-center relative min-h-[60vh] lg:min-h-[70vh] overflow-hidden">
+          <div className="flex-1 bg-gray-100 flex items-center justify-center relative min-h-[60vh] lg:min-h-[70vh]">
             <div className="w-full h-full flex items-center justify-center p-4">
-              <div className="max-w-full max-h-full flex items-center justify-center">
-                <CloudinaryImageDisplay
-                  imageId={imageId}
-                  variant="full_size"
-                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
-                  alt={imageData?.description || imageData?.prompt_text || 'Pet portrait'}
-                  fallbackUrl={imageData?.public_url || imageData?.image_url}
-                  onLoad={() => setImageLoaded(true)}
-                />
-              </div>
+              <CloudinaryImageDisplay
+                imageId={imageId}
+                variant="full_size"
+                className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                alt={imageData?.description || imageData?.prompt_text || 'Pet portrait'}
+                fallbackUrl={imageData?.public_url || imageData?.image_url}
+                onLoad={() => setImageLoaded(true)}
+              />
             </div>
             
             {/* Loading overlay */}
             {!imageLoaded && (
-              <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
-                <div className="text-gray-500">Loading high resolution image...</div>
+              <div className="absolute inset-0 bg-gray-200 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                  <PawSpinner size="lg" />
+                  <div className="text-gray-500">Loading high resolution image...</div>
+                </div>
               </div>
             )}
 
@@ -298,19 +300,6 @@ export default function ImageModal({
                 )}
               </div>
 
-              {/* Tags */}
-              {imageData?.tags && imageData.tags.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Tags</h3>
-                  <div className="flex flex-wrap gap-1">
-                    {imageData.tags.map((tag, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Admin-only: Prompt Display */}
               {isAdminMode && imageData?.prompt_text && (

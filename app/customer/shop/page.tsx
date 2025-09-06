@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Search, Filter, Star, ShoppingCart, Heart, Share2, ShoppingBag } from 'lucide-react';
+import { PawSpinner } from '@/components/ui/paw-spinner';
 import ReactMarkdown from 'react-markdown';
 import { SupabaseService } from '@/lib/supabase';
 import FeaturedCard from '@/components/FeaturedCard';
@@ -500,7 +501,7 @@ export default function CustomerShopPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+          <PawSpinner size="xl" />
         </div>
       </div>
     );

@@ -11,6 +11,8 @@ import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, ArrowRight, CreditCard, Shield, Loader2 } from "lucide-react"
+import ReactMarkdown from 'react-markdown'
+import Image from 'next/image'
 import Link from "next/link"
 import { useServerCart } from "@/lib/server-cart-context"
 import { useCountry } from "@/lib/country-context"
@@ -51,6 +53,20 @@ export default function CustomerCheckoutPage() {
   const supabase = getSupabaseClient()
   const supabaseService = new SupabaseService()
   const stripePromise = getStripe()
+
+  // Extract first bold line from markdown description
+  const extractFirstBoldLine = (description?: string) => {
+    if (!description) return 'Pet Portrait';
+    
+    // Extract text between ** ** (bold markdown)
+    const boldMatch = description.match(/\*\*(.*?)\*\*/);
+    if (boldMatch && boldMatch[1]) {
+      return boldMatch[1];
+    }
+    
+    // Fallback to first line if no bold text found
+    return description.split('\n')[0] || 'Pet Portrait';
+  };
 
   // Load user profile and customer data - using same pattern as customer/account page
   useEffect(() => {
@@ -192,9 +208,13 @@ export default function CustomerCheckoutPage() {
     currencySymbol,
     items: cart.items.map(item => ({
       title: item.imageTitle,
+      imageUrl: item.imageUrl,
+      imageId: item.imageId,
       product: `${item.product.format?.name} ${item.product.medium?.name} - ${item.product.size_name}`,
       price: item.pricing.sale_price / 100,
-      quantity: item.quantity
+      quantity: item.quantity,
+      // Get description from original cart item if available
+      originalDescription: item.imageTitle // We'll need to enhance this with actual descriptions
     })),
   }
 
@@ -1012,15 +1032,44 @@ export default function CustomerCheckoutPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {orderSummary.items.map((item, index) => (
-                  <div key={index} className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-900 font-medium">
-                        {item.title} {item.quantity > 1 && `(×${item.quantity})`}
-                      </span>
-                      <span className="font-medium">{formatPrice(Math.round(item.price * item.quantity * 100), currencyCode, currencySymbol)}</span>
+                  <div key={index} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
+                    {/* Thumbnail */}
+                    <div className="w-16 h-16 flex-shrink-0 bg-gray-200 rounded-lg overflow-hidden">
+                      {item.imageUrl && (
+                        <Image
+                          src={item.imageUrl}
+                          alt={item.title}
+                          width={64}
+                          height={64}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
+                      )}
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {item.product}
+                    
+                    {/* Content */}
+                    <div className="flex-1 space-y-1">
+                      <div className="flex justify-between items-start">
+                        <div className="text-sm font-medium text-gray-900 prose prose-sm max-w-none">
+                          <ReactMarkdown
+                            components={{
+                              p: ({ children }) => <span>{children}</span>,
+                              strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                            }}
+                          >
+                            {extractFirstBoldLine(item.title)}
+                          </ReactMarkdown>
+                          {item.quantity > 1 && (
+                            <span className="ml-2 text-gray-500 font-normal">(×{item.quantity})</span>
+                          )}
+                        </div>
+                        <span className="font-medium text-sm">
+                          {formatPrice(Math.round(item.price * item.quantity * 100), currencyCode, currencySymbol)}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {item.product}
+                      </div>
                     </div>
                   </div>
                 ))}

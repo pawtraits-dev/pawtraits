@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { PawSpinner } from '@/components/ui/paw-spinner';
 
 interface CloudinaryImageDisplayProps {
   imageId: string;
@@ -151,8 +152,8 @@ export function CloudinaryImageDisplay({
 
   if (loading) {
     return (
-      <div className={`bg-gray-200 animate-pulse rounded-lg flex items-center justify-center ${className}`}>
-        <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+      <div className={`bg-gray-200 rounded-lg flex items-center justify-center ${className}`}>
+        <PawSpinner size="md" />
       </div>
     );
   }

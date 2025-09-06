@@ -24,14 +24,41 @@ interface ImageAnalytics {
   likes: number;
   shares: number;
   purchases: number;
+  revenue: number;
   popularity_score: number;
   description?: string;
   tags: string[];
   is_featured: boolean;
 }
 
-type SortField = 'created_at' | 'views' | 'likes' | 'shares' | 'purchases' | 'popularity_score';
+type SortField = 'created_at' | 'views' | 'likes' | 'shares' | 'purchases' | 'revenue' | 'popularity_score';
 type SortDirection = 'asc' | 'desc';
+type ViewMode = 'individual' | 'by_breed' | 'by_theme' | 'by_product';
+
+interface GroupedAnalytics {
+  name: string;
+  totalImages: number;
+  totalViews: number;
+  totalLikes: number;
+  totalShares: number;
+  totalPurchases: number;
+  totalRevenue: number;
+  averagePopularity: number;
+  topImage?: ImageAnalytics;
+}
+
+interface ProductAnalytics {
+  productId: string;
+  productName: string;
+  productType: string;
+  totalSales: number;
+  totalRevenue: number;
+  totalCost: number;
+  grossProfit: number;
+  profitMargin: number;
+  averageOrderValue: number;
+  topImage?: ImageAnalytics;
+}
 
 export default function ImageAnalyticsPage() {
   const [images, setImages] = useState<ImageAnalytics[]>([]);
@@ -43,10 +70,14 @@ export default function ImageAnalyticsPage() {
   const [breedFilter, setBreedFilter] = useState<string>('all');
   const [themeFilter, setThemeFilter] = useState<string>('all');
   const [featuredFilter, setFeaturedFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('individual');
   
   const [breeds, setBreeds] = useState<{id: string, name: string}[]>([]);
   const [themes, setThemes] = useState<{id: string, name: string}[]>([]);
   const [allThemes, setAllThemes] = useState<{id: string, name: string}[]>([]);
+  const [breedAnalytics, setBreedAnalytics] = useState<GroupedAnalytics[]>([]);
+  const [themeAnalytics, setThemeAnalytics] = useState<GroupedAnalytics[]>([]);
+  const [productAnalytics, setProductAnalytics] = useState<ProductAnalytics[]>([]);
   
   // Bulk editing state
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
@@ -97,15 +128,34 @@ export default function ImageAnalyticsPage() {
         interactionsData = [];
       }
 
-      // Load order items for purchase data (if table exists)
+      // Load order items for purchase data and revenue (if table exists)
       let purchaseData: any[] = [];
+      let productSalesData: any[] = [];
       try {
         const { data, error } = await supabaseService.supabase
           .from('order_items')
-          .select('image_id, COUNT(*)')
+          .select('image_id, COUNT(*) as count, SUM(unit_price * quantity) as total_revenue')
           .group(['image_id']);
         
         if (!error) purchaseData = data || [];
+
+        // Load product sales data for product analytics
+        const { data: productData, error: productError } = await supabaseService.supabase
+          .from('order_items')
+          .select(`
+            product_id,
+            quantity,
+            unit_price,
+            cost_price,
+            fulfillment_cost,
+            ai_generation_cost,
+            total_cost,
+            gross_profit,
+            image_id,
+            products!inner(name, medium:media(name))
+          `);
+        
+        if (!productError) productSalesData = productData || [];
       } catch (err) {
         console.warn('Order items table not accessible:', err);
       }
@@ -129,6 +179,7 @@ export default function ImageAnalyticsPage() {
         
         const purchases = purchaseData?.find((p: any) => p.image_id === image.id);
         const purchaseCount = purchases?.count || 0;
+        const revenue = parseFloat(purchases?.total_revenue || '0') || 0;
         
         // Calculate popularity score: (likes × 3) + (shares × 5) + (views × 1) + (purchases × 10)
         const popularityScore = (likes * 3) + (shares * 5) + (views * 1) + (purchaseCount * 10);
@@ -148,6 +199,7 @@ export default function ImageAnalyticsPage() {
           likes,
           shares,
           purchases: purchaseCount,
+          revenue,
           popularity_score: popularityScore
         };
       });
@@ -178,6 +230,12 @@ export default function ImageAnalyticsPage() {
       const allThemesData = await supabaseService.getThemes();
       const activeThemes = allThemesData?.filter(theme => theme.is_active) || [];
       setAllThemes(activeThemes.sort((a, b) => a.name.localeCompare(b.name)).map(theme => ({ id: theme.id, name: theme.name })));
+
+      // Calculate grouped analytics
+      calculateGroupedAnalytics(processedImages);
+      
+      // Calculate product analytics
+      calculateProductAnalytics(productSalesData, processedImages);
 
     } catch (error) {
       console.error('Error loading image analytics:', error);
@@ -230,6 +288,107 @@ export default function ImageAnalyticsPage() {
     });
 
     setFilteredImages(filtered);
+  };
+
+  const calculateGroupedAnalytics = (imageData: ImageAnalytics[]) => {
+    // Calculate breed analytics
+    const breedGroups = imageData.reduce((acc, image) => {
+      const breedName = image.breed_name || 'Unknown';
+      if (!acc[breedName]) {
+        acc[breedName] = [];
+      }
+      acc[breedName].push(image);
+      return acc;
+    }, {} as Record<string, ImageAnalytics[]>);
+
+    const breedStats = Object.entries(breedGroups).map(([name, images]) => ({
+      name,
+      totalImages: images.length,
+      totalViews: images.reduce((sum, img) => sum + img.views, 0),
+      totalLikes: images.reduce((sum, img) => sum + img.likes, 0),
+      totalShares: images.reduce((sum, img) => sum + img.shares, 0),
+      totalPurchases: images.reduce((sum, img) => sum + img.purchases, 0),
+      totalRevenue: images.reduce((sum, img) => sum + img.revenue, 0),
+      averagePopularity: images.reduce((sum, img) => sum + img.popularity_score, 0) / images.length,
+      topImage: images.sort((a, b) => b.popularity_score - a.popularity_score)[0]
+    })).sort((a, b) => b.averagePopularity - a.averagePopularity);
+
+    // Calculate theme analytics
+    const themeGroups = imageData.reduce((acc, image) => {
+      const themeName = image.theme_name || 'Unknown';
+      if (!acc[themeName]) {
+        acc[themeName] = [];
+      }
+      acc[themeName].push(image);
+      return acc;
+    }, {} as Record<string, ImageAnalytics[]>);
+
+    const themeStats = Object.entries(themeGroups).map(([name, images]) => ({
+      name,
+      totalImages: images.length,
+      totalViews: images.reduce((sum, img) => sum + img.views, 0),
+      totalLikes: images.reduce((sum, img) => sum + img.likes, 0),
+      totalShares: images.reduce((sum, img) => sum + img.shares, 0),
+      totalPurchases: images.reduce((sum, img) => sum + img.purchases, 0),
+      totalRevenue: images.reduce((sum, img) => sum + img.revenue, 0),
+      averagePopularity: images.reduce((sum, img) => sum + img.popularity_score, 0) / images.length,
+      topImage: images.sort((a, b) => b.popularity_score - a.popularity_score)[0]
+    })).sort((a, b) => b.averagePopularity - a.averagePopularity);
+
+    setBreedAnalytics(breedStats);
+    setThemeAnalytics(themeStats);
+  };
+
+  const calculateProductAnalytics = (productSalesData: any[], imageData: ImageAnalytics[]) => {
+    // Group sales data by product
+    const productGroups = productSalesData.reduce((acc, sale) => {
+      const productId = sale.product_id;
+      const productName = sale.products?.name || 'Unknown Product';
+      const productType = sale.products?.medium?.name || 'Unknown Type';
+      
+      if (!acc[productId]) {
+        acc[productId] = {
+          productId,
+          productName,
+          productType,
+          sales: []
+        };
+      }
+      
+      acc[productId].sales.push(sale);
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Calculate analytics for each product
+    const productStats = Object.values(productGroups).map((group: any) => {
+      const sales = group.sales;
+      const totalSales = sales.reduce((sum: number, sale: any) => sum + (sale.quantity || 0), 0);
+      const totalRevenue = sales.reduce((sum: number, sale: any) => sum + (sale.unit_price * sale.quantity || 0), 0);
+      const totalCost = sales.reduce((sum: number, sale: any) => sum + (sale.total_cost || 0), 0);
+      const grossProfit = sales.reduce((sum: number, sale: any) => sum + (sale.gross_profit || 0), 0);
+      const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+      const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
+
+      // Find top performing image for this product
+      const productImageIds = sales.map((sale: any) => sale.image_id).filter(Boolean);
+      const productImages = imageData.filter(img => productImageIds.includes(img.id));
+      const topImage = productImages.sort((a, b) => b.popularity_score - a.popularity_score)[0];
+
+      return {
+        productId: group.productId,
+        productName: group.productName,
+        productType: group.productType,
+        totalSales,
+        totalRevenue,
+        totalCost,
+        grossProfit,
+        profitMargin,
+        averageOrderValue,
+        topImage
+      };
+    }).sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+    setProductAnalytics(productStats);
   };
 
   const handleSort = (field: SortField) => {
@@ -420,11 +579,53 @@ export default function ImageAnalyticsPage() {
         </div>
       </div>
 
-      {/* Filters and Search */}
+      {/* View Mode Selector */}
       <Card>
         <CardHeader>
-          <CardTitle>Filters & Search</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>Analytics View</CardTitle>
+          </div>
         </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant={viewMode === 'individual' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('individual')}
+            >
+              Individual Images
+            </Button>
+            <Button
+              variant={viewMode === 'by_breed' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('by_breed')}
+            >
+              By Breed
+            </Button>
+            <Button
+              variant={viewMode === 'by_theme' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('by_theme')}
+            >
+              By Theme
+            </Button>
+            <Button
+              variant={viewMode === 'by_product' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('by_product')}
+            >
+              By Product
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Filters and Search */}
+      {viewMode === 'individual' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Filters & Search</CardTitle>
+          </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="space-y-2">
@@ -496,6 +697,7 @@ export default function ImageAnalyticsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="popularity_score">Popularity Score</SelectItem>
+                  <SelectItem value="revenue">Revenue</SelectItem>
                   <SelectItem value="purchases">Purchases</SelectItem>
                   <SelectItem value="likes">Likes</SelectItem>
                   <SelectItem value="shares">Shares</SelectItem>
@@ -509,13 +711,14 @@ export default function ImageAnalyticsPage() {
       </Card>
 
       {/* Results Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-purple-600">{filteredImages.length}</div>
-            <div className="text-sm text-gray-600">Total Images</div>
-          </CardContent>
-        </Card>
+      {viewMode === 'individual' && (
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-purple-600">{filteredImages.length}</div>
+              <div className="text-sm text-gray-600">Total Images</div>
+            </CardContent>
+          </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-blue-600">
@@ -548,9 +751,265 @@ export default function ImageAnalyticsPage() {
             <div className="text-sm text-gray-600">Total Purchases</div>
           </CardContent>
         </Card>
-      </div>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-emerald-600">
+              £{filteredImages.reduce((sum, img) => sum + img.revenue, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-sm text-gray-600">Total Revenue</div>
+          </CardContent>
+        </Card>
+        </div>
+      )}
 
-      {/* Images Table */}
+      {/* Breed Analytics */}
+      {viewMode === 'by_breed' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Breed Performance Analytics</CardTitle>
+            <CardDescription>Performance metrics grouped by dog breed</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {breedAnalytics.map((breed, index) => (
+                <div key={breed.name} className="border rounded-lg p-4 hover:bg-gray-50">
+                  <div className="flex items-start space-x-4">
+                    {/* Top Image Thumbnail */}
+                    {breed.topImage && (
+                      <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg overflow-hidden">
+                        <Image
+                          src={breed.topImage.public_url}
+                          alt={`Top ${breed.name} image`}
+                          width={64}
+                          height={64}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Breed Name and Metrics */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <h3 className="text-lg font-semibold text-gray-900">{breed.name}</h3>
+                          <p className="text-sm text-gray-600">{breed.totalImages} images generated</p>
+                          <div className="flex items-center space-x-1">
+                            <Badge variant="outline" className="text-purple-600">
+                              Avg Score: {Math.round(breed.averagePopularity)}
+                            </Badge>
+                            <Badge variant="outline" className="text-emerald-600">
+                              £{breed.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        {/* Metrics Grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                          <div className="flex items-center space-x-1 text-blue-600">
+                            <Eye className="w-4 h-4" />
+                            <span>{breed.totalViews.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center space-x-1 text-red-600">
+                            <Heart className="w-4 h-4" />
+                            <span>{breed.totalLikes.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center space-x-1 text-green-600">
+                            <Share2 className="w-4 h-4" />
+                            <span>{breed.totalShares.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center space-x-1 text-orange-600">
+                            <ShoppingCart className="w-4 h-4" />
+                            <span>{breed.totalPurchases.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center space-x-1 text-emerald-600">
+                            <span className="font-medium">£{breed.totalRevenue.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Theme Analytics */}
+      {viewMode === 'by_theme' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Theme Performance Analytics</CardTitle>
+            <CardDescription>Performance metrics grouped by artistic theme</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {themeAnalytics.map((theme, index) => (
+                <div key={theme.name} className="border rounded-lg p-4 hover:bg-gray-50">
+                  <div className="flex items-start space-x-4">
+                    {/* Top Image Thumbnail */}
+                    {theme.topImage && (
+                      <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg overflow-hidden">
+                        <Image
+                          src={theme.topImage.public_url}
+                          alt={`Top ${theme.name} image`}
+                          width={64}
+                          height={64}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Theme Name and Metrics */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <h3 className="text-lg font-semibold text-gray-900">{theme.name}</h3>
+                          <p className="text-sm text-gray-600">{theme.totalImages} images generated</p>
+                          <div className="flex items-center space-x-1">
+                            <Badge variant="outline" className="text-purple-600">
+                              Avg Score: {Math.round(theme.averagePopularity)}
+                            </Badge>
+                            <Badge variant="outline" className="text-emerald-600">
+                              £{theme.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        {/* Metrics Grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                          <div className="flex items-center space-x-1 text-blue-600">
+                            <Eye className="w-4 h-4" />
+                            <span>{theme.totalViews.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center space-x-1 text-red-600">
+                            <Heart className="w-4 h-4" />
+                            <span>{theme.totalLikes.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center space-x-1 text-green-600">
+                            <Share2 className="w-4 h-4" />
+                            <span>{theme.totalShares.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center space-x-1 text-orange-600">
+                            <ShoppingCart className="w-4 h-4" />
+                            <span>{theme.totalPurchases.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center space-x-1 text-emerald-600">
+                            <span className="font-medium">£{theme.totalRevenue.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Product Analytics */}
+      {viewMode === 'by_product' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Product Performance Analytics</CardTitle>
+            <CardDescription>Revenue and profit metrics by product type</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {productAnalytics.map((product, index) => (
+                <div key={product.productId} className="border rounded-lg p-4 hover:bg-gray-50">
+                  <div className="flex items-start space-x-4">
+                    {/* Top Image Thumbnail */}
+                    {product.topImage && (
+                      <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg overflow-hidden">
+                        <Image
+                          src={product.topImage.public_url}
+                          alt={`Top image for ${product.productName}`}
+                          width={64}
+                          height={64}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Product Name and Metrics */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <h3 className="text-lg font-semibold text-gray-900">{product.productName}</h3>
+                          <p className="text-sm text-gray-600">{product.productType} • {product.totalSales} units sold</p>
+                          <div className="flex items-center space-x-1">
+                            <Badge variant="outline" className="text-emerald-600">
+                              £{product.totalRevenue.toFixed(2)} Revenue
+                            </Badge>
+                            <Badge variant="outline" className={`${product.profitMargin > 50 ? 'text-green-600' : product.profitMargin > 30 ? 'text-yellow-600' : 'text-red-600'}`}>
+                              {product.profitMargin.toFixed(1)}% Margin
+                            </Badge>
+                            <Badge variant="outline" className="text-blue-600">
+                              £{product.averageOrderValue.toFixed(2)} AOV
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        {/* Financial Metrics */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-right">
+                          <div>
+                            <div className="font-semibold text-emerald-600">£{product.totalRevenue.toFixed(2)}</div>
+                            <div className="text-xs text-gray-500">Revenue</div>
+                          </div>
+                          <div>
+                            <div className="font-semibold text-red-600">£{product.totalCost.toFixed(2)}</div>
+                            <div className="text-xs text-gray-500">Cost</div>
+                          </div>
+                          <div>
+                            <div className="font-semibold text-green-600">£{product.grossProfit.toFixed(2)}</div>
+                            <div className="text-xs text-gray-500">Profit</div>
+                          </div>
+                          <div>
+                            <div className="font-semibold text-purple-600">{product.totalSales}</div>
+                            <div className="text-xs text-gray-500">Units</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Progress Bar for Profit Margin */}
+                      <div className="mt-2">
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full ${
+                              product.profitMargin > 50 ? 'bg-green-500' : 
+                              product.profitMargin > 30 ? 'bg-yellow-500' : 
+                              'bg-red-500'
+                            }`}
+                            style={{ width: `${Math.min(product.profitMargin, 100)}%` }}
+                          ></div>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Profit Margin: {product.profitMargin.toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {productAnalytics.length === 0 && (
+                <div className="text-center py-12">
+                  <ShoppingCart className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-gray-500">No product sales data available</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Individual Images Table */}
+      {viewMode === 'individual' && (
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
@@ -649,6 +1108,9 @@ export default function ImageAnalyticsPage() {
                           <ShoppingCart className="w-4 h-4" />
                           <span>{image.purchases}</span>
                         </div>
+                        <div className="flex items-center space-x-1 text-emerald-600">
+                          <span className="font-medium">£{image.revenue.toFixed(2)}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -664,6 +1126,7 @@ export default function ImageAnalyticsPage() {
           </div>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

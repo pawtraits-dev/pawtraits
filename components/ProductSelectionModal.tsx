@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ShoppingCart, Plus, Minus, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import type { ImageCatalogWithDetails } from '@/lib/types';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 
@@ -57,6 +58,20 @@ export default function ProductSelectionModal({
   const { selectedCountry, getCountryPricing } = useCountryPricing();
   const router = useRouter();
 
+  // Extract title from markdown description for cleaner cart display
+  const extractTitle = (description?: string) => {
+    if (!description) return 'Pet Portrait';
+    
+    // Extract text between ** ** (bold markdown)
+    const boldMatch = description.match(/\*\*(.*?)\*\*/);
+    if (boldMatch && boldMatch[1]) {
+      return boldMatch[1];
+    }
+    
+    // Fallback to first line if no bold text found
+    return description.split('\n')[0] || 'Pet Portrait';
+  };
+
   // Get products that match the image's format and have pricing for selected country
   const availableProducts = products.filter(product => {
     const countryPricing = pricing.find(p => 
@@ -102,7 +117,7 @@ export default function ProductSelectionModal({
           productId: item.productId,
           imageId: image.id,
           imageUrl: image.public_url,
-          imageTitle: image.description || 'Pet Portrait',
+          imageTitle: extractTitle(image.description),
           product,
           pricing: productPricing,
           quantity: item.quantity,
@@ -194,7 +209,19 @@ export default function ProductSelectionModal({
               </div>
               
               {image.description && (
-                <p className="text-sm text-gray-600">{image.description}</p>
+                <div className="text-sm text-gray-600 prose prose-sm max-w-none">
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p className="text-sm text-gray-600 mb-2 last:mb-0">{children}</p>,
+                      strong: ({ children }) => <strong className="font-bold text-gray-800">{children}</strong>,
+                      em: ({ children }) => <em className="italic text-gray-700">{children}</em>,
+                      h1: ({ children }) => <h2 className="text-base font-bold text-gray-800 mb-1">{children}</h2>,
+                      h2: ({ children }) => <h3 className="text-sm font-semibold text-gray-700 mb-1">{children}</h3>,
+                    }}
+                  >
+                    {image.description}
+                  </ReactMarkdown>
+                </div>
               )}
             </div>
           </div>
