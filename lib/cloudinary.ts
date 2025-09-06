@@ -166,7 +166,7 @@ export class CloudinaryImageService {
       // Environment variables for overlays
       const watermarkId = process.env.CLOUDINARY_WATERMARK_PUBLIC_ID || 'pawtraits_watermark_logo';
       const brandLogoId = process.env.CLOUDINARY_BRAND_LOGO_PUBLIC_ID || 'brand_assets/pawtraits_brand_logo';
-      const watermarkOpacity = parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '60');
+      const watermarkOpacity = parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '35');
 
       // 1. ORIGINAL - 300 DPI, no overlay, secured for print fulfillment only
       const originalUrl = cloudinary.url(publicId, {
@@ -581,7 +581,7 @@ export class CloudinaryImageService {
       console.log(`🔄 Generating Cloudinary URL for publicId: "${publicId}", variant: ${variant}`);
       
       const watermarkId = process.env.CLOUDINARY_WATERMARK_PUBLIC_ID || 'pawtraits_watermark_logo';
-      const watermarkOpacity = parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '60');
+      const watermarkOpacity = parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '35');
 
       // Base configuration for signed URLs (simple signature without auth_token)
       // Temporarily disable URL signing to fix 502 errors with watermarked variants

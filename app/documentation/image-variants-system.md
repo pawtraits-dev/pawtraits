@@ -45,7 +45,7 @@ The Pawtraits application uses Cloudinary to generate and serve multiple variant
 ```bash
 # Cloudinary Overlays
 CLOUDINARY_WATERMARK_PUBLIC_ID=pawtraits_watermark_logo
-CLOUDINARY_WATERMARK_OPACITY=60
+CLOUDINARY_WATERMARK_OPACITY=35
 CLOUDINARY_BRAND_LOGO_PUBLIC_ID=pawtraits_brand_logo
 ```
 

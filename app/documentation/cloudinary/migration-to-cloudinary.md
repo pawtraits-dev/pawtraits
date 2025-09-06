@@ -73,7 +73,7 @@ CLOUDINARY_API_SECRET=your_api_secret
 
 # Watermark settings
 CLOUDINARY_WATERMARK_PUBLIC_ID=pawtraits_watermark_logo
-CLOUDINARY_WATERMARK_OPACITY=60
+CLOUDINARY_WATERMARK_OPACITY=35
 
 # QR Code settings  
 QR_CODE_BASE_URL=https://pawtraits.com/shop
@@ -206,7 +206,7 @@ export class CloudinaryImageService {
       crop: 'fill',
       quality: 85,
       overlay: process.env.CLOUDINARY_WATERMARK_PUBLIC_ID,
-      opacity: parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '60'),
+      opacity: parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '35'),
       gravity: 'center'
     });
 

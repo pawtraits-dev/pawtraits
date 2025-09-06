@@ -32,7 +32,7 @@ The watermark should be accessible at:
 ## Environment Variables Used
 
 - `CLOUDINARY_WATERMARK_PUBLIC_ID=pawtraits_watermark_logo`
-- `CLOUDINARY_WATERMARK_OPACITY=60`
+- `CLOUDINARY_WATERMARK_OPACITY=35`
 
 ## Testing
 

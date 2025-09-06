@@ -48,7 +48,7 @@ async function uploadWatermark() {
     if (success) {
       console.log('✅ Watermark uploaded successfully!');
       console.log(`   - Public ID: ${process.env.CLOUDINARY_WATERMARK_PUBLIC_ID || 'pawtraits_watermark_logo'}`);
-      console.log(`   - Opacity setting: ${process.env.CLOUDINARY_WATERMARK_OPACITY || '60'}%`);
+      console.log(`   - Opacity setting: ${process.env.CLOUDINARY_WATERMARK_OPACITY || '35'}%`);
       
       // Generate preview URL
       const { v2: cloudinary } = await import('cloudinary');

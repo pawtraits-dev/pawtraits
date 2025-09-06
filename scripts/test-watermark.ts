@@ -107,7 +107,7 @@ async function testWatermark() {
       crop: 'fill',
       quality: 85,
       overlay: process.env.CLOUDINARY_WATERMARK_PUBLIC_ID || 'pawtraits_watermark_logo',
-      opacity: parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '60'),
+      opacity: parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '35'),
       gravity: 'center'
     });
 

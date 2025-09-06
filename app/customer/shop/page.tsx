@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Filter, Star, ShoppingCart, Heart, Share2, ShoppingBag } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { SupabaseService } from '@/lib/supabase';
+import FeaturedCard from '@/components/FeaturedCard';
 // Removed AdminSupabaseService - will use regular service with public access
 import type { ImageCatalogWithDetails, Breed, Theme, AnimalType, Coat } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
@@ -521,46 +522,24 @@ export default function CustomerShopPage() {
 
         {/* Breed Description */}
         {showBreedDescription && selectedBreedData && (
-          <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                {selectedBreedData.animal_type === 'dog' ? '🐕' : '🐱'} {selectedBreedData.name}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col lg:flex-row gap-6">
-                {/* Hero Image */}
-                {selectedBreedData.hero_image_url && (
-                  <div className="lg:w-1/3 flex-shrink-0">
-                    <img 
-                      src={selectedBreedData.hero_image_url}
-                      alt={selectedBreedData.hero_image_alt || `${selectedBreedData.name} hero image`}
-                      className="w-full h-48 lg:h-64 object-contain bg-gray-50 rounded-lg shadow-md"
-                    />
-                  </div>
-                )}
-                
-                {/* Content */}
-                <div className="flex-1">
-                  <div className="text-gray-700 text-lg leading-relaxed prose prose-gray max-w-none">
-                    <ReactMarkdown>{selectedBreedData.description}</ReactMarkdown>
-                  </div>
-                  {selectedBreedData.personality_traits && selectedBreedData.personality_traits.length > 0 && (
-                    <div className="mt-4">
-                      <h4 className="font-semibold text-gray-900 mb-2">Personality Traits:</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedBreedData.personality_traits.map((trait, index) => (
-                          <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-800">
-                            {trait}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <FeaturedCard
+            title={selectedBreedData.name}
+            description={selectedBreedData.description}
+            heroImageUrl={selectedBreedData.hero_image_url}
+            heroImageAlt={selectedBreedData.hero_image_alt}
+            gradientFrom="blue-50"
+            gradientTo="purple-50"
+            borderColor="blue-200"
+            icon={selectedBreedData.animal_type === 'dog' ? '🐕' : '🐱'}
+            badges={selectedBreedData.personality_traits?.map(trait => ({
+              text: trait,
+              className: 'bg-blue-100 text-blue-800'
+            })) || []}
+            metadata={[
+              { label: 'Animal Type', value: selectedBreedData.animal_type, className: 'capitalize' },
+              ...(selectedBreedData.popularity_rank ? [{ label: 'Popularity Rank', value: `#${selectedBreedData.popularity_rank}` }] : [])
+            ]}
+          />
         )}
 
         {/* Coat Description */}
@@ -620,54 +599,29 @@ export default function CustomerShopPage() {
 
         {/* Theme Description */}
         {showThemeDescription && selectedThemeData && (
-          <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                🎨 {selectedThemeData.name}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col lg:flex-row gap-6">
-                {/* Hero Image */}
-                {selectedThemeData.hero_image_url && (
-                  <div className="lg:w-1/3 flex-shrink-0">
-                    <img 
-                      src={selectedThemeData.hero_image_url}
-                      alt={selectedThemeData.hero_image_alt || `${selectedThemeData.name} theme hero image`}
-                      className="w-full h-48 lg:h-32 object-cover rounded-lg shadow-md"
-                    />
-                  </div>
-                )}
-                
-                {/* Content */}
-                <div className="flex-1">
-                  <p className="text-gray-700 text-lg leading-relaxed">
-                    {selectedThemeData.description}
-                  </p>
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900">Difficulty:</span>
-                      <Badge variant="secondary" className="bg-purple-100 text-purple-800">
-                        {selectedThemeData.difficulty_level}/5
-                      </Badge>
-                    </div>
-                    {selectedThemeData.style_keywords && selectedThemeData.style_keywords.length > 0 && (
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-gray-900">Keywords:</span>
-                        <div className="flex flex-wrap gap-1">
-                          {selectedThemeData.style_keywords.slice(0, 3).map((keyword, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {keyword}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <FeaturedCard
+            title={selectedThemeData.name}
+            description={selectedThemeData.description}
+            heroImageUrl={selectedThemeData.hero_image_url}
+            heroImageAlt={selectedThemeData.hero_image_alt}
+            gradientFrom="purple-50"
+            gradientTo="pink-50"
+            borderColor="purple-200"
+            icon="🎨"
+            badges={[
+              { text: `Level ${selectedThemeData.difficulty_level}/5`, className: 'bg-purple-100 text-purple-800' },
+              ...(selectedThemeData.style_keywords && selectedThemeData.style_keywords.length > 0 
+                ? selectedThemeData.style_keywords.slice(0, 3).map(keyword => ({
+                    text: keyword,
+                    className: 'bg-pink-100 text-pink-800'
+                  }))
+                : [])
+            ]}
+            metadata={[
+              { label: 'Difficulty', value: `${selectedThemeData.difficulty_level}/5` },
+              ...(selectedThemeData.style_keywords?.length ? [{ label: 'Keywords', value: `${selectedThemeData.style_keywords.length} available` }] : [])
+            ]}
+          />
         )}
 
         {/* Animal Type Description */}
