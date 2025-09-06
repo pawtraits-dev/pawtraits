@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Heart, Share2, ShoppingCart, Search, ArrowUpDown } from 'lucide-react';
+import { Eye, Heart, Share2, ShoppingCart, Search, ArrowUpDown, Edit3, Check, X } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
 import { PawSpinner } from '@/components/ui/paw-spinner';
@@ -47,6 +47,12 @@ export default function ImageAnalyticsPage() {
   
   const [breeds, setBreeds] = useState<{id: string, name: string}[]>([]);
   const [themes, setThemes] = useState<{id: string, name: string}[]>([]);
+  const [allThemes, setAllThemes] = useState<{id: string, name: string}[]>([]);
+  
+  // Bulk editing state
+  const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
+  const [isEditing, setIsEditing] = useState(false);
+  const [bulkThemeId, setBulkThemeId] = useState<string>('');
 
   const supabaseService = new SupabaseService();
 
@@ -168,6 +174,11 @@ export default function ImageAnalyticsPage() {
       setBreeds(uniqueBreeds.sort().map((name: string) => ({ id: name, name })));
       setThemes(uniqueThemes.sort().map((name: string) => ({ id: name, name })));
 
+      // Load all themes for editing purposes
+      const allThemesData = await supabaseService.getThemes();
+      const activeThemes = allThemesData?.filter(theme => theme.is_active) || [];
+      setAllThemes(activeThemes.sort((a, b) => a.name.localeCompare(b.name)).map(theme => ({ id: theme.id, name: theme.name })));
+
     } catch (error) {
       console.error('Error loading image analytics:', error);
     } finally {
@@ -243,6 +254,66 @@ export default function ImageAnalyticsPage() {
     });
   };
 
+  const handleImageSelect = (imageId: string, isSelected: boolean) => {
+    const newSelection = new Set(selectedImages);
+    if (isSelected) {
+      newSelection.add(imageId);
+    } else {
+      newSelection.delete(imageId);
+    }
+    setSelectedImages(newSelection);
+  };
+
+  const handleSelectAll = (isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedImages(new Set(filteredImages.map(img => img.id)));
+    } else {
+      setSelectedImages(new Set());
+    }
+  };
+
+  const handleBulkThemeUpdate = async () => {
+    if (selectedImages.size === 0 || !bulkThemeId) {
+      alert('Please select images and a theme');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/images/update-theme', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageIds: Array.from(selectedImages),
+          newThemeId: bulkThemeId,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        alert(`Successfully updated theme for ${result.updatedCount} images`);
+        setSelectedImages(new Set());
+        setBulkThemeId('');
+        setIsEditing(false);
+        // Reload data to show changes
+        loadData();
+      } else {
+        alert(`Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating themes:', error);
+      alert('Failed to update themes');
+    }
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setSelectedImages(new Set());
+    setBulkThemeId('');
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -255,11 +326,73 @@ export default function ImageAnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Image Analytics</h1>
-        <p className="text-gray-600 mt-2">
-          Analyze performance metrics for generated images
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Image Analytics</h1>
+          <p className="text-gray-600 mt-2">
+            Analyze performance metrics for generated images
+          </p>
+        </div>
+        <div className="flex items-center space-x-3">
+          {!isEditing ? (
+            <div className="flex items-center space-x-2">
+              <Button 
+                onClick={() => {
+                  setThemeFilter('Toilet Reader');
+                  setIsEditing(true);
+                  // Auto-select Reading Room theme if available
+                  const readingRoomTheme = allThemes.find(t => t.name === 'Reading Room');
+                  if (readingRoomTheme) {
+                    setBulkThemeId(readingRoomTheme.id);
+                  }
+                }}
+                variant="outline"
+                className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                size="sm"
+              >
+                Fix "Toilet Reader" → "Reading Room"
+              </Button>
+              <Button 
+                onClick={() => setIsEditing(true)}
+                variant="outline"
+                className="flex items-center space-x-2"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>Edit Themes</span>
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <Select value={bulkThemeId} onValueChange={setBulkThemeId}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Select new theme..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {allThemes.map(theme => (
+                    <SelectItem key={theme.id} value={theme.id}>
+                      {theme.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button 
+                onClick={handleBulkThemeUpdate}
+                disabled={selectedImages.size === 0 || !bulkThemeId}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Check className="w-4 h-4 mr-2" />
+                Update ({selectedImages.size})
+              </Button>
+              <Button 
+                onClick={cancelEditing}
+                variant="outline"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Cancel
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Filters and Search */}
@@ -395,16 +528,44 @@ export default function ImageAnalyticsPage() {
       {/* Images Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Image Performance</CardTitle>
-          <CardDescription>
-            Images sorted by {sortField.replace('_', ' ')} ({sortDirection === 'desc' ? 'highest first' : 'lowest first'})
-          </CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Image Performance</CardTitle>
+              <CardDescription>
+                Images sorted by {sortField.replace('_', ' ')} ({sortDirection === 'desc' ? 'highest first' : 'lowest first'})
+              </CardDescription>
+            </div>
+            {isEditing && (
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="select-all"
+                  checked={filteredImages.length > 0 && selectedImages.size === filteredImages.length}
+                  onChange={(e) => handleSelectAll(e.target.checked)}
+                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                />
+                <label htmlFor="select-all" className="text-sm font-medium text-gray-700">
+                  Select All ({filteredImages.length})
+                </label>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {filteredImages.map((image, index) => (
-              <div key={image.id} className="border rounded-lg p-4 hover:bg-gray-50">
+              <div key={image.id} className={`border rounded-lg p-4 hover:bg-gray-50 ${selectedImages.has(image.id) ? 'ring-2 ring-purple-500 bg-purple-50' : ''}`}>
                 <div className="flex items-start space-x-4">
+                  {isEditing && (
+                    <div className="flex-shrink-0 pt-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedImages.has(image.id)}
+                        onChange={(e) => handleImageSelect(image.id, e.target.checked)}
+                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                      />
+                    </div>
+                  )}
                   {/* Image */}
                   <div className="flex-shrink-0 w-24 h-24 bg-gray-100 rounded-lg overflow-hidden">
                     <CatalogImage
