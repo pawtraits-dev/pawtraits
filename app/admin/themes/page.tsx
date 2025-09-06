@@ -20,6 +20,7 @@ export default function ThemesManagement() {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imageCounts, setImageCounts] = useState<Record<string, number>>({});
   
   const supabaseService = new SupabaseService();
 
@@ -27,11 +28,41 @@ export default function ThemesManagement() {
     loadThemes();
   }, []);
 
+  const loadImageCounts = async (themeIds: string[]) => {
+    try {
+      const counts: Record<string, number> = {};
+      
+      // Get image counts for all themes at once
+      const { data, error } = await supabaseService.supabase
+        .from('image_catalog')
+        .select('theme_id')
+        .in('theme_id', themeIds)
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      // Count images per theme
+      data?.forEach(image => {
+        counts[image.theme_id] = (counts[image.theme_id] || 0) + 1;
+      });
+
+      setImageCounts(counts);
+    } catch (err) {
+      console.error('Failed to load image counts:', err);
+    }
+  };
+
   const loadThemes = async () => {
     try {
       setLoading(true);
       const data = await supabaseService.getThemes();
       setThemes(data || []);
+      
+      // Load image counts for all themes
+      if (data && data.length > 0) {
+        const themeIds = data.map(theme => theme.id);
+        await loadImageCounts(themeIds);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load themes');
     } finally {
@@ -199,6 +230,9 @@ export default function ThemesManagement() {
                       </Badge>
                       <Badge className={getDifficultyColor(theme.difficulty_level)}>
                         {getDifficultyLabel(theme.difficulty_level)}
+                      </Badge>
+                      <Badge variant="outline" className="bg-purple-50 text-purple-700">
+                        {imageCounts[theme.id] || 0} images
                       </Badge>
                     </div>
                   </div>

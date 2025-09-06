@@ -215,6 +215,28 @@ export default function PartnerShopPage() {
     loadImages();
   }, [page, pageSize, animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm]);
 
+  const getBreedsWithImages = async (allBreeds: any[]) => {
+    const { data: breedImages } = await supabaseService.supabase
+      .from('image_catalog')
+      .select('breed_id')
+      .eq('is_active', true)
+      .not('breed_id', 'is', null);
+
+    const breedIdsWithImages = new Set(breedImages?.map(img => img.breed_id) || []);
+    return allBreeds.filter(breed => breedIdsWithImages.has(breed.id));
+  };
+
+  const getThemesWithImages = async (allThemes: any[]) => {
+    const { data: themeImages } = await supabaseService.supabase
+      .from('image_catalog')
+      .select('theme_id')
+      .eq('is_active', true)
+      .not('theme_id', 'is', null);
+
+    const themeIdsWithImages = new Set(themeImages?.map(img => img.theme_id) || []);
+    return allThemes.filter(theme => themeIdsWithImages.has(theme.id));
+  };
+
   const loadData = async () => {
     try {
       const [breedsData, coatsData, themesData, productsData, pricingData, currentUserData, partnerData] = await Promise.all([
@@ -227,9 +249,19 @@ export default function PartnerShopPage() {
         supabaseService.getCurrentPartner()
       ]);
 
-      setBreeds(breedsData?.filter((b: any) => b.is_active) || []);
+      const activeBreeds = breedsData?.filter((b: any) => b.is_active) || [];
+      const activeThemes = themesData?.filter((t: any) => t.is_active) || [];
+      
+      // Filter breeds and themes to only include those with images
+      const breedsWithImages = await getBreedsWithImages(activeBreeds);
+      const themesWithImages = await getThemesWithImages(activeThemes);
+
+      console.log(`Filtered breeds: ${breedsWithImages.length} out of ${activeBreeds.length} have images`);
+      console.log(`Filtered themes: ${themesWithImages.length} out of ${activeThemes.length} have images`);
+
+      setBreeds(breedsWithImages);
       setCoats(coatsData?.filter((c: any) => c.is_active) || []);
-      setThemes(themesData?.filter((t: any) => t.is_active) || []);
+      setThemes(themesWithImages);
       setProducts(productsData?.filter((p: any) => p.is_active) || []);
       setPricing(pricingData || []);
       setCurrentUser(currentUserData);
@@ -534,10 +566,6 @@ export default function PartnerShopPage() {
             gradientTo="purple-50"
             borderColor="blue-200"
             icon={selectedBreedData.animal_type === 'dog' ? '🐕' : '🐱'}
-            badges={selectedBreedData.personality_traits?.map(trait => ({
-              text: trait,
-              className: 'bg-blue-100 text-blue-800'
-            })) || []}
             metadata={[
               { label: 'Animal Type', value: selectedBreedData.animal_type, className: 'capitalize' },
               ...(selectedBreedData.popularity_rank ? [{ label: 'Popularity Rank', value: `#${selectedBreedData.popularity_rank}` }] : [])
@@ -611,15 +639,6 @@ export default function PartnerShopPage() {
             gradientTo="pink-50"
             borderColor="purple-200"
             icon="🎨"
-            badges={[
-              { text: `Level ${selectedThemeData.difficulty_level}/5`, className: 'bg-purple-100 text-purple-800' },
-              ...(selectedThemeData.style_keywords && selectedThemeData.style_keywords.length > 0 
-                ? selectedThemeData.style_keywords.slice(0, 3).map(keyword => ({
-                    text: keyword,
-                    className: 'bg-pink-100 text-pink-800'
-                  }))
-                : [])
-            ]}
             metadata={[
               { label: 'Difficulty', value: `${selectedThemeData.difficulty_level}/5` },
               ...(selectedThemeData.style_keywords?.length ? [{ label: 'Keywords', value: `${selectedThemeData.style_keywords.length} available` }] : [])

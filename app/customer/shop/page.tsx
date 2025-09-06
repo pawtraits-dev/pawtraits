@@ -231,6 +231,38 @@ export default function CustomerShopPage() {
     }
   }, [page, pageSize, animalType, selectedBreed, selectedCoat, selectedTheme, featuredOnly, debouncedSearchTerm]);
 
+  const getBreedsWithImages = async (allBreeds: any[]) => {
+    try {
+      const { data: breedImages } = await supabaseService.supabase
+        .from('image_catalog')
+        .select('breed_id')
+        .eq('is_active', true)
+        .not('breed_id', 'is', null);
+
+      const breedIdsWithImages = new Set(breedImages?.map(img => img.breed_id) || []);
+      return allBreeds.filter(breed => breedIdsWithImages.has(breed.id));
+    } catch (error) {
+      console.error('Error filtering breeds with images:', error);
+      return allBreeds; // Return all breeds if filtering fails
+    }
+  };
+
+  const getThemesWithImages = async (allThemes: any[]) => {
+    try {
+      const { data: themeImages } = await supabaseService.supabase
+        .from('image_catalog')
+        .select('theme_id')
+        .eq('is_active', true)
+        .not('theme_id', 'is', null);
+
+      const themeIdsWithImages = new Set(themeImages?.map(img => img.theme_id) || []);
+      return allThemes.filter(theme => themeIdsWithImages.has(theme.id));
+    } catch (error) {
+      console.error('Error filtering themes with images:', error);
+      return allThemes; // Return all themes if filtering fails
+    }
+  };
+
   const loadData = async () => {
     try {
       console.log('[LOAD_DATA] Starting data load...');
@@ -247,11 +279,22 @@ export default function CustomerShopPage() {
       
       console.log('[LOAD_DATA] Data loaded: Products:', filteredProducts.length, 'Pricing:', filteredPricing.length);
 
-      setBreeds(breedsData?.filter((b: any) => b.is_active) || []);
+      // Filter breeds and themes to only include those with images
+      const activeBreeds = breedsData?.filter((b: any) => b.is_active) || [];
+      const activeThemes = themesData?.filter((t: any) => t.is_active) || [];
+      
+      const [breedsWithImages, themesWithImages] = await Promise.all([
+        getBreedsWithImages(activeBreeds),
+        getThemesWithImages(activeThemes)
+      ]);
+
+      setBreeds(breedsWithImages);
       setCoats(coatsData?.filter((c: any) => c.is_active) || []);
-      setThemes(themesData?.filter((t: any) => t.is_active) || []);
+      setThemes(themesWithImages);
       setProducts(filteredProducts);
       setPricing(filteredPricing);
+      
+      console.log(`[LOAD_DATA] Filtered: ${breedsWithImages.length} breeds and ${themesWithImages.length} themes with images`);
       
       // Load initial filters after reference data is loaded
       loadInitialFilters();
@@ -531,10 +574,6 @@ export default function CustomerShopPage() {
             gradientTo="purple-50"
             borderColor="blue-200"
             icon={selectedBreedData.animal_type === 'dog' ? '🐕' : '🐱'}
-            badges={selectedBreedData.personality_traits?.map(trait => ({
-              text: trait,
-              className: 'bg-blue-100 text-blue-800'
-            })) || []}
             metadata={[
               { label: 'Animal Type', value: selectedBreedData.animal_type, className: 'capitalize' },
               ...(selectedBreedData.popularity_rank ? [{ label: 'Popularity Rank', value: `#${selectedBreedData.popularity_rank}` }] : [])
@@ -608,15 +647,6 @@ export default function CustomerShopPage() {
             gradientTo="pink-50"
             borderColor="purple-200"
             icon="🎨"
-            badges={[
-              { text: `Level ${selectedThemeData.difficulty_level}/5`, className: 'bg-purple-100 text-purple-800' },
-              ...(selectedThemeData.style_keywords && selectedThemeData.style_keywords.length > 0 
-                ? selectedThemeData.style_keywords.slice(0, 3).map(keyword => ({
-                    text: keyword,
-                    className: 'bg-pink-100 text-pink-800'
-                  }))
-                : [])
-            ]}
             metadata={[
               { label: 'Difficulty', value: `${selectedThemeData.difficulty_level}/5` },
               ...(selectedThemeData.style_keywords?.length ? [{ label: 'Keywords', value: `${selectedThemeData.style_keywords.length} available` }] : [])

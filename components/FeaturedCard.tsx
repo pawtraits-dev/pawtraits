@@ -41,10 +41,10 @@ export default function FeaturedCard({
     <Card className={`bg-gradient-to-r from-${gradientFrom} to-${gradientTo} border-${borderColor} shadow-lg`}>
       <CardContent className="p-6">
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Hero Image - 1:1 aspect ratio on the left */}
+          {/* Hero Image - 1:1 aspect ratio container on the left */}
           {heroImageUrl && (
-            <div className="lg:w-64 flex-shrink-0">
-              <div className="aspect-square overflow-hidden rounded-lg shadow-lg bg-white/50 backdrop-blur-sm">
+            <div className="w-64 h-64 flex-shrink-0">
+              <div className="w-full h-full overflow-hidden rounded-lg shadow-lg bg-white/50 backdrop-blur-sm">
                 <img 
                   src={heroImageUrl}
                   alt={heroImageAlt || `${title} hero image`}
@@ -93,20 +93,6 @@ export default function FeaturedCard({
               </div>
             )}
             
-            {/* Badges */}
-            {badges.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {badges.map((badge, index) => (
-                  <Badge 
-                    key={index} 
-                    variant="secondary" 
-                    className={badge.className || 'bg-white/60 text-gray-800 backdrop-blur-sm'}
-                  >
-                    {badge.text}
-                  </Badge>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </CardContent>

@@ -21,6 +21,7 @@ export default function BreedsManagement() {
   const [breeds, setBreeds] = useState<Breed[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imageCounts, setImageCounts] = useState<Record<string, number>>({});
   
   const supabaseService = new SupabaseService();
 
@@ -28,11 +29,41 @@ export default function BreedsManagement() {
     loadBreeds();
   }, [animalTypeFilter]);
 
+  const loadImageCounts = async (breedIds: string[]) => {
+    try {
+      const counts: Record<string, number> = {};
+      
+      // Get image counts for all breeds at once
+      const { data, error } = await supabaseService.supabase
+        .from('image_catalog')
+        .select('breed_id')
+        .in('breed_id', breedIds)
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      // Count images per breed
+      data?.forEach(image => {
+        counts[image.breed_id] = (counts[image.breed_id] || 0) + 1;
+      });
+
+      setImageCounts(counts);
+    } catch (err) {
+      console.error('Failed to load image counts:', err);
+    }
+  };
+
   const loadBreeds = async () => {
     try {
       setLoading(true);
       const data = await supabaseService.getBreeds(animalTypeFilter || undefined);
       setBreeds(data || []);
+      
+      // Load image counts for all breeds
+      if (data && data.length > 0) {
+        const breedIds = data.map(breed => breed.id);
+        await loadImageCounts(breedIds);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load breeds');
     } finally {
@@ -229,6 +260,9 @@ export default function BreedsManagement() {
                           Rank #{breed.popularity_rank}
                         </Badge>
                       )}
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                        {imageCounts[breed.id] || 0} images
+                      </Badge>
                     </div>
                   </div>
                 </div>
