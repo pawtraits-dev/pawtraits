@@ -132,30 +132,62 @@ export default function ImageAnalyticsPage() {
       let purchaseData: any[] = [];
       let productSalesData: any[] = [];
       try {
-        const { data, error } = await supabaseService.supabase
-          .from('order_items')
-          .select('image_id, COUNT(*) as count, SUM(unit_price * quantity) as total_revenue')
-          .group(['image_id']);
+        console.log('🔍 Loading order items data...');
         
-        if (!error) purchaseData = data || [];
+        // First, check what columns exist in the order_items table
+        const { data: columns } = await supabaseService.supabase
+          .from('information_schema.columns')
+          .select('column_name')
+          .eq('table_name', 'order_items')
+          .eq('table_schema', 'public');
+        
+        const columnNames = columns?.map(col => col.column_name) || [];
+        console.log('📋 Available columns in order_items:', columnNames);
+        
+        const hasUnitPrice = columnNames.includes('unit_price');
+        const hasTotalPrice = columnNames.includes('total_price');
+        const hasProductId = columnNames.includes('product_id');
+        
+        // Try to load purchase data with available columns
+        if (hasUnitPrice) {
+          const { data, error } = await supabaseService.supabase
+            .from('order_items')
+            .select('image_id, COUNT(*) as count, SUM(unit_price * quantity) as total_revenue')
+            .not('image_id', 'is', null)
+            .group(['image_id']);
+          
+          if (error) {
+            console.error('❌ Error loading purchase data:', error);
+          } else {
+            console.log(`✅ Loaded purchase data for ${data?.length || 0} images`);
+            purchaseData = data || [];
+          }
+        } else {
+          console.warn('⚠️ unit_price column not found, skipping purchase data');
+        }
 
-        // Load product sales data for product analytics
-        const { data: productData, error: productError } = await supabaseService.supabase
-          .from('order_items')
-          .select(`
-            product_id,
-            quantity,
-            unit_price,
-            cost_price,
-            fulfillment_cost,
-            ai_generation_cost,
-            total_cost,
-            gross_profit,
-            image_id,
-            products!inner(name, medium:media(name))
-          `);
+        // Try to load product sales data with available columns
+        console.log('🔍 Loading product sales data...');
+        const selectFields = ['quantity', 'image_id'];
+        if (hasProductId) selectFields.push('product_id');
+        if (hasUnitPrice) selectFields.push('unit_price');
+        if (hasTotalPrice) selectFields.push('total_price');
         
-        if (!productError) productSalesData = productData || [];
+        if (selectFields.length > 2) { // At least quantity, image_id, and one price field
+          const { data: productData, error: productError } = await supabaseService.supabase
+            .from('order_items')
+            .select(selectFields.join(', '));
+          
+          if (productError) {
+            console.error('❌ Error loading product sales data:', productError);
+          } else {
+            console.log(`✅ Loaded ${productData?.length || 0} order items for product analysis`);
+            productSalesData = productData || [];
+          }
+        } else {
+          console.warn('⚠️ Insufficient columns for product analysis');
+        }
+        
       } catch (err) {
         console.warn('Order items table not accessible:', err);
       }
@@ -340,17 +372,17 @@ export default function ImageAnalyticsPage() {
   };
 
   const calculateProductAnalytics = (productSalesData: any[], imageData: ImageAnalytics[]) => {
+    console.log('🔍 Calculating product analytics with', productSalesData.length, 'order items');
+    
     // Group sales data by product
     const productGroups = productSalesData.reduce((acc, sale) => {
-      const productId = sale.product_id;
-      const productName = sale.products?.name || 'Unknown Product';
-      const productType = sale.products?.medium?.name || 'Unknown Type';
+      const productId = sale.product_id || 'unknown';
       
       if (!acc[productId]) {
         acc[productId] = {
           productId,
-          productName,
-          productType,
+          productName: `Product ${productId}`,
+          productType: 'Physical Product',
           sales: []
         };
       }
@@ -359,13 +391,17 @@ export default function ImageAnalyticsPage() {
       return acc;
     }, {} as Record<string, any>);
 
+    console.log('📊 Product groups:', Object.keys(productGroups));
+
     // Calculate analytics for each product
     const productStats = Object.values(productGroups).map((group: any) => {
       const sales = group.sales;
       const totalSales = sales.reduce((sum: number, sale: any) => sum + (sale.quantity || 0), 0);
-      const totalRevenue = sales.reduce((sum: number, sale: any) => sum + (sale.unit_price * sale.quantity || 0), 0);
-      const totalCost = sales.reduce((sum: number, sale: any) => sum + (sale.total_cost || 0), 0);
-      const grossProfit = sales.reduce((sum: number, sale: any) => sum + (sale.gross_profit || 0), 0);
+      const totalRevenue = sales.reduce((sum: number, sale: any) => sum + (sale.total_price || sale.unit_price * sale.quantity || 0), 0);
+      
+      // Since we don't have cost data yet, use estimated 30% cost
+      const estimatedCost = totalRevenue * 0.3;
+      const grossProfit = totalRevenue - estimatedCost;
       const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
       const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
 
@@ -380,7 +416,7 @@ export default function ImageAnalyticsPage() {
         productType: group.productType,
         totalSales,
         totalRevenue,
-        totalCost,
+        totalCost: estimatedCost,
         grossProfit,
         profitMargin,
         averageOrderValue,
@@ -388,6 +424,7 @@ export default function ImageAnalyticsPage() {
       };
     }).sort((a, b) => b.totalRevenue - a.totalRevenue);
 
+    console.log('📈 Product stats calculated:', productStats.length, 'products');
     setProductAnalytics(productStats);
   };
 
