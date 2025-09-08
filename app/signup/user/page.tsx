@@ -192,7 +192,11 @@ function UserSignupContent() {
 
     if (step === 1) {
       if (!formData.email.trim()) newErrors.email = 'Email is required';
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Invalid email format';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        console.log('Email validation failed for:', formData.email);
+        console.log('Regex test result:', /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email));
+        newErrors.email = 'Invalid email format';
+      }
       
       if (!formData.password) newErrors.password = 'Password is required';
       else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
@@ -236,7 +240,17 @@ function UserSignupContent() {
         }
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        console.error('Supabase auth signup error:', authError);
+        console.error('Auth error details:', {
+          code: authError.code,
+          message: authError.message,
+          status: authError.status,
+          email: formData.email,
+          details: authError
+        });
+        throw authError;
+      }
 
       if (!authData.user) {
         throw new Error('Failed to create user account');
