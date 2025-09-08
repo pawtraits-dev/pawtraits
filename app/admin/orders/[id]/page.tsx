@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   ArrowLeft,
   Package, 
@@ -80,6 +81,9 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [productDetails, setProductDetails] = useState<{[key: string]: any}>({});
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [selectedImageTitle, setSelectedImageTitle] = useState<string>('');
+  const [showImageModal, setShowImageModal] = useState(false);
   const adminService = new AdminSupabaseService();
 
   useEffect(() => {
@@ -205,6 +209,12 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
       cancelled: "bg-gray-100 text-gray-800",
     };
     return variants[status.toLowerCase()] || "bg-gray-100 text-gray-800";
+  };
+
+  const handleImageClick = (imageUrl: string, imageTitle: string) => {
+    setSelectedImageUrl(imageUrl);
+    setSelectedImageTitle(imageTitle);
+    setShowImageModal(true);
   };
 
   if (loading) {
@@ -354,13 +364,13 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
               <div className="space-y-6">
                 {order.order_items?.map((item) => (
                   <div key={item.id} className="flex items-start space-x-4">
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 cursor-pointer" onClick={() => handleImageClick(item.image_url, item.image_title)}>
                       <Image
                         src={item.image_url}
                         alt={item.image_title}
                         width={120}
                         height={120}
-                        className="rounded-lg object-cover border"
+                        className="rounded-lg object-cover border hover:opacity-80 transition-opacity"
                       />
                     </div>
                     
@@ -368,11 +378,7 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
                       <h3 className="font-semibold text-gray-900">{item.image_title}</h3>
                       <div className="space-y-1 text-sm text-gray-600">
                         <p className="font-medium text-blue-900">{getProductDescription(item)}</p>
-                        <p>Image ID: {item.image_id}</p>
                         <p>Quantity: {item.quantity}</p>
-                        {productDetails[item.product_id] && (
-                          <p className="text-xs text-gray-500">Product ID: {item.product_id}</p>
-                        )}
                         {item.product_data && (
                           <div className="bg-gray-50 p-2 rounded text-xs">
                             <p className="font-medium">Product Details:</p>
@@ -581,6 +587,41 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
           </Card>
         </div>
       </div>
+
+      {/* Image Detail Modal */}
+      <Dialog open={showImageModal} onOpenChange={setShowImageModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Image Details</span>
+              <Button variant="ghost" size="sm" onClick={() => setShowImageModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex items-center justify-center p-4">
+            {selectedImageUrl && (
+              <div className="max-w-full max-h-[70vh] overflow-hidden">
+                <Image
+                  src={selectedImageUrl}
+                  alt={selectedImageTitle}
+                  width={800}
+                  height={600}
+                  className="w-full h-full object-contain rounded-lg"
+                  priority
+                />
+              </div>
+            )}
+          </div>
+          
+          {selectedImageTitle && (
+            <div className="px-6 pb-6">
+              <h3 className="text-lg font-semibold text-gray-900">{selectedImageTitle}</h3>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
