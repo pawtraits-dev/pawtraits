@@ -130,6 +130,19 @@ export class AdminSupabaseService {
     }
   }
 
+  async getProductByIdOrSku(idOrSku: string): Promise<Product | null> {
+    try {
+      const response = await fetch(`/api/admin/products/${encodeURIComponent(idOrSku)}`);
+      if (!response.ok) {
+        return null;
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting product by id or sku:', error);
+      return null;
+    }
+  }
+
   async createProduct(productData: ProductCreate): Promise<Product | null> {
     try {
       const response = await fetch('/api/admin/products', {
