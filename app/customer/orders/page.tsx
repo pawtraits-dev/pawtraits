@@ -101,11 +101,15 @@ export default function CustomerOrdersPage() {
       
       // Get current user email for API authentication
       const { data: { user } } = await supabaseService.getClient().auth.getUser()
-      if (!user?.email) return
+      if (!user?.email) {
+        console.warn('No user email found for product details loading')
+        return
+      }
       
       // Collect all unique product IDs from all orders
       const allOrderItems = orders.flatMap(order => order.order_items || [])
       const uniqueProductIds = [...new Set(allOrderItems.map(item => item.product_id))]
+      console.log('Customer loading product details for IDs:', uniqueProductIds)
       
       // Fetch product details for each unique product_id
       for (const productId of uniqueProductIds) {
@@ -114,15 +118,19 @@ export default function CustomerOrdersPage() {
           
           if (response.ok) {
             const product = await response.json()
+            console.log(`Customer product details for ${productId}:`, product)
             productDetailsMap[productId] = product
           } else {
-            console.warn(`Failed to fetch product details for ${productId}`)
+            console.warn(`Failed to fetch product details for ${productId}, status:`, response.status)
+            const errorText = await response.text()
+            console.warn('Error response:', errorText)
           }
         } catch (error) {
           console.error(`Error fetching product details for ${productId}:`, error)
         }
       }
       
+      console.log('Customer final product details map:', productDetailsMap)
       setProductDetails(productDetailsMap)
     } catch (error) {
       console.error('Error loading product details:', error)
@@ -131,6 +139,8 @@ export default function CustomerOrdersPage() {
 
   const getProductDescription = (productId: string) => {
     const product = productDetails[productId]
+    console.log(`Customer getting description for product ${productId}:`, product)
+    
     if (product) {
       // Use the product name if available, otherwise construct it
       if (product.name) {
@@ -147,7 +157,10 @@ export default function CustomerOrdersPage() {
       // Final fallback with dimensions
       return `${product.width_cm || 'Unknown'} x ${product.height_cm || 'Unknown'}cm ${formatName} ${mediumName}`.trim()
     }
-    return 'Product details loading...'
+    
+    // Show the current state for debugging
+    const hasProductDetails = Object.keys(productDetails).length > 0
+    return hasProductDetails ? `No product found for ID: ${productId}` : 'Product details loading...'
   }
 
   const handleImageClick = (imageUrl: string, imageTitle: string) => {

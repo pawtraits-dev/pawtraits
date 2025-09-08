@@ -120,14 +120,23 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
       
       // Fetch product details for each unique product_id
       const uniqueProductIds = [...new Set(orderItems.map(item => item.product_id))];
+      console.log('Loading product details for IDs:', uniqueProductIds);
       
       for (const productId of uniqueProductIds) {
-        const product = await adminService.getProduct(productId);
-        if (product) {
-          productDetailsMap[productId] = product;
+        try {
+          const product = await adminService.getProduct(productId);
+          console.log(`Product details for ${productId}:`, product);
+          if (product) {
+            productDetailsMap[productId] = product;
+          } else {
+            console.warn(`No product found for ID: ${productId}`);
+          }
+        } catch (productError) {
+          console.error(`Error fetching product ${productId}:`, productError);
         }
       }
       
+      console.log('Final product details map:', productDetailsMap);
       setProductDetails(productDetailsMap);
     } catch (error) {
       console.error('Error loading product details:', error);
@@ -157,6 +166,8 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
 
   const getProductDescription = (item: OrderItem) => {
     const product = productDetails[item.product_id];
+    console.log(`Getting description for product ${item.product_id}:`, product);
+    
     if (product) {
       // Use the product name if available, otherwise construct it
       if (product.name) {
@@ -173,7 +184,10 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
       // Final fallback with dimensions
       return `${product.width_cm || 'Unknown'} x ${product.height_cm || 'Unknown'}cm ${formatName} ${mediumName}`.trim();
     }
-    return 'Product details loading...';
+    
+    // Show the current state for debugging
+    const hasProductDetails = Object.keys(productDetails).length > 0;
+    return hasProductDetails ? `No product found for ID: ${item.product_id}` : 'Product details loading...';
   };
 
   const getStatusIcon = (status: string) => {

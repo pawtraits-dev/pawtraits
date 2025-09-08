@@ -59,6 +59,7 @@ function PartnerOrdersContent() {
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [selectedImageTitle, setSelectedImageTitle] = useState<string>('');
   const [showImageModal, setShowImageModal] = useState(false);
+  const [productDetails, setProductDetails] = useState<{[key: string]: any}>({});
   const supabaseService = new SupabaseService();
 
   useEffect(() => {
@@ -99,6 +100,11 @@ function PartnerOrdersContent() {
 
       const ordersData = await response.json();
       setOrders(ordersData || []);
+      
+      // Load product details for order items
+      if (ordersData && ordersData.length > 0) {
+        await loadProductDetails(ordersData);
+      }
     } catch (error) {
       console.error('Error loading orders:', error);
       setError(error instanceof Error ? error.message : 'Failed to load orders');
@@ -144,6 +150,96 @@ function PartnerOrdersContent() {
       style: 'currency',
       currency: currency
     }).format(price);
+  };
+
+  const loadProductDetails = async (orders: Order[]) => {
+    try {
+      const productDetailsMap: {[key: string]: any} = {};
+      
+      // Get current user session for API authentication
+      const { data: { session } } = await supabaseService.getClient().auth.getSession();
+      if (!session?.access_token) {
+        console.warn('No session found for partner product details loading');
+        return;
+      }
+      
+      // Collect all unique product IDs from all orders
+      const allOrderItems = orders.flatMap(order => order.items || []);
+      // Partner orders might use different field names - check both
+      const uniqueProductIds = [...new Set(allOrderItems.map(item => item.product_id || item.productId).filter(Boolean))];
+      console.log('Partner loading product details for IDs:', uniqueProductIds);
+      
+      // Use partner API endpoint if available
+      for (const productId of uniqueProductIds) {
+        try {
+          const response = await fetch(`/api/partners/products/${productId}`, {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          });
+          
+          if (response.ok) {
+            const product = await response.json();
+            console.log(`Partner product details for ${productId}:`, product);
+            productDetailsMap[productId] = product;
+          } else {
+            console.warn(`Failed to fetch partner product details for ${productId}, status:`, response.status);
+            // Fallback to shop API
+            try {
+              const { data: { user } } = await supabaseService.getClient().auth.getUser();
+              if (user?.email) {
+                const fallbackResponse = await fetch(`/api/shop/products/${productId}?email=${encodeURIComponent(user.email)}`);
+                if (fallbackResponse.ok) {
+                  const product = await fallbackResponse.json();
+                  productDetailsMap[productId] = product;
+                }
+              }
+            } catch (fallbackError) {
+              console.error(`Fallback product fetch failed for ${productId}:`, fallbackError);
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching partner product details for ${productId}:`, error);
+        }
+      }
+      
+      console.log('Partner final product details map:', productDetailsMap);
+      setProductDetails(productDetailsMap);
+    } catch (error) {
+      console.error('Error loading partner product details:', error);
+    }
+  };
+
+  const getProductDescription = (item: any) => {
+    // First try to get from product details API
+    const productId = item.product_id || item.productId;
+    const product = productDetails[productId];
+    
+    if (product) {
+      // Use the product name if available, otherwise construct it
+      if (product.name) {
+        return product.name;
+      }
+      // Fallback: construct description similar to generateDescription function
+      const sizeName = product.size_name || '';
+      const formatName = product.formats?.name || product.format?.name || '';
+      const mediumName = product.media?.name || product.medium?.name || '';
+      const description = `${sizeName} ${formatName} ${mediumName}`.trim();
+      if (description) {
+        return description;
+      }
+      // Final fallback with dimensions
+      return `${product.width_cm || 'Unknown'} x ${product.height_cm || 'Unknown'}cm ${formatName} ${mediumName}`.trim();
+    }
+    
+    // Fallback to the existing item.product field if available
+    if (item.product && item.product !== 'Unknown Product') {
+      return item.product;
+    }
+    
+    // Show the current state for debugging
+    const hasProductDetails = Object.keys(productDetails).length > 0;
+    return hasProductDetails ? `No product found for ID: ${productId}` : 'Product details loading...';
   };
 
   const handleImageClick = (imageUrl: string, imageTitle: string) => {
@@ -300,7 +396,7 @@ function PartnerOrdersContent() {
                       
                       <div className="flex-1 min-w-0">
                         <h3 className="text-sm font-medium text-gray-900">{item.title}</h3>
-                        <p className="text-sm font-medium text-green-700">{item.product}</p>
+                        <p className="text-sm font-medium text-green-700">{getProductDescription(item)}</p>
                         <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                         <Badge className="bg-green-100 text-green-800 text-xs mt-1">
                           Partner Order
