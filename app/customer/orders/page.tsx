@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Loader2 } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Loader2, X } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { SupabaseService } from '@/lib/supabase'
@@ -47,6 +48,10 @@ export default function CustomerOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [productDetails, setProductDetails] = useState<{[key: string]: any}>({})
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null)
+  const [selectedImageTitle, setSelectedImageTitle] = useState<string>('')
+  const [showImageModal, setShowImageModal] = useState(false)
   const supabaseService = new SupabaseService()
 
   useEffect(() => {
@@ -77,12 +82,83 @@ export default function CustomerOrdersPage() {
       console.log('Loaded orders:', ordersData)
       
       setOrders(ordersData || [])
+      
+      // Load product details for order items
+      if (ordersData && ordersData.length > 0) {
+        await loadProductDetails(ordersData)
+      }
     } catch (error) {
       console.error('Error loading orders:', error)
       setError('Failed to load orders. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadProductDetails = async (orders: Order[]) => {
+    try {
+      const productDetailsMap: {[key: string]: any} = {}
+      
+      // Get current user email for API authentication
+      const { data: { user } } = await supabaseService.getClient().auth.getUser()
+      if (!user?.email) return
+      
+      // Collect all unique product IDs from all orders
+      const allOrderItems = orders.flatMap(order => order.order_items || [])
+      const uniqueProductIds = [...new Set(allOrderItems.map(item => item.product_id))]
+      
+      // Fetch product details for each unique product_id
+      for (const productId of uniqueProductIds) {
+        try {
+          const response = await fetch(`/api/shop/products/${productId}?email=${encodeURIComponent(user.email)}`)
+          
+          if (response.ok) {
+            const product = await response.json()
+            productDetailsMap[productId] = product
+          } else {
+            console.warn(`Failed to fetch product details for ${productId}`)
+          }
+        } catch (error) {
+          console.error(`Error fetching product details for ${productId}:`, error)
+        }
+      }
+      
+      setProductDetails(productDetailsMap)
+    } catch (error) {
+      console.error('Error loading product details:', error)
+    }
+  }
+
+  const getProductDescription = (productId: string) => {
+    const product = productDetails[productId]
+    if (product) {
+      // Use the product name if available, otherwise construct it
+      if (product.name) {
+        return product.name
+      }
+      // Fallback: construct description similar to generateDescription function
+      const sizeName = product.size_name || ''
+      const formatName = product.formats?.name || product.format?.name || ''
+      const mediumName = product.media?.name || product.medium?.name || ''
+      const description = `${sizeName} ${formatName} ${mediumName}`.trim()
+      if (description) {
+        return description
+      }
+      // Final fallback with dimensions
+      return `${product.width_cm || 'Unknown'} x ${product.height_cm || 'Unknown'}cm ${formatName} ${mediumName}`.trim()
+    }
+    return 'Product details loading...'
+  }
+
+  const handleImageClick = (imageUrl: string, imageTitle: string) => {
+    setSelectedImageUrl(imageUrl)
+    setSelectedImageTitle(imageTitle)
+    setShowImageModal(true)
+  }
+
+  const formatPrice = (priceInPence: number, currency: string = 'GBP') => {
+    const symbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'
+    return `${symbol}${(priceInPence / 100).toFixed(2)}`
   }
 
   const getStatusColor = (status: Order['status']) => {
@@ -235,29 +311,60 @@ export default function CustomerOrdersPage() {
                 <div className="space-y-4">
                   {order.order_items?.map((item) => (
                     <div key={item.id} className="flex items-start space-x-4">
-                      <div className="flex-shrink-0">
+                      <div className="flex-shrink-0 cursor-pointer" onClick={() => handleImageClick(item.image_url, item.image_title)}>
                         <Image
                           src={item.image_url}
                           alt={item.image_title}
                           width={80}
                           height={80}
-                          className="rounded-lg object-cover"
+                          className="rounded-lg object-cover hover:opacity-80 transition-opacity"
                         />
                       </div>
                       
                       <div className="flex-1 min-w-0">
                         <h3 className="text-sm font-medium text-gray-900">{item.image_title}</h3>
-                        <p className="text-sm text-gray-600">Product ID: {item.product_id}</p>
+                        <p className="text-sm font-medium text-purple-700">{getProductDescription(item.product_id)}</p>
                         <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                       </div>
                       
                       <div className="text-right">
-                        <p className="text-lg font-semibold text-gray-900">
-                          £{(item.total_price / 100).toFixed(2)}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          £{(item.unit_price / 100).toFixed(2)} each
-                        </p>
+                        <div className="space-y-1">
+                          {/* Original Price (if there's a discount) */}
+                          {item.original_price && item.original_price !== item.unit_price && (
+                            <div className="text-xs">
+                              <span className="text-gray-500">Was: </span>
+                              <span className="text-gray-400 line-through">
+                                {formatPrice(item.original_price, order.currency)}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Current Price */}
+                          <div className="text-sm">
+                            <span className="font-medium">
+                              {formatPrice(item.unit_price, order.currency)}
+                            </span>
+                            <span className="text-gray-500"> × {item.quantity}</span>
+                          </div>
+                          
+                          {/* Discount Amount */}
+                          {((item.original_price && item.original_price !== item.unit_price) || (item.discount_amount && item.discount_amount > 0)) && (
+                            <div className="text-xs text-green-600">
+                              <span>Saved: </span>
+                              <span className="font-medium">
+                                {item.discount_amount && item.discount_amount > 0 
+                                  ? formatPrice(item.discount_amount * item.quantity, order.currency)
+                                  : formatPrice((item.original_price! - item.unit_price) * item.quantity, order.currency)
+                                }
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Total Price */}
+                          <div className="text-lg font-semibold text-gray-900">
+                            {formatPrice(item.total_price, order.currency)}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )) || (
@@ -354,6 +461,41 @@ export default function CustomerOrdersPage() {
             </p>
           </div>
         )}
+
+        {/* Image Detail Modal */}
+        <Dialog open={showImageModal} onOpenChange={setShowImageModal}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span>Image Details</span>
+                <Button variant="ghost" size="sm" onClick={() => setShowImageModal(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="flex items-center justify-center p-4">
+              {selectedImageUrl && (
+                <div className="max-w-full max-h-[70vh] overflow-hidden">
+                  <Image
+                    src={selectedImageUrl}
+                    alt={selectedImageTitle}
+                    width={800}
+                    height={600}
+                    className="w-full h-full object-contain rounded-lg"
+                    priority
+                  />
+                </div>
+              )}
+            </div>
+            
+            {selectedImageTitle && (
+              <div className="px-6 pb-6">
+                <h3 className="text-lg font-semibold text-gray-900">{selectedImageTitle}</h3>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

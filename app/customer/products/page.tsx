@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Filter, Package, Loader2, ShoppingCart } from 'lucide-react';
+import { Search, Filter, Package, Loader2 } from 'lucide-react';
 import { SupabaseService } from '@/lib/supabase';
 import type { Product, ProductPricing, Format, Media } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
@@ -428,51 +428,15 @@ export default function CustomerProductsPage() {
                 
                 return (
                   <Card key={product.id} className="group hover:shadow-lg transition-all duration-200 overflow-hidden">
-                    {/* Product Image Placeholder */}
-                    <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                      <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
-                        <Package className="w-16 h-16 text-gray-400 mb-4" />
-                        <h3 className="font-semibold text-gray-700 mb-2">
-                          {product.media?.name || 'Unknown Medium'}
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                          {product.formats?.name || 'Unknown Format'}
-                        </p>
-                        {product.media?.material_type && (
-                          <p className="text-xs text-gray-400 mt-1">
-                            {product.media.material_type} • {product.media.finish_type || 'Standard'}
-                          </p>
-                        )}
-                      </div>
-                      
-                      {/* Featured badge */}
+                    <CardContent className="p-6 space-y-4">{/* Added more padding and spacing */}
+                      {/* Featured badge at top */}
                       {product.is_featured && (
-                        <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-medium">
-                          Featured
+                        <div className="flex justify-end">
+                          <Badge className="bg-yellow-500 text-white">
+                            Featured
+                          </Badge>
                         </div>
                       )}
-                      
-                      {/* Durability badges */}
-                      <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
-                        {product.media?.uv_resistant && (
-                          <div className="bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
-                            UV
-                          </div>
-                        )}
-                        {product.media?.water_resistant && (
-                          <div className="bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">
-                            H2O
-                          </div>
-                        )}
-                        {product.media?.indoor_outdoor === 'both' && (
-                          <div className="bg-purple-500 text-white px-2 py-1 rounded text-xs font-medium">
-                            All
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <CardContent className="p-4 space-y-3">
                       {/* Product Info */}
                       <div>
                         <h3 className="font-semibold text-gray-900 line-clamp-2">
@@ -549,6 +513,11 @@ export default function CustomerProductsPage() {
                                   Water Resistant
                                 </Badge>
                               )}
+                              {product.media?.indoor_outdoor === 'both' && (
+                                <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-800">
+                                  Indoor & Outdoor
+                                </Badge>
+                              )}
                             </div>
                           </div>
                           
@@ -562,13 +531,6 @@ export default function CustomerProductsPage() {
                             </div>
                           )}
                           
-                          {/* SKU */}
-                          <div className="pt-1 border-t border-gray-100">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-gray-500">SKU:</span>
-                              <span className="font-mono">{product.sku}</span>
-                            </div>
-                          </div>
                         </div>
                       </div>
 
@@ -603,14 +565,6 @@ export default function CustomerProductsPage() {
                         </Badge>
                       </div>
 
-                      {/* Action Button */}
-                      <Button 
-                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                        disabled={product.stock_status === 'out_of_stock'}
-                      >
-                        <ShoppingCart className="w-4 h-4 mr-2" />
-                        {product.stock_status === 'out_of_stock' ? 'Out of Stock' : 'View Product'}
-                      </Button>
                     </CardContent>
                   </Card>
                 );

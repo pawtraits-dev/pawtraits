@@ -164,11 +164,16 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
       }
       // Fallback: construct description similar to generateDescription function
       const sizeName = product.size_name || '';
-      const formatName = product.format?.name || '';
-      const mediumName = product.medium?.name || '';
-      return `${sizeName} ${formatName} ${mediumName}`.trim() || `${product.width_cm} x ${product.height_cm}cm ${formatName} ${mediumName}`;
+      const formatName = product.formats?.name || product.format?.name || '';
+      const mediumName = product.media?.name || product.medium?.name || '';
+      const description = `${sizeName} ${formatName} ${mediumName}`.trim();
+      if (description) {
+        return description;
+      }
+      // Final fallback with dimensions
+      return `${product.width_cm || 'Unknown'} x ${product.height_cm || 'Unknown'}cm ${formatName} ${mediumName}`.trim();
     }
-    return `Product ID: ${item.product_id}`;
+    return 'Product details loading...';
   };
 
   const getStatusIcon = (status: string) => {
@@ -379,44 +384,49 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
                       <div className="space-y-1 text-sm text-gray-600">
                         <p className="font-medium text-blue-900">{getProductDescription(item)}</p>
                         <p>Quantity: {item.quantity}</p>
-                        {item.product_data && (
-                          <div className="bg-gray-50 p-2 rounded text-xs">
-                            <p className="font-medium">Product Details:</p>
-                            <pre className="whitespace-pre-wrap">{JSON.stringify(item.product_data, null, 2)}</pre>
-                          </div>
-                        )}
                       </div>
                     </div>
                     
                     <div className="text-right">
                       <div className="space-y-1">
-                        {/* Show original price if different from unit price (indicating discount) */}
-                        {item.original_price && item.original_price !== item.unit_price && (
-                          <p className="text-sm text-gray-400 line-through">
-                            Original: {formatPrice(item.original_price, order.currency)}
-                          </p>
-                        )}
-                        
-                        <p className="text-lg font-semibold text-gray-900">
-                          {formatPrice(item.total_price, order.currency)}
-                        </p>
-                        
-                        <div className="text-sm text-gray-500">
-                          <p>{formatPrice(item.unit_price, order.currency)} × {item.quantity}</p>
-                          
-                          {/* Show discount amount if available */}
-                          {item.discount_amount && item.discount_amount > 0 && (
-                            <p className="text-green-600">
-                              Discount: -{formatPrice(item.discount_amount * item.quantity, order.currency)}
-                            </p>
-                          )}
-                          
-                          {/* Calculate and show discount if original_price is available */}
+                        {/* Pricing Structure */}
+                        <div className="space-y-1">
+                          {/* Original Price (if there's a discount) */}
                           {item.original_price && item.original_price !== item.unit_price && (
-                            <p className="text-green-600">
-                              Saved: -{formatPrice((item.original_price - item.unit_price) * item.quantity, order.currency)}
-                            </p>
+                            <div className="text-sm">
+                              <span className="text-gray-500">Original: </span>
+                              <span className="text-gray-400 line-through">
+                                {formatPrice(item.original_price, order.currency)}
+                              </span>
+                            </div>
                           )}
+                          
+                          {/* Current Unit Price */}
+                          <div className="text-sm">
+                            <span className="text-gray-500">Price: </span>
+                            <span className="font-medium">
+                              {formatPrice(item.unit_price, order.currency)}
+                            </span>
+                            <span className="text-gray-500"> × {item.quantity}</span>
+                          </div>
+                          
+                          {/* Discount Amount */}
+                          {((item.original_price && item.original_price !== item.unit_price) || (item.discount_amount && item.discount_amount > 0)) && (
+                            <div className="text-sm text-green-600">
+                              <span>Discount: -</span>
+                              <span className="font-medium">
+                                {item.discount_amount && item.discount_amount > 0 
+                                  ? formatPrice(item.discount_amount * item.quantity, order.currency)
+                                  : formatPrice((item.original_price! - item.unit_price) * item.quantity, order.currency)
+                                }
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Total Price */}
+                          <div className="text-lg font-semibold text-gray-900 border-t border-gray-200 pt-1">
+                            Total: {formatPrice(item.total_price, order.currency)}
+                          </div>
                         </div>
                       </div>
                     </div>

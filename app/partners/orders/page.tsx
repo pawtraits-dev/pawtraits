@@ -5,7 +5,8 @@ import { PartnerOnly } from '@/components/user-access-control';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Users, Percent, AlertCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Users, Percent, AlertCircle, X } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -55,6 +56,9 @@ function PartnerOrdersContent() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [selectedImageTitle, setSelectedImageTitle] = useState<string>('');
+  const [showImageModal, setShowImageModal] = useState(false);
   const supabaseService = new SupabaseService();
 
   useEffect(() => {
@@ -140,6 +144,12 @@ function PartnerOrdersContent() {
       style: 'currency',
       currency: currency
     }).format(price);
+  };
+
+  const handleImageClick = (imageUrl: string, imageTitle: string) => {
+    setSelectedImageUrl(imageUrl);
+    setSelectedImageTitle(imageTitle);
+    setShowImageModal(true);
   };
 
   if (loading) {
@@ -272,14 +282,14 @@ function PartnerOrdersContent() {
                 <div className="space-y-4">
                   {order.items.map((item) => (
                     <div key={item.id} className="flex items-start space-x-4">
-                      <div className="flex-shrink-0">
+                      <div className="flex-shrink-0 cursor-pointer" onClick={() => item.imageUrl && handleImageClick(item.imageUrl, item.title)}>
                         {item.imageUrl ? (
                           <Image
                             src={item.imageUrl}
                             alt={item.title}
                             width={80}
                             height={80}
-                            className="rounded-lg object-cover"
+                            className="rounded-lg object-cover hover:opacity-80 transition-opacity"
                           />
                         ) : (
                           <div className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center">
@@ -290,7 +300,7 @@ function PartnerOrdersContent() {
                       
                       <div className="flex-1 min-w-0">
                         <h3 className="text-sm font-medium text-gray-900">{item.title}</h3>
-                        <p className="text-sm text-gray-600">{item.product}</p>
+                        <p className="text-sm font-medium text-green-700">{item.product}</p>
                         <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                         <Badge className="bg-green-100 text-green-800 text-xs mt-1">
                           Partner Order
@@ -298,12 +308,40 @@ function PartnerOrdersContent() {
                       </div>
                       
                       <div className="text-right">
-                        <p className="text-lg font-semibold text-green-600">
-                          {formatPrice(item.totalPrice, order.currency)}
-                        </p>
-                        <p className="text-xs text-gray-600">
-                          {formatPrice(item.unitPrice, order.currency)} each
-                        </p>
+                        <div className="space-y-1">
+                          {/* Original Price (if there's a discount) */}
+                          {item.originalPrice && item.originalPrice !== item.price && (
+                            <div className="text-xs">
+                              <span className="text-gray-500">Was: </span>
+                              <span className="text-gray-400 line-through">
+                                {formatPrice(item.originalPrice, order.currency)}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Current Unit Price */}
+                          <div className="text-sm">
+                            <span className="font-medium text-green-600">
+                              {formatPrice(item.unitPrice, order.currency)}
+                            </span>
+                            <span className="text-gray-500"> × {item.quantity}</span>
+                          </div>
+                          
+                          {/* Partner Discount */}
+                          {item.originalPrice && item.originalPrice !== item.price && (
+                            <div className="text-xs text-green-600">
+                              <span>Partner Saved: </span>
+                              <span className="font-medium">
+                                {formatPrice((item.originalPrice - item.price) * item.quantity, order.currency)}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Total Price */}
+                          <div className="text-lg font-semibold text-green-600">
+                            {formatPrice(item.totalPrice, order.currency)}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -405,6 +443,41 @@ function PartnerOrdersContent() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Image Detail Modal */}
+        <Dialog open={showImageModal} onOpenChange={setShowImageModal}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span>Image Details</span>
+                <Button variant="ghost" size="sm" onClick={() => setShowImageModal(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="flex items-center justify-center p-4">
+              {selectedImageUrl && (
+                <div className="max-w-full max-h-[70vh] overflow-hidden">
+                  <Image
+                    src={selectedImageUrl}
+                    alt={selectedImageTitle}
+                    width={800}
+                    height={600}
+                    className="w-full h-full object-contain rounded-lg"
+                    priority
+                  />
+                </div>
+              )}
+            </div>
+            
+            {selectedImageTitle && (
+              <div className="px-6 pb-6">
+                <h3 className="text-lg font-semibold text-gray-900">{selectedImageTitle}</h3>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
