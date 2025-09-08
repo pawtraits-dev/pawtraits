@@ -35,13 +35,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (referralError || !referral) {
+      console.log('[REFERRAL] Referral code not found:', referralCode, 'Error:', referralError?.message);
       return NextResponse.json(
         { 
           valid: false,
           error: 'Referral code not found',
           discount: null
         },
-        { status: 404 }
+        { status: 200 } // Change to 200 to avoid console errors
       );
     }
 

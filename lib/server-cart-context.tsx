@@ -179,8 +179,20 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
               }
             });
           }
+        } else if (response.status === 401) {
+          console.log('[CART] User not authenticated, starting with empty cart');
+          if (mounted) {
+            dispatch({
+              type: 'SET_CART',
+              payload: {
+                items: [],
+                totalItems: 0,
+                totalPrice: 0
+              }
+            });
+          }
         } else {
-          console.error('Failed to load cart:', response.status);
+          console.error('Failed to load cart:', response.status, response.statusText);
           if (mounted) {
             dispatch({ type: 'SET_LOADING', payload: false });
           }
@@ -294,10 +306,13 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
         console.log('[CART] Item added successfully, refreshing cart...');
         await refreshCart();
         console.log('[CART] Cart refreshed');
+      } else if (response.status === 401) {
+        console.error('[CART] User not authenticated for adding to cart');
+        throw new Error('Please log in to add items to your cart');
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error('[CART] Failed to add item:', errorData);
-        throw new Error(`Failed to add item to cart: ${response.status}`);
+        throw new Error(`Failed to add item to cart: ${response.status} - ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('[CART] Error adding to cart:', error);
