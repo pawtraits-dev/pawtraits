@@ -67,14 +67,24 @@ export async function GET(request: NextRequest) {
     // Process purchase data
     const purchaseMap: Record<string, { count: number; total_revenue: number }> = {};
     if (orderItems && !orderError) {
+      console.log(`Processing ${orderItems.length} order items for revenue calculation`);
       orderItems.forEach((item: any) => {
         const imageId = item.image_id;
-        if (!purchaseMap[imageId]) {
-          purchaseMap[imageId] = { count: 0, total_revenue: 0 };
+        if (imageId) { // Make sure imageId exists
+          if (!purchaseMap[imageId]) {
+            purchaseMap[imageId] = { count: 0, total_revenue: 0 };
+          }
+          purchaseMap[imageId].count++;
+          const itemRevenue = ((item.unit_price || 0) * (item.quantity || 0)) / 100; // Convert from pennies to pounds
+          purchaseMap[imageId].total_revenue += itemRevenue;
+          
+          // Debug logging for the first few items
+          if (Object.keys(purchaseMap).length <= 5) {
+            console.log(`Order item: imageId=${imageId}, unit_price=${item.unit_price}, quantity=${item.quantity}, itemRevenue=${itemRevenue}`);
+          }
         }
-        purchaseMap[imageId].count++;
-        purchaseMap[imageId].total_revenue += ((item.unit_price || 0) * (item.quantity || 0)) / 100; // Convert from pennies to pounds
       });
+      console.log(`Revenue calculated for ${Object.keys(purchaseMap).length} unique images`);
     }
     
     // Combine all data
