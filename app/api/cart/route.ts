@@ -36,6 +36,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch cart' }, { status: 500 });
     }
 
+    // Debug logging to trace product ID corruption in retrieved cart
+    console.log('[CART API DEBUG] Retrieved cart items:', {
+      userId: user.id,
+      itemCount: cartItems?.length || 0,
+      sampleItems: cartItems?.slice(0, 2)?.map((item: any) => ({
+        cartItemId: item.cart_item_id,
+        productId: item.product_id,
+        productIdType: typeof item.product_id,
+        imageId: item.image_id,
+        productDataId: item.product_data?.id,
+        productDataGelatoSku: item.product_data?.gelato_sku
+      }))
+    });
+
     // Calculate totals
     const totalItems = cartItems?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
     const totalPrice = cartItems?.reduce((sum: number, item: any) => sum + item.item_total, 0) || 0;
@@ -71,6 +85,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const requestData = await request.json();
     const {
       productId,
       imageId,
@@ -81,7 +96,18 @@ export async function POST(request: NextRequest) {
       product,
       partnerId,
       discountCode
-    } = await request.json();
+    } = requestData;
+
+    // Debug logging to trace product ID corruption
+    console.log('[CART API DEBUG] Adding item to cart:', {
+      productId,
+      productIdType: typeof productId,
+      productObjectId: product?.id,
+      productObjectIdType: typeof product?.id,
+      productGelatoSku: product?.gelato_sku,
+      imageId,
+      userId: user.id
+    });
 
     if (!productId || !imageId || !imageUrl || !imageTitle || !pricing || !product) {
       return NextResponse.json(

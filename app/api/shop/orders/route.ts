@@ -306,17 +306,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Create order items
-    const orderItemsData = orderData.items.map(item => ({
-      order_id: order.id,
-      product_id: item.productId, // This should be the actual database product.id
-      image_id: item.imageId,
-      image_url: item.imageUrl,
-      image_title: item.imageTitle,
-      quantity: item.quantity,
-      unit_price: item.unitPrice,
-      total_price: item.totalPrice,
-      created_at: new Date().toISOString()
-    }));
+    console.log('Creating order items from orderData.items:', JSON.stringify(orderData.items, null, 2));
+    
+    const orderItemsData = orderData.items.map(item => {
+      console.log(`Processing order item - productId: ${item.productId}, type: ${typeof item.productId}`);
+      return {
+        order_id: order.id,
+        product_id: item.productId, // This should be the actual database product.id (UUID)
+        image_id: item.imageId,
+        image_url: item.imageUrl,
+        image_title: item.imageTitle,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        total_price: item.totalPrice,
+        created_at: new Date().toISOString()
+      };
+    });
+    
+    console.log('Final orderItemsData being inserted:', JSON.stringify(orderItemsData, null, 2));
 
     const { error: itemsError } = await supabase
       .from('order_items')
