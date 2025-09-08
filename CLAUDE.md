@@ -101,6 +101,138 @@ For payment processing to work properly:
 - **Image Storage**: Cloudinary for optimized image delivery
 - **Print Fulfillment**: Gelato integration for physical products
 
+## 🏗️ CRITICAL ARCHITECTURAL PATTERNS - MUST FOLLOW
+
+### Data Access Layer Architecture
+
+**✅ CORRECT PATTERNS - ALWAYS USE THESE:**
+
+#### Admin Routes (`/admin/*`)
+```typescript
+// ✅ CORRECT: Use AdminSupabaseService
+import { AdminSupabaseService } from '@/lib/admin-supabase';
+
+const adminService = new AdminSupabaseService();
+const product = await adminService.getProduct(productId);      // ✅ Good
+const orders = await adminService.getOrders();                 // ✅ Good  
+const media = await adminService.getMedia();                   // ✅ Good
+```
+
+#### Customer Routes (`/customer/*`)
+```typescript
+// ✅ CORRECT: Use API endpoints with email authentication
+const { data: { user } } = await supabaseService.getClient().auth.getUser();
+const response = await fetch(`/api/shop/products/${id}?email=${user.email}`);  // ✅ Good
+const response = await fetch(`/api/shop/orders?email=${user.email}`);          // ✅ Good
+```
+
+#### Partner Routes (`/partners/*`)
+```typescript
+// ✅ CORRECT: Use API endpoints with bearer token authentication
+const { data: { session } } = await supabase.auth.getSession();
+const response = await fetch('/api/referrals', {
+  headers: { 'Authorization': `Bearer ${session.access_token}` }
+});  // ✅ Good
+```
+
+**❌ ANTI-PATTERNS - NEVER DO THESE:**
+
+```typescript
+// ❌ NEVER: Direct Supabase queries in frontend components
+const { data } = await supabaseService.getClient()
+  .from('products').select('*').eq('id', productId);           // ❌ WRONG
+
+// ❌ NEVER: Mixing admin and customer access patterns  
+const product = await adminService.getProduct(id);             // ❌ WRONG in customer routes
+
+// ❌ NEVER: Bypassing the API layer
+const { data } = await supabase.from('orders').select('*');    // ❌ WRONG
+
+// ❌ NEVER: Direct database access from frontend
+import { createClient } from '@supabase/supabase-js';          // ❌ WRONG in components
+```
+
+### Authentication Flow Patterns
+
+**✅ Frontend Authentication (All Routes)**
+```typescript
+// ✅ CORRECT: Only use SupabaseService for auth checks
+const supabaseService = new SupabaseService();
+const userProfile = await supabaseService.getCurrentUserProfile();
+const { data: { user } } = await supabaseService.getClient().auth.getUser();
+```
+
+**✅ API Route Authentication**
+```typescript
+// ✅ CORRECT: Validate auth in API routes, not frontend
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const customerEmail = searchParams.get('email');
+  
+  const supabaseService = new SupabaseService();
+  const { data: { user } } = await supabaseService.getClient().auth.getUser();
+  
+  if (!user?.email || user.email !== customerEmail) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // ... proceed with data access
+}
+```
+
+### Security Boundaries & Data Flow
+
+**🔒 SECURITY PRINCIPLE: Frontend → API Routes → Database**
+- **Frontend components** only handle UI and call API endpoints
+- **API routes** handle authentication, authorization, and database access  
+- **Database access** only happens in API routes or service classes
+
+**✅ Correct Data Flow Examples:**
+
+```
+Customer Order Details Page:
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Frontend      │───▶│  /api/shop/      │───▶│   SupabaseService│
+│   Component     │    │  orders/[id]     │    │   + Database    │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+
+Admin Product Management:
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Admin         │───▶│ AdminSupabase    │───▶│   API Routes    │
+│   Component     │    │ Service          │    │   + Database    │  
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+```
+
+**❌ Wrong Data Flow (NEVER DO):**
+```
+┌─────────────────┐                           ┌─────────────────┐
+│   Frontend      │──────────────────────────▶│   Database      │
+│   Component     │    (Direct Supabase)      │   Direct Access │
+└─────────────────┘                           └─────────────────┘
+```
+
+### API Endpoint Patterns
+
+**✅ Customer APIs (Public with Email Auth)**
+- `/api/shop/orders/[id]?email=user@example.com`
+- `/api/shop/products/[id]?email=user@example.com`  
+- `/api/customers/pets/[id]` (with Bearer token)
+
+**✅ Partner APIs (Bearer Token Auth)**
+- `/api/referrals` (with Authorization header)
+- `/api/partners/[id]/analytics` (with Bearer token)
+
+**✅ Admin APIs (Service Role Access)**
+- Used via `AdminSupabaseService` methods
+- `/api/admin/products`, `/api/admin/orders`, etc.
+- Never called directly from customer/partner frontend
+
+**❌ NEVER create direct database access patterns:**
+```typescript
+// ❌ NEVER DO THIS in any frontend component
+const supabase = createClient(url, key);
+const { data } = await supabase.from('table').select();
+```
+
 ### User Type System
 The application supports three distinct user types with separate authentication flows:
 - **Admin**: Full system access via `/admin/*` routes
@@ -355,6 +487,39 @@ Use Stripe test mode with test API keys. Test cards:
 - Component update validation scripts
 - End-to-end testing with Playwright for critical user flows
 - Claude development helper script: `tsx scripts/claude-dev-helper.ts` for AI-assisted debugging
+
+## 🚨 ARCHITECTURAL COMPLIANCE CHECKLIST
+
+**Before implementing ANY data access, verify:**
+
+✅ **For Admin Features:**
+- [ ] Using `AdminSupabaseService` methods only
+- [ ] No direct Supabase client calls in components
+- [ ] All database access goes through service methods
+
+✅ **For Customer Features:**  
+- [ ] Using `/api/shop/*` endpoints only
+- [ ] Email-based authentication for API calls
+- [ ] No direct database queries in frontend
+- [ ] No admin service usage in customer components
+
+✅ **For Partner Features:**
+- [ ] Using API endpoints with Bearer token auth
+- [ ] Following `/api/referrals` and similar patterns
+- [ ] No direct database access from components
+
+✅ **For All Features:**
+- [ ] Authentication handled at API layer, not frontend
+- [ ] Data validation in API routes, not components
+- [ ] Proper error handling and status codes
+- [ ] No bypass of the API layer architecture
+
+**❌ RED FLAGS - If you see these, STOP and refactor:**
+- Direct `.from()` calls in React components
+- `createClient()` imports in frontend components  
+- Mixed admin/customer service usage
+- Database queries outside API routes/services
+- Authentication logic in frontend components
 
 ## Important Implementation Notes
 

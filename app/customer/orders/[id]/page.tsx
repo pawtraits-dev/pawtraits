@@ -34,6 +34,8 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   total_price: number;
+  original_price?: number; // For discount display
+  discount_amount?: number;
   product_data?: any;
 }
 
@@ -74,6 +76,7 @@ export default function CustomerOrderDetailPage({ params }: { params: { id: stri
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [productDetails, setProductDetails] = useState<{[key: string]: any}>({});
   const supabaseService = new SupabaseService();
 
   useEffect(() => {
@@ -109,6 +112,11 @@ export default function CustomerOrderDetailPage({ params }: { params: { id: stri
       
       const orderData = await response.json();
       setOrder(orderData);
+      
+      // Load product details for each order item
+      if (orderData.order_items?.length > 0) {
+        await loadProductDetails(orderData.order_items);
+      }
     } catch (error) {
       console.error('Error loading order:', error);
       setError('Failed to load order details');
@@ -117,10 +125,66 @@ export default function CustomerOrderDetailPage({ params }: { params: { id: stri
     }
   };
 
+  const loadProductDetails = async (orderItems: OrderItem[]) => {
+    try {
+      const productDetailsMap: {[key: string]: any} = {};
+      
+      // Get current user email for API authentication
+      const { data: { user } } = await supabaseService.getClient().auth.getUser();
+      if (!user?.email) {
+        console.error('No user email found for product details API');
+        return;
+      }
+      
+      // Fetch product details for each unique product_id using shop products API
+      const uniqueProductIds = [...new Set(orderItems.map(item => item.product_id))];
+      
+      for (const productId of uniqueProductIds) {
+        try {
+          const response = await fetch(`/api/shop/products/${productId}?email=${encodeURIComponent(user.email)}`);
+          
+          if (response.ok) {
+            const product = await response.json();
+            productDetailsMap[productId] = product;
+          } else {
+            console.error(`Failed to fetch product ${productId}:`, response.status);
+          }
+        } catch (error) {
+          console.error(`Error fetching product ${productId}:`, error);
+        }
+      }
+      
+      setProductDetails(productDetailsMap);
+    } catch (error) {
+      console.error('Error loading product details:', error);
+    }
+  };
+
   const refreshOrder = async () => {
     setRefreshing(true);
     await loadOrder();
     setRefreshing(false);
+  };
+
+  const formatPrice = (priceInPence: number, currency: string = 'GBP') => {
+    const symbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
+    return `${symbol}${(priceInPence / 100).toFixed(2)}`;
+  };
+
+  const getProductDescription = (item: OrderItem) => {
+    const product = productDetails[item.product_id];
+    if (product) {
+      // Use the product name if available, otherwise construct it
+      if (product.name) {
+        return product.name;
+      }
+      // Fallback: construct description similar to generateDescription function
+      const sizeName = product.size_name || '';
+      const formatName = product.formats?.name || '';
+      const mediumName = product.media?.name || '';
+      return `${sizeName} ${formatName} ${mediumName}`.trim() || `${product.width_cm} x ${product.height_cm}cm ${formatName} ${mediumName}`;
+    }
+    return null; // Don't show product ID to customers
   };
 
   const getStatusColor = (status: Order['status']) => {
@@ -277,7 +341,7 @@ export default function CustomerOrderDetailPage({ params }: { params: { id: stri
               </Badge>
               <div className="text-right">
                 <p className="text-2xl font-bold text-gray-900">
-                  £{(order.total_amount / 100).toFixed(2)}
+                  {formatPrice(order.total_amount, order.currency)}
                 </p>
                 <p className="text-sm text-gray-500">{order.currency}</p>
               </div>
@@ -330,6 +394,9 @@ export default function CustomerOrderDetailPage({ params }: { params: { id: stri
                   
                   <div className="flex-1 space-y-2">
                     <h3 className="font-semibold text-gray-900">{item.image_title}</h3>
+                    {getProductDescription(item) && (
+                      <p className="text-sm font-medium text-purple-700">{getProductDescription(item)}</p>
+                    )}
                     <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                     
                     <div className="flex space-x-3">
@@ -351,12 +418,36 @@ export default function CustomerOrderDetailPage({ params }: { params: { id: stri
                   </div>
                   
                   <div className="text-right">
-                    <p className="text-lg font-semibold text-gray-900">
-                      £{(item.total_price / 100).toFixed(2)}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      £{(item.unit_price / 100).toFixed(2)} × {item.quantity}
-                    </p>
+                    <div className="space-y-1">
+                      {/* Show original price if different from unit price (indicating discount) */}
+                      {item.original_price && item.original_price !== item.unit_price && (
+                        <p className="text-sm text-gray-400 line-through">
+                          {formatPrice(item.original_price, order.currency)}
+                        </p>
+                      )}
+                      
+                      <p className="text-lg font-semibold text-gray-900">
+                        {formatPrice(item.total_price, order.currency)}
+                      </p>
+                      
+                      <div className="text-sm text-gray-500">
+                        <p>{formatPrice(item.unit_price, order.currency)} × {item.quantity}</p>
+                        
+                        {/* Show discount amount if available */}
+                        {item.discount_amount && item.discount_amount > 0 && (
+                          <p className="text-green-600">
+                            Saved: {formatPrice(item.discount_amount * item.quantity, order.currency)}
+                          </p>
+                        )}
+                        
+                        {/* Calculate and show discount if original_price is available */}
+                        {item.original_price && item.original_price !== item.unit_price && (
+                          <p className="text-green-600">
+                            You saved: {formatPrice((item.original_price - item.unit_price) * item.quantity, order.currency)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )) || (
@@ -395,16 +486,16 @@ export default function CustomerOrderDetailPage({ params }: { params: { id: stri
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Subtotal:</span>
-                <span>£{(order.subtotal_amount / 100).toFixed(2)}</span>
+                <span>{formatPrice(order.subtotal_amount, order.currency)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Shipping:</span>
-                <span>£{(order.shipping_amount / 100).toFixed(2)}</span>
+                <span>{formatPrice(order.shipping_amount, order.currency)}</span>
               </div>
               <Separator />
               <div className="flex justify-between font-semibold">
                 <span>Total:</span>
-                <span>£{(order.total_amount / 100).toFixed(2)}</span>
+                <span>{formatPrice(order.total_amount, order.currency)}</span>
               </div>
               
               <Separator />

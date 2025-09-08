@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { AdminSupabaseService } from '@/lib/admin-supabase';
 
 interface OrderItem {
   id: string;
@@ -37,25 +38,6 @@ interface OrderItem {
   original_price?: number; // For discount display
   discount_amount?: number;
   product_data?: any;
-  products?: {
-    id: string;
-    name: string;
-    sku: string;
-    width_cm: number;
-    height_cm: number;
-    size_name: string;
-    medium_id: string;
-    format_id: string;
-    media: {
-      id: string;
-      name: string;
-      category: string;
-    };
-    formats: {
-      id: string;
-      name: string;
-    };
-  };
 }
 
 interface Order {
@@ -97,6 +79,8 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [productDetails, setProductDetails] = useState<{[key: string]: any}>({});
+  const adminService = new AdminSupabaseService();
 
   useEffect(() => {
     loadOrder();
@@ -113,11 +97,36 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
       
       const orderData = await response.json();
       setOrder(orderData);
+      
+      // Load product details for each order item
+      if (orderData.order_items?.length > 0) {
+        await loadProductDetails(orderData.order_items);
+      }
     } catch (error) {
       console.error('Error loading order:', error);
       setError('Failed to load order details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProductDetails = async (orderItems: OrderItem[]) => {
+    try {
+      const productDetailsMap: {[key: string]: any} = {};
+      
+      // Fetch product details for each unique product_id
+      const uniqueProductIds = [...new Set(orderItems.map(item => item.product_id))];
+      
+      for (const productId of uniqueProductIds) {
+        const product = await adminService.getProduct(productId);
+        if (product) {
+          productDetailsMap[productId] = product;
+        }
+      }
+      
+      setProductDetails(productDetailsMap);
+    } catch (error) {
+      console.error('Error loading product details:', error);
     }
   };
 
@@ -143,16 +152,16 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
   };
 
   const getProductDescription = (item: OrderItem) => {
-    if (item.products) {
+    const product = productDetails[item.product_id];
+    if (product) {
       // Use the product name if available, otherwise construct it
-      if (item.products.name) {
-        return item.products.name;
+      if (product.name) {
+        return product.name;
       }
       // Fallback: construct description similar to generateDescription function
-      const product = item.products;
       const sizeName = product.size_name || '';
-      const formatName = product.formats.name || '';
-      const mediumName = product.media.name || '';
+      const formatName = product.format?.name || '';
+      const mediumName = product.medium?.name || '';
       return `${sizeName} ${formatName} ${mediumName}`.trim() || `${product.width_cm} x ${product.height_cm}cm ${formatName} ${mediumName}`;
     }
     return `Product ID: ${item.product_id}`;
@@ -361,7 +370,7 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
                         <p className="font-medium text-blue-900">{getProductDescription(item)}</p>
                         <p>Image ID: {item.image_id}</p>
                         <p>Quantity: {item.quantity}</p>
-                        {item.products && (
+                        {productDetails[item.product_id] && (
                           <p className="text-xs text-gray-500">Product ID: {item.product_id}</p>
                         )}
                         {item.product_data && (

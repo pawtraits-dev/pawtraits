@@ -21,7 +21,8 @@ import {
   Eye,
   ShoppingCart,
   Sparkles,
-  Search
+  Search,
+  Grid3X3
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -40,6 +41,7 @@ interface CustomerLayoutProps {
 const navigationItems = [
   { name: 'Home', href: '/customer', icon: Home },
   { name: 'Browse Shop', href: '/customer/shop', icon: ShoppingBag },
+  { name: 'Products', href: '/customer/products', icon: Grid3X3 },
   { name: 'My Gallery', href: '/customer/gallery', icon: ImageIcon },
   { name: 'My Pets', href: '/customer/pets', icon: Heart },
   { name: 'My Orders', href: '/customer/orders', icon: Package },
