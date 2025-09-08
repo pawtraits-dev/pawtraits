@@ -328,8 +328,8 @@ export default function ProfitAnalysisPage() {
       }
     ];
 
-    // Generate monthly trend
-    const monthlyTrend = generateMonthlyTrend();
+    // Generate monthly trend based on actual order data
+    const monthlyTrend = generateActualMonthlyTrend(currentOrders, previousOrders);
 
     // Calculate key metrics
     const totalOrders = currentOrders.length;
@@ -395,24 +395,80 @@ export default function ProfitAnalysisPage() {
     }));
   };
 
-  const generateMonthlyTrend = () => {
-    return Array.from({ length: 12 }, (_, i) => {
-      const date = new Date();
-      date.setMonth(date.getMonth() - (11 - i));
+  const generateActualMonthlyTrend = (currentOrders: any[], previousOrders: any[]) => {
+    // Combine all orders for trend analysis
+    const allOrders = [...currentOrders, ...previousOrders];
+    
+    // Group orders by month
+    const monthlyData: Record<string, { revenue: number; costs: number; orders: any[] }> = {};
+    
+    allOrders.forEach(order => {
+      const orderDate = new Date(order.created_at);
+      const monthKey = orderDate.toISOString().slice(0, 7); // YYYY-MM format
       
-      // Generate realistic trend data
-      const baseRevenue = 45000 + (Math.random() * 20000);
-      const costs = baseRevenue * 0.75;
-      const profit = baseRevenue - costs;
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = { revenue: 0, costs: 0, orders: [] };
+      }
       
-      return {
-        month: date.toISOString().slice(0, 7),
-        revenue: baseRevenue,
-        costs: costs,
-        profit: profit,
-        margin: (profit / baseRevenue) * 100
-      };
+      monthlyData[monthKey].revenue += order.total_amount || 0;
+      monthlyData[monthKey].orders.push(order);
     });
+    
+    // Calculate costs for each month using same logic as main calculation
+    Object.keys(monthlyData).forEach(monthKey => {
+      const monthOrders = monthlyData[monthKey].orders;
+      const monthCosts = monthOrders.reduce((sum, order) => {
+        const orderCosts = order.order_items?.reduce((itemSum: number, item: any) => {
+          const capturedProductCost = item.captured_product_cost || 0;
+          const capturedShippingCost = item.captured_shipping_cost || 0;
+          const capturedAiCost = item.captured_ai_cost || 0;
+          const capturedProcessingFee = item.captured_processing_fee || 0;
+          const capturedCommissionAmount = item.captured_commission_amount || 0;
+          
+          const totalCapturedCost = capturedProductCost + capturedShippingCost + capturedAiCost + 
+                                   capturedProcessingFee + capturedCommissionAmount;
+          
+          if (totalCapturedCost > 0) {
+            return itemSum + totalCapturedCost;
+          }
+          
+          // Fallback estimation
+          const itemRevenue = (item.unit_price || 0) * (item.quantity || 0);
+          const estimatedProductCost = itemRevenue * 0.35;
+          const estimatedShipping = itemRevenue * 0.10;
+          const estimatedProcessing = itemRevenue * 0.03;
+          const estimatedAiCost = 50 * (item.quantity || 1);
+          
+          return itemSum + estimatedProductCost + estimatedShipping + estimatedProcessing + estimatedAiCost;
+        }, 0) || 0;
+        
+        return sum + orderCosts;
+      }, 0);
+      
+      monthlyData[monthKey].costs = monthCosts;
+    });
+    
+    // Generate trend array for last 12 months (fill empty months with zeros)
+    const trendData = [];
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const monthKey = date.toISOString().slice(0, 7);
+      
+      const monthData = monthlyData[monthKey] || { revenue: 0, costs: 0 };
+      const profit = monthData.revenue - monthData.costs;
+      const margin = monthData.revenue > 0 ? (profit / monthData.revenue) * 100 : 0;
+      
+      trendData.push({
+        month: monthKey,
+        revenue: monthData.revenue,
+        costs: monthData.costs,
+        profit,
+        margin
+      });
+    }
+    
+    return trendData;
   };
 
   const generateSampleProfitData = (): ProfitData => {
