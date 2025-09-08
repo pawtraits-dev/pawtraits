@@ -16,12 +16,33 @@ export async function GET(
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    // Get order with items (admin has access to all orders)
+    // Get order with items and product details (admin has access to all orders)
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select(`
         *,
-        order_items (*)
+        order_items (
+          *,
+          products (
+            id,
+            name,
+            sku,
+            width_cm,
+            height_cm,
+            size_name,
+            medium_id,
+            format_id,
+            media (
+              id,
+              name,
+              category
+            ),
+            formats (
+              id,
+              name
+            )
+          )
+        )
       `)
       .eq('id', orderId)
       .single();

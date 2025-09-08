@@ -34,7 +34,28 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   total_price: number;
+  original_price?: number; // For discount display
+  discount_amount?: number;
   product_data?: any;
+  products?: {
+    id: string;
+    name: string;
+    sku: string;
+    width_cm: number;
+    height_cm: number;
+    size_name: string;
+    medium_id: string;
+    format_id: string;
+    media: {
+      id: string;
+      name: string;
+      category: string;
+    };
+    formats: {
+      id: string;
+      name: string;
+    };
+  };
 }
 
 interface Order {
@@ -119,6 +140,22 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const getProductDescription = (item: OrderItem) => {
+    if (item.products) {
+      // Use the product name if available, otherwise construct it
+      if (item.products.name) {
+        return item.products.name;
+      }
+      // Fallback: construct description similar to generateDescription function
+      const product = item.products;
+      const sizeName = product.size_name || '';
+      const formatName = product.formats.name || '';
+      const mediumName = product.media.name || '';
+      return `${sizeName} ${formatName} ${mediumName}`.trim() || `${product.width_cm} x ${product.height_cm}cm ${formatName} ${mediumName}`;
+    }
+    return `Product ID: ${item.product_id}`;
   };
 
   const getStatusIcon = (status: string) => {
@@ -321,9 +358,12 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
                     <div className="flex-1 space-y-2">
                       <h3 className="font-semibold text-gray-900">{item.image_title}</h3>
                       <div className="space-y-1 text-sm text-gray-600">
-                        <p>Product ID: {item.product_id}</p>
+                        <p className="font-medium text-blue-900">{getProductDescription(item)}</p>
                         <p>Image ID: {item.image_id}</p>
                         <p>Quantity: {item.quantity}</p>
+                        {item.products && (
+                          <p className="text-xs text-gray-500">Product ID: {item.product_id}</p>
+                        )}
                         {item.product_data && (
                           <div className="bg-gray-50 p-2 rounded text-xs">
                             <p className="font-medium">Product Details:</p>
@@ -334,12 +374,36 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
                     </div>
                     
                     <div className="text-right">
-                      <p className="text-lg font-semibold text-gray-900">
-                        {formatPrice(item.total_price, order.currency)}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {formatPrice(item.unit_price, order.currency)} × {item.quantity}
-                      </p>
+                      <div className="space-y-1">
+                        {/* Show original price if different from unit price (indicating discount) */}
+                        {item.original_price && item.original_price !== item.unit_price && (
+                          <p className="text-sm text-gray-400 line-through">
+                            Original: {formatPrice(item.original_price, order.currency)}
+                          </p>
+                        )}
+                        
+                        <p className="text-lg font-semibold text-gray-900">
+                          {formatPrice(item.total_price, order.currency)}
+                        </p>
+                        
+                        <div className="text-sm text-gray-500">
+                          <p>{formatPrice(item.unit_price, order.currency)} × {item.quantity}</p>
+                          
+                          {/* Show discount amount if available */}
+                          {item.discount_amount && item.discount_amount > 0 && (
+                            <p className="text-green-600">
+                              Discount: -{formatPrice(item.discount_amount * item.quantity, order.currency)}
+                            </p>
+                          )}
+                          
+                          {/* Calculate and show discount if original_price is available */}
+                          {item.original_price && item.original_price !== item.unit_price && (
+                            <p className="text-green-600">
+                              Saved: -{formatPrice((item.original_price - item.unit_price) * item.quantity, order.currency)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )) || (
@@ -446,7 +510,15 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Gelato Order ID:</span>
-                    <span className="font-mono text-xs">{order.gelato_order_id}</span>
+                    <a 
+                      href={`https://dashboard.gelato.com/orders/view/${order.gelato_order_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline flex items-center"
+                    >
+                      {order.gelato_order_id}
+                      <ExternalLink className="w-3 h-3 ml-1" />
+                    </a>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Print Status:</span>

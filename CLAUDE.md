@@ -32,11 +32,25 @@ tsx scripts/upload-watermark.ts         # Upload watermark assets
 tsx scripts/migrate-to-cloudinary.ts    # Migrate to Cloudinary storage
 tsx scripts/check-storage-structure.ts  # Check storage structure
 tsx scripts/test-component-updates.ts   # Test component updates
+tsx scripts/debug-env.ts                # Debug environment variables
+tsx scripts/debug-sales-data.ts         # Debug sales data and analytics
+tsx scripts/load-countries.ts           # Load country/pricing data
+tsx scripts/upload-brand-logo.ts        # Upload brand assets
+tsx scripts/test-image-variants.ts      # Test image variation generation
+tsx scripts/test-image-security.ts      # Test image security and access
+tsx scripts/setup-hero-images-bucket.ts # Setup hero image storage
+tsx scripts/run-carousel-migration.ts   # Migrate carousel data
 
 # Enhanced Cart & Gelato Integration Tests
 ./scripts/run-step1-tests.sh            # Run all Step 1 enhanced cart tests
 tsx scripts/test-enhanced-cart.ts       # Test enhanced cart data structure
 tsx scripts/test-cart-api-integration.ts # Test cart API integration with enhanced data
+
+# End-to-End Testing (Playwright)
+npx playwright test                      # Run all E2E tests
+npx playwright test --ui                 # Run tests with UI mode
+npx playwright test --headed             # Run tests in headed mode
+npx playwright show-report               # View test results
 ```
 
 ## Environment Setup
@@ -339,6 +353,8 @@ Use Stripe test mode with test API keys. Test cards:
 - Debug API endpoints for troubleshooting RLS policies
 - Cloudinary migration and testing utilities
 - Component update validation scripts
+- End-to-end testing with Playwright for critical user flows
+- Claude development helper script: `tsx scripts/claude-dev-helper.ts` for AI-assisted debugging
 
 ## Important Implementation Notes
 
