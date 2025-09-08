@@ -88,11 +88,46 @@ export default function CustomerProductsPage() {
               pricing: productPricing
             });
           } else {
-            // Fallback: use original product data without detailed info
-            console.warn(`Failed to fetch details for product ${product.id}`);
+            // Fallback: use original product data without detailed media info
+            console.warn(`Failed to fetch details for product ${product.id}, using basic product data`);
+            
+            // Add pricing information to basic product
+            const productPricing = allPricing?.filter(p => p.product_id === product.id) || [];
+            
+            // Use basic product data with empty media object
+            detailedProducts.push({
+              ...product,
+              media: {
+                id: '',
+                name: 'Unknown Medium',
+                category: '',
+              },
+              formats: {
+                id: '',
+                name: 'Unknown Format',
+              },
+              pricing: productPricing
+            });
           }
         } catch (error) {
           console.error(`Error fetching product details for ${product.id}:`, error);
+          
+          // Fallback: use original product data
+          const productPricing = allPricing?.filter(p => p.product_id === product.id) || [];
+          
+          detailedProducts.push({
+            ...product,
+            media: {
+              id: '',
+              name: 'Unknown Medium', 
+              category: '',
+            },
+            formats: {
+              id: '',
+              name: 'Unknown Format',
+            },
+            pricing: productPricing
+          });
         }
       }
 

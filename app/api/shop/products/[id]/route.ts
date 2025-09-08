@@ -7,28 +7,16 @@ export async function GET(
 ) {
   try {
     const productId = params.id;
+    
+    // Products are public data, so email is optional for now
+    // We keep the parameter for consistency with other shop APIs
     const { searchParams } = new URL(request.url);
     const customerEmail = searchParams.get('email');
 
-    if (!customerEmail) {
-      return NextResponse.json(
-        { error: 'Customer email required' },
-        { status: 400 }
-      );
-    }
-
     const supabaseService = new SupabaseService();
 
-    // Verify the customer is authenticated by checking their email exists
-    const { data: { user } } = await supabaseService.getClient().auth.getUser();
-    if (!user?.email || user.email !== customerEmail) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-
     // Get product details with full media information (only public information suitable for customers)
+    // Products are public data, so no need for strict auth verification like orders
     const { data: product, error: productError } = await supabaseService.getClient()
       .from('products')
       .select(`
@@ -41,7 +29,7 @@ export async function GET(
         is_active,
         stock_status,
         is_featured,
-        media!inner(
+        media(
           id,
           name,
           category,
@@ -54,7 +42,7 @@ export async function GET(
           water_resistant,
           care_instructions
         ),
-        formats!inner(id, name)
+        formats(id, name)
       `)
       .eq('id', productId)
       .eq('is_active', true)  // Only return active products to customers
@@ -62,8 +50,9 @@ export async function GET(
 
     if (productError || !product) {
       console.error('Product not found:', productError);
+      console.error('Product ID searched:', productId);
       return NextResponse.json(
-        { error: 'Product not found' },
+        { error: 'Product not found', details: productError?.message },
         { status: 404 }
       );
     }
