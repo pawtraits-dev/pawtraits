@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
           purchaseMap[imageId] = { count: 0, total_revenue: 0 };
         }
         purchaseMap[imageId].count++;
-        purchaseMap[imageId].total_revenue += (item.unit_price || 0) * (item.quantity || 0);
+        purchaseMap[imageId].total_revenue += ((item.unit_price || 0) * (item.quantity || 0)) / 100; // Convert from pennies to pounds
       });
     }
     

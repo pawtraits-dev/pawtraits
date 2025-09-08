@@ -34,6 +34,7 @@ interface ImageAnalytics {
 type SortField = 'created_at' | 'views' | 'likes' | 'shares' | 'purchases' | 'revenue' | 'cart_count' | 'popularity_score';
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'individual' | 'by_breed' | 'by_theme' | 'by_product';
+type GroupSortField = 'name' | 'totalImages' | 'totalViews' | 'totalLikes' | 'totalShares' | 'totalPurchases' | 'totalRevenue' | 'totalCartCount' | 'averagePopularity';
 
 interface GroupedAnalytics {
   name: string;
@@ -66,6 +67,10 @@ export default function ImageAnalyticsPage() {
   const [breedAnalytics, setBreedAnalytics] = useState<GroupedAnalytics[]>([]);
   const [themeAnalytics, setThemeAnalytics] = useState<GroupedAnalytics[]>([]);
   
+  // Group sorting state
+  const [groupSortField, setGroupSortField] = useState<GroupSortField>('averagePopularity');
+  const [groupSortDirection, setGroupSortDirection] = useState<SortDirection>('desc');
+  
   // Bulk editing state
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
   const [isEditing, setIsEditing] = useState(false);
@@ -81,6 +86,29 @@ export default function ImageAnalyticsPage() {
   useEffect(() => {
     filterAndSortImages();
   }, [images, searchTerm, sortField, sortDirection, breedFilter, themeFilter, featuredFilter]);
+
+  useEffect(() => {
+    // Re-sort grouped analytics when group sorting changes
+    if (breedAnalytics.length > 0) {
+      const sortedBreeds = [...breedAnalytics].sort((a, b) => {
+        const aValue = a[groupSortField];
+        const bValue = b[groupSortField];
+        const comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        return groupSortDirection === 'asc' ? comparison : -comparison;
+      });
+      setBreedAnalytics(sortedBreeds);
+    }
+    
+    if (themeAnalytics.length > 0) {
+      const sortedThemes = [...themeAnalytics].sort((a, b) => {
+        const aValue = a[groupSortField];
+        const bValue = b[groupSortField];
+        const comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        return groupSortDirection === 'asc' ? comparison : -comparison;
+      });
+      setThemeAnalytics(sortedThemes);
+    }
+  }, [groupSortField, groupSortDirection]);
 
   const loadData = async () => {
     try {
@@ -191,7 +219,7 @@ export default function ImageAnalyticsPage() {
       totalCartCount: images.reduce((sum, img) => sum + img.cart_count, 0),
       averagePopularity: images.reduce((sum, img) => sum + img.popularity_score, 0) / images.length,
       topImage: images.sort((a, b) => b.popularity_score - a.popularity_score)[0]
-    })).sort((a, b) => b.averagePopularity - a.averagePopularity);
+    }));
 
     // Calculate theme analytics
     const themeGroups = imageData.reduce((acc, image) => {
@@ -214,7 +242,7 @@ export default function ImageAnalyticsPage() {
       totalCartCount: images.reduce((sum, img) => sum + img.cart_count, 0),
       averagePopularity: images.reduce((sum, img) => sum + img.popularity_score, 0) / images.length,
       topImage: images.sort((a, b) => b.popularity_score - a.popularity_score)[0]
-    })).sort((a, b) => b.averagePopularity - a.averagePopularity);
+    }));
 
     setBreedAnalytics(breedStats);
     setThemeAnalytics(themeStats);
@@ -409,68 +437,90 @@ export default function ImageAnalyticsPage() {
       {viewMode === 'by_breed' && (
         <Card>
           <CardHeader>
-            <CardTitle>Breed Performance Analytics</CardTitle>
-            <CardDescription>Performance metrics grouped by dog breed</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Breed Performance Analytics</CardTitle>
+                <CardDescription>Performance metrics grouped by dog breed</CardDescription>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Select value={groupSortField} onValueChange={(value: GroupSortField) => setGroupSortField(value)}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="averagePopularity">Popularity Score</SelectItem>
+                    <SelectItem value="totalRevenue">Total Revenue</SelectItem>
+                    <SelectItem value="totalPurchases">Total Purchases</SelectItem>
+                    <SelectItem value="totalCartCount">Total Cart Count</SelectItem>
+                    <SelectItem value="totalLikes">Total Likes</SelectItem>
+                    <SelectItem value="totalShares">Total Shares</SelectItem>
+                    <SelectItem value="totalViews">Total Views</SelectItem>
+                    <SelectItem value="totalImages">Total Images</SelectItem>
+                    <SelectItem value="name">Name</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setGroupSortDirection(groupSortDirection === 'asc' ? 'desc' : 'asc')}
+                >
+                  <ArrowUpDown className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {breedAnalytics.map((breed, index) => (
-                <div key={breed.name} className="border rounded-lg p-4 hover:bg-gray-50">
-                  <div className="flex items-start space-x-4">
-                    {/* Top Image Thumbnail */}
-                    {breed.topImage && (
-                      <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg overflow-hidden">
-                        <Image
-                          src={breed.topImage.public_url}
-                          alt={breed.topImage.prompt_text || 'Image'}
-                          width={64}
-                          height={64}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                    
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          #{index + 1} {breed.name}
-                        </h3>
-                        <Badge variant="outline">
-                          {breed.totalImages} image{breed.totalImages !== 1 ? 's' : ''}
-                        </Badge>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                        <div className="text-center">
-                          <div className="text-xl font-bold text-blue-600">{breed.totalViews.toLocaleString()}</div>
-                          <div className="text-sm text-gray-500">Views</div>
-                        </div>
-                        <div className="grid grid-cols-4 gap-4 col-span-1 md:col-span-4">
-                          <div className="flex items-center space-x-1 text-blue-600">
-                            <Eye className="w-4 h-4" />
-                            <span>{breed.totalViews.toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-red-600">
-                            <Heart className="w-4 h-4" />
-                            <span>{breed.totalLikes.toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-green-600">
-                            <Share2 className="w-4 h-4" />
-                            <span>{breed.totalShares.toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-orange-600">
-                            <ShoppingCart className="w-4 h-4" />
-                            <span>{breed.totalPurchases.toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-yellow-600">
-                            <ShoppingBag className="w-4 h-4" />
-                            <span>{breed.totalCartCount.toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-emerald-600">
-                            <span className="font-medium">£{breed.totalRevenue.toFixed(2)}</span>
-                          </div>
-                        </div>
-                      </div>
+                <div key={breed.name} className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-gray-50">
+                  {/* Ranking */}
+                  <div className="flex-shrink-0 w-8 text-center">
+                    <span className="text-lg font-bold text-gray-500">#{index + 1}</span>
+                  </div>
+                  
+                  {/* Top Image Thumbnail */}
+                  {breed.topImage && (
+                    <div className="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg overflow-hidden">
+                      <Image
+                        src={breed.topImage.public_url}
+                        alt={breed.topImage.prompt_text || 'Image'}
+                        width={48}
+                        height={48}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Breed Name and Count */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">{breed.name}</h3>
+                    <p className="text-sm text-gray-500">{breed.totalImages} image{breed.totalImages !== 1 ? 's' : ''}</p>
+                  </div>
+                  
+                  {/* Metrics */}
+                  <div className="flex items-center space-x-6 text-sm">
+                    <div className="flex items-center space-x-1 text-blue-600">
+                      <Eye className="w-4 h-4" />
+                      <span className="font-medium">{breed.totalViews.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-red-600">
+                      <Heart className="w-4 h-4" />
+                      <span className="font-medium">{breed.totalLikes.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-green-600">
+                      <Share2 className="w-4 h-4" />
+                      <span className="font-medium">{breed.totalShares.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-orange-600">
+                      <ShoppingCart className="w-4 h-4" />
+                      <span className="font-medium">{breed.totalPurchases.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-yellow-600">
+                      <ShoppingBag className="w-4 h-4" />
+                      <span className="font-medium">{breed.totalCartCount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-emerald-600">
+                      <span className="font-bold">£{breed.totalRevenue.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -484,68 +534,90 @@ export default function ImageAnalyticsPage() {
       {viewMode === 'by_theme' && (
         <Card>
           <CardHeader>
-            <CardTitle>Theme Performance Analytics</CardTitle>
-            <CardDescription>Performance metrics grouped by artistic theme</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Theme Performance Analytics</CardTitle>
+                <CardDescription>Performance metrics grouped by artistic theme</CardDescription>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Select value={groupSortField} onValueChange={(value: GroupSortField) => setGroupSortField(value)}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="averagePopularity">Popularity Score</SelectItem>
+                    <SelectItem value="totalRevenue">Total Revenue</SelectItem>
+                    <SelectItem value="totalPurchases">Total Purchases</SelectItem>
+                    <SelectItem value="totalCartCount">Total Cart Count</SelectItem>
+                    <SelectItem value="totalLikes">Total Likes</SelectItem>
+                    <SelectItem value="totalShares">Total Shares</SelectItem>
+                    <SelectItem value="totalViews">Total Views</SelectItem>
+                    <SelectItem value="totalImages">Total Images</SelectItem>
+                    <SelectItem value="name">Name</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setGroupSortDirection(groupSortDirection === 'asc' ? 'desc' : 'asc')}
+                >
+                  <ArrowUpDown className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {themeAnalytics.map((theme, index) => (
-                <div key={theme.name} className="border rounded-lg p-4 hover:bg-gray-50">
-                  <div className="flex items-start space-x-4">
-                    {/* Top Image Thumbnail */}
-                    {theme.topImage && (
-                      <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg overflow-hidden">
-                        <Image
-                          src={theme.topImage.public_url}
-                          alt={theme.topImage.prompt_text || 'Image'}
-                          width={64}
-                          height={64}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                    
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          #{index + 1} {theme.name}
-                        </h3>
-                        <Badge variant="outline">
-                          {theme.totalImages} image{theme.totalImages !== 1 ? 's' : ''}
-                        </Badge>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                        <div className="text-center">
-                          <div className="text-xl font-bold text-blue-600">{theme.totalViews.toLocaleString()}</div>
-                          <div className="text-sm text-gray-500">Views</div>
-                        </div>
-                        <div className="grid grid-cols-4 gap-4 col-span-1 md:col-span-4">
-                          <div className="flex items-center space-x-1 text-blue-600">
-                            <Eye className="w-4 h-4" />
-                            <span>{theme.totalViews.toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-red-600">
-                            <Heart className="w-4 h-4" />
-                            <span>{theme.totalLikes.toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-green-600">
-                            <Share2 className="w-4 h-4" />
-                            <span>{theme.totalShares.toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-orange-600">
-                            <ShoppingCart className="w-4 h-4" />
-                            <span>{theme.totalPurchases.toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-yellow-600">
-                            <ShoppingBag className="w-4 h-4" />
-                            <span>{theme.totalCartCount.toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-emerald-600">
-                            <span className="font-medium">£{theme.totalRevenue.toFixed(2)}</span>
-                          </div>
-                        </div>
-                      </div>
+                <div key={theme.name} className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-gray-50">
+                  {/* Ranking */}
+                  <div className="flex-shrink-0 w-8 text-center">
+                    <span className="text-lg font-bold text-gray-500">#{index + 1}</span>
+                  </div>
+                  
+                  {/* Top Image Thumbnail */}
+                  {theme.topImage && (
+                    <div className="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg overflow-hidden">
+                      <Image
+                        src={theme.topImage.public_url}
+                        alt={theme.topImage.prompt_text || 'Image'}
+                        width={48}
+                        height={48}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Theme Name and Count */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">{theme.name}</h3>
+                    <p className="text-sm text-gray-500">{theme.totalImages} image{theme.totalImages !== 1 ? 's' : ''}</p>
+                  </div>
+                  
+                  {/* Metrics */}
+                  <div className="flex items-center space-x-6 text-sm">
+                    <div className="flex items-center space-x-1 text-blue-600">
+                      <Eye className="w-4 h-4" />
+                      <span className="font-medium">{theme.totalViews.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-red-600">
+                      <Heart className="w-4 h-4" />
+                      <span className="font-medium">{theme.totalLikes.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-green-600">
+                      <Share2 className="w-4 h-4" />
+                      <span className="font-medium">{theme.totalShares.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-orange-600">
+                      <ShoppingCart className="w-4 h-4" />
+                      <span className="font-medium">{theme.totalPurchases.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-yellow-600">
+                      <ShoppingBag className="w-4 h-4" />
+                      <span className="font-medium">{theme.totalCartCount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-emerald-600">
+                      <span className="font-bold">£{theme.totalRevenue.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -563,62 +635,66 @@ export default function ImageAnalyticsPage() {
             <CardDescription>Individual image analytics and performance metrics</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="space-y-3">
               {filteredImages.map((image, index) => (
-                <div key={image.id} className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-                  <div className="relative">
+                <div key={image.id} className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                  {/* Image Thumbnail */}
+                  <div className="relative flex-shrink-0">
                     <Image
                       src={image.public_url}
                       alt={image.prompt_text || 'AI Generated Image'}
-                      width={300}
-                      height={300}
-                      className="w-full h-48 object-cover"
+                      width={64}
+                      height={64}
+                      className="w-16 h-16 object-cover rounded-lg"
                     />
                     {image.is_featured && (
-                      <Badge className="absolute top-2 right-2 bg-yellow-500 text-yellow-900">
-                        Featured
+                      <Badge className="absolute -top-1 -right-1 bg-yellow-500 text-yellow-900 text-xs px-1">
+                        ⭐
                       </Badge>
                     )}
                   </div>
                   
-                  <div className="p-4 space-y-3">
-                    <div>
-                      <p className="text-sm text-gray-600 line-clamp-2">{image.prompt_text}</p>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <Badge variant="outline" className="text-xs">{image.breed_name}</Badge>
-                        <Badge variant="outline" className="text-xs">{image.theme_name}</Badge>
-                        {image.is_featured && (
-                          <Badge className="text-xs bg-yellow-100 text-yellow-800">
-                            Featured
-                          </Badge>
-                        )}
+                  {/* Image Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0 pr-4">
+                        <p className="text-sm text-gray-900 line-clamp-2 mb-1">{image.prompt_text}</p>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline" className="text-xs">{image.breed_name}</Badge>
+                          <Badge variant="outline" className="text-xs">{image.theme_name}</Badge>
+                          {image.is_featured && (
+                            <Badge className="text-xs bg-yellow-100 text-yellow-800">
+                              Featured
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    
-                    {/* Metrics */}
-                    <div className="flex items-center space-x-6 text-sm">
-                      <div className="flex items-center space-x-1 text-blue-600">
-                        <Eye className="w-4 h-4" />
-                        <span>{image.views}</span>
-                      </div>
-                      <div className="flex items-center space-x-1 text-red-600">
-                        <Heart className="w-4 h-4" />
-                        <span>{image.likes}</span>
-                      </div>
-                      <div className="flex items-center space-x-1 text-green-600">
-                        <Share2 className="w-4 h-4" />
-                        <span>{image.shares}</span>
-                      </div>
-                      <div className="flex items-center space-x-1 text-orange-600">
-                        <ShoppingCart className="w-4 h-4" />
-                        <span>{image.purchases}</span>
-                      </div>
-                      <div className="flex items-center space-x-1 text-yellow-600">
-                        <ShoppingBag className="w-4 h-4" />
-                        <span>{image.cart_count}</span>
-                      </div>
-                      <div className="flex items-center space-x-1 text-emerald-600">
-                        <span className="font-medium">£{image.revenue.toFixed(2)}</span>
+                      
+                      {/* Metrics */}
+                      <div className="flex items-center space-x-4 text-sm">
+                        <div className="flex items-center space-x-1 text-blue-600">
+                          <Eye className="w-4 h-4" />
+                          <span className="font-medium">{image.views}</span>
+                        </div>
+                        <div className="flex items-center space-x-1 text-red-600">
+                          <Heart className="w-4 h-4" />
+                          <span className="font-medium">{image.likes}</span>
+                        </div>
+                        <div className="flex items-center space-x-1 text-green-600">
+                          <Share2 className="w-4 h-4" />
+                          <span className="font-medium">{image.shares}</span>
+                        </div>
+                        <div className="flex items-center space-x-1 text-orange-600">
+                          <ShoppingCart className="w-4 h-4" />
+                          <span className="font-medium">{image.purchases}</span>
+                        </div>
+                        <div className="flex items-center space-x-1 text-yellow-600">
+                          <ShoppingBag className="w-4 h-4" />
+                          <span className="font-medium">{image.cart_count}</span>
+                        </div>
+                        <div className="flex items-center space-x-1 text-emerald-600">
+                          <span className="font-bold">£{image.revenue.toFixed(2)}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
