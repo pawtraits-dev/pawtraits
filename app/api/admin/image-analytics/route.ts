@@ -14,11 +14,14 @@ export async function GET(request: NextRequest) {
     
     const supabaseService = new SupabaseService();
     
-    // Load all images with details using the service method
+    // Load all images with details using the service method (no limit for accurate analytics)
     const imageData = await supabaseService.getImages({
-      limit: 1000,
-      publicOnly: false
+      publicOnly: false // Get all images for accurate total count and analytics
     });
+    
+    // Load breed and theme data for hero images and descriptions
+    const { data: breeds } = await supabase.from('breeds').select('*');
+    const { data: themes } = await supabase.from('themes').select('*');
     
     // Load user interactions using service role client
     const { data: interactions, error: interactionsError } = await supabase
@@ -107,7 +110,11 @@ export async function GET(request: NextRequest) {
       };
     });
     
-    return NextResponse.json(analyticsData);
+    return NextResponse.json({
+      images: analyticsData,
+      breeds: breeds || [],
+      themes: themes || []
+    });
     
   } catch (error) {
     console.error('Error loading image analytics:', error);

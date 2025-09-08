@@ -47,7 +47,24 @@ interface GroupedAnalytics {
   totalCartCount: number;
   averagePopularity: number;
   topImage?: ImageAnalytics;
+  heroImageUrl?: string;
+  description?: string;
 }
+
+// Helper function to extract the first bold text from markdown
+const extractFirstBoldText = (markdown: string): string => {
+  if (!markdown) return '';
+  
+  // Match **text** pattern and get the first occurrence
+  const boldMatch = markdown.match(/\*\*(.*?)\*\*/);
+  if (boldMatch) {
+    return boldMatch[1];
+  }
+  
+  // Fallback to first line if no bold text found
+  const firstLine = markdown.split('\n')[0];
+  return firstLine.replace(/[#*]/g, '').trim();
+};
 
 export default function ImageAnalyticsPage() {
   const [images, setImages] = useState<ImageAnalytics[]>([]);
@@ -66,6 +83,8 @@ export default function ImageAnalyticsPage() {
   const [allThemes, setAllThemes] = useState<{id: string, name: string}[]>([]);
   const [breedAnalytics, setBreedAnalytics] = useState<GroupedAnalytics[]>([]);
   const [themeAnalytics, setThemeAnalytics] = useState<GroupedAnalytics[]>([]);
+  const [breedData, setBreedData] = useState<any[]>([]);
+  const [themeData, setThemeData] = useState<any[]>([]);
   
   // Group sorting state
   const [groupSortField, setGroupSortField] = useState<GroupSortField>('averagePopularity');
@@ -121,10 +140,15 @@ export default function ImageAnalyticsPage() {
         throw new Error('Failed to load image analytics');
       }
       
-      const processedImages = await response.json();
+      const data = await response.json();
+      const processedImages = data.images || data; // Handle both new and old response format
       console.log(`Loaded ${processedImages.length} images with analytics`);
       
       setImages(processedImages);
+      
+      // Store breed and theme data for grouped analytics
+      if (data.breeds) setBreedData(data.breeds);
+      if (data.themes) setThemeData(data.themes);
 
       // Load filter options
       const uniqueBreeds = Array.from(new Set(processedImages.map((img: any) => img.breed_name).filter(Boolean))) as string[];
@@ -208,18 +232,23 @@ export default function ImageAnalyticsPage() {
       return acc;
     }, {} as Record<string, ImageAnalytics[]>);
 
-    const breedStats = Object.entries(breedGroups).map(([name, images]) => ({
-      name,
-      totalImages: images.length,
-      totalViews: images.reduce((sum, img) => sum + img.views, 0),
-      totalLikes: images.reduce((sum, img) => sum + img.likes, 0),
-      totalShares: images.reduce((sum, img) => sum + img.shares, 0),
-      totalPurchases: images.reduce((sum, img) => sum + img.purchases, 0),
-      totalRevenue: images.reduce((sum, img) => sum + img.revenue, 0),
-      totalCartCount: images.reduce((sum, img) => sum + img.cart_count, 0),
-      averagePopularity: images.reduce((sum, img) => sum + img.popularity_score, 0) / images.length,
-      topImage: images.sort((a, b) => b.popularity_score - a.popularity_score)[0]
-    }));
+    const breedStats = Object.entries(breedGroups).map(([name, images]) => {
+      const breedInfo = breedData.find(breed => breed.name === name);
+      return {
+        name,
+        totalImages: images.length,
+        totalViews: images.reduce((sum, img) => sum + img.views, 0),
+        totalLikes: images.reduce((sum, img) => sum + img.likes, 0),
+        totalShares: images.reduce((sum, img) => sum + img.shares, 0),
+        totalPurchases: images.reduce((sum, img) => sum + img.purchases, 0),
+        totalRevenue: images.reduce((sum, img) => sum + img.revenue, 0),
+        totalCartCount: images.reduce((sum, img) => sum + img.cart_count, 0),
+        averagePopularity: images.reduce((sum, img) => sum + img.popularity_score, 0) / images.length,
+        topImage: images.sort((a, b) => b.popularity_score - a.popularity_score)[0],
+        heroImageUrl: breedInfo?.hero_image_url,
+        description: breedInfo?.description
+      };
+    });
 
     // Calculate theme analytics
     const themeGroups = imageData.reduce((acc, image) => {
@@ -231,18 +260,23 @@ export default function ImageAnalyticsPage() {
       return acc;
     }, {} as Record<string, ImageAnalytics[]>);
 
-    const themeStats = Object.entries(themeGroups).map(([name, images]) => ({
-      name,
-      totalImages: images.length,
-      totalViews: images.reduce((sum, img) => sum + img.views, 0),
-      totalLikes: images.reduce((sum, img) => sum + img.likes, 0),
-      totalShares: images.reduce((sum, img) => sum + img.shares, 0),
-      totalPurchases: images.reduce((sum, img) => sum + img.purchases, 0),
-      totalRevenue: images.reduce((sum, img) => sum + img.revenue, 0),
-      totalCartCount: images.reduce((sum, img) => sum + img.cart_count, 0),
-      averagePopularity: images.reduce((sum, img) => sum + img.popularity_score, 0) / images.length,
-      topImage: images.sort((a, b) => b.popularity_score - a.popularity_score)[0]
-    }));
+    const themeStats = Object.entries(themeGroups).map(([name, images]) => {
+      const themeInfo = themeData.find(theme => theme.name === name);
+      return {
+        name,
+        totalImages: images.length,
+        totalViews: images.reduce((sum, img) => sum + img.views, 0),
+        totalLikes: images.reduce((sum, img) => sum + img.likes, 0),
+        totalShares: images.reduce((sum, img) => sum + img.shares, 0),
+        totalPurchases: images.reduce((sum, img) => sum + img.purchases, 0),
+        totalRevenue: images.reduce((sum, img) => sum + img.revenue, 0),
+        totalCartCount: images.reduce((sum, img) => sum + img.cart_count, 0),
+        averagePopularity: images.reduce((sum, img) => sum + img.popularity_score, 0) / images.length,
+        topImage: images.sort((a, b) => b.popularity_score - a.popularity_score)[0],
+        heroImageUrl: themeInfo?.hero_image_url,
+        description: themeInfo?.description
+      };
+    });
 
     setBreedAnalytics(breedStats);
     setThemeAnalytics(themeStats);
@@ -478,12 +512,12 @@ export default function ImageAnalyticsPage() {
                     <span className="text-lg font-bold text-gray-500">#{index + 1}</span>
                   </div>
                   
-                  {/* Top Image Thumbnail */}
-                  {breed.topImage && (
+                  {/* Hero Image Thumbnail */}
+                  {(breed.heroImageUrl || breed.topImage) && (
                     <div className="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg overflow-hidden">
                       <Image
-                        src={breed.topImage.public_url}
-                        alt={breed.topImage.prompt_text || 'Image'}
+                        src={breed.heroImageUrl || breed.topImage?.public_url || ''}
+                        alt={breed.name}
                         width={48}
                         height={48}
                         className="w-full h-full object-cover"
@@ -491,9 +525,14 @@ export default function ImageAnalyticsPage() {
                     </div>
                   )}
                   
-                  {/* Breed Name and Count */}
+                  {/* Breed Name, Description and Count */}
                   <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-semibold text-gray-900 truncate">{breed.name}</h3>
+                    {breed.description && (
+                      <p className="text-sm font-bold text-gray-700 truncate">
+                        {extractFirstBoldText(breed.description)}
+                      </p>
+                    )}
                     <p className="text-sm text-gray-500">{breed.totalImages} image{breed.totalImages !== 1 ? 's' : ''}</p>
                   </div>
                   
@@ -575,12 +614,12 @@ export default function ImageAnalyticsPage() {
                     <span className="text-lg font-bold text-gray-500">#{index + 1}</span>
                   </div>
                   
-                  {/* Top Image Thumbnail */}
-                  {theme.topImage && (
+                  {/* Hero Image Thumbnail */}
+                  {(theme.heroImageUrl || theme.topImage) && (
                     <div className="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg overflow-hidden">
                       <Image
-                        src={theme.topImage.public_url}
-                        alt={theme.topImage.prompt_text || 'Image'}
+                        src={theme.heroImageUrl || theme.topImage?.public_url || ''}
+                        alt={theme.name}
                         width={48}
                         height={48}
                         className="w-full h-full object-cover"
@@ -588,9 +627,14 @@ export default function ImageAnalyticsPage() {
                     </div>
                   )}
                   
-                  {/* Theme Name and Count */}
+                  {/* Theme Name, Description and Count */}
                   <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-semibold text-gray-900 truncate">{theme.name}</h3>
+                    {theme.description && (
+                      <p className="text-sm font-bold text-gray-700 truncate">
+                        {extractFirstBoldText(theme.description)}
+                      </p>
+                    )}
                     <p className="text-sm text-gray-500">{theme.totalImages} image{theme.totalImages !== 1 ? 's' : ''}</p>
                   </div>
                   
@@ -658,7 +702,14 @@ export default function ImageAnalyticsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0 pr-4">
-                        <p className="text-sm text-gray-900 line-clamp-2 mb-1">{image.prompt_text}</p>
+                        <div className="mb-1">
+                          {image.description && (
+                            <p className="text-sm font-bold text-gray-900 mb-1">
+                              {extractFirstBoldText(image.description)}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-600 line-clamp-1">{image.prompt_text}</p>
+                        </div>
                         <div className="flex items-center space-x-2">
                           <Badge variant="outline" className="text-xs">{image.breed_name}</Badge>
                           <Badge variant="outline" className="text-xs">{image.theme_name}</Badge>
