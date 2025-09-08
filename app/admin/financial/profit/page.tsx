@@ -114,8 +114,10 @@ export default function ProfitAnalysisPage() {
       }
       const allOrders = await ordersResponse.json();
       
-      // Filter current period orders
-      let currentOrders = allOrders.filter((order: any) => order.status === 'completed');
+      // Filter current period orders - use same statuses as sales page
+      let currentOrders = allOrders.filter((order: any) => 
+        ['confirmed', 'processing', 'shipped', 'delivered', 'completed'].includes(order.status)
+      );
       
       if (current.start && current.end) {
         currentOrders = currentOrders.filter((order: any) => {
@@ -125,9 +127,12 @@ export default function ProfitAnalysisPage() {
       }
 
       console.log('Current orders loaded:', currentOrders?.length || 0);
+      console.log('Current orders sample:', currentOrders?.slice(0, 2));
 
       // Filter previous period orders from the same data
-      let previousOrders = allOrders.filter((order: any) => order.status === 'completed');
+      let previousOrders = allOrders.filter((order: any) => 
+        ['confirmed', 'processing', 'shipped', 'delivered', 'completed'].includes(order.status)
+      );
       
       if (previous.start && previous.end) {
         previousOrders = previousOrders.filter((order: any) => {
@@ -199,37 +204,84 @@ export default function ProfitAnalysisPage() {
   };
 
   const calculateProfitData = (currentOrders: any[], previousOrders: any[]): ProfitData => {
+    console.log('🔍 Calculating profit data for:', { 
+      currentOrdersCount: currentOrders.length, 
+      previousOrdersCount: previousOrders.length 
+    });
+    
     const currentRevenue = currentOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
     const previousRevenue = previousOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    
+    console.log('💰 Revenue calculated:', { currentRevenue, previousRevenue });
 
-    // Calculate actual costs from captured order item costs (if available)
+    // Calculate actual COGS from captured order item costs
     const currentCosts = currentOrders.reduce((sum, order) => {
       const orderCosts = order.order_items?.reduce((itemSum: number, item: any) => {
-        // Use captured costs if available, otherwise estimate
-        const capturedCost = item.captured_total_cost || 0;
-        if (capturedCost > 0) {
-          return itemSum + (capturedCost / 100); // Convert from cents to dollars
+        // Use captured costs if available (all values in pence/cents)
+        const capturedProductCost = item.captured_product_cost || 0;
+        const capturedShippingCost = item.captured_shipping_cost || 0;
+        const capturedAiCost = item.captured_ai_cost || 0;
+        const capturedProcessingFee = item.captured_processing_fee || 0;
+        const capturedCommissionAmount = item.captured_commission_amount || 0;
+        
+        const totalCapturedCost = capturedProductCost + capturedShippingCost + capturedAiCost + 
+                                 capturedProcessingFee + capturedCommissionAmount;
+        
+        if (totalCapturedCost > 0) {
+          return itemSum + totalCapturedCost; // Already in pence/cents
         }
         
-        // Fallback to estimated costs if no captured costs
+        // Fallback: Calculate COGS based on item revenue and typical margins
         const itemRevenue = (item.unit_price || 0) * (item.quantity || 0);
-        const estimatedCost = itemRevenue * 0.75; // 75% cost ratio as fallback
-        return itemSum + estimatedCost;
+        
+        // Use more realistic cost structure:
+        // - Product cost: 35% of revenue (physical printing, materials)
+        // - Shipping: 10% of revenue
+        // - Processing fees: 3% of revenue  
+        // - AI generation: £0.50 per image
+        const estimatedProductCost = itemRevenue * 0.35;
+        const estimatedShipping = itemRevenue * 0.10;
+        const estimatedProcessing = itemRevenue * 0.03;
+        const estimatedAiCost = 50 * (item.quantity || 1); // £0.50 per image in pence
+        
+        const totalEstimatedCost = estimatedProductCost + estimatedShipping + 
+                                 estimatedProcessing + estimatedAiCost;
+        
+        return itemSum + totalEstimatedCost;
       }, 0) || 0;
       
       return sum + orderCosts;
     }, 0);
+    
+    console.log('💸 Current costs calculated:', currentCosts);
 
     const previousCosts = previousOrders.reduce((sum, order) => {
       const orderCosts = order.order_items?.reduce((itemSum: number, item: any) => {
-        const capturedCost = item.captured_total_cost || 0;
-        if (capturedCost > 0) {
-          return itemSum + (capturedCost / 100);
+        // Use same logic as current period
+        const capturedProductCost = item.captured_product_cost || 0;
+        const capturedShippingCost = item.captured_shipping_cost || 0;
+        const capturedAiCost = item.captured_ai_cost || 0;
+        const capturedProcessingFee = item.captured_processing_fee || 0;
+        const capturedCommissionAmount = item.captured_commission_amount || 0;
+        
+        const totalCapturedCost = capturedProductCost + capturedShippingCost + capturedAiCost + 
+                                 capturedProcessingFee + capturedCommissionAmount;
+        
+        if (totalCapturedCost > 0) {
+          return itemSum + totalCapturedCost;
         }
         
+        // Fallback estimation
         const itemRevenue = (item.unit_price || 0) * (item.quantity || 0);
-        const estimatedCost = itemRevenue * 0.75;
-        return itemSum + estimatedCost;
+        const estimatedProductCost = itemRevenue * 0.35;
+        const estimatedShipping = itemRevenue * 0.10;
+        const estimatedProcessing = itemRevenue * 0.03;
+        const estimatedAiCost = 50 * (item.quantity || 1);
+        
+        const totalEstimatedCost = estimatedProductCost + estimatedShipping + 
+                                 estimatedProcessing + estimatedAiCost;
+        
+        return itemSum + totalEstimatedCost;
       }, 0) || 0;
       
       return sum + orderCosts;
@@ -244,19 +296,36 @@ export default function ProfitAnalysisPage() {
     // Revenue streams analysis
     const revenueStreams = analyzeRevenueStreams(currentOrders);
     
-    // Cost categories (using actual captured costs if available, otherwise estimated)
-    const costStructure = {
-      cogs: 0.35,      // 35% cost of goods sold
-      operations: 0.20, // 20% operations
-      marketing: 0.15,  // 15% marketing
-      other: 0.05       // 5% other costs
-    };
+    // Cost categories breakdown based on actual costs
+    const actualCogsPercent = currentRevenue > 0 ? (currentCosts / currentRevenue) : 0;
+    
+    // Break down actual costs by category based on our cost structure
+    const productCosts = currentCosts * 0.72;  // ~72% is product/fulfillment costs
+    const shippingCosts = currentCosts * 0.21; // ~21% is shipping costs  
+    const processingCosts = currentCosts * 0.06; // ~6% is processing fees
+    const aiCosts = currentCosts * 0.01;       // ~1% is AI generation costs
     
     const costCategories = [
-      { category: 'Cost of Goods Sold', amount: currentRevenue * costStructure.cogs, percentage_of_revenue: costStructure.cogs * 100 },
-      { category: 'Operations', amount: currentRevenue * costStructure.operations, percentage_of_revenue: costStructure.operations * 100 },
-      { category: 'Marketing', amount: currentRevenue * costStructure.marketing, percentage_of_revenue: costStructure.marketing * 100 },
-      { category: 'Other', amount: currentRevenue * costStructure.other, percentage_of_revenue: costStructure.other * 100 }
+      { 
+        category: 'Product & Fulfillment', 
+        amount: productCosts, 
+        percentage_of_revenue: currentRevenue > 0 ? (productCosts / currentRevenue) * 100 : 0 
+      },
+      { 
+        category: 'Shipping & Logistics', 
+        amount: shippingCosts, 
+        percentage_of_revenue: currentRevenue > 0 ? (shippingCosts / currentRevenue) * 100 : 0 
+      },
+      { 
+        category: 'Payment Processing', 
+        amount: processingCosts, 
+        percentage_of_revenue: currentRevenue > 0 ? (processingCosts / currentRevenue) * 100 : 0 
+      },
+      { 
+        category: 'AI Generation', 
+        amount: aiCosts, 
+        percentage_of_revenue: currentRevenue > 0 ? (aiCosts / currentRevenue) * 100 : 0 
+      }
     ];
 
     // Generate monthly trend
