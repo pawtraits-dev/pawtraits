@@ -34,8 +34,8 @@ export default function CustomerProductsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [mediumFilter, setMediumFilter] = useState('');
-  const [formatFilter, setFormatFilter] = useState('');
+  const [mediumFilter, setMediumFilter] = useState('all-mediums');
+  const [formatFilter, setFormatFilter] = useState('all-formats');
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   
@@ -181,9 +181,9 @@ export default function CustomerProductsPage() {
     })
     .filter(product => {
       // Medium filter
-      if (mediumFilter && product.media?.id !== mediumFilter) return false;
+      if (mediumFilter && mediumFilter !== 'all-mediums' && product.media?.id !== mediumFilter) return false;
       // Format filter
-      if (formatFilter && product.formats?.id !== formatFilter) return false;
+      if (formatFilter && formatFilter !== 'all-formats' && product.formats?.id !== formatFilter) return false;
       return true;
     })
     .sort((a, b) => {
@@ -227,8 +227,8 @@ export default function CustomerProductsPage() {
 
   const clearFilters = () => {
     setSearchTerm('');
-    setMediumFilter('');
-    setFormatFilter('');
+    setMediumFilter('all-mediums');
+    setFormatFilter('all-formats');
     setSortBy('name');
     setSortOrder('asc');
   };
@@ -324,7 +324,7 @@ export default function CustomerProductsPage() {
                     <SelectValue placeholder="All mediums" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All mediums</SelectItem>
+                    <SelectItem value="all-mediums">All mediums</SelectItem>
                     {availableMedia.map(medium => (
                       <SelectItem key={medium.id} value={medium.id}>
                         {medium.name}
@@ -342,7 +342,7 @@ export default function CustomerProductsPage() {
                     <SelectValue placeholder="All formats" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All formats</SelectItem>
+                    <SelectItem value="all-formats">All formats</SelectItem>
                     {availableFormats.map(format => (
                       <SelectItem key={format.id} value={format.id}>
                         {format.name}
@@ -403,12 +403,12 @@ export default function CustomerProductsPage() {
               </div>
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">No Products Found</h2>
               <p className="text-gray-600 mb-8">
-                {searchTerm || mediumFilter || formatFilter 
+                {searchTerm || (mediumFilter && mediumFilter !== 'all-mediums') || (formatFilter && formatFilter !== 'all-formats') 
                   ? 'Try adjusting your search or filter criteria'
                   : 'No products are currently available'
                 }
               </p>
-              {(searchTerm || mediumFilter || formatFilter) && (
+              {(searchTerm || (mediumFilter && mediumFilter !== 'all-mediums') || (formatFilter && formatFilter !== 'all-formats')) && (
                 <Button onClick={clearFilters} variant="outline">
                   Clear all filters
                 </Button>
