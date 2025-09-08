@@ -6,12 +6,15 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const productId = params.id;
+    const productId = decodeURIComponent(params.id);
+    console.log('Product API - Received product ID:', params.id);
+    console.log('Product API - Decoded product ID:', productId);
     
     // Products are public data, so email is optional for now
     // We keep the parameter for consistency with other shop APIs
     const { searchParams } = new URL(request.url);
     const customerEmail = searchParams.get('email');
+    console.log('Product API - Customer email:', customerEmail);
 
     const supabaseService = new SupabaseService();
 

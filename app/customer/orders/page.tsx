@@ -111,10 +111,14 @@ export default function CustomerOrdersPage() {
       const uniqueProductIds = [...new Set(allOrderItems.map(item => item.product_id))]
       console.log('Customer loading product details for IDs:', uniqueProductIds)
       
-      // Fetch product details for each unique product_id
+      // Fetch product details via API with proper URL encoding
       for (const productId of uniqueProductIds) {
         try {
-          const response = await fetch(`/api/shop/products/${productId}?email=${encodeURIComponent(user.email)}`)
+          const encodedProductId = encodeURIComponent(productId)
+          const url = `/api/shop/products/${encodedProductId}?email=${encodeURIComponent(user.email)}`
+          console.log(`Customer fetching URL: ${url}`)
+          
+          const response = await fetch(url)
           
           if (response.ok) {
             const product = await response.json()

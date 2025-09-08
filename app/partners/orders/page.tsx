@@ -156,10 +156,10 @@ function PartnerOrdersContent() {
     try {
       const productDetailsMap: {[key: string]: any} = {};
       
-      // Get current user session for API authentication
-      const { data: { session } } = await supabaseService.getClient().auth.getSession();
-      if (!session?.access_token) {
-        console.warn('No session found for partner product details loading');
+      // Get current user email for API authentication (fallback to shop API)
+      const { data: { user } } = await supabaseService.getClient().auth.getUser();
+      if (!user?.email) {
+        console.warn('No user email found for partner product details loading');
         return;
       }
       
@@ -169,14 +169,14 @@ function PartnerOrdersContent() {
       const uniqueProductIds = [...new Set(allOrderItems.map(item => item.product_id || item.productId).filter(Boolean))];
       console.log('Partner loading product details for IDs:', uniqueProductIds);
       
-      // Use partner API endpoint if available
+      // Fetch product details via shop API with proper URL encoding
       for (const productId of uniqueProductIds) {
         try {
-          const response = await fetch(`/api/partners/products/${productId}`, {
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`
-            }
-          });
+          const encodedProductId = encodeURIComponent(productId);
+          const url = `/api/shop/products/${encodedProductId}?email=${encodeURIComponent(user.email)}`;
+          console.log(`Partner fetching URL: ${url}`);
+          
+          const response = await fetch(url);
           
           if (response.ok) {
             const product = await response.json();
@@ -184,19 +184,8 @@ function PartnerOrdersContent() {
             productDetailsMap[productId] = product;
           } else {
             console.warn(`Failed to fetch partner product details for ${productId}, status:`, response.status);
-            // Fallback to shop API
-            try {
-              const { data: { user } } = await supabaseService.getClient().auth.getUser();
-              if (user?.email) {
-                const fallbackResponse = await fetch(`/api/shop/products/${productId}?email=${encodeURIComponent(user.email)}`);
-                if (fallbackResponse.ok) {
-                  const product = await fallbackResponse.json();
-                  productDetailsMap[productId] = product;
-                }
-              }
-            } catch (fallbackError) {
-              console.error(`Fallback product fetch failed for ${productId}:`, fallbackError);
-            }
+            const errorText = await response.text();
+            console.warn('Partner error response:', errorText);
           }
         } catch (error) {
           console.error(`Error fetching partner product details for ${productId}:`, error);

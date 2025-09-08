@@ -120,23 +120,32 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
       
       // Fetch product details for each unique product_id
       const uniqueProductIds = [...new Set(orderItems.map(item => item.product_id))];
-      console.log('Loading product details for IDs:', uniqueProductIds);
+      console.log('Admin loading product details for IDs:', uniqueProductIds);
       
+      // Use admin API endpoint for product details
       for (const productId of uniqueProductIds) {
         try {
-          const product = await adminService.getProduct(productId);
-          console.log(`Product details for ${productId}:`, product);
-          if (product) {
+          const encodedProductId = encodeURIComponent(productId);
+          const url = `/api/admin/products/${encodedProductId}`;
+          console.log(`Admin fetching URL: ${url}`);
+          
+          const response = await fetch(url);
+          
+          if (response.ok) {
+            const product = await response.json();
+            console.log(`Admin product details for ${productId}:`, product);
             productDetailsMap[productId] = product;
           } else {
-            console.warn(`No product found for ID: ${productId}`);
+            console.warn(`Failed to fetch admin product details for ${productId}, status:`, response.status);
+            const errorText = await response.text();
+            console.warn('Admin error response:', errorText);
           }
         } catch (productError) {
           console.error(`Error fetching product ${productId}:`, productError);
         }
       }
       
-      console.log('Final product details map:', productDetailsMap);
+      console.log('Admin final product details map:', productDetailsMap);
       setProductDetails(productDetailsMap);
     } catch (error) {
       console.error('Error loading product details:', error);
