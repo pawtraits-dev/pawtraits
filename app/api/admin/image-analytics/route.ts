@@ -20,8 +20,11 @@ export async function GET(request: NextRequest) {
     });
     
     // Load breed and theme data for hero images and descriptions
-    const { data: breeds } = await supabase.from('breeds').select('*');
-    const { data: themes } = await supabase.from('themes').select('*');
+    const { data: breeds, error: breedsError } = await supabase.from('breeds').select('*');
+    const { data: themes, error: themesError } = await supabase.from('themes').select('*');
+    
+    if (breedsError) console.error('Breeds loading error:', breedsError);
+    if (themesError) console.error('Themes loading error:', themesError);
     
     // Load user interactions using service role client
     const { data: interactions, error: interactionsError } = await supabase
@@ -67,7 +70,6 @@ export async function GET(request: NextRequest) {
     // Process purchase data
     const purchaseMap: Record<string, { count: number; total_revenue: number }> = {};
     if (orderItems && !orderError) {
-      console.log(`Processing ${orderItems.length} order items for revenue calculation`);
       orderItems.forEach((item: any) => {
         const imageId = item.image_id;
         if (imageId) { // Make sure imageId exists
@@ -77,14 +79,8 @@ export async function GET(request: NextRequest) {
           purchaseMap[imageId].count++;
           const itemRevenue = ((item.unit_price || 0) * (item.quantity || 0)) / 100; // Convert from pennies to pounds
           purchaseMap[imageId].total_revenue += itemRevenue;
-          
-          // Debug logging for the first few items
-          if (Object.keys(purchaseMap).length <= 5) {
-            console.log(`Order item: imageId=${imageId}, unit_price=${item.unit_price}, quantity=${item.quantity}, itemRevenue=${itemRevenue}`);
-          }
         }
       });
-      console.log(`Revenue calculated for ${Object.keys(purchaseMap).length} unique images`);
     }
     
     // Combine all data

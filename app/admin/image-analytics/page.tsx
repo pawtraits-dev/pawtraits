@@ -132,7 +132,6 @@ export default function ImageAnalyticsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      console.log('Loading image analytics data...');
       
       // Use the dedicated API endpoint following established patterns
       const response = await fetch('/api/admin/image-analytics');
@@ -142,13 +141,16 @@ export default function ImageAnalyticsPage() {
       
       const data = await response.json();
       const processedImages = data.images || data; // Handle both new and old response format
-      console.log(`Loaded ${processedImages.length} images with analytics`);
       
       setImages(processedImages);
       
       // Store breed and theme data for grouped analytics
-      if (data.breeds) setBreedData(data.breeds);
-      if (data.themes) setThemeData(data.themes);
+      if (data.breeds) {
+        setBreedData(data.breeds);
+      }
+      if (data.themes) {
+        setThemeData(data.themes);
+      }
 
       // Load filter options
       const uniqueBreeds = Array.from(new Set(processedImages.map((img: any) => img.breed_name).filter(Boolean))) as string[];
