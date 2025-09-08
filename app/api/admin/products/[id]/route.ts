@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
-import { SupabaseService } from '@/lib/supabase';
 
 export async function GET(
   request: NextRequest,
@@ -13,19 +12,11 @@ export async function GET(
 
     const adminService = new AdminSupabaseService();
 
-    // Try to get product by ID first, then fall back to SKU lookup
-    let product = await adminService.getProduct(productId);
-    
-    // If not found by ID, try the service's built-in SKU handling via the regular service calls
-    // The SupabaseService getProductById already handles SKU fallback internally
-    const supabaseService = new SupabaseService();
-    if (!product) {
-      console.log('Admin Product API - Product not found by admin service, trying regular service with SKU fallback');
-      product = await supabaseService.getProductById(productId);
-    }
+    // Get product by ID (should be a UUID)
+    const product = await adminService.getProduct(productId);
     
     if (!product) {
-      console.error('Admin Product API - Product not found by ID or SKU:', productId);
+      console.error('Admin Product API - Product not found by ID:', productId);
       return NextResponse.json(
         { error: 'Product not found' },
         { status: 404 }

@@ -308,7 +308,7 @@ export async function POST(request: NextRequest) {
     // Create order items
     const orderItemsData = orderData.items.map(item => ({
       order_id: order.id,
-      product_id: item.productId,
+      product_id: item.productId, // This should be the actual database product.id
       image_id: item.imageId,
       image_url: item.imageUrl,
       image_title: item.imageTitle,

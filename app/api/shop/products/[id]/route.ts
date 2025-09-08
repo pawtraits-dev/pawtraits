@@ -19,9 +19,36 @@ export async function GET(
     const supabaseService = new SupabaseService();
 
     // Get product details with full media information (only public information suitable for customers)
-    // Use service layer to find product (will handle ID vs SKU lookup internally)
-    const product = await supabaseService.getProductById(productId);
-    const productError = product ? null : { message: 'Product not found' };
+    const { data: product, error: productError } = await supabaseService.getClient()
+      .from('products')
+      .select(`
+        id,
+        name,
+        sku,
+        width_cm,
+        height_cm,
+        size_name,
+        is_active,
+        stock_status,
+        is_featured,
+        media(
+          id,
+          name,
+          category,
+          description,
+          material_type,
+          finish_type,
+          thickness_mm,
+          indoor_outdoor,
+          uv_resistant,
+          water_resistant,
+          care_instructions
+        ),
+        formats(id, name)
+      `)
+      .eq('id', productId)
+      .eq('is_active', true)  // Only return active products to customers
+      .single();
 
     if (productError || !product) {
       console.error('Product not found:', productError);

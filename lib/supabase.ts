@@ -263,8 +263,7 @@ export class SupabaseService {
 
   async getProductById(id: string, countryCode?: string): Promise<Product | null> {
     try {
-      // First try to find by ID
-      let { data: product, error } = await this.supabase
+      const { data: product, error } = await this.supabase
         .from('products')
         .select(`
           *,
@@ -274,28 +273,8 @@ export class SupabaseService {
         .eq('id', id)
         .single();
 
-      // If not found by ID, try by SKU (for cases where Gelato SKUs are used as product IDs)
-      if (error && error.code === 'PGRST116') {
-        console.log('Product not found by ID, trying SKU lookup for:', id);
-        const { data: productBySku, error: skuError } = await this.supabase
-          .from('products')
-          .select(`
-            *,
-            medium:media(*),
-            format:formats(*)
-          `)
-          .eq('sku', id)
-          .single();
-        
-        if (!skuError && productBySku) {
-          product = productBySku;
-          error = null;
-          console.log('Found product by SKU:', id);
-        }
-      }
-
       if (error) {
-        console.log('Product not found by ID or SKU:', id);
+        console.log('Product not found by ID:', id, error.message);
         return null;
       }
 
@@ -304,7 +283,7 @@ export class SupabaseService {
         let pricingQuery = this.supabase
           .from('product_pricing')
           .select('*, country:countries(*)')
-          .eq('product_id', product.id); // Use the actual product.id, not the search parameter
+          .eq('product_id', id);
 
         if (countryCode) {
           pricingQuery = pricingQuery.eq('country_code', countryCode);
