@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Users, Percent, AlertCircle, X } from 'lucide-react';
+import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Users, Percent, AlertCircle, X, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';

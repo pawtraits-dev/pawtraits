@@ -31,7 +31,7 @@ export class ProductDescriptionService {
       
       // Collect all unique product IDs from all orders
       const allOrderItems = orders.flatMap(order => order.order_items || []);
-      const uniqueProductIds = [...new Set(allOrderItems.map(item => item.product_id))];
+      const uniqueProductIds = Array.from(new Set(allOrderItems.map(item => item.product_id)));
       console.log('Loading product details for IDs:', uniqueProductIds);
       
       // Fetch product details via API with proper URL encoding
