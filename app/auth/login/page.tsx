@@ -6,7 +6,7 @@ import type React from "react"
 export const dynamic = 'force-dynamic'
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { SupabaseService } from '@/lib/supabase'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,6 +23,8 @@ import Link from "next/link"
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const returnTo = searchParams.get('returnTo')
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loginAttempts, setLoginAttempts] = useState(0)
@@ -95,7 +97,11 @@ export default function LoginPage() {
       
       let redirectUrl = "/customer"; // default for customers
       
-      if (profile) {
+      // Use returnTo parameter if provided and valid
+      if (returnTo && returnTo.startsWith('/')) {
+        console.log("Login - Using returnTo redirect:", returnTo);
+        redirectUrl = returnTo;
+      } else if (profile) {
         console.log("Login - Profile user_type:", profile.user_type);
         switch (profile.user_type) {
           case 'admin':

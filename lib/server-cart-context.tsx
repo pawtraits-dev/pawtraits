@@ -4,6 +4,7 @@ import React, { createContext, useContext, useReducer, useEffect, useState } fro
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { getSupabaseClient } from '@/lib/supabase-client';
 import { SupabaseService } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 export interface CartItem {
   id: string; // Server-side cart item ID
@@ -98,6 +99,13 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
   const [cart, dispatch] = useReducer(cartReducer, initialState);
   const [hasError, setHasError] = useState(false);
   const supabaseService = new SupabaseService();
+  const router = useRouter();
+
+  // Redirect to login when authentication is required
+  const redirectToLogin = () => {
+    console.log('[CART AUTH] Redirecting to login - authentication required for cart operations');
+    router.push('/auth/login?returnTo=' + encodeURIComponent(window.location.pathname));
+  };
 
   // Get auth token for API calls
   const getAuthToken = async () => {
@@ -279,7 +287,8 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
       const token = await getAuthToken();
       if (!token) {
         console.error('[CART] No auth token available');
-        throw new Error('Authentication required');
+        redirectToLogin();
+        return; // Don't throw error, just redirect
       }
       
       console.log('[CART] Auth token obtained, making request...');
@@ -330,7 +339,8 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
     try {
       const token = await getAuthToken();
       if (!token) {
-        throw new Error('Authentication required');
+        redirectToLogin();
+        return;
       }
 
       const response = await fetch(`/api/cart/${id}`, {
@@ -357,7 +367,8 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
     try {
       const token = await getAuthToken();
       if (!token) {
-        throw new Error('Authentication required');
+        redirectToLogin();
+        return;
       }
 
       const response = await fetch(`/api/cart/${id}`, {
@@ -382,7 +393,8 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
     try {
       const token = await getAuthToken();
       if (!token) {
-        throw new Error('Authentication required');
+        redirectToLogin();
+        return;
       }
 
       const response = await fetch('/api/cart', {
