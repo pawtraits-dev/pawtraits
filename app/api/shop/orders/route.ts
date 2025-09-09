@@ -305,11 +305,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create order items
-    console.log('Creating order items from orderData.items:', JSON.stringify(orderData.items, null, 2));
-    
+    // Create order items (product IDs are now correct UUIDs after data cleanup)
     const orderItemsData = orderData.items.map(item => {
-      console.log(`Processing order item - productId: ${item.productId}, type: ${typeof item.productId}`);
       return {
         order_id: order.id,
         product_id: item.productId, // This should be the actual database product.id (UUID)
@@ -322,8 +319,6 @@ export async function POST(request: NextRequest) {
         created_at: new Date().toISOString()
       };
     });
-    
-    console.log('Final orderItemsData being inserted:', JSON.stringify(orderItemsData, null, 2));
 
     const { error: itemsError } = await supabase
       .from('order_items')
