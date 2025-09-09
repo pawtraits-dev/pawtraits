@@ -319,14 +319,43 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
   try {
     console.log('Creating Gelato order for:', order.order_number);
 
-    // Get order items from payment intent metadata
-    const metadata = paymentIntent.metadata || {};
-    const cartItems: any[] = [];
+    // Get cart items from database instead of reconstructing from metadata
+    console.log('Getting cart items from database for customer:', paymentIntent.customer_email || paymentIntent.receipt_email);
+    const customerEmail = paymentIntent.customer_email || paymentIntent.receipt_email;
     
-    // Reconstruct cart items from enhanced metadata
-    for (let i = 1; i <= 10; i++) {
-      const itemId = metadata[`item${i}_id`];
-      const itemTitle = metadata[`item${i}_title`];
+    let cartItems: any[] = [];
+    
+    if (customerEmail) {
+      // Get user by email first
+      const { data: userData, error: userError } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('email', customerEmail)
+        .single();
+      
+      if (!userError && userData) {
+        // Get cart items for this user
+        const { data: dbCartItems, error: cartError } = await supabase
+          .rpc('get_user_cart', { p_user_id: userData.id });
+        
+        if (!cartError && dbCartItems) {
+          cartItems = dbCartItems;
+          console.log('✅ Retrieved cart items from database:', cartItems.length);
+        } else {
+          console.log('Failed to get cart from database:', cartError);
+        }
+      } else {
+        console.log('Failed to find user by email:', userError);
+      }
+    }
+    
+    // Fallback to metadata reconstruction if database lookup failed
+    if (cartItems.length === 0) {
+      console.log('Falling back to metadata reconstruction');
+      const metadata = paymentIntent.metadata || {};
+      for (let i = 1; i <= 10; i++) {
+        const itemId = metadata[`item${i}_id`];
+        const itemTitle = metadata[`item${i}_title`];
       const itemQty = metadata[`item${i}_qty`];
       
       if (itemId) {
@@ -358,6 +387,7 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
           }
         });
       }
+    } // End fallback reconstruction
     }
 
     if (cartItems.length === 0) {
