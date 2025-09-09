@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { SupabaseService } from '@/lib/supabase';
 
 interface OrderItem {
   id: string;
@@ -72,6 +73,7 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const supabaseService = new SupabaseService();
 
   useEffect(() => {
     loadOrder();
@@ -80,7 +82,20 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
   const loadOrder = async () => {
     try {
       setError(null);
-      const response = await fetch(`/api/partners/orders/${params.id}`);
+      
+      // Get auth session for API calls
+      const { data: { session } } = await supabaseService.getClient().auth.getSession();
+      if (!session?.access_token) {
+        setError('Session expired - please log in again');
+        setLoading(false);
+        return;
+      }
+      
+      const response = await fetch(`/api/partners/orders/${params.id}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
       
       if (!response.ok) {
         if (response.status === 404) {

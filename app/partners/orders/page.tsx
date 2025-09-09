@@ -13,15 +13,13 @@ import { SupabaseService } from '@/lib/supabase';
 
 interface OrderItem {
   id: string;
-  imageUrl: string;
-  imageTitle: string;
-  title: string;
-  product: string;
+  product_id: string;
+  image_url: string;
+  image_title: string;
   quantity: number;
-  unitPrice: number;
-  totalPrice: number;
-  originalPrice: number;
-  price: number;
+  unit_price: number;
+  total_price: number;
+  original_price?: number;
 }
 
 interface Order {
@@ -37,7 +35,7 @@ interface Order {
   currency: string;
   estimatedDelivery?: string;
   trackingNumber?: string;
-  items: OrderItem[];
+  order_items: OrderItem[];
   clientInfo: {
     name: string;
     email: string;
@@ -164,9 +162,9 @@ function PartnerOrdersContent() {
       }
       
       // Collect all unique product IDs from all orders
-      const allOrderItems = orders.flatMap(order => order.items || []);
-      // Partner orders might use different field names - check both
-      const uniqueProductIds = [...new Set(allOrderItems.map(item => item.product_id || item.productId).filter(Boolean))];
+      const allOrderItems = orders.flatMap(order => order.order_items || []);
+      // Use consistent field names like customer orders
+      const uniqueProductIds = [...new Set(allOrderItems.map(item => item.product_id).filter(Boolean))];
       console.log('Partner loading product details for IDs:', uniqueProductIds);
       
       // Fetch product details via shop API with proper URL encoding
@@ -365,13 +363,13 @@ function PartnerOrdersContent() {
               
               <CardContent className="p-6">
                 <div className="space-y-4">
-                  {order.items.map((item) => (
+                  {order.order_items?.map((item) => (
                     <div key={item.id} className="flex items-start space-x-4">
-                      <div className="flex-shrink-0 cursor-pointer" onClick={() => item.imageUrl && handleImageClick(item.imageUrl, item.title)}>
-                        {item.imageUrl ? (
+                      <div className="flex-shrink-0 cursor-pointer" onClick={() => item.image_url && handleImageClick(item.image_url, item.image_title)}>
+                        {item.image_url ? (
                           <Image
-                            src={item.imageUrl}
-                            alt={item.title}
+                            src={item.image_url}
+                            alt={item.image_title}
                             width={80}
                             height={80}
                             className="rounded-lg object-cover hover:opacity-80 transition-opacity"
@@ -384,8 +382,8 @@ function PartnerOrdersContent() {
                       </div>
                       
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-medium text-gray-900">{item.title}</h3>
-                        <p className="text-sm font-medium text-green-700">{getProductDescription(item)}</p>
+                        <h3 className="text-sm font-medium text-gray-900">{item.image_title}</h3>
+                        <p className="text-sm font-medium text-green-700">{getProductDescription(item.product_id)}</p>
                         <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                         <Badge className="bg-green-100 text-green-800 text-xs mt-1">
                           Partner Order
