@@ -24,7 +24,6 @@ import {
 import Link from 'next/link';
 import Image from 'next/image';
 import { productDescriptionService } from '@/lib/product-utils';
-import { createClient } from '@supabase/supabase-js';
 
 interface OrderItem {
   id: string;
@@ -83,25 +82,7 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
   const loadOrder = async () => {
     try {
       setError(null);
-      
-      // Get auth session for API calls
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        setError('Session expired - please log in again');
-        setLoading(false);
-        return;
-      }
-      
-      const response = await fetch(`/api/partners/orders/${params.id}`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
+      const response = await fetch(`/api/partners/orders/${params.id}`);
       
       if (!response.ok) {
         if (response.status === 404) {
