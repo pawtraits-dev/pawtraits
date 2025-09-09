@@ -73,6 +73,7 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [productDetails, setProductDetails] = useState<{[key: string]: any}>({});
 
   useEffect(() => {
     loadAllOrders();
@@ -91,6 +92,12 @@ export default function AdminOrdersPage() {
       if (response.ok) {
         const orderData = await response.json();
         setOrders(orderData);
+        
+        // Load product details for all order items
+        const allOrderItems = orderData.flatMap((order: Order) => order.order_items || []);
+        if (allOrderItems.length > 0) {
+          await loadProductDetails(allOrderItems);
+        }
       } else {
         console.error('Failed to load orders');
         setOrders([]);
@@ -101,6 +108,73 @@ export default function AdminOrdersPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadProductDetails = async (orderItems: OrderItem[]) => {
+    try {
+      const productDetailsMap: {[key: string]: any} = {};
+      
+      // Fetch product details for each unique product_id
+      const uniqueProductIds = [...new Set(orderItems.map(item => item.product_id))];
+      console.log('Admin loading product details for IDs:', uniqueProductIds);
+      
+      // Use admin API endpoint for product details
+      for (const productId of uniqueProductIds) {
+        try {
+          const encodedProductId = encodeURIComponent(productId);
+          const url = `/api/admin/products/${encodedProductId}`;
+          console.log(`Admin fetching URL: ${url}`);
+          
+          const response = await fetch(url);
+          
+          if (response.ok) {
+            const product = await response.json();
+            console.log(`Admin product details for ${productId}:`, product);
+            productDetailsMap[productId] = product;
+          } else {
+            console.warn(`Failed to fetch admin product details for ${productId}, status:`, response.status);
+          }
+        } catch (productError) {
+          console.error(`Error fetching product ${productId}:`, productError);
+        }
+      }
+      
+      console.log('Admin final product details map:', productDetailsMap);
+      setProductDetails(productDetailsMap);
+    } catch (error) {
+      console.error('Error loading product details:', error);
+    }
+  };
+
+  const formatPrice = (priceInPence: number, currency: string = 'GBP') => {
+    const symbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
+    return `${symbol}${(priceInPence / 100).toFixed(2)}`;
+  };
+
+  const getProductDescription = (productId: string) => {
+    const product = productDetails[productId];
+    console.log(`Admin getting description for product ${productId}:`, product);
+    
+    if (product) {
+      // Use the product name if available, otherwise construct it
+      if (product.name) {
+        return product.name;
+      }
+      // Fallback: construct description similar to generateDescription function
+      const sizeName = product.size_name || '';
+      const formatName = product.formats?.name || product.format?.name || '';
+      const mediumName = product.media?.name || product.medium?.name || '';
+      const description = `${sizeName} ${formatName} ${mediumName}`.trim();
+      if (description) {
+        return description;
+      }
+      // Final fallback with dimensions
+      return `${product.width_cm || 'Unknown'} x ${product.height_cm || 'Unknown'}cm ${formatName} ${mediumName}`.trim();
+    }
+    
+    // Show the current state for debugging
+    const hasProductDetails = Object.keys(productDetails).length > 0;
+    return hasProductDetails ? `Product ID: ${productId.substring(0, 8)}...` : 'Loading...';
   };
 
   const filterOrders = () => {
@@ -152,10 +226,6 @@ export default function AdminOrdersPage() {
     );
 
     setFilteredOrders(filtered);
-  };
-
-  const formatPrice = (priceInPence: number) => {
-    return `£${(priceInPence / 100).toFixed(2)}`;
   };
 
   const formatDate = (isoDate: string) => {
@@ -393,18 +463,24 @@ export default function AdminOrdersPage() {
                     </div>
 
                     {/* Order Items Preview */}
-                    <div className="flex items-center space-x-2">
-                      {order.order_items && order.order_items.slice(0, 3).map((item) => (
-                        <img
-                          key={item.id}
-                          src={item.image_url}
-                          alt={item.image_title}
-                          className="w-10 h-10 rounded-lg object-cover border"
-                        />
+                    <div className="space-y-2 max-w-md">
+                      {order.order_items && order.order_items.slice(0, 2).map((item) => (
+                        <div key={item.id} className="flex items-center space-x-2">
+                          <img
+                            src={item.image_url}
+                            alt={item.image_title}
+                            className="w-8 h-8 rounded object-cover border"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-900 truncate">{item.image_title}</p>
+                            <p className="text-xs text-purple-600 truncate">{getProductDescription(item.product_id)}</p>
+                            <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                          </div>
+                        </div>
                       ))}
-                      {order.order_items && order.order_items.length > 3 && (
-                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
-                          +{order.order_items.length - 3}
+                      {order.order_items && order.order_items.length > 2 && (
+                        <div className="text-xs text-gray-500 text-center">
+                          +{order.order_items.length - 2} more items
                         </div>
                       )}
                     </div>
