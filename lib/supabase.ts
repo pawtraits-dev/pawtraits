@@ -1397,4 +1397,44 @@ export class SupabaseService {
     const { error } = await this.supabase.auth.signOut();
     if (error) throw error;
   }
+
+  // Get partner order by ID - checks both referral and direct partner orders
+  async getPartnerOrder(orderId: string, partnerId?: string): Promise<any | null> {
+    const partner = partnerId ? await this.getPartner(partnerId) : await this.getCurrentPartner();
+    if (!partner) throw new Error('Partner not found');
+
+    // First try to find via referrals (referral-based orders)
+    const { data: referralOrder, error: referralError } = await this.supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items (*),
+        referrals!inner(partner_id)
+      `)
+      .eq('id', orderId)
+      .eq('referrals.partner_id', partner.id)
+      .single();
+
+    if (!referralError && referralOrder) {
+      return referralOrder;
+    }
+
+    // If not found via referrals, try direct partner orders (placed by partner's email)
+    const { data: directOrder, error: directOrderError } = await this.supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items (*)
+      `)
+      .eq('id', orderId)
+      .eq('customer_email', partner.email)
+      .single();
+
+    if (directOrderError) {
+      if (directOrderError.code === 'PGRST116') return null; // Not found
+      throw directOrderError;
+    }
+
+    return directOrder;
+  }
 }

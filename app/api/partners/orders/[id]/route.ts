@@ -18,20 +18,10 @@ export async function GET(
       );
     }
 
-    // Get order with items, ensuring it's related to this partner
-    const { data: order, error: orderError } = await supabaseService.getClient()
-      .from('orders')
-      .select(`
-        *,
-        order_items (*),
-        referrals!inner(partner_id)
-      `)
-      .eq('id', orderId)
-      .eq('referrals.partner_id', partner.id)
-      .single();
+    // Get order using SupabaseService method (handles both referral and direct orders)
+    const order = await supabaseService.getPartnerOrder(orderId, partner.id);
 
-    if (orderError || !order) {
-      console.error('Order not found for partner:', orderError);
+    if (!order) {
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
