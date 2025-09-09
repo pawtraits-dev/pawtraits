@@ -22,6 +22,7 @@ import {
   Loader2,
   X
 } from 'lucide-react';
+import { productDescriptionService } from '@/lib/product-utils';
 
 interface OrderItem {
   id: string;
@@ -94,9 +95,9 @@ export default function AdminOrdersPage() {
         setOrders(orderData);
         
         // Load product details for all order items
-        const allOrderItems = orderData.flatMap((order: Order) => order.order_items || []);
-        if (allOrderItems.length > 0) {
-          await loadProductDetails(allOrderItems);
+        if (orderData && orderData.length > 0) {
+          const productDetailsMap = await productDescriptionService.loadProductDetails(orderData);
+          setProductDetails(productDetailsMap);
         }
       } else {
         console.error('Failed to load orders');
@@ -110,71 +111,12 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const loadProductDetails = async (orderItems: OrderItem[]) => {
-    try {
-      const productDetailsMap: {[key: string]: any} = {};
-      
-      // Fetch product details for each unique product_id
-      const uniqueProductIds = [...new Set(orderItems.map(item => item.product_id))];
-      console.log('Admin loading product details for IDs:', uniqueProductIds);
-      
-      // Use shop API endpoint for product details (same as customer/partner orders)
-      for (const productId of uniqueProductIds) {
-        try {
-          const encodedProductId = encodeURIComponent(productId);
-          const url = `/api/shop/products/${encodedProductId}`;
-          console.log(`Admin fetching URL: ${url}`);
-          
-          const response = await fetch(url);
-          
-          if (response.ok) {
-            const product = await response.json();
-            console.log(`Admin product details for ${productId}:`, product);
-            productDetailsMap[productId] = product;
-          } else {
-            console.warn(`Failed to fetch admin product details for ${productId}, status:`, response.status);
-          }
-        } catch (productError) {
-          console.error(`Error fetching product ${productId}:`, productError);
-        }
-      }
-      
-      console.log('Admin final product details map:', productDetailsMap);
-      setProductDetails(productDetailsMap);
-    } catch (error) {
-      console.error('Error loading product details:', error);
-    }
+  const getProductDescription = (productId: string) => {
+    return productDescriptionService.getProductDescription(productId, productDetails);
   };
 
   const formatPrice = (priceInPence: number, currency: string = 'GBP') => {
-    const symbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
-    return `${symbol}${(priceInPence / 100).toFixed(2)}`;
-  };
-
-  const getProductDescription = (productId: string) => {
-    const product = productDetails[productId];
-    console.log(`Admin getting description for product ${productId}:`, product);
-    
-    if (product) {
-      // Use the product name if available, otherwise construct it
-      if (product.name) {
-        return product.name;
-      }
-      // Fallback: construct description similar to generateDescription function
-      const sizeName = product.size_name || '';
-      const formatName = product.formats?.name || product.format?.name || '';
-      const mediumName = product.media?.name || product.medium?.name || '';
-      const description = `${sizeName} ${formatName} ${mediumName}`.trim();
-      if (description) {
-        return description;
-      }
-      // Final fallback with dimensions
-      return `${product.width_cm || 'Unknown'} x ${product.height_cm || 'Unknown'}cm ${formatName} ${mediumName}`.trim();
-    }
-    
-    // Show the current state for debugging
-    const hasProductDetails = Object.keys(productDetails).length > 0;
-    return hasProductDetails ? `Product ID: ${productId.substring(0, 8)}...` : 'Loading...';
+    return productDescriptionService.formatPrice(priceInPence, currency);
   };
 
   const filterOrders = () => {

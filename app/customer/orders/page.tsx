@@ -9,6 +9,7 @@ import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Loader2
 import Link from "next/link"
 import Image from "next/image"
 import { SupabaseService } from '@/lib/supabase'
+import { productDescriptionService } from '@/lib/product-utils'
 
 interface OrderItem {
   id: string;
@@ -85,7 +86,8 @@ export default function CustomerOrdersPage() {
       
       // Load product details for order items
       if (ordersData && ordersData.length > 0) {
-        await loadProductDetails(ordersData)
+        const productDetailsMap = await productDescriptionService.loadProductDetails(ordersData)
+        setProductDetails(productDetailsMap)
       }
     } catch (error) {
       console.error('Error loading orders:', error)
@@ -95,76 +97,8 @@ export default function CustomerOrdersPage() {
     }
   }
 
-  const loadProductDetails = async (orders: Order[]) => {
-    try {
-      const productDetailsMap: {[key: string]: any} = {}
-      
-      // Get current user email for API authentication
-      const { data: { user } } = await supabaseService.getClient().auth.getUser()
-      if (!user?.email) {
-        console.warn('No user email found for product details loading')
-        return
-      }
-      
-      // Collect all unique product IDs from all orders
-      const allOrderItems = orders.flatMap(order => order.order_items || [])
-      const uniqueProductIds = [...new Set(allOrderItems.map(item => item.product_id))]
-      console.log('Customer loading product details for IDs:', uniqueProductIds)
-      
-      // Fetch product details via API with proper URL encoding
-      for (const productId of uniqueProductIds) {
-        try {
-          const encodedProductId = encodeURIComponent(productId)
-          const url = `/api/shop/products/${encodedProductId}?email=${encodeURIComponent(user.email)}`
-          console.log(`Customer fetching URL: ${url}`)
-          
-          const response = await fetch(url)
-          
-          if (response.ok) {
-            const product = await response.json()
-            console.log(`Customer product details for ${productId}:`, product)
-            productDetailsMap[productId] = product
-          } else {
-            console.warn(`Failed to fetch product details for ${productId}, status:`, response.status)
-            const errorText = await response.text()
-            console.warn('Error response:', errorText)
-          }
-        } catch (error) {
-          console.error(`Error fetching product details for ${productId}:`, error)
-        }
-      }
-      
-      console.log('Customer final product details map:', productDetailsMap)
-      setProductDetails(productDetailsMap)
-    } catch (error) {
-      console.error('Error loading product details:', error)
-    }
-  }
-
   const getProductDescription = (productId: string) => {
-    const product = productDetails[productId]
-    console.log(`Customer getting description for product ${productId}:`, product)
-    
-    if (product) {
-      // Use the product name if available, otherwise construct it
-      if (product.name) {
-        return product.name
-      }
-      // Fallback: construct description similar to generateDescription function
-      const sizeName = product.size_name || ''
-      const formatName = product.formats?.name || product.format?.name || ''
-      const mediumName = product.media?.name || product.medium?.name || ''
-      const description = `${sizeName} ${formatName} ${mediumName}`.trim()
-      if (description) {
-        return description
-      }
-      // Final fallback with dimensions
-      return `${product.width_cm || 'Unknown'} x ${product.height_cm || 'Unknown'}cm ${formatName} ${mediumName}`.trim()
-    }
-    
-    // Show the current state for debugging
-    const hasProductDetails = Object.keys(productDetails).length > 0
-    return hasProductDetails ? `No product found for ID: ${productId}` : 'Product details loading...'
+    return productDescriptionService.getProductDescription(productId, productDetails)
   }
 
   const handleImageClick = (imageUrl: string, imageTitle: string) => {

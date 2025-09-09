@@ -26,6 +26,7 @@ import {
 import Link from 'next/link';
 import Image from 'next/image';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
+import { productDescriptionService } from '@/lib/product-utils';
 
 interface OrderItem {
   id: string;
@@ -104,7 +105,8 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
       
       // Load product details for each order item
       if (orderData.order_items?.length > 0) {
-        await loadProductDetails(orderData.order_items);
+        const productDetailsMap = await productDescriptionService.loadProductDetails([orderData]);
+        setProductDetails(productDetailsMap);
       }
     } catch (error) {
       console.error('Error loading order:', error);
