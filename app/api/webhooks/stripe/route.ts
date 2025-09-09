@@ -480,10 +480,22 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
 
     // Store detailed cart items for the order
     console.log(`Creating ${cartItems.length} order items for order ${order.id}`);
+    console.log('WEBHOOK DEBUG - Cart items structure:', JSON.stringify(cartItems, null, 2));
+    
     for (const item of cartItems) {
+      console.log('WEBHOOK DEBUG - Processing item:', {
+        hasProductData: !!item.product_data,
+        productDataKeys: item.product_data ? Object.keys(item.product_data) : 'N/A',
+        productDataId: item.product_data?.id,
+        productDataIdType: typeof item.product_data?.id,
+        productDataGelatoSku: item.product_data?.gelato_sku,
+        productId: item.product_id,
+        itemKeys: Object.keys(item)
+      });
+      
       const itemData = {
         order_id: order.id,
-        product_id: item.product_data?.id || 'unknown', // Use database UUID, not Gelato SKU
+        product_id: item.product_data?.id || item.product_id || 'unknown', // Try multiple sources
         image_id: item.image_id,
         image_url: imageUrls[item.image_id] || '',
         image_title: item.image_title,
