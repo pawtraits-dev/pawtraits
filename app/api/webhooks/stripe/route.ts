@@ -168,7 +168,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     }
 
     // Create Gelato order for fulfillment
-    await createGelatoOrder(order, paymentIntent, supabase);
+    await createGelatoOrder(order, paymentIntent, supabase, metadata);
 
     // TODO: Send confirmation email to customer
     // TODO: Notify admin of new order
@@ -315,7 +315,7 @@ async function handleReferralFromPayment(
 }
 
 // Create Gelato order for print fulfillment
-async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) {
+async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, metadata: any = {}) {
   try {
     console.log('Creating Gelato order for:', order.order_number);
 
@@ -352,21 +352,26 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
     // Fallback to metadata reconstruction if database lookup failed
     if (cartItems.length === 0) {
       console.log('Falling back to metadata reconstruction');
-      const metadata = paymentIntent.metadata || {};
+      const paymentIntentMetadata = paymentIntent.metadata || {};
+      console.log('🔍 WEBHOOK DEBUG - PaymentIntent metadata keys:', Object.keys(paymentIntentMetadata));
+      console.log('🔍 WEBHOOK DEBUG - Looking for item metadata...');
+      
       for (let i = 1; i <= 10; i++) {
-        const itemId = metadata[`item${i}_id`];
-        const productId = metadata[`item${i}_product_id`]; // Database UUID
-        const itemTitle = metadata[`item${i}_title`];
-        const itemQty = metadata[`item${i}_qty`];
-        const unitPrice = metadata[`item${i}_unit_price`];
+        const itemId = paymentIntentMetadata[`item${i}_id`];
+        const productId = paymentIntentMetadata[`item${i}_product_id`]; // Database UUID
+        const itemTitle = paymentIntentMetadata[`item${i}_title`];
+        const itemQty = paymentIntentMetadata[`item${i}_qty`];
+        const unitPrice = paymentIntentMetadata[`item${i}_unit_price`];
+        
+        console.log(`🔍 WEBHOOK DEBUG - Item ${i}:`, { itemId, productId, itemTitle, itemQty, unitPrice });
       
       if (itemId) {
         // Enhanced Gelato data from metadata
-        const gelatoUid = metadata[`item${i}_gelato_uid`];
-        const width = parseFloat(metadata[`item${i}_width`]) || 30;
-        const height = parseFloat(metadata[`item${i}_height`]) || 30;
-        const medium = metadata[`item${i}_medium`] || 'Canvas';
-        const format = metadata[`item${i}_format`] || 'Portrait';
+        const gelatoUid = paymentIntentMetadata[`item${i}_gelato_uid`];
+        const width = parseFloat(paymentIntentMetadata[`item${i}_width`]) || 30;
+        const height = parseFloat(paymentIntentMetadata[`item${i}_height`]) || 30;
+        const medium = paymentIntentMetadata[`item${i}_medium`] || 'Canvas';
+        const format = paymentIntentMetadata[`item${i}_format`] || 'Portrait';
         
         cartItems.push({
           image_id: itemId,
