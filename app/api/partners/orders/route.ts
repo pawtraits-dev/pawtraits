@@ -70,48 +70,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Transform the data to match the expected format
-    const transformedOrders = (partnerOrders || []).map(order => ({
-      id: order.id,
-      orderNumber: order.order_number,
-      date: order.created_at,
-      status: order.status,
-      total: order.total_amount / 100, // Convert from pence to pounds
-      originalTotal: (order.total_amount + (order.discount_amount || 0)) / 100,
-      partnerDiscount: (order.discount_amount || 0) / 100,
-      subtotal: order.subtotal_amount / 100,
-      shipping: order.shipping_amount / 100,
-      currency: order.currency || 'GBP',
-      estimatedDelivery: order.estimated_delivery,
-      trackingNumber: order.tracking_number,
-      items: (order.order_items || []).map((item: any) => ({
-        id: item.id,
-        imageUrl: item.image_url,
-        imageTitle: item.image_title,
-        title: item.image_title,
-        product: `Product ID: ${item.product_id}`,
-        quantity: item.quantity,
-        unitPrice: item.unit_price / 100,
-        totalPrice: item.total_price / 100,
-        originalPrice: item.unit_price / 100, // For now, same as unit price
-        price: item.unit_price / 100
-      })),
-      // Client info (for partners, this is usually themselves unless they specify otherwise)
-      clientInfo: {
-        name: `${order.shipping_first_name} ${order.shipping_last_name}`,
-        email: order.customer_email
-      },
-      shippingAddress: {
-        firstName: order.shipping_first_name,
-        lastName: order.shipping_last_name,
-        address: order.shipping_address,
-        city: order.shipping_city,
-        postcode: order.shipping_postcode,
-        country: order.shipping_country
-      }
-    }));
-
-    return NextResponse.json(transformedOrders);
+    // Return the raw orders data in the same format as customer/admin APIs
+    // This allows the common ProductDescriptionService to work properly
+    return NextResponse.json(partnerOrders || []);
 
   } catch (error) {
     console.error('Error in partner orders API:', error);

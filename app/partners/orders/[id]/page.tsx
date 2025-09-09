@@ -24,6 +24,7 @@ import {
 import Link from 'next/link';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
+import { productDescriptionService } from '@/lib/product-utils';
 
 interface OrderItem {
   id: string;
@@ -73,6 +74,7 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [productDetails, setProductDetails] = useState<{[key: string]: any}>({});
   const supabaseService = new SupabaseService();
 
   useEffect(() => {
@@ -111,6 +113,12 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
       
       const orderData = await response.json();
       setOrder(orderData);
+      
+      // Load product details if order has items
+      if (orderData && orderData.order_items && orderData.order_items.length > 0) {
+        const productDetailsMap = await productDescriptionService.loadProductDetails([orderData]);
+        setProductDetails(productDetailsMap);
+      }
     } catch (error) {
       console.error('Error loading order:', error);
       setError('Failed to load order details');
@@ -126,8 +134,11 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
   };
 
   const formatPrice = (priceInPence: number, currency: string = 'GBP') => {
-    const symbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
-    return `${symbol}${(priceInPence / 100).toFixed(2)}`;
+    return productDescriptionService.formatPrice(priceInPence, currency);
+  };
+
+  const getProductDescription = (productId: string) => {
+    return productDescriptionService.getProductDescription(productId, productDetails);
   };
 
   const getStatusColor = (status: string) => {
@@ -310,6 +321,7 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
                       
                       <div className="flex-1 space-y-2">
                         <h3 className="font-semibold text-gray-900">{item.image_title}</h3>
+                        <p className="text-sm font-medium text-green-700">{getProductDescription(item.product_id)}</p>
                         <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                       </div>
                       

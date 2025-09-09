@@ -116,42 +116,8 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
     }
   };
 
-  const loadProductDetails = async (orderItems: OrderItem[]) => {
-    try {
-      const productDetailsMap: {[key: string]: any} = {};
-      
-      // Fetch product details for each unique product_id
-      const uniqueProductIds = [...new Set(orderItems.map(item => item.product_id))];
-      console.log('Admin loading product details for IDs:', uniqueProductIds);
-      
-      // Use admin API endpoint for product details
-      for (const productId of uniqueProductIds) {
-        try {
-          const encodedProductId = encodeURIComponent(productId);
-          const url = `/api/admin/products/${encodedProductId}`;
-          console.log(`Admin fetching URL: ${url}`);
-          
-          const response = await fetch(url);
-          
-          if (response.ok) {
-            const product = await response.json();
-            console.log(`Admin product details for ${productId}:`, product);
-            productDetailsMap[productId] = product;
-          } else {
-            console.warn(`Failed to fetch admin product details for ${productId}, status:`, response.status);
-            const errorText = await response.text();
-            console.warn('Admin error response:', errorText);
-          }
-        } catch (productError) {
-          console.error(`Error fetching product ${productId}:`, productError);
-        }
-      }
-      
-      console.log('Admin final product details map:', productDetailsMap);
-      setProductDetails(productDetailsMap);
-    } catch (error) {
-      console.error('Error loading product details:', error);
-    }
+  const getProductDescription = (productId: string) => {
+    return productDescriptionService.getProductDescription(productId, productDetails);
   };
 
   const refreshOrder = async () => {
@@ -161,8 +127,7 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
   };
 
   const formatPrice = (priceInPence: number, currency: string = 'GBP') => {
-    const symbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
-    return `${symbol}${(priceInPence / 100).toFixed(2)}`;
+    return productDescriptionService.formatPrice(priceInPence, currency);
   };
 
   const formatDate = (isoDate: string) => {
@@ -175,31 +140,6 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
     });
   };
 
-  const getProductDescription = (item: OrderItem) => {
-    const product = productDetails[item.product_id];
-    console.log(`Getting description for product ${item.product_id}:`, product);
-    
-    if (product) {
-      // Use the product name if available, otherwise construct it
-      if (product.name) {
-        return product.name;
-      }
-      // Fallback: construct description similar to generateDescription function
-      const sizeName = product.size_name || '';
-      const formatName = product.formats?.name || product.format?.name || '';
-      const mediumName = product.media?.name || product.medium?.name || '';
-      const description = `${sizeName} ${formatName} ${mediumName}`.trim();
-      if (description) {
-        return description;
-      }
-      // Final fallback with dimensions
-      return `${product.width_cm || 'Unknown'} x ${product.height_cm || 'Unknown'}cm ${formatName} ${mediumName}`.trim();
-    }
-    
-    // Show the current state for debugging
-    const hasProductDetails = Object.keys(productDetails).length > 0;
-    return hasProductDetails ? `No product found for ID: ${item.product_id}` : 'Product details loading...';
-  };
 
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
@@ -407,7 +347,7 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
                     <div className="flex-1 space-y-2">
                       <h3 className="font-semibold text-gray-900">{item.image_title}</h3>
                       <div className="space-y-1 text-sm text-gray-600">
-                        <p className="font-medium text-blue-900">{getProductDescription(item)}</p>
+                        <p className="font-medium text-blue-900">{getProductDescription(item.product_id)}</p>
                         <p>Quantity: {item.quantity}</p>
                       </div>
                     </div>
