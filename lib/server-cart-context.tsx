@@ -106,8 +106,14 @@ export function ServerCartProvider({ children }: { children: React.ReactNode }) 
       console.log('[CART AUTH] Session check:', { 
         hasSession: !!session, 
         hasUser: !!session?.user,
-        hasAccessToken: !!session?.access_token
+        hasAccessToken: !!session?.access_token,
+        userEmail: session?.user?.email,
+        sessionExpiry: session?.expires_at
       });
+      
+      if (!session) {
+        console.log('[CART AUTH] No session found - user needs to log in');
+      }
       
       return session?.access_token || null;
     } catch (error) {
