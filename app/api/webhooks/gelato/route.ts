@@ -18,10 +18,12 @@ export async function POST(request: NextRequest) {
     }
 
     const event = JSON.parse(body);
+    console.log('Gelato webhook raw payload:', body);
+    console.log('Gelato webhook parsed event:', event);
     console.log('Gelato webhook event received:', {
-      eventType: event.eventType,
-      orderId: event.orderId,
-      orderReferenceId: event.orderReferenceId,
+      eventType: event.eventType || event.type || event.event_type,
+      orderId: event.orderId || event.order_id,
+      orderReferenceId: event.orderReferenceId || event.order_reference_id,
       timestamp: new Date().toISOString()
     });
 
