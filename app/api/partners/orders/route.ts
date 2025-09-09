@@ -6,6 +6,7 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function GET(request: NextRequest) {
   try {
+    // Use service role key like admin/shop APIs for full access
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
@@ -22,8 +23,13 @@ export async function GET(request: NextRequest) {
 
     const token = authHeader.replace('Bearer ', '');
 
-    // Get user from token
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Create a separate client instance for user authentication
+    const userSupabase = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // Get user from token using anon client
+    const { data: { user }, error: authError } = await userSupabase.auth.getUser(token);
     
     if (authError || !user) {
       return NextResponse.json(
@@ -32,7 +38,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if this user is a partner
+    // Check if this user is a partner using service role client (no RLS restrictions)
     const { data: partner, error: partnerError } = await supabase
       .from('partners')
       .select('id, email, first_name, last_name, business_name')
@@ -46,11 +52,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get orders placed by this partner
-    // We'll identify partner orders by checking if the order was placed through partner checkout
-    // For now, we'll look for orders that have partner-related metadata or were placed by the partner's email
-    
-    // First approach: Orders placed by partner's email (when they order for clients)
+    // Get orders placed by this partner using service role client (no RLS restrictions)
+    // This ensures we get complete order data like admin/shop APIs
     const { data: partnerOrders, error: ordersError } = await supabase
       .from('orders')
       .select(`

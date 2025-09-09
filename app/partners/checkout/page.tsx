@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, ArrowRight, CreditCard, Shield, Loader2, Users, Percent } from "lucide-react"
 import Link from "next/link"
 import { useServerCart } from "@/lib/server-cart-context"
@@ -37,9 +38,12 @@ export default function PartnerCheckoutPage() {
     clientEmail: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [shippingOptions, setShippingOptions] = useState<any[]>([])
+  const [selectedShippingOption, setSelectedShippingOption] = useState<any>(null)
+  const [loadingShipping, setLoadingShipping] = useState(false)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
-  const { cart, getShippingCost, getCartTotal, clearCart } = useServerCart()
+  const { cart, clearCart } = useServerCart()
   const router = useRouter()
   const supabaseService = new SupabaseService()
   const stripePromise = getStripe()
@@ -101,7 +105,7 @@ export default function PartnerCheckoutPage() {
   const subtotal = cart.totalPrice / 100;
   const partnerDiscount = subtotal * 0.15; // 15% partner discount
   const discountedSubtotal = subtotal - partnerDiscount;
-  const shipping = getShippingCost() / 100;
+  const shipping = selectedShippingOption ? (selectedShippingOption.price / 100) : 0;
   const total = discountedSubtotal + shipping;
 
   const orderSummary = {
@@ -198,38 +202,122 @@ export default function PartnerCheckoutPage() {
     }
   }
 
+  // Fetch shipping options from Gelato after address validation
+  const fetchShippingOptions = async () => {
+    if (!validateShipping()) {
+      return;
+    }
+
+    setLoadingShipping(true);
+    setErrors(prev => ({ ...prev, shipping: '' }));
+
+    try {
+      console.log('🚚 Fetching shipping options from Gelato...');
+      
+      // Create shipping address object
+      const shippingAddress = {
+        firstName: shippingData.firstName,
+        lastName: shippingData.lastName,
+        address1: shippingData.address,
+        city: shippingData.city,
+        postalCode: shippingData.postcode,
+        country: 'GB' // Partner orders are UK only for now
+      };
+
+      // Get auth token for API calls
+      const { data: { session } } = await supabaseService.getClient().auth.getSession();
+      const token = session?.access_token;
+      
+      // Call our shipping API endpoint
+      const response = await fetch('/api/shipping/options', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: JSON.stringify({
+          shippingAddress,
+          cartItems: cart.items.map(item => ({
+            gelatoProductUid: item.gelatoProductUid,
+            quantity: item.quantity,
+            printSpecs: item.printSpecs
+          }))
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch shipping options');
+      }
+
+      const { shippingOptions: options } = await response.json();
+      
+      console.log('🚚 Received shipping options:', options);
+      
+      if (!options || options.length === 0) {
+        throw new Error('No shipping options available for this address');
+      }
+
+      setShippingOptions(options);
+      
+      // Auto-select the first option
+      setSelectedShippingOption(options[0]);
+      
+      // Move to step 2 (shipping selection)
+      setCurrentStep(2);
+
+    } catch (error) {
+      console.error('Error fetching shipping options:', error);
+      setErrors(prev => ({ 
+        ...prev, 
+        shipping: error instanceof Error ? error.message : 'Failed to fetch shipping options'
+      }));
+    } finally {
+      setLoadingShipping(false);
+    }
+  };
+
   const handleShippingSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (validateShipping()) {
-      setIsProcessing(true)
-      try {
-        // Step 2: Validate cart items for Gelato availability before payment
-        console.log('🔍 Validating partner cart for Gelato availability...');
-        const validationResult = await validateCartForGelato();
+    // Step 1: Validate shipping address and fetch shipping options
+    await fetchShippingOptions();
+  }
+
+  // Handle shipping option selection and move to payment
+  const handleShippingOptionSubmit = async () => {
+    if (!selectedShippingOption) {
+      setErrors({ shipping: 'Please select a shipping option' });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // Step 2: Validate cart items for Gelato availability before payment
+      console.log('🔍 Validating partner cart for Gelato availability...');
+      const validationResult = await validateCartForGelato();
+      
+      if (!validationResult.isValid) {
+        console.error('❌ Partner cart validation failed:', validationResult.errors);
         
-        if (!validationResult.isValid) {
-          console.error('❌ Partner cart validation failed:', validationResult.errors);
-          
-          // Show user-friendly error message
-          const errorMessage = validationResult.errors.length > 0 
-            ? `Unable to process partner order: ${validationResult.errors[0].error}` 
-            : 'Some items in your cart cannot be printed. Please review your cart.';
-          
-          alert(errorMessage + '\n\nPlease remove or replace the affected items and try again.');
-          return;
-        }
+        // Show user-friendly error message
+        const errorMessage = validationResult.errors.length > 0 
+          ? `Unable to process partner order: ${validationResult.errors[0].error}` 
+          : 'Some items in your cart cannot be printed. Please review your cart.';
         
-        if (validationResult.warnings && validationResult.warnings.length > 0) {
-          console.warn('⚠️ Partner cart validation warnings:', validationResult.warnings);
-          // Continue with warnings, but log them
-        }
-        
-        console.log('✅ Partner cart validation passed, proceeding with payment...');
-        await createPaymentIntent()
-        setCurrentStep(2)
-      } finally {
-        setIsProcessing(false)
+        alert(errorMessage + '\n\nPlease remove or replace the affected items and try again.');
+        return;
       }
+      
+      if (validationResult.warnings && validationResult.warnings.length > 0) {
+        console.warn('⚠️ Partner cart validation warnings:', validationResult.warnings);
+        // Continue with warnings, but log them
+      }
+      
+      console.log('✅ Partner cart validation passed, proceeding with payment...');
+      await createPaymentIntent()
+      setCurrentStep(3) // Now step 3 since we added shipping selection
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -359,9 +447,9 @@ export default function PartnerCheckoutPage() {
   }
 
   const steps = [
-    { number: 1, title: "Shipping", completed: currentStep > 1 },
-    { number: 2, title: "Payment", completed: false },
-    { number: 3, title: "Confirmation", completed: false },
+    { number: 1, title: "Address", completed: currentStep > 1 },
+    { number: 2, title: "Shipping", completed: currentStep > 2 },
+    { number: 3, title: "Payment", completed: false },
   ]
 
   // Show loading state while user profile is loading
@@ -608,8 +696,100 @@ export default function PartnerCheckoutPage() {
               </Card>
             )}
 
-            {/* Step 2: Payment */}
+            {/* Step 2: Shipping Options */}
             {currentStep === 2 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Truck className="w-5 h-5 mr-2" />
+                    Select Shipping Option
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {loadingShipping ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-green-600" />
+                      <p className="text-gray-600">Finding shipping options...</p>
+                    </div>
+                  ) : (
+                    <>
+                      {errors.shipping && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                          <p className="text-red-600 text-sm">{errors.shipping}</p>
+                        </div>
+                      )}
+                      
+                      <div className="space-y-4">
+                        {shippingOptions.map((option, index) => (
+                          <div
+                            key={index}
+                            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                              selectedShippingOption?.id === option.id
+                                ? 'border-green-500 bg-green-50'
+                                : 'border-gray-200 hover:border-green-300'
+                            }`}
+                            onClick={() => setSelectedShippingOption(option)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h3 className="font-medium text-gray-900">{option.name}</h3>
+                                <p className="text-sm text-gray-600">{option.description}</p>
+                                {option.estimatedDeliveryDays && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Estimated delivery: {option.estimatedDeliveryDays} business days
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="font-medium text-lg">
+                                  {option.price === 0 ? 'Free' : `£${(option.price / 100).toFixed(2)}`}
+                                </p>
+                                {selectedShippingOption?.id === option.id && (
+                                  <p className="text-green-600 text-sm">Selected</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="flex gap-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setCurrentStep(1)}
+                          className="flex-1"
+                        >
+                          <ArrowLeft className="w-4 h-4 mr-2" />
+                          Back to Address
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={handleShippingOptionSubmit}
+                          disabled={!selectedShippingOption || isProcessing}
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                        >
+                          {isProcessing ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              Continue to Payment
+                              <ArrowRight className="w-4 h-4 ml-2" />
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Step 3: Payment */}
+            {currentStep === 3 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
