@@ -5,7 +5,7 @@ import type React from "react"
 // Force dynamic rendering for authentication routes
 export const dynamic = 'force-dynamic'
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { SupabaseService } from '@/lib/supabase'
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,7 @@ import Link from "next/link"
 // import { SecureForm, FormField } from '@/components/security/SecureForm'
 // import { clientSanitizer } from '@/lib/client-data-sanitizer'
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const returnTo = searchParams.get('returnTo')
@@ -223,5 +223,13 @@ export default function LoginPage() {
           </Card>
         </div>
       </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <LoginPageContent />
+    </Suspense>
   )
 }
