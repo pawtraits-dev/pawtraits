@@ -118,11 +118,11 @@ export default function AdminOrdersPage() {
       const uniqueProductIds = [...new Set(orderItems.map(item => item.product_id))];
       console.log('Admin loading product details for IDs:', uniqueProductIds);
       
-      // Use admin API endpoint for product details
+      // Use shop API endpoint for product details (same as customer/partner orders)
       for (const productId of uniqueProductIds) {
         try {
           const encodedProductId = encodeURIComponent(productId);
-          const url = `/api/admin/products/${encodedProductId}`;
+          const url = `/api/shop/products/${encodedProductId}`;
           console.log(`Admin fetching URL: ${url}`);
           
           const response = await fetch(url);
