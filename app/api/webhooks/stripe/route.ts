@@ -508,6 +508,18 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
       console.log('Order updated with Gelato order ID:', gelatoOrder.id);
     }
 
+    // Check if order items already exist (created by direct order API)
+    const { data: existingOrderItems, error: checkError } = await supabase
+      .from('order_items')
+      .select('id')
+      .eq('order_id', order.id)
+      .limit(1);
+
+    if (!checkError && existingOrderItems && existingOrderItems.length > 0) {
+      console.log(`Order ${order.id} already has ${existingOrderItems.length} order items, skipping creation`);
+      return;
+    }
+
     // Store detailed cart items for the order
     console.log(`Creating ${cartItems.length} order items for order ${order.id}`);
     console.log('WEBHOOK DEBUG - Cart items structure:', JSON.stringify(cartItems, null, 2));
