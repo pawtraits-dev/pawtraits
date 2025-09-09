@@ -150,8 +150,10 @@ export async function POST(request: NextRequest) {
     if (body.cartItems && body.cartItems.length > 0) {
       body.cartItems.slice(0, 3).forEach((item, index) => {
         metadata[`item${index + 1}_id`] = item.imageId;
+        metadata[`item${index + 1}_product_id`] = item.productId; // Database UUID for order_items
         metadata[`item${index + 1}_title`] = item.imageTitle.substring(0, 50); // Truncate to avoid metadata limit
         metadata[`item${index + 1}_qty`] = item.quantity.toString();
+        metadata[`item${index + 1}_unit_price`] = item.unitPrice.toString(); // Store unit price
         // Enhanced Gelato data for fulfillment
         if (item.gelatoProductUid) {
           metadata[`item${index + 1}_gelato_uid`] = item.gelatoProductUid.substring(0, 100);

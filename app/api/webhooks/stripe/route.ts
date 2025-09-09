@@ -355,8 +355,10 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
       const metadata = paymentIntent.metadata || {};
       for (let i = 1; i <= 10; i++) {
         const itemId = metadata[`item${i}_id`];
+        const productId = metadata[`item${i}_product_id`]; // Database UUID
         const itemTitle = metadata[`item${i}_title`];
-      const itemQty = metadata[`item${i}_qty`];
+        const itemQty = metadata[`item${i}_qty`];
+        const unitPrice = metadata[`item${i}_unit_price`];
       
       if (itemId) {
         // Enhanced Gelato data from metadata
@@ -368,10 +370,12 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
         
         cartItems.push({
           image_id: itemId,
+          product_id: productId, // Database UUID for order_items
           image_title: itemTitle,
           quantity: parseInt(itemQty) || 1,
+          unit_price: parseInt(unitPrice) || 0,
           product_data: {
-            // Use saved Gelato product UID instead of mapping
+            id: productId, // Database UUID
             gelato_sku: gelatoUid,
             medium: { name: medium },
             format: { name: format },
@@ -537,13 +541,13 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
       
       const itemData = {
         order_id: order.id,
-        product_id: item.product_data?.id || item.product_id || 'unknown', // Try multiple sources
+        product_id: item.product_id || item.product_data?.id || 'unknown', // Database UUID from metadata
         image_id: item.image_id,
         image_url: imageUrls[item.image_id] || '',
         image_title: item.image_title,
         quantity: item.quantity,
-        unit_price: Math.round(paymentIntent.amount / cartItems.reduce((sum, i) => sum + i.quantity, 0)), // Estimate unit price
-        total_price: Math.round((paymentIntent.amount / cartItems.reduce((sum, i) => sum + i.quantity, 0)) * item.quantity),
+        unit_price: item.unit_price || Math.round(paymentIntent.amount / cartItems.reduce((sum, i) => sum + i.quantity, 0)), // Use metadata unit price or estimate
+        total_price: item.unit_price ? (item.unit_price * item.quantity) : Math.round((paymentIntent.amount / cartItems.reduce((sum, i) => sum + i.quantity, 0)) * item.quantity),
         product_data: JSON.stringify(item.product_data),
         print_image_url: imageUrls[item.image_id],
         created_at: new Date().toISOString()

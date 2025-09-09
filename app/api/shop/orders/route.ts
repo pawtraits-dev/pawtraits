@@ -50,6 +50,11 @@ export async function POST(request: NextRequest) {
     });
 
     const orderData: CreateOrderData = await request.json();
+    console.log('🔍 DIRECT ORDER API - Order creation started:', {
+      itemsCount: orderData.items?.length || 0,
+      totalAmount: orderData.totalAmount,
+      customerEmail: orderData.shippingAddress?.email
+    });
 
     // Generate order number
     const orderNumber = generateOrderNumber();
@@ -306,6 +311,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Create order items (Note: These may be overwritten by Stripe webhook)
+    console.log('🔍 DIRECT ORDER API - Creating order items:', {
+      orderId: order.id,
+      itemsCount: orderData.items?.length || 0,
+      items: orderData.items?.map(item => ({
+        productId: item.productId,
+        imageId: item.imageId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice
+      }))
+    });
+
     const orderItemsData = orderData.items.map(item => ({
       order_id: order.id,
       product_id: item.productId, // Database UUID
@@ -318,13 +334,17 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString()
     }));
 
+    console.log('🔍 DIRECT ORDER API - Order items data prepared:', orderItemsData);
+
     const { error: itemsError } = await supabase
       .from('order_items')
       .insert(orderItemsData);
 
     if (itemsError) {
-      console.error('Error creating order items:', itemsError);
+      console.error('❌ DIRECT ORDER API - Error creating order items:', itemsError);
       throw itemsError;
+    } else {
+      console.log('✅ DIRECT ORDER API - Order items created successfully');
     }
 
     // Return order details
