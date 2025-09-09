@@ -483,7 +483,7 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any) 
     for (const item of cartItems) {
       const itemData = {
         order_id: order.id,
-        product_id: item.product_data?.gelato_sku || 'unknown',
+        product_id: item.product_data?.id || 'unknown', // Use database UUID, not Gelato SKU
         image_id: item.image_id,
         image_url: imageUrls[item.image_id] || '',
         image_title: item.image_title,

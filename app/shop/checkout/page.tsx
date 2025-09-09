@@ -144,40 +144,23 @@ export default function CheckoutPage() {
     setIsProcessing(true)
 
     try {
-      // Create order data - Debug what's being sent
-      console.log('=== CHECKOUT DEBUG ===');
-      console.log('Cart items before mapping:', cart.items.map(item => ({
-        productId: item.productId,
-        productIdType: typeof item.productId,
-        imageId: item.imageId,
-        quantity: item.quantity
-      })));
-      
+      // Create order data
       const orderData = {
-        items: cart.items.map(item => {
-          console.log('Mapping cart item:', {
-            productId: item.productId,
-            productIdType: typeof item.productId
-          });
-          return {
-            productId: item.productId,
-            imageId: item.imageId,
-            imageUrl: item.imageUrl,
-            imageTitle: item.imageTitle,
-            quantity: item.quantity,
-            unitPrice: item.pricing.sale_price, // in pence
-            totalPrice: item.pricing.sale_price * item.quantity // in pence
-          };
-        }),
+        items: cart.items.map(item => ({
+          productId: item.productId,
+          imageId: item.imageId,
+          imageUrl: item.imageUrl,
+          imageTitle: item.imageTitle,
+          quantity: item.quantity,
+          unitPrice: item.pricing.sale_price, // in pence
+          totalPrice: item.pricing.sale_price * item.quantity // in pence
+        })),
         shippingAddress: shippingData,
         totalAmount: getCartTotal(), // in pence
         shippingCost: getShippingCost(), // in pence
         currency: 'GBP',
         referralCode: referralCode || undefined
       }
-
-      console.log('Final orderData being sent to API:', JSON.stringify(orderData, null, 2));
-      console.log('=== END CHECKOUT DEBUG ===');
 
       // Create order via API
       const response = await fetch('/api/shop/orders', {

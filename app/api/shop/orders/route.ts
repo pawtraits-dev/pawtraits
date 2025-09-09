@@ -305,33 +305,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create order items - Debug the product ID flow
-    console.log('=== ORDER CREATION DEBUG ===');
-    console.log('Raw orderData.items received:', JSON.stringify(orderData.items, null, 2));
-    
-    const orderItemsData = orderData.items.map((item, index) => {
-      console.log(`Order item ${index}:`, {
-        productId: item.productId,
-        productIdType: typeof item.productId,
-        imageId: item.imageId,
-        quantity: item.quantity
-      });
-      
-      return {
-        order_id: order.id,
-        product_id: item.productId, // This should be the actual database product.id (UUID)
-        image_id: item.imageId,
-        image_url: item.imageUrl,
-        image_title: item.imageTitle,
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        total_price: item.totalPrice,
-        created_at: new Date().toISOString()
-      };
-    });
-    
-    console.log('Final orderItemsData to insert:', JSON.stringify(orderItemsData, null, 2));
-    console.log('=== END ORDER DEBUG ===');
+    // Create order items (Note: These may be overwritten by Stripe webhook)
+    const orderItemsData = orderData.items.map(item => ({
+      order_id: order.id,
+      product_id: item.productId, // Database UUID
+      image_id: item.imageId,
+      image_url: item.imageUrl,
+      image_title: item.imageTitle,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+      total_price: item.totalPrice,
+      created_at: new Date().toISOString()
+    }));
 
     const { error: itemsError } = await supabase
       .from('order_items')
