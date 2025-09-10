@@ -137,6 +137,14 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
     return productDescriptionService.formatPrice(priceInPence, currency);
   };
 
+  const getItemPricing = (item: any, order: any) => {
+    return productDescriptionService.getOrderItemPricing(item, order);
+  };
+
+  const getOrderPricing = (order: any) => {
+    return productDescriptionService.getOrderPricing(order);
+  };
+
   const getProductDescription = (productId: string) => {
     return productDescriptionService.getProductDescription(productId, productDetails);
   };
@@ -326,12 +334,36 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
                       </div>
                       
                       <div className="text-right">
-                        <p className="text-lg font-semibold text-gray-900">
-                          {formatPrice(item.total_price, order.currency)}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {formatPrice(item.unit_price, order.currency)} × {item.quantity}
-                        </p>
+                        {(() => {
+                          const pricing = getItemPricing(item, order);
+                          return (
+                            <div className="space-y-1">
+                              {pricing.originalPrice && pricing.hasDiscount && (
+                                <div className="text-sm">
+                                  <span className="text-gray-500">Original: </span>
+                                  <span className="text-gray-400 line-through">
+                                    {pricing.originalPrice}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="text-sm">
+                                <span className="text-gray-500">Partner Price: </span>
+                                <span className="font-semibold text-green-600">
+                                  {pricing.unitPrice}
+                                </span>
+                                <span className="text-gray-500"> × {pricing.quantity}</span>
+                              </div>
+                              {pricing.hasDiscount && (
+                                <div className="text-xs text-green-600 font-medium">
+                                  {productDescriptionService.getDiscountMessage(pricing, 'partner')}
+                                </div>
+                              )}
+                              <p className="text-lg font-semibold text-gray-900">
+                                {pricing.totalPrice}
+                              </p>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   )) || (

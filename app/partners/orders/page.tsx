@@ -140,6 +140,14 @@ export default function PartnerOrdersPage() {
     return productDescriptionService.formatPrice(priceInPence, currency);
   };
 
+  const getItemPricing = (item: any, order: any) => {
+    return productDescriptionService.getOrderItemPricing(item, order);
+  };
+
+  const getOrderPricing = (order: any) => {
+    return productDescriptionService.getOrderPricing(order);
+  };
+
   const handleImageClick = (imageUrl: string, imageTitle: string) => {
     setSelectedImageUrl(imageUrl);
     setSelectedImageTitle(imageTitle);
@@ -253,46 +261,64 @@ export default function PartnerOrdersPage() {
                           </div>
                           
                           <div className="text-right">
-                            <div className="space-y-1">
-                              {item.original_price && item.original_price !== item.unit_price && (
-                                <div className="text-sm">
-                                  <span className="text-gray-500">Original: </span>
-                                  <span className="text-gray-400 line-through">
-                                    {formatPrice(item.original_price, order.currency)}
-                                  </span>
+                            {(() => {
+                              const pricing = getItemPricing(item, order);
+                              return (
+                                <div className="space-y-1">
+                                  {pricing.originalPrice && pricing.hasDiscount && (
+                                    <div className="text-sm">
+                                      <span className="text-gray-500">Original: </span>
+                                      <span className="text-gray-400 line-through">
+                                        {pricing.originalPrice}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="text-sm">
+                                    <span className="text-gray-500">Partner Price: </span>
+                                    <span className="font-semibold text-green-600">
+                                      {pricing.unitPrice}
+                                    </span>
+                                  </div>
+                                  {pricing.hasDiscount && (
+                                    <div className="text-xs text-green-600 font-medium">
+                                      {productDescriptionService.getDiscountMessage(pricing, 'partner')}
+                                    </div>
+                                  )}
+                                  <div className="text-sm font-semibold text-gray-900">
+                                    Total: {pricing.totalPrice}
+                                  </div>
                                 </div>
-                              )}
-                              <div className="text-sm">
-                                <span className="text-gray-500">Partner Price: </span>
-                                <span className="font-semibold text-green-600">
-                                  {formatPrice(item.unit_price, order.currency)}
-                                </span>
-                              </div>
-                              <div className="text-sm font-semibold text-gray-900">
-                                Total: {formatPrice(item.total_price, order.currency)}
-                              </div>
-                            </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       ))}
                     </div>
                     
                     <div className="mt-6 pt-4 border-t border-gray-100">
-                      <div className="flex justify-between items-center">
-                        <div className="text-sm text-gray-600">
-                          <p>Subtotal: {formatPrice(order.subtotal_amount, order.currency)}</p>
-                          <p>Shipping: {formatPrice(order.shipping_amount, order.currency)}</p>
-                          {order.estimated_delivery && (
-                            <p>Est. Delivery: {new Date(order.estimated_delivery).toLocaleDateString('en-GB')}</p>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-gray-900">
-                            {formatPrice(order.total_amount, order.currency)}
-                          </p>
-                          <p className="text-sm text-green-600 font-medium">Partner Pricing Applied</p>
-                        </div>
-                      </div>
+                      {(() => {
+                        const orderPricing = getOrderPricing(order);
+                        return (
+                          <div className="flex justify-between items-center">
+                            <div className="text-sm text-gray-600">
+                              <p>Subtotal: {orderPricing.subtotal}</p>
+                              <p>Shipping: {orderPricing.shipping}</p>
+                              {orderPricing.hasOrderDiscount && (
+                                <p className="text-green-600">Total Saved: {orderPricing.totalDiscountFormatted}</p>
+                              )}
+                              {order.estimated_delivery && (
+                                <p>Est. Delivery: {new Date(order.estimated_delivery).toLocaleDateString('en-GB')}</p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-2xl font-bold text-gray-900">
+                                {orderPricing.total}
+                              </p>
+                              <p className="text-sm text-green-600 font-medium">Partner Pricing Applied</p>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
