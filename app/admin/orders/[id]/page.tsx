@@ -130,6 +130,14 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
     return productDescriptionService.formatPrice(priceInPence, currency);
   };
 
+  const getItemPricing = (item: any, order: any) => {
+    return productDescriptionService.getOrderItemPricing(item, order);
+  };
+
+  const getOrderPricing = (order: any) => {
+    return productDescriptionService.getOrderPricing(order);
+  };
+
   const formatDate = (isoDate: string) => {
     return new Date(isoDate).toLocaleDateString('en-GB', {
       year: 'numeric',
@@ -353,47 +361,44 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
                     </div>
                     
                     <div className="text-right">
-                      <div className="space-y-1">
-                        {/* Pricing Structure */}
-                        <div className="space-y-1">
-                          {/* Original Price (if there's a discount) */}
-                          {item.original_price && item.original_price !== item.unit_price && (
-                            <div className="text-sm">
-                              <span className="text-gray-500">Original: </span>
-                              <span className="text-gray-400 line-through">
-                                {formatPrice(item.original_price, order.currency)}
+                      {(() => {
+                        const pricing = getItemPricing(item, order);
+                        return (
+                          <div className="space-y-1">
+                            {/* Original price */}
+                            <div className="text-sm flex justify-between">
+                              <span className="text-gray-500">Original Price</span>
+                              <span className={pricing.hasDiscount ? "text-gray-400 line-through" : "text-gray-900"}>
+                                {pricing.originalPrice || pricing.unitPrice}
                               </span>
                             </div>
-                          )}
-                          
-                          {/* Current Unit Price */}
-                          <div className="text-sm">
-                            <span className="text-gray-500">Price: </span>
-                            <span className="font-medium">
-                              {formatPrice(item.unit_price, order.currency)}
-                            </span>
-                            <span className="text-gray-500"> × {item.quantity}</span>
-                          </div>
-                          
-                          {/* Discount Amount */}
-                          {((item.original_price && item.original_price !== item.unit_price) || (item.discount_amount && item.discount_amount > 0)) && (
-                            <div className="text-sm text-green-600">
-                              <span>Discount: -</span>
+                            
+                            {/* Discount */}
+                            {pricing.hasDiscount && (
+                              <div className="text-sm flex justify-between">
+                                <span className="text-gray-500">Discount ({pricing.discountPercentage}%)</span>
+                                <span className="text-green-600 font-medium">
+                                  -{pricing.discountPerUnitFormatted}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* Unit price */}
+                            <div className="text-sm flex justify-between">
+                              <span className="text-gray-500">Price × {pricing.quantity}</span>
                               <span className="font-medium">
-                                {item.discount_amount && item.discount_amount > 0 
-                                  ? formatPrice(item.discount_amount * item.quantity, order.currency)
-                                  : formatPrice((item.original_price! - item.unit_price) * item.quantity, order.currency)
-                                }
+                                {pricing.unitPrice}
                               </span>
                             </div>
-                          )}
-                          
-                          {/* Total Price */}
-                          <div className="text-lg font-semibold text-gray-900 border-t border-gray-200 pt-1">
-                            Total: {formatPrice(item.total_price, order.currency)}
+                            
+                            {/* Total price */}
+                            <div className="text-lg font-semibold flex justify-between border-t pt-1 mt-1">
+                              <span className="text-gray-900">Item Total</span>
+                              <span className="text-gray-900">{pricing.totalPrice}</span>
+                            </div>
                           </div>
-                        </div>
-                      </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 )) || (

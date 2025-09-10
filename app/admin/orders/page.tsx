@@ -119,6 +119,14 @@ export default function AdminOrdersPage() {
     return productDescriptionService.formatPrice(priceInPence, currency);
   };
 
+  const getItemPricing = (item: any, order: any) => {
+    return productDescriptionService.getOrderItemPricing(item, order);
+  };
+
+  const getOrderPricing = (order: any) => {
+    return productDescriptionService.getOrderPricing(order);
+  };
+
   const filterOrders = () => {
     let filtered = [...orders];
 
@@ -430,17 +438,35 @@ export default function AdminOrdersPage() {
 
                   {/* Order Total & Actions */}
                   <div className="flex flex-col items-end space-y-3">
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-gray-900">
-                        {formatPrice(order.total_amount)}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Subtotal: {formatPrice(order.subtotal_amount)}
-                        {order.shipping_amount > 0 && (
-                          <span> + Shipping: {formatPrice(order.shipping_amount)}</span>
-                        )}
-                      </p>
-                    </div>
+                    {(() => {
+                      const orderPricing = getOrderPricing(order);
+                      return (
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-gray-900">
+                            {orderPricing.total}
+                          </p>
+                          <div className="text-sm text-gray-500 space-y-1">
+                            <div className="flex justify-between gap-4">
+                              <span>Subtotal:</span>
+                              <span>{orderPricing.subtotal}</span>
+                            </div>
+                            {order.shipping_amount > 0 && (
+                              <div className="flex justify-between gap-4">
+                                <span>Shipping:</span>
+                                <span>{orderPricing.shipping}</span>
+                              </div>
+                            )}
+                            {orderPricing.hasOrderDiscount && (
+                              <div className="flex justify-between gap-4 text-green-600">
+                                <span>Discount:</span>
+                                <span>-{orderPricing.totalDiscountFormatted}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
 
                     <div className="flex space-x-2">
                       <Button variant="outline" size="sm" asChild>

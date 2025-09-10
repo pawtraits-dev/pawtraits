@@ -108,9 +108,16 @@ export default function CustomerOrdersPage() {
   }
 
   const formatPrice = (priceInPence: number, currency: string = 'GBP') => {
-    const symbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'
-    return `${symbol}${(priceInPence / 100).toFixed(2)}`
-  }
+    return productDescriptionService.formatPrice(priceInPence, currency);
+  };
+
+  const getItemPricing = (item: any, order: any) => {
+    return productDescriptionService.getOrderItemPricing(item, order);
+  };
+
+  const getOrderPricing = (order: any) => {
+    return productDescriptionService.getOrderPricing(order);
+  };
 
   const getStatusColor = (status: Order['status']) => {
     switch (status) {

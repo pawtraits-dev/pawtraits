@@ -266,37 +266,35 @@ export default function PartnerOrdersPage() {
                               return (
                                 <div className="space-y-1">
                                   {/* Original price per item */}
-                                  <div className="text-sm">
-                                    <span className="text-gray-500">Original: </span>
+                                  <div className="text-sm flex justify-between">
+                                    <span className="text-gray-500">Original Price</span>
                                     <span className={pricing.hasDiscount ? "text-gray-400 line-through" : "text-gray-900"}>
                                       {pricing.originalPrice || pricing.unitPrice}
                                     </span>
-                                    <span className="text-gray-500"> each</span>
                                   </div>
                                   
                                   {/* Partner discount per item */}
                                   {pricing.hasDiscount && (
-                                    <div className="text-sm">
-                                      <span className="text-gray-500">Partner Discount: </span>
+                                    <div className="text-sm flex justify-between">
+                                      <span className="text-gray-500">Partner Discount ({pricing.discountPercentage}%)</span>
                                       <span className="text-green-600 font-medium">
                                         -{pricing.discountPerUnitFormatted}
                                       </span>
-                                      <span className="text-gray-500"> each ({pricing.discountPercentage}% off)</span>
                                     </div>
                                   )}
                                   
                                   {/* Discounted price per item */}
-                                  <div className="text-sm">
-                                    <span className="text-gray-500">Partner Price: </span>
+                                  <div className="text-sm flex justify-between">
+                                    <span className="text-gray-500">Partner Price × {pricing.quantity}</span>
                                     <span className="font-semibold text-green-600">
                                       {pricing.unitPrice}
                                     </span>
-                                    <span className="text-gray-500"> × {pricing.quantity}</span>
                                   </div>
                                   
                                   {/* Total for this item */}
-                                  <div className="text-sm font-semibold text-gray-900">
-                                    Item Total: {pricing.totalPrice}
+                                  <div className="text-sm font-semibold flex justify-between border-t pt-1 mt-1">
+                                    <span className="text-gray-900">Item Total</span>
+                                    <span className="text-gray-900">{pricing.totalPrice}</span>
                                   </div>
                                 </div>
                               );

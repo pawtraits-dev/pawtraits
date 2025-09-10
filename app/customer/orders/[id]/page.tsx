@@ -24,6 +24,7 @@ import {
 import Link from 'next/link';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
+import { productDescriptionService } from '@/lib/product-utils';
 
 interface OrderItem {
   id: string;
@@ -167,24 +168,15 @@ export default function CustomerOrderDetailPage({ params }: { params: { id: stri
   };
 
   const formatPrice = (priceInPence: number, currency: string = 'GBP') => {
-    const symbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
-    return `${symbol}${(priceInPence / 100).toFixed(2)}`;
+    return productDescriptionService.formatPrice(priceInPence, currency);
   };
 
-  const getProductDescription = (item: OrderItem) => {
-    const product = productDetails[item.product_id];
-    if (product) {
-      // Use the product name if available, otherwise construct it
-      if (product.name) {
-        return product.name;
-      }
-      // Fallback: construct description similar to generateDescription function
-      const sizeName = product.size_name || '';
-      const formatName = product.formats?.name || '';
-      const mediumName = product.media?.name || '';
-      return `${sizeName} ${formatName} ${mediumName}`.trim() || `${product.width_cm} x ${product.height_cm}cm ${formatName} ${mediumName}`;
-    }
-    return null; // Don't show product ID to customers
+  const getProductDescription = (productId: string) => {
+    return productDescriptionService.getProductDescription(productId, productDetails);
+  };
+
+  const getItemPricing = (item: any, order: any) => {
+    return productDescriptionService.getOrderItemPricing(item, order);
   };
 
   const getStatusColor = (status: Order['status']) => {
@@ -394,8 +386,8 @@ export default function CustomerOrderDetailPage({ params }: { params: { id: stri
                   
                   <div className="flex-1 space-y-2">
                     <h3 className="font-semibold text-gray-900">{item.image_title}</h3>
-                    {getProductDescription(item) && (
-                      <p className="text-sm font-medium text-purple-700">{getProductDescription(item)}</p>
+                    {getProductDescription(item.product_id) && (
+                      <p className="text-sm font-medium text-purple-700">{getProductDescription(item.product_id)}</p>
                     )}
                     <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                     
@@ -418,36 +410,44 @@ export default function CustomerOrderDetailPage({ params }: { params: { id: stri
                   </div>
                   
                   <div className="text-right">
-                    <div className="space-y-1">
-                      {/* Show original price if different from unit price (indicating discount) */}
-                      {item.original_price && item.original_price !== item.unit_price && (
-                        <p className="text-sm text-gray-400 line-through">
-                          {formatPrice(item.original_price, order.currency)}
-                        </p>
-                      )}
-                      
-                      <p className="text-lg font-semibold text-gray-900">
-                        {formatPrice(item.total_price, order.currency)}
-                      </p>
-                      
-                      <div className="text-sm text-gray-500">
-                        <p>{formatPrice(item.unit_price, order.currency)} × {item.quantity}</p>
-                        
-                        {/* Show discount amount if available */}
-                        {item.discount_amount && item.discount_amount > 0 && (
-                          <p className="text-green-600">
-                            Saved: {formatPrice(item.discount_amount * item.quantity, order.currency)}
-                          </p>
-                        )}
-                        
-                        {/* Calculate and show discount if original_price is available */}
-                        {item.original_price && item.original_price !== item.unit_price && (
-                          <p className="text-green-600">
-                            You saved: {formatPrice((item.original_price - item.unit_price) * item.quantity, order.currency)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                    {(() => {
+                      const pricing = getItemPricing(item, order);
+                      return (
+                        <div className="space-y-1">
+                          {/* Original price per item */}
+                          <div className="text-sm flex justify-between">
+                            <span className="text-gray-500">Original Price</span>
+                            <span className={pricing.hasDiscount ? "text-gray-400 line-through" : "text-gray-900"}>
+                              {pricing.originalPrice || pricing.unitPrice}
+                            </span>
+                          </div>
+                          
+                          {/* Discount per item */}
+                          {pricing.hasDiscount && (
+                            <div className="text-sm flex justify-between">
+                              <span className="text-gray-500">Discount ({pricing.discountPercentage}%)</span>
+                              <span className="text-green-600 font-medium">
+                                -{pricing.discountPerUnitFormatted}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Unit price per item */}
+                          <div className="text-sm flex justify-between">
+                            <span className="text-gray-500">Unit Price × {pricing.quantity}</span>
+                            <span className="font-medium text-gray-900">
+                              {pricing.unitPrice}
+                            </span>
+                          </div>
+                          
+                          {/* Total for this item */}
+                          <div className="text-sm font-semibold flex justify-between border-t pt-1 mt-1">
+                            <span className="text-gray-900">Item Total</span>
+                            <span className="text-gray-900">{pricing.totalPrice}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )) || (
