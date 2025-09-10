@@ -362,8 +362,9 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, 
         const itemTitle = paymentIntentMetadata[`item${i}_title`];
         const itemQty = paymentIntentMetadata[`item${i}_qty`];
         const unitPrice = paymentIntentMetadata[`item${i}_unit_price`];
+        const originalPrice = paymentIntentMetadata[`item${i}_original_price`];
         
-        console.log(`🔍 WEBHOOK DEBUG - Item ${i}:`, { itemId, productId, itemTitle, itemQty, unitPrice });
+        console.log(`🔍 WEBHOOK DEBUG - Item ${i}:`, { itemId, productId, itemTitle, itemQty, unitPrice, originalPrice });
       
       if (itemId) {
         // Enhanced Gelato data from metadata
@@ -379,6 +380,7 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, 
           image_title: itemTitle,
           quantity: parseInt(itemQty) || 1,
           unit_price: parseInt(unitPrice) || 0,
+          original_price: originalPrice ? parseInt(originalPrice) : null, // Store original price for discounts
           product_data: {
             id: productId, // Database UUID
             gelato_sku: gelatoUid,
