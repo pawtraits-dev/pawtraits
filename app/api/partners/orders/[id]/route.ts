@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SupabaseService } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function GET(
   request: NextRequest,
@@ -7,21 +10,67 @@ export async function GET(
 ) {
   try {
     const orderId = params.id;
-    const supabaseService = new SupabaseService();
+    
+    // Use service role key like main orders API for full access
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
 
-    // Check if user is a partner
-    const partner = await supabaseService.getCurrentPartner();
-    if (!partner) {
+    // Get authorization header (same pattern as main orders API)
+    const authHeader = request.headers.get('authorization');
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
-        { error: 'Partner access required' },
-        { status: 403 }
+        { error: 'Authorization required' },
+        { status: 401 }
       );
     }
 
-    // Get order using SupabaseService method
-    const order = await supabaseService.getPartnerOrder(orderId, partner.id);
+    const token = authHeader.replace('Bearer ', '');
 
-    if (!order) {
+    // Create a separate client instance for user authentication
+    const userSupabase = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // Get user from token using anon client
+    const { data: { user }, error: authError } = await userSupabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Invalid authorization' },
+        { status: 401 }
+      );
+    }
+
+    // Check if this user is a partner using service role client (no RLS restrictions)
+    const { data: partner, error: partnerError } = await supabase
+      .from('partners')
+      .select('id, email, first_name, last_name, business_name')
+      .eq('id', user.id)
+      .single();
+
+    if (partnerError || !partner) {
+      return NextResponse.json(
+        { error: 'Partner not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get specific order placed by this partner using service role client (no RLS restrictions)
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items (
+          *
+        )
+      `)
+      .eq('id', orderId)
+      .eq('customer_email', partner.email)
+      .single();
+
+    if (orderError || !order) {
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
@@ -31,7 +80,7 @@ export async function GET(
     return NextResponse.json(order);
 
   } catch (error) {
-    console.error('Error fetching partner order details:', error);
+    console.error('Error in partner order details API:', error);
     return NextResponse.json(
       { error: 'Failed to fetch order details' },
       { status: 500 }
