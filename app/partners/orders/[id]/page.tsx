@@ -189,9 +189,10 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
     }
   };
 
-  const calculateCommission = (orderTotal: number) => {
-    // Assume 10% commission rate for partners
-    return Math.round(orderTotal * 0.10);
+  const calculateCommission = (order: any) => {
+    // Commission calculated on subtotal only (excluding shipping)
+    const subtotal = order.subtotal_amount || 0;
+    return Math.round(subtotal * 0.10);
   };
 
   if (loading) {
@@ -235,7 +236,7 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
     );
   }
 
-  const commissionAmount = calculateCommission(order.total_amount);
+  const commissionAmount = calculateCommission(order);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
@@ -407,12 +408,12 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
                   
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Order Value:</span>
-                      <span>{formatPrice(order.total_amount, order.currency)}</span>
+                      <span className="text-gray-600">Items Subtotal:</span>
+                      <span>{formatPrice(order.subtotal_amount, order.currency)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Commission Rate:</span>
-                      <span>10%</span>
+                      <span>10% (on items only)</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Status:</span>

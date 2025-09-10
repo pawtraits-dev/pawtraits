@@ -552,6 +552,7 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, 
         image_title: item.image_title,
         quantity: item.quantity,
         unit_price: item.unit_price || Math.round(paymentIntent.amount / cartItems.reduce((sum, i) => sum + i.quantity, 0)), // Use metadata unit price or estimate
+        original_price: item.original_price || item.unit_price, // Store original price for discount calculations
         total_price: item.unit_price ? (item.unit_price * item.quantity) : Math.round((paymentIntent.amount / cartItems.reduce((sum, i) => sum + i.quantity, 0)) * item.quantity),
         product_data: JSON.stringify(item.product_data),
         print_image_url: imageUrls[item.image_id],
