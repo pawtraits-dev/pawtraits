@@ -338,14 +338,27 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
                           const pricing = getItemPricing(item, order);
                           return (
                             <div className="space-y-1">
-                              {pricing.originalPrice && pricing.hasDiscount && (
+                              {/* Original price per item */}
+                              <div className="text-sm">
+                                <span className="text-gray-500">Original: </span>
+                                <span className={pricing.hasDiscount ? "text-gray-400 line-through" : "text-gray-900"}>
+                                  {pricing.originalPrice || pricing.unitPrice}
+                                </span>
+                                <span className="text-gray-500"> each</span>
+                              </div>
+                              
+                              {/* Partner discount per item */}
+                              {pricing.hasDiscount && (
                                 <div className="text-sm">
-                                  <span className="text-gray-500">Original: </span>
-                                  <span className="text-gray-400 line-through">
-                                    {pricing.originalPrice}
+                                  <span className="text-gray-500">Partner Discount: </span>
+                                  <span className="text-green-600 font-medium">
+                                    -{pricing.discountPerUnitFormatted}
                                   </span>
+                                  <span className="text-gray-500"> each ({pricing.discountPercentage}% off)</span>
                                 </div>
                               )}
+                              
+                              {/* Discounted price per item */}
                               <div className="text-sm">
                                 <span className="text-gray-500">Partner Price: </span>
                                 <span className="font-semibold text-green-600">
@@ -353,12 +366,9 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
                                 </span>
                                 <span className="text-gray-500"> × {pricing.quantity}</span>
                               </div>
-                              {pricing.hasDiscount && (
-                                <div className="text-xs text-green-600 font-medium">
-                                  {productDescriptionService.getDiscountMessage(pricing, 'partner')}
-                                </div>
-                              )}
-                              <p className="text-lg font-semibold text-gray-900">
+                              
+                              {/* Total for this item */}
+                              <p className="text-lg font-semibold text-gray-900 border-t pt-1 mt-2">
                                 {pricing.totalPrice}
                               </p>
                             </div>

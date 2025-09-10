@@ -346,6 +346,7 @@ export default function PartnerCheckoutPage() {
         customerEmail: shippingData.email.trim(),
         customerName: customerName,
         shippingAddress: shippingData,
+        shippingOption: selectedShippingOption, // MISSING: Include selected shipping option
         cartItems: cart.items.map(item => ({
           productId: item.productId,
           imageId: item.imageId,

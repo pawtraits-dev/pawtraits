@@ -265,27 +265,38 @@ export default function PartnerOrdersPage() {
                               const pricing = getItemPricing(item, order);
                               return (
                                 <div className="space-y-1">
-                                  {pricing.originalPrice && pricing.hasDiscount && (
+                                  {/* Original price per item */}
+                                  <div className="text-sm">
+                                    <span className="text-gray-500">Original: </span>
+                                    <span className={pricing.hasDiscount ? "text-gray-400 line-through" : "text-gray-900"}>
+                                      {pricing.originalPrice || pricing.unitPrice}
+                                    </span>
+                                    <span className="text-gray-500"> each</span>
+                                  </div>
+                                  
+                                  {/* Partner discount per item */}
+                                  {pricing.hasDiscount && (
                                     <div className="text-sm">
-                                      <span className="text-gray-500">Original: </span>
-                                      <span className="text-gray-400 line-through">
-                                        {pricing.originalPrice}
+                                      <span className="text-gray-500">Partner Discount: </span>
+                                      <span className="text-green-600 font-medium">
+                                        -{pricing.discountPerUnitFormatted}
                                       </span>
+                                      <span className="text-gray-500"> each ({pricing.discountPercentage}% off)</span>
                                     </div>
                                   )}
+                                  
+                                  {/* Discounted price per item */}
                                   <div className="text-sm">
                                     <span className="text-gray-500">Partner Price: </span>
                                     <span className="font-semibold text-green-600">
                                       {pricing.unitPrice}
                                     </span>
+                                    <span className="text-gray-500"> × {pricing.quantity}</span>
                                   </div>
-                                  {pricing.hasDiscount && (
-                                    <div className="text-xs text-green-600 font-medium">
-                                      {productDescriptionService.getDiscountMessage(pricing, 'partner')}
-                                    </div>
-                                  )}
+                                  
+                                  {/* Total for this item */}
                                   <div className="text-sm font-semibold text-gray-900">
-                                    Total: {pricing.totalPrice}
+                                    Item Total: {pricing.totalPrice}
                                   </div>
                                 </div>
                               );
@@ -300,11 +311,14 @@ export default function PartnerOrdersPage() {
                         const orderPricing = getOrderPricing(order);
                         return (
                           <div className="flex justify-between items-center">
-                            <div className="text-sm text-gray-600">
-                              <p>Subtotal: {orderPricing.subtotal}</p>
+                            <div className="text-sm text-gray-600 space-y-1">
+                              <p>Subtotal (Partner Prices): {orderPricing.subtotal}</p>
                               <p>Shipping: {orderPricing.shipping}</p>
                               {orderPricing.hasOrderDiscount && (
-                                <p className="text-green-600">Total Saved: {orderPricing.totalDiscountFormatted}</p>
+                                <p className="text-green-600 font-medium">
+                                  Partner Discount: {orderPricing.totalDiscountFormatted}
+                                  <span className="text-xs text-gray-500 block">*Applied to items only</span>
+                                </p>
                               )}
                               {order.estimated_delivery && (
                                 <p>Est. Delivery: {new Date(order.estimated_delivery).toLocaleDateString('en-GB')}</p>
@@ -315,6 +329,11 @@ export default function PartnerOrdersPage() {
                                 {orderPricing.total}
                               </p>
                               <p className="text-sm text-green-600 font-medium">Partner Pricing Applied</p>
+                              {orderPricing.hasOrderDiscount && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  You saved {orderPricing.totalDiscountFormatted} on items
+                                </p>
+                              )}
                             </div>
                           </div>
                         );
