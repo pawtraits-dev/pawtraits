@@ -100,6 +100,107 @@ export class ProductDescriptionService {
     return `${symbol}${(priceInPence / 100).toFixed(2)}`;
   }
 
+  // Comprehensive price display utility for order items
+  getOrderItemPricing(item: any, order: any) {
+    const currency = order.currency || 'GBP';
+    
+    return {
+      // Original price (before any discounts)
+      originalPrice: item.original_price ? this.formatPrice(item.original_price, currency) : null,
+      
+      // Current unit price (after discounts)
+      unitPrice: this.formatPrice(item.unit_price, currency),
+      
+      // Total price for this item (unit_price × quantity)
+      totalPrice: this.formatPrice(item.total_price, currency),
+      
+      // Discount calculations
+      hasDiscount: item.original_price && item.original_price !== item.unit_price,
+      discountPerUnit: item.original_price && item.original_price !== item.unit_price 
+        ? item.original_price - item.unit_price 
+        : 0,
+      discountTotal: item.original_price && item.original_price !== item.unit_price 
+        ? (item.original_price - item.unit_price) * item.quantity 
+        : 0,
+      discountPercentage: item.original_price && item.original_price !== item.unit_price
+        ? Math.round(((item.original_price - item.unit_price) / item.original_price) * 100)
+        : 0,
+      
+      // Formatted discount amounts
+      discountPerUnitFormatted: item.original_price && item.original_price !== item.unit_price 
+        ? this.formatPrice(item.original_price - item.unit_price, currency)
+        : null,
+      discountTotalFormatted: item.original_price && item.original_price !== item.unit_price 
+        ? this.formatPrice((item.original_price - item.unit_price) * item.quantity, currency)
+        : null,
+      
+      // Quantity
+      quantity: item.quantity,
+      
+      // Raw values (for calculations)
+      raw: {
+        originalPrice: item.original_price || item.unit_price,
+        unitPrice: item.unit_price,
+        totalPrice: item.total_price,
+        discountPerUnit: item.original_price && item.original_price !== item.unit_price 
+          ? item.original_price - item.unit_price 
+          : 0,
+        discountTotal: item.original_price && item.original_price !== item.unit_price 
+          ? (item.original_price - item.unit_price) * item.quantity 
+          : 0
+      }
+    };
+  }
+
+  // Comprehensive price display utility for orders
+  getOrderPricing(order: any) {
+    const currency = order.currency || 'GBP';
+    
+    // Calculate totals from items
+    const items = order.order_items || [];
+    const itemsTotal = items.reduce((sum: number, item: any) => sum + (item.total_price || 0), 0);
+    const originalTotal = items.reduce((sum: number, item: any) => 
+      sum + ((item.original_price || item.unit_price) * item.quantity), 0);
+    const totalDiscount = originalTotal - itemsTotal;
+    
+    return {
+      // Order totals
+      subtotal: this.formatPrice(order.subtotal_amount || itemsTotal, currency),
+      shipping: this.formatPrice(order.shipping_amount || 0, currency),
+      total: this.formatPrice(order.total_amount, currency),
+      
+      // Discount information
+      hasOrderDiscount: totalDiscount > 0,
+      totalDiscountAmount: totalDiscount,
+      totalDiscountFormatted: totalDiscount > 0 ? this.formatPrice(totalDiscount, currency) : null,
+      
+      // Raw values
+      raw: {
+        subtotal: order.subtotal_amount || itemsTotal,
+        shipping: order.shipping_amount || 0,
+        total: order.total_amount,
+        discount: totalDiscount
+      },
+      
+      // Currency
+      currency,
+      currencySymbol: currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'
+    };
+  }
+
+  // Generate discount messaging based on user type
+  getDiscountMessage(pricing: any, userType: 'customer' | 'partner' | 'admin' = 'customer') {
+    if (!pricing.hasDiscount) return null;
+    
+    const messages = {
+      customer: `You saved: ${pricing.discountTotalFormatted}`,
+      partner: `Partner Discount: ${pricing.discountTotalFormatted} (${pricing.discountPercentage}% off)`,
+      admin: `Discount Applied: ${pricing.discountTotalFormatted} (${pricing.discountPercentage}% off)`
+    };
+    
+    return messages[userType];
+  }
+
   // Clear cache if needed
   clearCache(): void {
     this.productCache = {};
