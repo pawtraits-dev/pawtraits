@@ -24,7 +24,6 @@ import {
 import Link from 'next/link';
 import Image from 'next/image';
 import { productDescriptionService } from '@/lib/product-utils';
-import { SupabaseService } from '@/lib/supabase';
 
 interface OrderItem {
   id: string;
@@ -42,6 +41,10 @@ interface Order {
   order_number: string;
   status: string;
   customer_email: string;
+  client_email?: string;
+  client_name?: string;
+  placed_by_partner_id?: string;
+  order_type?: string;
   shipping_first_name: string;
   shipping_last_name: string;
   shipping_address: string;
@@ -75,7 +78,6 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [productDetails, setProductDetails] = useState<{[key: string]: any}>({});
-  const supabaseService = new SupabaseService();
 
   useEffect(() => {
     loadOrder();
@@ -85,19 +87,8 @@ export default function PartnerOrderDetailPage({ params }: { params: { id: strin
     try {
       setError(null);
       
-      // Get auth session for API calls (same as main orders page)
-      const { data: { session } } = await supabaseService.getClient().auth.getSession();
-      if (!session?.access_token) {
-        setError('Session expired - please log in again');
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch(`/api/partners/orders/${params.id}`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
+      // Use cookie-based authentication like the main orders page
+      const response = await fetch(`/api/partners/orders/${params.id}`);
       
       if (!response.ok) {
         if (response.status === 404) {

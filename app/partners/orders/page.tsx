@@ -27,6 +27,10 @@ interface Order {
   order_number: string;
   status: 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'confirmed';
   customer_email: string;
+  client_email?: string;
+  client_name?: string;
+  placed_by_partner_id?: string;
+  order_type?: string;
   shipping_first_name: string;
   shipping_last_name: string;
   shipping_address: string;
@@ -94,6 +98,28 @@ export default function PartnerOrdersPage() {
 
   const getProductDescription = (productId: string) => {
     return productDescriptionService.getProductDescription(productId, productDetails);
+  };
+
+  const getOrderTypeLabel = (orderType?: string) => {
+    switch (orderType) {
+      case 'customer':
+        return 'Direct Customer';
+      case 'partner':
+        return 'Partner Order';
+      case 'partner_for_client':
+        return 'Partner for Client';
+      default:
+        return 'Partner Order'; // Default for legacy orders
+    }
+  };
+
+  const getOrderTypeBadge = (orderType?: string) => {
+    const variants: Record<string, string> = {
+      customer: "bg-blue-100 text-blue-800",
+      partner: "bg-green-100 text-green-800", 
+      partner_for_client: "bg-purple-100 text-purple-800",
+    };
+    return variants[orderType || 'partner'] || "bg-green-100 text-green-800";
   };
 
   const getStatusColor = (status: Order['status']) => {
@@ -247,8 +273,8 @@ export default function PartnerOrdersPage() {
                             <h3 className="text-sm font-medium text-gray-900">{item.image_title}</h3>
                             <p className="text-sm font-medium text-green-700">{getProductDescription(item.product_id)}</p>
                             <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
-                            <Badge className="bg-green-100 text-green-800 text-xs mt-1">
-                              Partner Order
+                            <Badge className={getOrderTypeBadge(order.order_type)} >
+                              {getOrderTypeLabel(order.order_type)}
                             </Badge>
                           </div>
                           
