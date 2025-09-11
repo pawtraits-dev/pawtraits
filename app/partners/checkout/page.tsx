@@ -884,7 +884,8 @@ export default function PartnerCheckoutPage() {
                           email: shippingData.email,
                           name: `${shippingData.firstName} ${shippingData.lastName}`,
                           address: {
-                            line1: shippingData.address,
+                            line1: shippingData.addressLine1 || shippingData.address,
+                            line2: shippingData.addressLine2,
                             city: shippingData.city,
                             postal_code: shippingData.postcode,
                             country: shippingData.country,

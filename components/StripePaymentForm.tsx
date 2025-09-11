@@ -28,6 +28,7 @@ interface CustomerDetails {
   name: string
   address: {
     line1: string
+    line2?: string
     city: string
     postal_code: string
     country: string
@@ -152,6 +153,7 @@ export default function StripePaymentForm({
                 name: customerDetails.name,
                 address: {
                   line1: customerDetails.address.line1,
+                  ...(customerDetails.address.line2 && { line2: customerDetails.address.line2 }),
                   city: customerDetails.address.city,
                   postal_code: customerDetails.address.postal_code,
                   country: customerDetails.address.country,
