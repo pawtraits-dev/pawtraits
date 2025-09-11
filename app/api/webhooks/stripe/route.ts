@@ -127,31 +127,61 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       
       if (partnerEmail) {
         // Get partner user profile and partner record
+        console.log('Webhook: Looking up user_profiles for email:', partnerEmail);
         const { data: partnerProfile, error: profileError } = await supabase
           .from('user_profiles')
-          .select('id')
+          .select('id, email, user_type')
           .eq('email', partnerEmail)
           .eq('user_type', 'partner')
           .single();
 
+        console.log('Webhook: User profile lookup result:', { 
+          partnerProfile, 
+          profileError: profileError?.message,
+          profileErrorCode: profileError?.code 
+        });
+
         if (!profileError && partnerProfile) {
           partnerUserProfile = partnerProfile;
           
-          // Get the partner record (partners.id matches user_profiles.id directly)
-          const { data: partnerRecord, error: partnerError } = await supabase
-            .from('partners')
-            .select('id')
+          // Get the partner record using the partner_id from user_profiles
+          console.log('Webhook: Looking up partners table for partner_id from user_profiles');
+          const { data: partnerIdResult, error: partnerIdError } = await supabase
+            .from('user_profiles')
+            .select('partner_id')
             .eq('id', partnerProfile.id)
             .single();
 
-          if (!partnerError && partnerRecord) {
-            placedByPartnerId = partnerRecord.id;
-            console.log('Webhook: Found partner record:', { partnerId: partnerRecord.id });
+          if (!partnerIdError && partnerIdResult?.partner_id) {
+            console.log('Webhook: Looking up partners table for partner_id:', partnerIdResult.partner_id);
+            const { data: partnerRecord, error: partnerError } = await supabase
+              .from('partners')
+              .select('id, email')
+              .eq('id', partnerIdResult.partner_id)
+              .single();
+
+            console.log('Webhook: Partner record lookup result:', { 
+              partnerRecord, 
+              partnerError: partnerError?.message,
+              partnerErrorCode: partnerError?.code 
+            });
+
+            if (!partnerError && partnerRecord) {
+              placedByPartnerId = partnerRecord.id;
+              console.log('Webhook: Successfully found partner:', { 
+                userProfileId: partnerProfile.id,
+                partnerIdFromProfile: partnerIdResult.partner_id,
+                partnerRecordId: partnerRecord.id,
+                finalPartnerId: placedByPartnerId 
+              });
+            } else {
+              console.log('Webhook: Partner record lookup failed - partner_id exists in user_profiles but no matching partners table record');
+            }
           } else {
-            console.log('Webhook: Partner record lookup failed:', { error: partnerError });
+            console.log('Webhook: Partner ID lookup failed - user_profiles record has no partner_id or lookup failed:', partnerIdError?.message);
           }
         } else {
-          console.log('Webhook: Partner profile lookup failed:', { error: profileError });
+          console.log('Webhook: Partner profile lookup failed - no user_profiles record found for this email with user_type=partner');
         }
       } else {
         console.log('Webhook: No partner email found in metadata for partner order');
