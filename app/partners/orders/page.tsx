@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Users, Percent, AlertCircle, X, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { SupabaseService } from '@/lib/supabase';
 import { productDescriptionService } from '@/lib/product-utils';
 
 interface OrderItem {
@@ -54,8 +53,6 @@ export default function PartnerOrdersPage() {
   const [selectedImageTitle, setSelectedImageTitle] = useState<string>('');
   const [showImageModal, setShowImageModal] = useState(false);
 
-  const supabaseService = new SupabaseService();
-
   useEffect(() => {
     loadOrders();
   }, []);
@@ -65,23 +62,18 @@ export default function PartnerOrdersPage() {
       setLoading(true);
       setError(null);
       
-      // Get auth session for API calls
-      const { data: { session } } = await supabaseService.getClient().auth.getSession();
-      if (!session?.access_token) {
-        setError('Session expired - please log in again');
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch('/api/partners/orders', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
+      // Fetch orders from API (authentication handled server-side)
+      const response = await fetch('/api/partners/orders');
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch orders');
+        if (response.status === 401) {
+          setError('Please log in to view your orders.');
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to fetch orders');
+        }
+        setLoading(false);
+        return;
       }
 
       const ordersData = await response.json();

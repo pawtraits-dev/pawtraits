@@ -11,29 +11,16 @@ export async function GET(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    // Get authorization header  
-    const authHeader = request.headers.get('authorization');
+    // Get user from authenticated session (cookie-based like shop orders API)
+    const { createRouteHandlerClient } = await import('@supabase/auth-helpers-nextjs');
+    const { cookies } = await import('next/headers');
+    const cookieStore = cookies();
+    const authSupabase = createRouteHandlerClient({ cookies: () => cookieStore });
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Authorization required' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-
-    // Create a separate client instance for user authentication
-    const userSupabase = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
-
-    // Get user from token using anon client
-    const { data: { user }, error: authError } = await userSupabase.auth.getUser(token);
-    
+    const { data: { user }, error: authError } = await authSupabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'Invalid authorization' },
+        { error: 'Authentication required' },
         { status: 401 }
       );
     }
