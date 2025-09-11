@@ -13,6 +13,7 @@ import {
   Truck, 
   CheckCircle, 
   User,
+  Users,
   Mail,
   MapPin,
   Calendar,
@@ -74,6 +75,19 @@ interface Order {
   payment_intent_id?: string;
   error_message?: string;
   metadata?: string;
+  // Partner-client order fields
+  order_type?: string;
+  placed_by_partner_id?: string;
+  client_email?: string;
+  client_name?: string;
+  // Partner information (joined from partners table)
+  partners?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    business_name?: string;
+    email: string;
+  } | null;
 }
 
 export default function AdminOrderDetailPage({ params }: { params: { id: string } }) {
@@ -447,6 +461,55 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
               </div>
             </CardContent>
           </Card>
+
+          {/* Partner Information - for partner-for-client orders */}
+          {order.order_type === 'partner_for_client' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="w-5 h-5" />
+                  <span>Partner & Client</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {order.client_name && (
+                  <div>
+                    <p className="font-medium mb-2 text-purple-700">Client Details</p>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex items-center space-x-2">
+                        <User className="w-4 h-4" />
+                        <span>{order.client_name}</span>
+                      </div>
+                      {order.client_email && (
+                        <div className="flex items-center space-x-2">
+                          <Mail className="w-4 h-4" />
+                          <span>{order.client_email}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {order.partners && (
+                  <div>
+                    <p className="font-medium mb-2 text-green-700">Placing Partner</p>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex items-center space-x-2">
+                        <User className="w-4 h-4" />
+                        <span>
+                          {order.partners.business_name || `${order.partners.first_name} ${order.partners.last_name}`}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Mail className="w-4 h-4" />
+                        <span>{order.partners.email}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Payment Information */}
           <Card>
