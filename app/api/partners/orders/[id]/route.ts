@@ -6,10 +6,11 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const orderId = params.id;
+    const { id: orderId } = await params;
+    console.log('Partner order detail API: Looking for order ID:', orderId);
     
     // Use service role key like main orders API for full access
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -19,10 +20,15 @@ export async function GET(
     // Get user from authenticated session (cookie-based like main orders API)
     const { createRouteHandlerClient } = await import('@supabase/auth-helpers-nextjs');
     const { cookies } = await import('next/headers');
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const authSupabase = createRouteHandlerClient({ cookies: () => cookieStore });
     
     const { data: { user }, error: authError } = await authSupabase.auth.getUser();
+    console.log('Partner order detail API: Auth check:', { 
+      hasUser: !!user, 
+      userId: user?.id?.substring(0, 8), 
+      authError: authError?.message 
+    });
     
     if (authError || !user) {
       return NextResponse.json(
@@ -38,6 +44,13 @@ export async function GET(
       .eq('id', user.id)
       .single();
 
+    console.log('Partner order detail API: User profile lookup:', {
+      hasProfile: !!userProfile,
+      userType: userProfile?.user_type,
+      partnerId: userProfile?.partner_id?.substring(0, 8),
+      profileError: profileError?.message
+    });
+
     if (profileError || !userProfile || userProfile.user_type !== 'partner') {
       return NextResponse.json(
         { error: 'Partner profile not found' },
@@ -52,6 +65,12 @@ export async function GET(
       .eq('id', userProfile.partner_id)
       .single();
 
+    console.log('Partner order detail API: Partner lookup:', {
+      hasPartner: !!partner,
+      partnerEmail: partner?.email,
+      partnerError: partnerError?.message
+    });
+
     if (partnerError || !partner) {
       return NextResponse.json(
         { error: 'Partner not found' },
@@ -61,6 +80,13 @@ export async function GET(
 
     // Get specific order placed by this partner (both partner orders and partner-for-client orders)
     // This matches the logic used in the main /api/partners/orders route
+    console.log('Partner order detail API: Order lookup query:', {
+      orderId: orderId,
+      partnerEmail: partner.email,
+      partnerId: partner.id.substring(0, 8),
+      query: `customer_email.eq.${partner.email},placed_by_partner_id.eq.${partner.id}`
+    });
+
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select(`
@@ -74,6 +100,15 @@ export async function GET(
         `customer_email.eq.${partner.email},placed_by_partner_id.eq.${partner.id}`
       )
       .single();
+
+    console.log('Partner order detail API: Order lookup result:', {
+      hasOrder: !!order,
+      orderType: order?.order_type,
+      customerEmail: order?.customer_email,
+      placedByPartnerId: order?.placed_by_partner_id?.substring(0, 8),
+      orderError: orderError?.message,
+      errorCode: orderError?.code
+    });
 
     if (orderError || !order) {
       return NextResponse.json(
