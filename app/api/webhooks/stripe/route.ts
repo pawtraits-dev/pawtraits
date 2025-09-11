@@ -95,12 +95,14 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     amount: paymentIntent.amount,
     currency: paymentIntent.currency,
     customerEmail: paymentIntent.metadata?.customerEmail,
+    orderType: paymentIntent.metadata?.orderType,
   });
 
   try {
     // Extract order information from metadata
     const metadata = paymentIntent.metadata || {};
     const customerEmail = metadata.customerEmail;
+    const orderType = metadata.orderType || 'customer';
     
     if (!customerEmail) {
       console.error('No customer email found in payment intent metadata');
@@ -111,26 +113,65 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     const shippingCost = parseInt(metadata.shippingCost || '0');
     const subtotalAmount = paymentIntent.amount - shippingCost;
 
-    // Create order record from payment data
+    // Get partner ID if this is a partner order
+    let partnerUserProfile = null;
+    let placedByPartnerId = null;
+    
+    if (orderType.startsWith('partner')) {
+      const partnerEmail = metadata.partnerEmail || metadata.placedByEmail;
+      if (partnerEmail) {
+        // Get partner user profile and partner record
+        const { data: partnerProfile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('email', partnerEmail)
+          .eq('user_type', 'partner')
+          .single();
+
+        if (!profileError && partnerProfile) {
+          partnerUserProfile = partnerProfile;
+          
+          // Get the partner record
+          const { data: partnerRecord, error: partnerError } = await supabase
+            .from('partners')
+            .select('id')
+            .eq('user_id', partnerProfile.id)
+            .single();
+
+          if (!partnerError && partnerRecord) {
+            placedByPartnerId = partnerRecord.id;
+          }
+        }
+      }
+    }
+
+    // Create order record with proper attribution
     const orderData = {
       order_number: `PW-${Date.now()}-${paymentIntent.id.slice(-6)}`,
       status: 'confirmed',
-      customer_email: customerEmail,
+      customer_email: customerEmail, // Client email for partner-client orders
       shipping_first_name: metadata.shippingFirstName || '',
       shipping_last_name: metadata.shippingLastName || '',
       shipping_address: metadata.shippingAddress || '',
       shipping_city: metadata.shippingCity || '',
       shipping_postcode: metadata.shippingPostcode || '',
       shipping_country: metadata.shippingCountry || 'United Kingdom',
-      subtotal_amount: subtotalAmount, // Product cost only
-      shipping_amount: shippingCost, // Actual shipping cost from metadata
-      total_amount: paymentIntent.amount, // Total including shipping
+      subtotal_amount: subtotalAmount,
+      shipping_amount: shippingCost,
+      total_amount: paymentIntent.amount,
       currency: paymentIntent.currency.toUpperCase(),
       estimated_delivery: metadata.shippingDeliveryEstimate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       payment_intent_id: paymentIntent.id,
       payment_status: 'paid',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      
+      // New fields for partner-client order support
+      order_type: orderType,
+      placed_by_partner_id: placedByPartnerId,
+      client_email: orderType === 'partner_for_client' ? metadata.clientEmail || customerEmail : null,
+      client_name: orderType === 'partner_for_client' ? metadata.clientName || metadata.customerName : null,
+      
       metadata: JSON.stringify({
         stripePaymentIntentId: paymentIntent.id,
         stripeChargeId: paymentIntent.latest_charge,
@@ -138,6 +179,12 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
         paymentMethod: paymentIntent.payment_method_types[0] || 'card',
         shippingMethodUid: metadata.shippingMethodUid,
         shippingMethodName: metadata.shippingMethodName,
+        orderType: orderType,
+        placedByEmail: metadata.placedByEmail,
+        partnerEmail: metadata.partnerEmail,
+        isForClient: metadata.isForClient,
+        businessName: metadata.businessName,
+        partnerDiscount: metadata.partnerDiscount,
       }),
     };
 
@@ -162,8 +209,8 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       status: order.status
     });
 
-    // Handle referral if present
-    if (metadata.referralCode) {
+    // Handle referral if present (customer orders only)
+    if (metadata.referralCode && orderType === 'customer') {
       await handleReferralFromPayment(metadata.referralCode, customerEmail, paymentIntent.amount, order.id, supabase);
     }
 

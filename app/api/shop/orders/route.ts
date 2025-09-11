@@ -430,26 +430,52 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get orders for this customer (case-insensitive email comparison)
-    console.log('Shop orders API: Querying orders for email:', email);
-    const { data: orders, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        order_items (
-          *
-        )
-      `)
-      .ilike('customer_email', email) // Case-insensitive search
-      .order('created_at', { ascending: false });
-      
-    console.log('Shop orders API: Found orders:', orders?.length || 0);
-    if (orders?.length) {
-      console.log('Shop orders API: Order emails:', orders.map(o => o.customer_email));
+    // Get orders for this customer using the new database function
+    // This includes direct customer orders AND orders placed by partners for this client
+    console.log('Shop orders API: Querying orders for email using get_client_orders:', email);
+    
+    const { data: clientOrders, error: clientOrdersError } = await supabase
+      .rpc('get_client_orders', { p_client_email: email.toLowerCase() });
+
+    if (clientOrdersError) {
+      console.error('Error calling get_client_orders:', clientOrdersError);
+      throw clientOrdersError;
     }
 
-    if (error) {
-      throw error;
+    console.log('Shop orders API: Found client orders:', clientOrders?.length || 0);
+
+    // Get full order details with order_items for each order
+    const orders = [];
+    if (clientOrders && clientOrders.length > 0) {
+      for (const clientOrder of clientOrders) {
+        const { data: fullOrder, error: orderError } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items (
+              *
+            )
+          `)
+          .eq('id', clientOrder.id)
+          .single();
+
+        if (!orderError && fullOrder) {
+          orders.push(fullOrder);
+        } else {
+          console.error('Error fetching full order details for order:', clientOrder.id, orderError);
+        }
+      }
+    }
+
+    console.log('Shop orders API: Final orders with items:', orders.length);
+    if (orders.length > 0) {
+      console.log('Shop orders API: Order types:', orders.map(o => ({
+        id: o.id.substring(0, 8),
+        type: o.order_type,
+        customer_email: o.customer_email,
+        client_email: o.client_email,
+        placed_by_partner: !!o.placed_by_partner_id
+      })));
     }
 
     return NextResponse.json(orders || []);

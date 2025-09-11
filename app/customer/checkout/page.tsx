@@ -23,6 +23,7 @@ import { Elements } from '@stripe/react-stripe-js'
 import { getStripe } from '@/lib/stripe-client'
 import { formatPrice } from '@/lib/product-types'
 import StripePaymentForm from '@/components/StripePaymentForm'
+import { checkoutValidation } from '@/lib/checkout-validation'
 
 export default function CustomerCheckoutPage() {
   const [currentStep, setCurrentStep] = useState(1)
@@ -220,82 +221,29 @@ export default function CustomerCheckoutPage() {
 
 
   const validateShipping = () => {
-    const newErrors: Record<string, string> = {}
-
-    // Basic field validation
-    if (!shippingData.firstName.trim()) newErrors.firstName = "First name is required"
-    if (!shippingData.lastName.trim()) newErrors.lastName = "Last name is required"
-    if (!shippingData.email.trim()) {
-      newErrors.email = "Email address is required"
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shippingData.email.trim())) {
-      newErrors.email = "Please enter a valid email address"
-    }
-    if (!shippingData.address.trim()) newErrors.address = "Address is required"
-    if (!shippingData.city.trim()) newErrors.city = "City is required"
-    if (!shippingData.postcode.trim()) newErrors.postcode = "Postcode is required"
+    const addressValidation = checkoutValidation.validateAddress(shippingData, countries);
     
-    // Country validation - ensure it's a supported country
-    if (!shippingData.country || !shippingData.country.trim()) {
-      newErrors.country = "Country is required"
-    } else if (countries && countries.length > 0) {
-      // Validate against supported countries from the context (only if countries are loaded)
-      const isValidCountry = countries.some(c => c.name === shippingData.country);
-      if (!isValidCountry) {
-        newErrors.country = "Please select a valid country from the list"
+    if (addressValidation.isValid) {
+      setErrors({});
+      return true;
+    } else {
+      // Parse the error string into individual field errors
+      const newErrors: Record<string, string> = {};
+      if (addressValidation.error) {
+        // For now, show the combined error in a general field
+        // Could be enhanced to parse individual field errors
+        newErrors.general = addressValidation.error;
       }
+      setErrors(newErrors);
+      return false;
     }
-    
-    // Postcode format validation based on country
-    const postcode = shippingData.postcode.trim();
-    if (postcode && shippingData.country && countries && countries.length > 0) {
-      // Get country code from country name
-      const selectedCountryInfo = countries.find(c => c.name === shippingData.country);
-      const countryCode = selectedCountryInfo?.code;
-      let postcodeValid = true;
-      let postcodeFormat = "";
-      
-      switch (countryCode) {
-        case 'GB': // UK postcode format
-          postcodeValid = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i.test(postcode);
-          postcodeFormat = "UK postcode format (e.g., SW1A 1AA)";
-          break;
-        case 'US': // US zip code format
-          postcodeValid = /^[0-9]{5}(-[0-9]{4})?$/.test(postcode);
-          postcodeFormat = "US zip code format (e.g., 12345 or 12345-6789)";
-          break;
-        case 'CA': // Canadian postal code format
-          postcodeValid = /^[A-Z][0-9][A-Z]\s?[0-9][A-Z][0-9]$/i.test(postcode);
-          postcodeFormat = "Canadian postal code format (e.g., K1A 0A6)";
-          break;
-        case 'DE': // German postcode format
-        case 'FR': // French postcode format
-          postcodeValid = /^[0-9]{5}$/.test(postcode);
-          postcodeFormat = "5-digit postal code (e.g., 12345)";
-          break;
-        case 'AU': // Australian postcode format
-          postcodeValid = /^[0-9]{4}$/.test(postcode);
-          postcodeFormat = "4-digit postcode (e.g., 1234)";
-          break;
-        default:
-          // For other countries, just check it's not empty (already validated above)
-          postcodeValid = true;
-      }
-      
-      if (!postcodeValid) {
-        newErrors.postcode = `Please enter a valid ${postcodeFormat}`;
-      }
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
   }
 
-  // Validate cart items for Gelato availability (Step 2 implementation)
+  // Validate cart items for Gelato availability using shared validation service
   const validateCartForGelato = async () => {
     try {
       console.log('🔍 Getting authentication token for cart validation...');
       
-      // Try to get fresh session, with fallback to user token
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
@@ -304,66 +252,24 @@ export default function CustomerCheckoutPage() {
       }
       
       if (!session?.access_token) {
-        console.error('No access token found in session:', { 
-          hasSession: !!session, 
-          hasUser: !!session?.user,
-          sessionKeys: session ? Object.keys(session) : 'no session'
-        });
-        
-        // Skip cart validation if no auth - this is a non-critical step
-        console.warn('⚠️ Skipping cart validation due to auth issues - proceeding with checkout');
-        return {
-          isValid: true,
-          errors: [],
-          warnings: [{
-            message: 'Cart validation skipped due to authentication issues'
-          }]
-        };
+        console.warn('⚠️ No auth token - skipping cart validation');
+        return { isValid: true, warnings: ['Cart validation skipped due to authentication issues'] };
       }
 
-      console.log('🔍 Auth token obtained, making validation request...');
-
-      const response = await fetch('/api/cart/validate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          mode: 'full' // Full validation including Gelato API calls
-        })
-      });
-
-      console.log('🔍 Validation API response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Validation API error:', errorData);
-        throw new Error(errorData.error || `Validation failed: ${response.status}`);
-      }
-
-      const data = await response.json();
+      console.log('🔍 Using checkout validation service...');
+      const result = await checkoutValidation.validateCart(session.access_token);
       
-      console.log('🔍 Cart validation result:', {
-        isValid: data.isValid,
-        errors: data.errors?.length || 0,
-        warnings: data.warnings?.length || 0
-      });
-
-      return data;
+      console.log('🔍 Cart validation result:', result);
+      return {
+        isValid: result.isValid,
+        errors: result.error ? [{ error: result.error }] : [],
+        warnings: result.warnings || []
+      };
     } catch (error) {
       console.error('Error validating cart:', error);
-      
-      // Return a failed validation result
       return {
         isValid: false,
-        errors: [{
-          itemIndex: -1,
-          imageId: 'unknown',
-          imageTitle: 'Validation Error',
-          error: `Validation service error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          code: 'API_ERROR'
-        }],
+        errors: [{ error: `Validation service error: ${error instanceof Error ? error.message : 'Unknown error'}` }],
         warnings: []
       };
     }
@@ -521,6 +427,7 @@ export default function CustomerCheckoutPage() {
         currency: currencyCode.toLowerCase(),
         customerEmail: shippingData.email.trim(),
         customerName: customerName,
+        userType: 'customer', // This is a customer order
         shippingAddress: shippingData,
         shippingOption: selectedShippingOption,
         cartItems: cart.items.map(item => ({
@@ -693,6 +600,13 @@ export default function CustomerCheckoutPage() {
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleShippingSubmit} className="space-y-6">
+                    {/* General validation errors */}
+                    {errors.general && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <p className="text-red-600 text-sm">{errors.general}</p>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="firstName">First Name *</Label>

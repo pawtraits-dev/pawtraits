@@ -18,6 +18,7 @@ import { SupabaseService } from '@/lib/supabase'
 import { Elements } from '@stripe/react-stripe-js'
 import { getStripe } from '@/lib/stripe-client'
 import StripePaymentForm from '@/components/StripePaymentForm'
+import { checkoutValidation } from '@/lib/checkout-validation'
 
 export default function PartnerCheckoutPage() {
   const [currentStep, setCurrentStep] = useState(1)
@@ -123,80 +124,51 @@ export default function PartnerCheckoutPage() {
   }
 
   const validateShipping = () => {
-    const newErrors: Record<string, string> = {}
-
-    if (!shippingData.firstName.trim()) newErrors.firstName = "First name is required"
-    if (!shippingData.lastName.trim()) newErrors.lastName = "Last name is required"
-    if (!shippingData.email.trim()) {
-      newErrors.email = "Email address is required"
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shippingData.email.trim())) {
-      newErrors.email = "Please enter a valid email address"
-    }
-    if (!shippingData.address.trim()) newErrors.address = "Address is required"
-    if (!shippingData.city.trim()) newErrors.city = "City is required"
-    if (!shippingData.postcode.trim()) newErrors.postcode = "Postcode is required"
+    // UK only for partners - create a mock countries array
+    const ukCountries = [{ code: 'GB', name: 'United Kingdom', currency_code: 'GBP', currency_symbol: '£', flag: '🇬🇧' }];
     
-    if (shippingData.isForClient) {
-      if (!shippingData.clientName.trim()) newErrors.clientName = "Client name is required"
-      if (!shippingData.clientEmail.trim()) {
-        newErrors.clientEmail = "Client email is required"
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shippingData.clientEmail.trim())) {
-        newErrors.clientEmail = "Please enter a valid client email address"
+    const addressValidation = checkoutValidation.validateAddress(shippingData, ukCountries);
+    
+    if (addressValidation.isValid) {
+      setErrors({});
+      return true;
+    } else {
+      // Parse the error string into individual field errors
+      const newErrors: Record<string, string> = {};
+      if (addressValidation.error) {
+        // For now, show the combined error in a general field
+        newErrors.general = addressValidation.error;
       }
+      setErrors(newErrors);
+      return false;
     }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
   }
 
-  // Validate cart items for Gelato availability (Step 2 implementation)
+  // Validate cart items using shared validation service
   const validateCartForGelato = async () => {
     try {
       const { data: { session } } = await supabaseService.getClient().auth.getSession();
       const token = session?.access_token;
       
       if (!token) {
-        throw new Error('Authentication required for validation');
+        console.warn('⚠️ No auth token - skipping cart validation');
+        return { isValid: true, warnings: ['Cart validation skipped due to authentication issues'] };
       }
 
-      const response = await fetch('/api/cart/validate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          mode: 'full' // Full validation including Gelato API calls
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Validation failed: ${response.status}`);
-      }
-
-      const data = await response.json();
+      console.log('🔍 Using checkout validation service...');
+      const result = await checkoutValidation.validateCart(token);
       
-      console.log('🔍 Partner cart validation result:', {
-        isValid: data.isValid,
-        errors: data.errors?.length || 0,
-        warnings: data.warnings?.length || 0
-      });
-
-      return data;
+      console.log('🔍 Partner cart validation result:', result);
+      return {
+        isValid: result.isValid,
+        errors: result.error ? [{ error: result.error }] : [],
+        warnings: result.warnings || []
+      };
     } catch (error) {
       console.error('Error validating partner cart:', error);
-      
-      // Return a failed validation result
       return {
         isValid: false,
-        errors: [{
-          itemIndex: -1,
-          imageId: 'unknown',
-          imageTitle: 'Validation Error',
-          error: `Validation service error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          code: 'API_ERROR'
-        }],
+        errors: [{ error: `Validation service error: ${error instanceof Error ? error.message : 'Unknown error'}` }],
         warnings: []
       };
     }
@@ -340,13 +312,19 @@ export default function PartnerCheckoutPage() {
         throw new Error('Partner name is required');
       }
       
+      // Use the validation service to determine customer details and order type
+      const customerEmail = checkoutValidation.getCustomerEmail(shippingData);
+      const customerNameFinal = checkoutValidation.getCustomerName(shippingData);
+      
       const paymentData = {
         amount: partnerTotal, // Partner discounted total in pence
         currency: 'gbp',
-        customerEmail: shippingData.email.trim(),
-        customerName: customerName,
+        customerEmail: customerEmail, // Will be client email for partner-client orders
+        customerName: customerNameFinal, // Will be client name for partner-client orders
+        placedByEmail: shippingData.email.trim(), // Partner email who placed the order
+        userType: 'partner',
         shippingAddress: shippingData,
-        shippingOption: selectedShippingOption, // MISSING: Include selected shipping option
+        shippingOption: selectedShippingOption,
         cartItems: cart.items.map(item => ({
           productId: item.productId,
           imageId: item.imageId,
@@ -532,6 +510,13 @@ export default function PartnerCheckoutPage() {
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleShippingSubmit} className="space-y-6">
+                    {/* General validation errors */}
+                    {errors.general && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <p className="text-red-600 text-sm">{errors.general}</p>
+                      </div>
+                    )}
+
                     {/* Client Toggle */}
                     <div className="bg-green-50 p-4 rounded-lg">
                       <div className="flex items-center space-x-2">

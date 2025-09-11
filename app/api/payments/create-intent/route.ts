@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPaymentIntent } from '@/lib/stripe-server';
 import { getSupabaseClient } from '@/lib/supabase-client';
+import { checkoutValidation } from '@/lib/checkout-validation';
 
 interface CreatePaymentIntentRequest {
   amount: number; // in pence
   currency?: string;
-  customerEmail: string;
-  customerName: string;
+  customerEmail: string; // Will be client email for partner-client orders
+  customerName: string;  // Will be client name for partner-client orders
+  // Optional: who actually placed the order (partner email when different from customer)
+  placedByEmail?: string;
+  userType?: 'customer' | 'partner'; // User type of person placing order
   shippingAddress: {
     firstName: string;
     lastName: string;
@@ -25,6 +29,7 @@ interface CreatePaymentIntentRequest {
     imageTitle: string;
     quantity: number;
     unitPrice: number;
+    originalPrice?: number; // For partner discounts
     // Enhanced Gelato data for order fulfillment
     gelatoProductUid?: string;
     printSpecs?: {
@@ -97,10 +102,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create metadata for the payment
+    // Determine order type using the validation service
+    const orderType = checkoutValidation.getOrderType(
+      body.userType || 'customer', 
+      body.shippingAddress.isForClient || false
+    );
+
+    // Create unified metadata structure
     const metadata: Record<string, string> = {
+      // Core customer information (client email for partner-client orders)
       customerEmail: body.customerEmail,
       customerName: body.customerName,
+      
+      // Order attribution
+      orderType: orderType,
+      placedByEmail: body.placedByEmail || body.customerEmail, // Who actually placed the order
+      
+      // Cart info
       cartItemCount: body.cartItems?.length.toString() || '0',
     };
 
@@ -125,24 +143,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Add referral code if provided
-    if (body.referralCode) {
+    // Add referral code if provided (customer orders only)
+    if (body.referralCode && orderType === 'customer') {
       metadata.referralCode = body.referralCode;
     }
 
     // Add partner-specific metadata
-    if (body.isPartnerOrder) {
+    if (orderType.startsWith('partner')) {
       metadata.isPartnerOrder = 'true';
+      
       if (body.partnerDiscount) {
         metadata.partnerDiscount = body.partnerDiscount.toString();
       }
+      
       if (body.shippingAddress.businessName) {
         metadata.businessName = body.shippingAddress.businessName;
       }
-      if (body.clientInfo) {
-        metadata.clientName = body.clientInfo.name;
-        metadata.clientEmail = body.clientInfo.email;
+      
+      // Partner-client order specific metadata
+      if (orderType === 'partner_for_client') {
         metadata.isForClient = 'true';
+        metadata.clientName = body.shippingAddress.clientName || body.customerName;
+        metadata.clientEmail = body.shippingAddress.clientEmail || body.customerEmail;
+        // Partner who placed the order
+        metadata.partnerEmail = body.placedByEmail || '';
       }
     }
 
