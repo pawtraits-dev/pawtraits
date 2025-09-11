@@ -152,7 +152,9 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       customer_email: customerEmail, // Client email for partner-client orders
       shipping_first_name: metadata.shippingFirstName || '',
       shipping_last_name: metadata.shippingLastName || '',
-      shipping_address: metadata.shippingAddress || '',
+      shipping_address: metadata.shippingAddress || '', // Keep for backward compatibility
+      shipping_address_line_1: metadata.shippingAddressLine1 || metadata.shippingAddress || '',
+      shipping_address_line_2: metadata.shippingAddressLine2 || null,
       shipping_city: metadata.shippingCity || '',
       shipping_postcode: metadata.shippingPostcode || '',
       shipping_country: metadata.shippingCountry || 'United Kingdom',

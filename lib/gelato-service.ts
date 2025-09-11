@@ -865,11 +865,13 @@ export class GelatoService {
       };
     });
 
-    // Map shipping address to Gelato format
+    // Map shipping address to Gelato format using new address lines
     const shippingAddress = {
       firstName: order.shipping_first_name,
       lastName: order.shipping_last_name,
-      addressLine1: order.shipping_address,
+      // Use new address lines if available, fallback to old single address field
+      addressLine1: order.shipping_address_line_1 || order.shipping_address,
+      ...(order.shipping_address_line_2 && { addressLine2: order.shipping_address_line_2 }),
       city: order.shipping_city,
       postCode: order.shipping_postcode,
       country: this.mapCountryToGelatoCode(order.shipping_country),

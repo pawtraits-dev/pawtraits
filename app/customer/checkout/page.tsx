@@ -34,7 +34,9 @@ export default function CustomerCheckoutPage() {
     firstName: "",
     lastName: "",
     email: "",
-    address: "",
+    address: "", // Keep for backward compatibility
+    addressLine1: "",
+    addressLine2: "",
     city: "",
     postcode: "",
     country: "", // Will be set from selectedCountryData
@@ -649,15 +651,29 @@ export default function CustomerCheckoutPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="address">Address *</Label>
+                      <Label htmlFor="addressLine1">Address Line 1 *</Label>
                       <Input
-                        id="address"
-                        value={shippingData.address}
-                        onChange={(e) => handleInputChange("address", e.target.value)}
-                        className={errors.address ? "border-red-500" : ""}
+                        id="addressLine1"
+                        value={shippingData.addressLine1}
+                        onChange={(e) => {
+                          handleInputChange("addressLine1", e.target.value);
+                          // Update the old address field for backward compatibility
+                          handleInputChange("address", e.target.value);
+                        }}
+                        className={errors.addressLine1 ? "border-red-500" : ""}
                         placeholder="123 Main Street"
                       />
-                      {errors.address && <p className="text-sm text-red-600">{errors.address}</p>}
+                      {errors.addressLine1 && <p className="text-sm text-red-600">{errors.addressLine1}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="addressLine2">Address Line 2 (Optional)</Label>
+                      <Input
+                        id="addressLine2"
+                        value={shippingData.addressLine2}
+                        onChange={(e) => handleInputChange("addressLine2", e.target.value)}
+                        placeholder="Apartment, suite, etc."
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

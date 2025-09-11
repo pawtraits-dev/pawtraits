@@ -15,7 +15,9 @@ export interface Address {
   firstName: string;
   lastName: string;
   email: string;
-  address: string;
+  address: string; // For backward compatibility
+  addressLine1?: string; // New field for separate address lines
+  addressLine2?: string; // New field for separate address lines
   city: string;
   postcode: string;
   country: string;
@@ -67,7 +69,15 @@ export class CheckoutValidationService {
       errors.push("Please enter a valid email address");
     }
     
-    if (!address.address?.trim()) errors.push("Address is required");
+    // Address validation - check for either old format or new address lines
+    if (address.addressLine1) {
+      if (!address.addressLine1.trim()) {
+        errors.push("Address line 1 is required");
+      }
+      // Address line 2 is optional, no validation needed
+    } else if (!address.address?.trim()) {
+      errors.push("Address is required");
+    }
     if (!address.city?.trim()) errors.push("City is required");
     if (!address.postcode?.trim()) errors.push("Postcode is required");
     
@@ -315,6 +325,38 @@ export class CheckoutValidationService {
       return isForClient ? 'partner_for_client' : 'partner';
     }
     return 'customer';
+  }
+
+  /**
+   * Get address lines formatted for Gelato API
+   * Handles both old single address field and new address lines
+   */
+  getAddressLinesForGelato(address: Address): { address1: string; address2?: string } {
+    if (address.addressLine1) {
+      return {
+        address1: address.addressLine1.trim(),
+        address2: address.addressLine2?.trim() || undefined
+      };
+    } else {
+      // Fallback to old single address field
+      return {
+        address1: address.address?.trim() || '',
+        address2: undefined
+      };
+    }
+  }
+
+  /**
+   * Get combined address string for display purposes
+   */
+  getCombinedAddress(address: Address): string {
+    if (address.addressLine1) {
+      const line1 = address.addressLine1.trim();
+      const line2 = address.addressLine2?.trim();
+      return line2 ? `${line1}, ${line2}` : line1;
+    } else {
+      return address.address?.trim() || '';
+    }
   }
 
   /**

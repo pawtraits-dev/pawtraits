@@ -14,7 +14,9 @@ interface CreatePaymentIntentRequest {
   shippingAddress: {
     firstName: string;
     lastName: string;
-    address: string;
+    address: string; // Keep for backward compatibility
+    addressLine1?: string; // New field
+    addressLine2?: string; // New field
     city: string;
     postcode: string;
     country: string;
@@ -126,7 +128,23 @@ export async function POST(request: NextRequest) {
     if (body.shippingAddress) {
       metadata.shippingFirstName = body.shippingAddress.firstName;
       metadata.shippingLastName = body.shippingAddress.lastName;
-      metadata.shippingAddress = body.shippingAddress.address;
+      
+      // Use new address lines if available, fallback to old address field
+      if (body.shippingAddress.addressLine1) {
+        metadata.shippingAddressLine1 = body.shippingAddress.addressLine1;
+        if (body.shippingAddress.addressLine2) {
+          metadata.shippingAddressLine2 = body.shippingAddress.addressLine2;
+        }
+        // Also populate old field for backward compatibility
+        const combinedAddress = body.shippingAddress.addressLine2 
+          ? `${body.shippingAddress.addressLine1}, ${body.shippingAddress.addressLine2}`
+          : body.shippingAddress.addressLine1;
+        metadata.shippingAddress = combinedAddress;
+      } else {
+        // Fallback to old single address field
+        metadata.shippingAddress = body.shippingAddress.address;
+      }
+      
       metadata.shippingCity = body.shippingAddress.city;
       metadata.shippingPostcode = body.shippingAddress.postcode;
       metadata.shippingCountry = body.shippingAddress.country;
