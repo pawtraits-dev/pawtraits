@@ -387,6 +387,25 @@ export async function GET(request: NextRequest) {
     const orderNumber = searchParams.get('orderNumber');
     const orderId = searchParams.get('orderId');
     const paymentIntent = searchParams.get('paymentIntent');
+    
+    // For customer order history requests (no specific order lookup params), 
+    // get email from authenticated session instead of query parameter
+    let customerEmail = email;
+    if (!orderNumber && !orderId && !paymentIntent && !email) {
+      const { createRouteHandlerClient } = await import('@supabase/auth-helpers-nextjs');
+      const { cookies } = await import('next/headers');
+      const cookieStore = cookies();
+      const authSupabase = createRouteHandlerClient({ cookies: () => cookieStore });
+      
+      const { data: { user }, error: userError } = await authSupabase.auth.getUser();
+      if (userError || !user?.email) {
+        return NextResponse.json(
+          { error: 'Authentication required' },
+          { status: 401 }
+        );
+      }
+      customerEmail = user.email;
+    }
 
     // If searching by order number, ID, or payment intent (for confirmation page)
     if (orderNumber || orderId || paymentIntent) {
@@ -422,10 +441,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(orders);
     }
 
-    // Otherwise require email for customer order history
-    if (!email) {
+    // At this point we should have customerEmail from either query param or session
+    if (!customerEmail) {
       return NextResponse.json(
-        { error: 'Email, orderNumber, or orderId parameter is required' },
+        { error: 'Authentication required or email parameter missing' },
         { status: 400 }
       );
     }
@@ -435,7 +454,7 @@ export async function GET(request: NextRequest) {
     // This query replicates the same logic as the get_client_orders function:
     // - Direct customer orders: customer_email = email AND order_type = 'customer' 
     // - Partner-placed client orders: client_email = email AND order_type = 'partner_for_client'
-    console.log('Shop orders API: Querying orders for email using direct query:', email);
+    console.log('Shop orders API: Querying orders for email using direct query:', customerEmail);
     
     const { data: clientOrders, error: clientOrdersError } = await supabase
       .from('orders')
@@ -455,7 +474,7 @@ export async function GET(request: NextRequest) {
         estimated_delivery
       `)
       .or(
-        `and(customer_email.eq.${email.toLowerCase()},order_type.eq.customer),and(client_email.eq.${email.toLowerCase()},order_type.eq.partner_for_client)`
+        `and(customer_email.eq.${customerEmail.toLowerCase()},order_type.eq.customer),and(client_email.eq.${customerEmail.toLowerCase()},order_type.eq.partner_for_client)`
       )
       .order('created_at', { ascending: false });
 

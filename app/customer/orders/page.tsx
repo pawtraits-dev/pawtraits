@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Loader2, X } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { SupabaseService } from '@/lib/supabase'
 import { productDescriptionService } from '@/lib/product-utils'
 
 interface OrderItem {
@@ -53,7 +52,6 @@ export default function CustomerOrdersPage() {
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null)
   const [selectedImageTitle, setSelectedImageTitle] = useState<string>('')
   const [showImageModal, setShowImageModal] = useState(false)
-  const supabaseService = new SupabaseService()
 
   useEffect(() => {
     loadOrders()
@@ -63,20 +61,18 @@ export default function CustomerOrdersPage() {
     try {
       setError(null)
       
-      // Get current user
-      const { data: { user } } = await supabaseService.getClient().auth.getUser()
-      if (!user?.email) {
-        setError('No user found. Please log in.')
-        setLoading(false)
-        return
-      }
-
-      // Fetch orders from the shop orders API
-      console.log('Fetching orders for user email:', user.email)
-      const response = await fetch(`/api/shop/orders?email=${encodeURIComponent(user.email)}`)
+      // Fetch orders from the shop orders API (authentication handled server-side)
+      console.log('Fetching orders for authenticated user')
+      const response = await fetch('/api/shop/orders')
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch orders: ${response.status}`)
+        if (response.status === 401) {
+          setError('Please log in to view your orders.')
+        } else {
+          throw new Error(`Failed to fetch orders: ${response.status}`)
+        }
+        setLoading(false)
+        return
       }
       
       const ordersData = await response.json()
