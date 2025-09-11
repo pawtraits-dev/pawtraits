@@ -39,13 +39,34 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get orders placed by this partner using the database function
+    // Get orders placed by this partner using direct query (consistent with app architecture)
     // This includes orders placed by the partner for themselves AND for clients
+    console.log('Partners orders API: Querying orders for partner using direct query:', partner.email);
+    
     const { data: partnerOrdersResult, error: partnerOrdersError } = await supabase
-      .rpc('get_partner_orders', { p_partner_email: partner.email });
+      .from('orders')
+      .select(`
+        id,
+        order_number,
+        status,
+        customer_email,
+        client_email,
+        client_name,
+        placed_by_partner_id,
+        order_type,
+        total_amount,
+        currency,
+        created_at,
+        updated_at,
+        estimated_delivery
+      `)
+      .or(
+        `customer_email.eq.${partner.email},placed_by_partner_id.eq.${partner.id}`
+      )
+      .order('created_at', { ascending: false });
 
     if (partnerOrdersError) {
-      console.error('Error calling get_partner_orders:', partnerOrdersError);
+      console.error('Error querying partner orders directly:', partnerOrdersError);
       return NextResponse.json(
         { error: 'Failed to fetch partner orders' },
         { status: 500 }
