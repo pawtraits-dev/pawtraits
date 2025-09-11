@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get orders placed by this partner using the new database function
+    // Get orders placed by this partner using the database function
     // This includes orders placed by the partner for themselves AND for clients
     const { data: partnerOrdersResult, error: partnerOrdersError } = await supabase
       .rpc('get_partner_orders', { p_partner_email: partner.email });

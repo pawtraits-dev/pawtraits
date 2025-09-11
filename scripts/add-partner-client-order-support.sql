@@ -121,9 +121,8 @@ BEGIN
     o.customer_email = p_partner_email
     OR 
     EXISTS (
-      SELECT 1 FROM partners p, user_profiles up
-      WHERE p.user_id = up.id 
-      AND up.email = p_partner_email
+      SELECT 1 FROM partners p
+      WHERE p.email = p_partner_email
       AND o.placed_by_partner_id = p.id
     )
   ORDER BY o.created_at DESC;
