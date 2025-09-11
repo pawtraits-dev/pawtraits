@@ -482,6 +482,42 @@ export default function PartnerDetailPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Commission Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <DollarSign className="w-5 h-5 mr-2" />
+                  Commission Settings
+                </CardTitle>
+                <CardDescription>
+                  Commission rates for this partner's referrals
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <TrendingUp className="w-4 h-4 text-green-600" />
+                  <div>
+                    <p className="font-medium">{partner.initial_commission_rate || 20.00}%</p>
+                    <p className="text-sm text-gray-600">Initial Commission Rate</p>
+                    <p className="text-xs text-gray-500">Applied to first-time customer orders</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  <TrendingUp className="w-4 h-4 text-blue-600" />
+                  <div>
+                    <p className="font-medium">{partner.subsequent_commission_rate || 5.00}%</p>
+                    <p className="text-sm text-gray-600">Subsequent Commission Rate</p>
+                    <p className="text-xs text-gray-500">Applied to repeat customer orders</p>
+                  </div>
+                </div>
+
+                <div className="pt-2 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                  <p><strong>How it works:</strong> Partners earn the initial rate on a customer's first purchase, then the subsequent rate for all future orders from that customer.</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 

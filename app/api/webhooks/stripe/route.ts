@@ -131,11 +131,11 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
         if (!profileError && partnerProfile) {
           partnerUserProfile = partnerProfile;
           
-          // Get the partner record
+          // Get the partner record (partners.id matches user_profiles.id directly)
           const { data: partnerRecord, error: partnerError } = await supabase
             .from('partners')
             .select('id')
-            .eq('user_id', partnerProfile.id)
+            .eq('id', partnerProfile.id)
             .single();
 
           if (!partnerError && partnerRecord) {
@@ -150,8 +150,13 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       order_number: `PW-${Date.now()}-${paymentIntent.id.slice(-6)}`,
       status: 'confirmed',
       customer_email: customerEmail, // Client email for partner-client orders
-      shipping_first_name: metadata.shippingFirstName || '',
-      shipping_last_name: metadata.shippingLastName || '',
+      // For partner-for-client orders, use client name in shipping fields, not partner name
+      shipping_first_name: orderType === 'partner_for_client' 
+        ? (metadata.clientName ? metadata.clientName.split(' ')[0] : metadata.shippingFirstName || '') 
+        : metadata.shippingFirstName || '',
+      shipping_last_name: orderType === 'partner_for_client' 
+        ? (metadata.clientName ? metadata.clientName.split(' ').slice(1).join(' ') : metadata.shippingLastName || '') 
+        : metadata.shippingLastName || '',
       shipping_address: metadata.shippingAddress || '', // Keep for backward compatibility
       shipping_address_line_1: metadata.shippingAddressLine1 || metadata.shippingAddress || '',
       shipping_address_line_2: metadata.shippingAddressLine2 || null,
@@ -663,9 +668,18 @@ async function handlePartnerCommission(
       subtotalAmount: order.subtotal_amount
     });
 
-    // Partner commission is 10% of subtotal (items only, excluding shipping)
-    const commissionRate = 10.00;
-    const commissionAmount = Math.round(order.subtotal_amount * (commissionRate / 100));
+    // Get partner-specific commission rates
+    const { data: partnerData, error: partnerRateError } = await supabase
+      .from('partners')
+      .select('initial_commission_rate, subsequent_commission_rate')
+      .eq('id', partnerId)
+      .single();
+
+    if (partnerRateError) {
+      console.error('Failed to get partner commission rates:', partnerRateError);
+      // Use default rates if we can't fetch partner rates
+      partnerData = { initial_commission_rate: 20.00, subsequent_commission_rate: 5.00 };
+    }
     
     // For partner-client orders, the "client" is the actual customer
     const clientEmail = metadata.orderType === 'partner_for_client' 
@@ -684,6 +698,13 @@ async function handlePartnerCommission(
       .neq('id', order.id); // Exclude current order
 
     const isInitialOrder = !existingOrders || existingOrders.length === 0;
+    
+    // Use partner-specific commission rates based on whether this is first order
+    const commissionRate = isInitialOrder 
+      ? partnerData.initial_commission_rate 
+      : partnerData.subsequent_commission_rate;
+      
+    const commissionAmount = Math.round(order.subtotal_amount * (commissionRate / 100));
 
     // Create client_orders record for commission tracking
     const { error: clientOrderError } = await supabase

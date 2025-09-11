@@ -64,6 +64,11 @@ interface Order {
   delivered_at?: string;
   payment_status?: string;
   payment_intent_id?: string;
+  // Partner-client order fields
+  order_type?: string;
+  placed_by_partner_id?: string;
+  client_email?: string;
+  client_name?: string;
 }
 
 export default function AdminOrdersPage() {
@@ -73,6 +78,7 @@ export default function AdminOrdersPage() {
   const [searchEmail, setSearchEmail] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [orderTypeFilter, setOrderTypeFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [productDetails, setProductDetails] = useState<{[key: string]: any}>({});
 
@@ -82,7 +88,7 @@ export default function AdminOrdersPage() {
 
   useEffect(() => {
     filterOrders();
-  }, [orders, searchEmail, statusFilter, dateFilter]);
+  }, [orders, searchEmail, statusFilter, dateFilter, orderTypeFilter]);
 
   const loadAllOrders = async () => {
     setLoading(true);
@@ -170,6 +176,14 @@ export default function AdminOrdersPage() {
       }
     }
 
+    // Order type filter
+    if (orderTypeFilter !== 'all') {
+      filtered = filtered.filter(order => {
+        const orderType = order.order_type || 'customer'; // Default to customer for legacy orders
+        return orderType === orderTypeFilter;
+      });
+    }
+
     // Sort by creation date (newest first)
     filtered.sort((a, b) => 
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -226,10 +240,33 @@ export default function AdminOrdersPage() {
     return variants[status.toLowerCase()] || "bg-gray-100 text-gray-800";
   };
 
+  const getOrderTypeLabel = (orderType?: string) => {
+    switch (orderType) {
+      case 'customer':
+        return 'Direct Customer';
+      case 'partner':
+        return 'Partner Order';
+      case 'partner_for_client':
+        return 'Partner for Client';
+      default:
+        return 'Direct Customer'; // Legacy orders
+    }
+  };
+
+  const getOrderTypeBadge = (orderType?: string) => {
+    const variants: Record<string, string> = {
+      customer: "bg-blue-100 text-blue-800",
+      partner: "bg-green-100 text-green-800", 
+      partner_for_client: "bg-purple-100 text-purple-800",
+    };
+    return variants[orderType || 'customer'] || "bg-blue-100 text-blue-800";
+  };
+
   const clearFilters = () => {
     setSearchEmail('');
     setStatusFilter('all');
     setDateFilter('all');
+    setOrderTypeFilter('all');
   };
 
   if (loading) {
@@ -326,8 +363,23 @@ export default function AdminOrdersPage() {
                 </Select>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="orderType">Order Type</Label>
+                <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="customer">Direct Customer</SelectItem>
+                    <SelectItem value="partner">Partner Order</SelectItem>
+                    <SelectItem value="partner_for_client">Partner for Client</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="flex items-end space-x-2">
-                {(searchEmail || statusFilter !== 'all' || dateFilter !== 'all') && (
+                {(searchEmail || statusFilter !== 'all' || dateFilter !== 'all' || orderTypeFilter !== 'all') && (
                   <Button variant="outline" onClick={clearFilters} size="sm">
                     <X className="w-4 h-4 mr-2" />
                     Clear
@@ -376,6 +428,9 @@ export default function AdminOrdersPage() {
                           <span className="capitalize">{order.status}</span>
                         </div>
                       </Badge>
+                      <Badge className={getOrderTypeBadge(order.order_type)}>
+                        {getOrderTypeLabel(order.order_type)}
+                      </Badge>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
@@ -388,6 +443,11 @@ export default function AdminOrdersPage() {
                           <Mail className="w-4 h-4" />
                           <span>{order.customer_email}</span>
                         </div>
+                        {order.order_type === 'partner_for_client' && order.client_name && (
+                          <div className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded">
+                            Client: {order.client_name} ({order.client_email})
+                          </div>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center space-x-2">
