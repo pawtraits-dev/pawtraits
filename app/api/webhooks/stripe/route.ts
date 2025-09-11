@@ -119,6 +119,12 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     
     if (orderType.startsWith('partner')) {
       const partnerEmail = metadata.partnerEmail || metadata.placedByEmail;
+      console.log('Webhook: Looking for partner ID for order type:', orderType, {
+        partnerEmail: metadata.partnerEmail,
+        placedByEmail: metadata.placedByEmail,
+        resolvedEmail: partnerEmail
+      });
+      
       if (partnerEmail) {
         // Get partner user profile and partner record
         const { data: partnerProfile, error: profileError } = await supabase
@@ -140,8 +146,15 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
 
           if (!partnerError && partnerRecord) {
             placedByPartnerId = partnerRecord.id;
+            console.log('Webhook: Found partner record:', { partnerId: partnerRecord.id });
+          } else {
+            console.log('Webhook: Partner record lookup failed:', { error: partnerError });
           }
+        } else {
+          console.log('Webhook: Partner profile lookup failed:', { error: profileError });
         }
+      } else {
+        console.log('Webhook: No partner email found in metadata for partner order');
       }
     }
 
