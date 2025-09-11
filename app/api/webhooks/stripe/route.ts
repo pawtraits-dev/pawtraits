@@ -214,6 +214,11 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       await handleReferralFromPayment(metadata.referralCode, customerEmail, paymentIntent.amount, order.id, supabase);
     }
 
+    // Handle partner commission (for partner orders)
+    if (orderType.startsWith('partner') && placedByPartnerId) {
+      await handlePartnerCommission(order, paymentIntent, metadata, placedByPartnerId, supabase);
+    }
+
     // Create Gelato order for fulfillment
     await createGelatoOrder(order, paymentIntent, supabase, metadata);
 
@@ -636,5 +641,89 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, 
     } catch (updateError) {
       console.error('Failed to update order with error status:', updateError);
     }
+  }
+}
+
+// Handle partner commission for partner orders
+async function handlePartnerCommission(
+  order: any,
+  paymentIntent: any,
+  metadata: any,
+  partnerId: string,
+  supabase: any
+) {
+  try {
+    console.log('Creating partner commission record for:', {
+      orderId: order.id,
+      partnerId,
+      orderType: metadata.orderType,
+      totalAmount: order.total_amount,
+      subtotalAmount: order.subtotal_amount
+    });
+
+    // Partner commission is 10% of subtotal (items only, excluding shipping)
+    const commissionRate = 10.00;
+    const commissionAmount = Math.round(order.subtotal_amount * (commissionRate / 100));
+    
+    // For partner-client orders, the "client" is the actual customer
+    const clientEmail = metadata.orderType === 'partner_for_client' 
+      ? metadata.clientEmail || order.customer_email
+      : order.customer_email;
+    
+    const clientName = metadata.orderType === 'partner_for_client'
+      ? metadata.clientName || order.customer_email
+      : `${order.shipping_first_name} ${order.shipping_last_name}`.trim();
+
+    // Check if this is the client's first order (for partner commission tracking)
+    const { data: existingOrders } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('customer_email', clientEmail)
+      .neq('id', order.id); // Exclude current order
+
+    const isInitialOrder = !existingOrders || existingOrders.length === 0;
+
+    // Create client_orders record for commission tracking
+    const { error: clientOrderError } = await supabase
+      .from('client_orders')
+      .insert({
+        client_email: clientEmail,
+        client_name: clientName,
+        partner_id: partnerId,
+        order_id: order.id,
+        order_value: order.subtotal_amount, // Subtotal only (no shipping)
+        is_initial_order: isInitialOrder,
+        commission_rate: commissionRate,
+        commission_amount: commissionAmount,
+        commission_paid: false,
+        order_status: 'completed',
+        order_type: metadata.orderType,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+    if (clientOrderError) {
+      console.error('Failed to create partner commission record:', clientOrderError);
+      console.error('Commission record data:', {
+        client_email: clientEmail,
+        client_name: clientName,
+        partner_id: partnerId,
+        order_id: order.id,
+        order_value: order.subtotal_amount,
+        commission_amount: commissionAmount
+      });
+    } else {
+      console.log('✅ Successfully created partner commission record:', {
+        partnerId,
+        clientEmail,
+        orderValue: order.subtotal_amount,
+        commissionAmount,
+        commissionRate,
+        isInitialOrder
+      });
+    }
+
+  } catch (error) {
+    console.error('Error handling partner commission:', error);
   }
 }
