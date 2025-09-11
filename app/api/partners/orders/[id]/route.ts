@@ -37,32 +37,11 @@ export async function GET(
       );
     }
 
-    // Get user profile and check if this user is a partner
-    const { data: userProfile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('id, user_type, partner_id')
-      .eq('id', user.id)
-      .single();
-
-    console.log('Partner order detail API: User profile lookup:', {
-      hasProfile: !!userProfile,
-      userType: userProfile?.user_type,
-      partnerId: userProfile?.partner_id?.substring(0, 8),
-      profileError: profileError?.message
-    });
-
-    if (profileError || !userProfile || userProfile.user_type !== 'partner') {
-      return NextResponse.json(
-        { error: 'Partner profile not found' },
-        { status: 404 }
-      );
-    }
-
-    // Get partner record using the correct relationship
+    // Get partner record directly using user ID (simpler approach)
     const { data: partner, error: partnerError } = await supabase
       .from('partners')
       .select('id, email, first_name, last_name, business_name')
-      .eq('id', userProfile.partner_id)
+      .eq('id', user.id)
       .single();
 
     console.log('Partner order detail API: Partner lookup:', {
@@ -78,13 +57,11 @@ export async function GET(
       );
     }
 
-    // Get specific order placed by this partner (both partner orders and partner-for-client orders)
-    // This matches the logic used in the main /api/partners/orders route
-    console.log('Partner order detail API: Order lookup query:', {
+    // Simple approach: Get the order by ID first, then verify it belongs to this partner
+    console.log('Partner order detail API: Order lookup:', {
       orderId: orderId,
       partnerEmail: partner.email,
-      partnerId: partner.id.substring(0, 8),
-      query: `customer_email.eq.${partner.email},placed_by_partner_id.eq.${partner.id}`
+      partnerId: partner.id.substring(0, 8)
     });
 
     const { data: order, error: orderError } = await supabase
@@ -96,26 +73,39 @@ export async function GET(
         )
       `)
       .eq('id', orderId)
-      .or(
-        `customer_email.eq.${partner.email},placed_by_partner_id.eq.${partner.id}`
-      )
       .single();
 
-    console.log('Partner order detail API: Order lookup result:', {
+    console.log('Partner order detail API: Order found:', {
       hasOrder: !!order,
       orderType: order?.order_type,
       customerEmail: order?.customer_email,
-      placedByPartnerId: order?.placed_by_partner_id?.substring(0, 8),
-      orderError: orderError?.message,
-      errorCode: orderError?.code
+      placedByPartnerId: order?.placed_by_partner_id?.substring(0, 8)
     });
 
-    if (orderError || !order) {
+    // Check if this order belongs to the partner (either as customer or placed by partner)
+    if (order && !(
+      order.customer_email === partner.email || 
+      order.placed_by_partner_id === partner.id
+    )) {
+      console.log('Partner order detail API: Order access denied - not owned by partner');
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
       );
     }
+
+    if (orderError || !order) {
+      console.log('Partner order detail API: Order not found:', {
+        orderError: orderError?.message,
+        errorCode: orderError?.code
+      });
+      return NextResponse.json(
+        { error: 'Order not found' },
+        { status: 404 }
+      );
+    }
+
+    console.log('Partner order detail API: Order access verified - returning order');
 
     return NextResponse.json(order);
 

@@ -14,13 +14,20 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    // Get all orders with their items (admin access)
+    // Get all orders with their items and partner info (admin access)
     const { data: orders, error } = await supabase
       .from('orders')
       .select(`
         *,
         order_items (
           *
+        ),
+        partners!orders_placed_by_partner_id_fkey (
+          id,
+          first_name,
+          last_name,
+          business_name,
+          email
         )
       `)
       .order('created_at', { ascending: false })

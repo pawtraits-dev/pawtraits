@@ -69,6 +69,14 @@ interface Order {
   placed_by_partner_id?: string;
   client_email?: string;
   client_name?: string;
+  // Partner information (joined from partners table)
+  partners?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    business_name?: string;
+    email: string;
+  } | null;
 }
 
 export default function AdminOrdersPage() {
@@ -444,8 +452,15 @@ export default function AdminOrdersPage() {
                           <span>{order.customer_email}</span>
                         </div>
                         {order.order_type === 'partner_for_client' && order.client_name && (
-                          <div className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded">
-                            Client: {order.client_name} ({order.client_email})
+                          <div className="space-y-1">
+                            <div className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded">
+                              Client: {order.client_name} ({order.client_email})
+                            </div>
+                            {order.partners && (
+                              <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                                Partner: {order.partners.business_name || `${order.partners.first_name} ${order.partners.last_name}`} ({order.partners.email})
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
