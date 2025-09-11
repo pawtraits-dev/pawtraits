@@ -42,6 +42,11 @@ interface Order {
   metadata: string;
   order_items: OrderItem[];
   tracking_number?: string;
+  // Partner-client order fields
+  order_type?: string;
+  placed_by_partner_id?: string;
+  client_email?: string;
+  client_name?: string;
 }
 
 export default function CustomerOrdersPage() {
@@ -250,6 +255,11 @@ export default function CustomerOrdersPage() {
                     <p className="text-sm text-gray-600">
                       Shipping to: {order.shipping_first_name} {order.shipping_last_name}
                     </p>
+                    {order.order_type === 'partner_for_client' && (
+                      <p className="text-sm text-purple-600 bg-purple-50 px-2 py-1 rounded-md inline-block mt-1">
+                        📋 Order placed by partner on your behalf
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center space-x-4">
                     <Badge className={`${getStatusColor(order.status)} flex items-center space-x-1`}>

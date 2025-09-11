@@ -41,7 +41,11 @@ export async function GET(request: NextRequest) {
 
     // Get orders placed by this partner using direct query (consistent with app architecture)
     // This includes orders placed by the partner for themselves AND for clients
-    console.log('Partners orders API: Querying orders for partner using direct query:', partner.email);
+    console.log('Partners orders API: Querying orders for partner:', {
+      email: partner.email,
+      id: partner.id,
+      query: `customer_email.eq.${partner.email},placed_by_partner_id.eq.${partner.id}`
+    });
     
     const { data: partnerOrdersResult, error: partnerOrdersError } = await supabase
       .from('orders')
@@ -74,6 +78,15 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('Partner orders API: Found partner orders:', partnerOrdersResult?.length || 0);
+    if (partnerOrdersResult && partnerOrdersResult.length > 0) {
+      console.log('Partner orders details:', partnerOrdersResult.map(o => ({
+        id: o.id.substring(0, 8),
+        order_type: o.order_type,
+        customer_email: o.customer_email,
+        client_email: o.client_email,
+        placed_by_partner_id: o.placed_by_partner_id?.substring(0, 8)
+      })));
+    }
 
     // Get full order details with order_items for each order
     const partnerOrders = [];
