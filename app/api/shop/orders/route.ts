@@ -430,15 +430,37 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get orders for this customer using the new database function
-    // This includes direct customer orders AND orders placed by partners for this client
-    console.log('Shop orders API: Querying orders for email using get_client_orders:', email);
+    // TEMPORARY FIX: Using direct query instead of get_client_orders RPC function
+    // The RPC function has a PostgreSQL type mismatch error (VARCHAR vs TEXT in column 2)
+    // This query replicates the same logic as the get_client_orders function:
+    // - Direct customer orders: customer_email = email AND order_type = 'customer' 
+    // - Partner-placed client orders: client_email = email AND order_type = 'partner_for_client'
+    console.log('Shop orders API: Querying orders for email using direct query:', email);
     
     const { data: clientOrders, error: clientOrdersError } = await supabase
-      .rpc('get_client_orders', { p_client_email: email.toLowerCase() });
+      .from('orders')
+      .select(`
+        id,
+        order_number,
+        status,
+        customer_email,
+        client_email,
+        client_name,
+        placed_by_partner_id,
+        order_type,
+        total_amount,
+        currency,
+        created_at,
+        updated_at,
+        estimated_delivery
+      `)
+      .or(
+        `and(customer_email.eq.${email.toLowerCase()},order_type.eq.customer),and(client_email.eq.${email.toLowerCase()},order_type.eq.partner_for_client)`
+      )
+      .order('created_at', { ascending: false });
 
     if (clientOrdersError) {
-      console.error('Error calling get_client_orders:', clientOrdersError);
+      console.error('Error querying client orders directly:', clientOrdersError);
       throw clientOrdersError;
     }
 
