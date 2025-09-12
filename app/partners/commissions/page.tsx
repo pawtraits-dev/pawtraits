@@ -55,8 +55,6 @@ function CommissionsPageContent() {
   const [error, setError] = useState("")
   const [selectedOrders, setSelectedOrders] = useState<string[]>([])
 
-  const supabase = getSupabaseClient()
-
   useEffect(() => {
     fetchCommissions()
   }, [statusFilter])
@@ -65,33 +63,22 @@ function CommissionsPageContent() {
     try {
       setLoading(true)
       
+      // Get session for authorization
+      const supabase = getSupabaseClient()
       const { data: { session } } = await supabase.auth.getSession()
       
       if (!session?.access_token) {
         throw new Error('Not authenticated')
       }
 
-      // Get current user profile to get partner ID
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('User not found')
-
-      // Get partner profile
-      const { data: partner } = await supabase
-        .from('partners')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
-
-      if (!partner) throw new Error('Partner not found')
-
       // Build API URL with filters
-      const params = new URLSearchParams({ 
-        partnerId: partner.id,
-        ...(statusFilter !== 'all' && { status: statusFilter })
-      })
+      const params = new URLSearchParams()
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter)
+      }
 
-      console.log('Fetching commissions from /api/partners/commissions...')
-      const response = await fetch(`/api/partners/commissions?${params}`, {
+      console.log('Fetching commissions from /api/partner/commissions...')
+      const response = await fetch(`/api/partner/commissions?${params}`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         }
@@ -118,10 +105,12 @@ function CommissionsPageContent() {
     if (selectedOrders.length === 0) return
 
     try {
+      // Get session for authorization
+      const supabase = getSupabaseClient()
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error('Not authenticated')
 
-      const response = await fetch('/api/partners/commissions', {
+      const response = await fetch('/api/partner/commissions', {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
