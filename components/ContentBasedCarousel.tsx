@@ -155,13 +155,15 @@ export default function ContentBasedCarousel({
     <div className={`relative rounded-lg overflow-hidden ${className}`}>
       {/* Main Carousel */}
       <div className="relative h-full">
-        {/* Background Image */}
+        {/* Background Image - 1:1 aspect ratio centered */}
         <div 
           className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage: currentContent.hero_image_url 
               ? `url(${currentContent.hero_image_url})`
-              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center center'
           }}
         >
           <div className="absolute inset-0 bg-black bg-opacity-40"></div>
@@ -190,12 +192,20 @@ export default function ContentBasedCarousel({
               </p>
             )}
 
-            {/* Description */}
-            {currentContent.description && (
-              <p className="text-lg mb-8 opacity-80 max-w-2xl mx-auto drop-shadow-lg">
-                {currentContent.description}
-              </p>
-            )}
+            {/* Description - First line only in bold */}
+            {currentContent.description && (() => {
+              // Extract first sentence (ending with ., !, or ?) or first line
+              const sentences = currentContent.description.match(/[^\.!?]*[\.!?]/);
+              const firstSentence = sentences 
+                ? sentences[0].trim()
+                : currentContent.description.split('\n')[0].trim();
+              
+              return (
+                <p className="text-lg mb-8 opacity-80 max-w-2xl mx-auto drop-shadow-lg">
+                  <strong>{firstSentence}</strong>
+                </p>
+              );
+            })()}
 
             {/* CTA Button */}
             <Button
