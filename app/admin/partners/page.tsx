@@ -153,7 +153,9 @@ export default function AdminPartnersPage() {
     total: partners.length,
     pending: partners.filter(p => p.approval_status === 'pending').length,
     approved: partners.filter(p => p.approval_status === 'approved').length,
-    active: partners.filter((p: any) => p.is_active).length
+    active: partners.filter((p: any) => p.is_active).length,
+    total_commissions: partners.reduce((sum: number, p: any) => sum + (p.total_commissions || 0), 0),
+    unpaid_commissions: partners.reduce((sum: number, p: any) => sum + (p.unpaid_commissions || 0), 0)
   };
 
   if (loading) {
@@ -175,7 +177,7 @@ export default function AdminPartnersPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -227,6 +229,23 @@ export default function AdminPartnersPage() {
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900">{stats.active}</p>
                 <p className="text-sm text-gray-600">Active</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-orange-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.total_commissions)}</p>
+                <p className="text-sm text-gray-600">Total Commissions</p>
+                {stats.unpaid_commissions > 0 && (
+                  <p className="text-xs text-orange-600">{formatCurrency(stats.unpaid_commissions)} unpaid</p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -344,8 +363,18 @@ export default function AdminPartnersPage() {
                           {partner.successful_referrals} successful ({getConversionRate(partner.total_referrals, partner.successful_referrals)}%)
                         </div>
                         <div className="text-purple-600 font-medium">
-                          {formatCurrency(partner.total_commissions)} earned
+                          {formatCurrency(partner.total_commissions)} total
                         </div>
+                        {partner.unpaid_commissions > 0 && (
+                          <div className="text-orange-600 text-xs">
+                            {formatCurrency(partner.unpaid_commissions)} unpaid
+                          </div>
+                        )}
+                        {partner.paid_commissions > 0 && (
+                          <div className="text-green-600 text-xs">
+                            {formatCurrency(partner.paid_commissions)} paid
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="p-4">

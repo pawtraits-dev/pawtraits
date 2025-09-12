@@ -58,6 +58,8 @@ export default function CommissionTrackingPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCommissions, setSelectedCommissions] = useState<string[]>([]);
+  const [processingPayment, setProcessingPayment] = useState(false);
 
   const supabaseService = new SupabaseService();
 
@@ -73,99 +75,44 @@ export default function CommissionTrackingPage() {
     try {
       setLoading(true);
       
-      // Get date range
+      console.log('Loading commission data from client_orders table...');
+      
+      // Load commission data from client_orders table (the actual commission records)
+      const commissionsResponse = await fetch('/api/admin/commissions');
+      if (!commissionsResponse.ok) {
+        throw new Error('Failed to fetch commission data');
+      }
+      
+      const commissionsData = await commissionsResponse.json();
+      console.log('Commission data loaded:', commissionsData.length, 'records');
+      
+      // Apply date filter if needed
+      let filteredCommissions = commissionsData;
       const { start, end } = getDateRange(timePeriod);
       
-      console.log('Loading commission data for period:', timePeriod, { start, end });
-      
-      // Load referrals using the admin API to get properly formatted data
-      const referralsResponse = await fetch('/api/admin/referrals');
-      if (!referralsResponse.ok) {
-        throw new Error('Failed to fetch referrals');
-      }
-      const allReferrals = await referralsResponse.json();
-      
-      // Filter to only referrals with orders and apply date filter
-      let referralsWithOrders = allReferrals.filter((referral: any) => referral.order_id);
-      
       if (start && end) {
-        referralsWithOrders = referralsWithOrders.filter((referral: any) => {
-          const purchaseDate = referral.purchased_at ? new Date(referral.purchased_at) : new Date(referral.created_at);
-          return purchaseDate >= new Date(start) && purchaseDate <= new Date(end);
+        filteredCommissions = commissionsData.filter((commission: any) => {
+          const commissionDate = new Date(commission.created_at);
+          return commissionDate >= new Date(start) && commissionDate <= new Date(end);
         });
       }
-      
-      const referralsError = null;
-      
-      console.log('Referrals with orders loaded:', referralsWithOrders?.length || 0, 'Error:', referralsError);
-      
-      if (referralsError) {
-        console.error('Referrals query error:', referralsError);
-        throw referralsError;
-      }
 
-      // Load existing commission records (if table exists)
-      let existingCommissions = [];
-      try {
-        const { data: commissionsData } = await supabaseService.getClient()
-          .from('commissions')
-          .select('*');
-        existingCommissions = commissionsData || [];
-      } catch (commissionsError) {
-        console.warn('Commissions table not found, using calculated commissions:', commissionsError);
-      }
-
-      console.log('Existing commissions loaded:', existingCommissions.length);
-
-      // Handle empty data case
-      if (!referralsWithOrders || referralsWithOrders.length === 0) {
-        console.log('No referrals with orders found');
-        setCommissions([]);
-        setCommissionSummary({
-          total_commissions: 0,
-          pending_amount: 0,
-          approved_amount: 0,
-          paid_amount: 0,
-          disputed_amount: 0,
-          total_partners: 0,
-          avg_commission_rate: 0,
-          top_earners: [],
-          monthly_trend: []
-        });
-        return;
-      }
-
-      // Process commission data from referrals
-      const processedCommissions: Commission[] = [];
-      
-      referralsWithOrders.forEach((referral: any) => {
-        if (referral.partner_business && referral.partner_business !== 'N/A') {
-          const commissionRate = referral.commission_rate || 0.1; // Default 10%
-          // commission_amount from API is already in pounds, convert to pence for consistent formatting
-          const commissionAmount = referral.commission_amount ? (referral.commission_amount * 100) : ((referral.order_value || 0) * commissionRate);
-          
-          // Check if commission already exists
-          const existingCommission = existingCommissions.find((c: any) => c.order_id === referral.order_id);
-          
-          processedCommissions.push({
-            id: existingCommission?.id || `${referral.order_id}-${referral.id}`,
-            partner_id: referral.id,
-            partner_name: referral.partner_business,
-            partner_email: referral.partner_email,
-            order_id: referral.order_id,
-            order_amount: referral.order_value || 0,
-            commission_rate: commissionRate,
-            commission_amount: commissionAmount,
-            status: referral.commission_paid ? 'paid' : (existingCommission?.status || 'pending'),
-            created_at: referral.created_at,
-            paid_at: referral.commission_paid ? referral.purchased_at : existingCommission?.paid_at,
-            referral_code: referral.id,
-            customer_name: referral.client_email
-          });
-        } else {
-          console.warn('No partner found for referral:', referral.id);
-        }
-      });
+      // Process commission data into the format expected by the UI
+      const processedCommissions: Commission[] = filteredCommissions.map((commission: any) => ({
+        id: commission.id,
+        partner_id: commission.partner_id,
+        partner_name: commission.partner_name || 'Unknown Partner',
+        partner_email: commission.partner_email || '',
+        order_id: commission.order_id,
+        order_amount: commission.order_amount || 0,
+        commission_rate: commission.commission_rate / 100, // Convert percentage to decimal
+        commission_amount: commission.commission_amount, // Already in pennies from database
+        status: commission.commission_paid ? 'paid' : 'pending',
+        created_at: commission.created_at,
+        paid_at: commission.commission_paid ? commission.updated_at : undefined,
+        referral_code: commission.referral_code || commission.order_id,
+        customer_name: commission.client_name || commission.client_email
+      }));
 
       console.log('Processed commissions:', processedCommissions.length);
 
@@ -174,7 +121,7 @@ export default function CommissionTrackingPage() {
 
     } catch (error) {
       console.error('Error loading commission data:', error);
-      // Set empty data structure instead of using sample data
+      // Set empty data structure
       setCommissions([]);
       setCommissionSummary({
         total_commissions: 0,
@@ -345,6 +292,25 @@ export default function CommissionTrackingPage() {
 
   const updateCommissionStatus = async (commissionId: string, newStatus: Commission['status']) => {
     try {
+      if (newStatus === 'paid') {
+        // Call the API to mark as paid
+        const response = await fetch('/api/admin/commissions', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            commissionIds: [commissionId],
+            action: 'markPaid'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update commission status');
+        }
+      }
+
+      // Update local state
       const updatedCommissions = commissions.map(c => 
         c.id === commissionId 
           ? { ...c, status: newStatus, paid_at: newStatus === 'paid' ? new Date().toISOString() : c.paid_at }
@@ -354,10 +320,42 @@ export default function CommissionTrackingPage() {
       setCommissions(updatedCommissions);
       setCommissionSummary(calculateCommissionSummary(updatedCommissions));
       
-      // In a real application, you would update the database here
-      
     } catch (error) {
       console.error('Error updating commission status:', error);
+      // Reload data to ensure consistency
+      loadCommissionData();
+    }
+  };
+
+  const markSelectedAsPaid = async () => {
+    if (selectedCommissions.length === 0) return;
+
+    try {
+      setProcessingPayment(true);
+      
+      const response = await fetch('/api/admin/commissions', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          commissionIds: selectedCommissions,
+          action: 'markPaid'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to mark commissions as paid');
+      }
+
+      // Reload data and clear selection
+      await loadCommissionData();
+      setSelectedCommissions([]);
+      
+    } catch (error) {
+      console.error('Error marking commissions as paid:', error);
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -412,10 +410,26 @@ export default function CommissionTrackingPage() {
           </p>
         </div>
         
-        <Button onClick={loadCommissionData} variant="outline">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex space-x-3">
+          {selectedCommissions.length > 0 && (
+            <Button 
+              onClick={markSelectedAsPaid}
+              disabled={processingPayment}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {processingPayment ? (
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4 mr-2" />
+              )}
+              Mark {selectedCommissions.length} as Paid
+            </Button>
+          )}
+          <Button onClick={loadCommissionData} variant="outline">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {commissionSummary && (
@@ -549,24 +563,58 @@ export default function CommissionTrackingPage() {
             <div className="lg:col-span-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Commission Details</CardTitle>
-                  <CardDescription>Individual commission records and payouts</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Commission Details</CardTitle>
+                      <CardDescription>Individual commission records and payouts</CardDescription>
+                    </div>
+                    {filteredCommissions.some(c => c.status === 'pending') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const pendingCommissions = filteredCommissions
+                            .filter(c => c.status === 'pending')
+                            .map(c => c.id);
+                          setSelectedCommissions(pendingCommissions);
+                        }}
+                      >
+                        Select All Pending
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     {filteredCommissions.map((commission) => (
                       <div key={commission.id} className="border rounded-lg p-4 hover:bg-gray-50">
                         <div className="flex items-start justify-between">
-                          <div className="space-y-2">
-                            <div className="flex items-center space-x-3">
-                              <span className="font-medium text-gray-900">{commission.partner_name}</span>
-                              {getStatusBadge(commission.status)}
-                            </div>
-                            <div className="text-sm text-gray-600 space-y-1">
-                              <p>Customer: {commission.customer_name || 'Unknown'}</p>
-                              <p>Code: {commission.referral_code}</p>
-                              <p>Order: {formatCurrency(commission.order_amount)} × {(commission.commission_rate * 100).toFixed(1)}%</p>
-                              <p>Date: {formatDate(commission.created_at)}</p>
+                          <div className="flex items-start space-x-3">
+                            {commission.status === 'pending' && (
+                              <input
+                                type="checkbox"
+                                checked={selectedCommissions.includes(commission.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedCommissions([...selectedCommissions, commission.id]);
+                                  } else {
+                                    setSelectedCommissions(selectedCommissions.filter(id => id !== commission.id));
+                                  }
+                                }}
+                                className="mt-1"
+                              />
+                            )}
+                            <div className="space-y-2">
+                              <div className="flex items-center space-x-3">
+                                <span className="font-medium text-gray-900">{commission.partner_name}</span>
+                                {getStatusBadge(commission.status)}
+                              </div>
+                              <div className="text-sm text-gray-600 space-y-1">
+                                <p>Customer: {commission.customer_name || 'Unknown'}</p>
+                                <p>Code: {commission.referral_code}</p>
+                                <p>Order: {formatCurrency(commission.order_amount)} × {(commission.commission_rate * 100).toFixed(1)}%</p>
+                                <p>Date: {formatDate(commission.created_at)}</p>
+                              </div>
                             </div>
                           </div>
                           

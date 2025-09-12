@@ -53,13 +53,21 @@ export async function GET(request: NextRequest) {
           // Get referral stats for this partner
           const { data: referralStats } = await supabaseService['supabase']
             .from('referrals')
-            .select('id, status, commission_amount')
+            .select('id, status')
+            .eq('partner_id', partner.id);
+          
+          // Get commission data from client_orders table (actual commission records)
+          const { data: commissionStats } = await supabaseService['supabase']
+            .from('client_orders')
+            .select('commission_amount, commission_paid')
             .eq('partner_id', partner.id);
           
           const totalReferrals = referralStats?.length || 0;
           const successfulReferrals = referralStats?.filter((r: any) => r.status === 'purchased').length || 0;
-          // Convert commission_amount from pence to pounds
-          const totalCommissions = referralStats?.reduce((sum: number, r: any) => sum + ((r.commission_amount || 0) / 100), 0) || 0;
+          // Convert commission_amount from pennies to pounds
+          const totalCommissions = commissionStats?.reduce((sum: number, c: any) => sum + ((c.commission_amount || 0) / 100), 0) || 0;
+          const paidCommissions = commissionStats?.filter((c: any) => c.commission_paid).reduce((sum: number, c: any) => sum + ((c.commission_amount || 0) / 100), 0) || 0;
+          const unpaidCommissions = totalCommissions - paidCommissions;
           
           partnersWithData.push({
             ...partner,
@@ -67,7 +75,9 @@ export async function GET(request: NextRequest) {
             approval_status: partner.approval_status || 'pending' as const,
             total_referrals: totalReferrals,
             successful_referrals: successfulReferrals,
-            total_commissions: totalCommissions
+            total_commissions: totalCommissions,
+            paid_commissions: paidCommissions,
+            unpaid_commissions: unpaidCommissions
           });
         }
       }
