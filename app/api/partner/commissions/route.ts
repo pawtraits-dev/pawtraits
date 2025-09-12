@@ -35,26 +35,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get partner profile for this user
-    const { data: partner, error: partnerError } = await supabase
-      .from('partners')
-      .select('id')
-      .eq('id', user.id)
+    // Get user profile to find the partner_id
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('partner_id')
+      .eq('user_id', user.id)
+      .eq('user_type', 'partner')
       .single();
 
-    if (partnerError || !partner) {
-      console.error('Partner lookup error:', partnerError);
+    if (profileError || !userProfile?.partner_id) {
+      console.error('User profile or partner ID not found:', profileError);
       return NextResponse.json(
-        { error: 'Partner not found' },
+        { error: 'Partner profile not found' },
         { status: 404 }
       );
     }
+
+    const partnerId = userProfile.partner_id;
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status'); // 'paid' or 'unpaid'
 
-    console.log('Partner commissions API: Fetching commission data for partner:', partner.id);
+    console.log('Partner commissions API: Fetching commission data for partner:', partnerId);
 
     // Get commission data
     let query = supabase
@@ -67,7 +70,7 @@ export async function GET(request: NextRequest) {
           client_email
         )
       `)
-      .eq('partner_id', partner.id);
+      .eq('partner_id', partnerId);
 
     if (status === 'paid') {
       query = query.eq('commission_paid', true);
@@ -116,7 +119,7 @@ export async function GET(request: NextRequest) {
       paidCommissions
     };
 
-    console.log('Partner commissions API: Found', orders?.length || 0, 'commission orders for partner', partner.id);
+    console.log('Partner commissions API: Found', orders?.length || 0, 'commission orders for partner', partnerId);
     return NextResponse.json(response);
 
   } catch (error) {
@@ -157,19 +160,23 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Get partner profile for this user
-    const { data: partner, error: partnerError } = await supabase
-      .from('partners')
-      .select('id')
-      .eq('id', user.id)
+    // Get user profile to find the partner_id
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('partner_id')
+      .eq('user_id', user.id)
+      .eq('user_type', 'partner')
       .single();
 
-    if (partnerError || !partner) {
+    if (profileError || !userProfile?.partner_id) {
+      console.error('User profile or partner ID not found:', profileError);
       return NextResponse.json(
-        { error: 'Partner not found' },
+        { error: 'Partner profile not found' },
         { status: 404 }
       );
     }
+
+    const partnerId = userProfile.partner_id;
 
     const { orderIds, action } = await request.json();
 
@@ -185,7 +192,7 @@ export async function PATCH(request: NextRequest) {
       const { data: existingOrders, error: verifyError } = await supabase
         .from('client_orders')
         .select('id')
-        .eq('partner_id', partner.id)
+        .eq('partner_id', partnerId)
         .in('id', orderIds);
 
       if (verifyError || !existingOrders || existingOrders.length !== orderIds.length) {
