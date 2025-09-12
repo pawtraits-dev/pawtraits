@@ -224,7 +224,7 @@ export interface CarouselContentWithDetails extends CarouselContentSelection {
   hero_image_alt: string;
   cta_text: string;
   cta_url: string;
-  theme_color_palette?: string;
+  theme_style_keywords?: string[];
   breed_animal_type?: 'dog' | 'cat';
 }
 
@@ -234,7 +234,7 @@ export interface Theme {
   description: string;
   hero_image_url?: string;
   hero_image_alt?: string;
-  color_palette?: string;
+  style_keywords?: string[];
   is_active: boolean;
 }
 

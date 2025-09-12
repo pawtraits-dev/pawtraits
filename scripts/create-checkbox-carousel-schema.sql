@@ -151,9 +151,9 @@ SELECT
     
     -- Additional metadata
     CASE ccs.content_type 
-        WHEN 'theme' THEN t.color_palette
+        WHEN 'theme' THEN t.style_keywords
         ELSE NULL
-    END as theme_color_palette,
+    END as theme_style_keywords,
     
     CASE ccs.content_type 
         WHEN 'dog_breed' THEN b.animal_type
