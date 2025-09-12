@@ -510,7 +510,7 @@ export default function PartnerDashboard() {
       value: `£${(stats.totalCommissions / 100).toFixed(2)}`,
       icon: DollarSign,
       color: 'bg-green-500',
-      href: '/partners/analytics'
+      href: '/partners/commissions'
     },
     {
       title: 'Conversion Rate',

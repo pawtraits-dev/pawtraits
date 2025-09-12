@@ -131,6 +131,9 @@ function ReferralsPageContent() {
             <Link href="/partners">
               <Button variant="outline">Back to Dashboard</Button>
             </Link>
+            <Link href="/partners/commissions">
+              <Button variant="outline">View Commissions</Button>
+            </Link>
             <Link href="/partners/referrals/create">
               <Button className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
                 <Plus className="w-4 h-4 mr-2" />
@@ -142,14 +145,22 @@ function ReferralsPageContent() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {stats.map((stat, index) => (
-            <Card key={index} className="border-green-200">
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-green-900">{stat.value}</div>
-                <div className="text-sm text-green-700">{stat.label}</div>
-              </CardContent>
-            </Card>
-          ))}
+          {stats.map((stat, index) => {
+            const isCommissionStat = stat.label === "Total Commissions"
+            const CardWrapper = isCommissionStat ? Link : 'div'
+            const cardProps = isCommissionStat ? { href: "/partners/commissions" } : {}
+            
+            return (
+              <CardWrapper key={index} {...cardProps}>
+                <Card className={`border-green-200 ${isCommissionStat ? 'hover:shadow-lg transition-shadow cursor-pointer' : ''}`}>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold text-green-900">{stat.value}</div>
+                    <div className="text-sm text-green-700">{stat.label}</div>
+                  </CardContent>
+                </Card>
+              </CardWrapper>
+            )
+          })}
         </div>
 
         {/* Filters and Search */}
