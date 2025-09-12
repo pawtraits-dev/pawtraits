@@ -281,9 +281,6 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
             
             <div className="flex items-center space-x-4">
               <CountrySelector compact={true} showLabel={false} />
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                Customer
-              </Badge>
               <CartIcon />
             </div>
           </div>

@@ -19,7 +19,6 @@ import {
   CheckCircle,
   ArrowRight,
   Handshake,
-  BarChart3,
   QrCode,
   Heart,
   Building,
@@ -521,11 +520,11 @@ export default function PartnerDashboard() {
       href: '/partners/commissions'
     },
     {
-      title: 'Conversion Rate',
-      value: `${stats.conversionRate.toFixed(1)}%`,
-      icon: TrendingUp,
-      color: 'bg-purple-500',
-      href: '/partners/analytics'
+      title: 'Pending Commissions',
+      value: `£${(stats.pendingCommissions / 100).toFixed(2)}`,
+      icon: Clock,
+      color: 'bg-orange-500',
+      href: '/partners/commissions'
     }
   ];
 
@@ -545,10 +544,10 @@ export default function PartnerDashboard() {
       color: 'from-blue-500 to-cyan-500'
     },
     {
-      title: 'View Analytics',
-      description: 'Track your performance and earnings',
-      icon: BarChart3,
-      href: '/partners/analytics',
+      title: 'View Commissions',
+      description: 'Track your earnings and payments',
+      icon: DollarSign,
+      href: '/partners/commissions',
       color: 'from-purple-500 to-pink-500'
     },
     {
@@ -601,7 +600,7 @@ export default function PartnerDashboard() {
           Welcome, {partner?.business_name || `${partner?.first_name} ${partner?.last_name}`}!
         </h1>
         <p className="text-gray-600 mt-2">
-          {partner?.status === 'approved' 
+          {partner?.approval_status === 'approved' 
             ? "Your partner account is active. Start earning commissions by referring clients!"
             : "Your partner application is being reviewed. You'll be notified once approved."
           }
@@ -609,7 +608,7 @@ export default function PartnerDashboard() {
       </div>
 
       {/* Account Status */}
-      {partner?.status !== 'approved' && (
+      {partner?.approval_status !== 'approved' && (
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="p-6">
             <div className="flex items-center space-x-3">

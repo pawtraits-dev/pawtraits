@@ -10,7 +10,6 @@ import CartIcon from '@/components/cart-icon';
 import { 
   Users, 
   ShoppingBag, 
-  BarChart3, 
   Target,
   Package,
   LogOut,
@@ -42,7 +41,7 @@ const navigationItems = [
   { name: 'Dashboard', href: '/partners', icon: Home },
   { name: 'Partner Shop', href: '/partners/shop', icon: ShoppingBag },
   { name: 'Referrals', href: '/partners/referrals', icon: Target },
-  { name: 'Analytics', href: '/partners/analytics', icon: BarChart3 },
+  { name: 'Commissions', href: '/partners/commissions', icon: DollarSign },
   { name: 'Orders', href: '/partners/orders', icon: Package },
   { name: 'Cart', href: '/partners/cart', icon: ShoppingCart },
   { name: 'Account', href: '/partners/account', icon: User },
@@ -198,10 +197,10 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
           </div>
           <div className="mt-2">
             <Badge 
-              variant={partner?.status === 'approved' ? 'default' : 'secondary'}
-              className={partner?.status === 'approved' ? 'bg-green-100 text-green-800' : ''}
+              variant={partner?.approval_status === 'approved' ? 'default' : 'secondary'}
+              className={partner?.approval_status === 'approved' ? 'bg-green-100 text-green-800' : ''}
             >
-              {partner?.status || 'Pending'}
+              {partner?.approval_status === 'approved' ? 'Approved' : 'Under Review'}
             </Badge>
           </div>
         </div>
