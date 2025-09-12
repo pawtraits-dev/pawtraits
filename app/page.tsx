@@ -479,11 +479,16 @@ function HomePageContent() {
       {/* Hero Carousel Section */}
       <section className="relative bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <ContentBasedCarousel 
-            pageType="home"
-            className="h-[40vh] md:h-[45vh]"
-            showControls={true}
-          />
+          {/* Container matching width of 3 middle grid cards */}
+          <div className="flex justify-center">
+            <div className="w-full max-w-2xl">
+              <ContentBasedCarousel 
+                pageType="home"
+                className="aspect-square w-full"
+                showControls={true}
+              />
+            </div>
+          </div>
         </div>
       </section>
 

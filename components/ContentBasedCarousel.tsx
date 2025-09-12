@@ -185,20 +185,19 @@ export default function ContentBasedCarousel({
               {currentContent.title}
             </h2>
 
-            {/* Subtitle */}
-            {currentContent.subtitle && (
-              <p className="text-xl md:text-2xl mb-6 opacity-90 drop-shadow-lg">
-                {currentContent.subtitle}
-              </p>
-            )}
-
-            {/* Description - First line only in bold */}
-            {currentContent.description && (() => {
+            {/* Subtitle/Description - First sentence only in bold, trim leading asterisks */}
+            {currentContent.subtitle && (() => {
+              // Clean up the subtitle text
+              let cleanText = currentContent.subtitle;
+              
+              // Remove leading asterisks and whitespace
+              cleanText = cleanText.replace(/^\*+\s*/, '');
+              
               // Extract first sentence (ending with ., !, or ?) or first line
-              const sentences = currentContent.description.match(/[^\.!?]*[\.!?]/);
+              const sentences = cleanText.match(/[^\.!?]*[\.!?]/);
               const firstSentence = sentences 
                 ? sentences[0].trim()
-                : currentContent.description.split('\n')[0].trim();
+                : cleanText.split('\n')[0].trim();
               
               return (
                 <p className="text-lg mb-8 opacity-80 max-w-2xl mx-auto drop-shadow-lg">
