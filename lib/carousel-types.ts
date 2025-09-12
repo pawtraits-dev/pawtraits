@@ -2,6 +2,8 @@
 
 export type PageType = 'home' | 'dogs' | 'cats' | 'themes';
 
+export type ContentType = 'theme' | 'dog_breed' | 'cat_breed';
+
 export type TextPosition = 
   | 'center' 
   | 'left' 
@@ -196,3 +198,64 @@ export const DefaultSlideSettings: Partial<CarouselSlideFormData> = {
   sort_order: 0,
   is_active: true
 };
+
+// New interfaces for checkbox-based carousel system
+export interface CarouselContentSelection {
+  id: string;
+  carousel_id: string;
+  content_type: ContentType;
+  content_id: string;
+  sort_order: number;
+  is_active: boolean;
+  custom_title?: string;
+  custom_subtitle?: string;
+  custom_description?: string;
+  custom_cta_text?: string;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+}
+
+export interface CarouselContentWithDetails extends CarouselContentSelection {
+  title: string;
+  subtitle: string;
+  description: string;
+  hero_image_url: string;
+  hero_image_alt: string;
+  cta_text: string;
+  cta_url: string;
+  theme_color_palette?: string;
+  breed_animal_type?: 'dog' | 'cat';
+}
+
+export interface Theme {
+  id: string;
+  name: string;
+  description: string;
+  hero_image_url?: string;
+  hero_image_alt?: string;
+  color_palette?: string;
+  is_active: boolean;
+}
+
+export interface Breed {
+  id: string;
+  name: string;
+  description: string;
+  hero_image_url?: string;
+  hero_image_alt?: string;
+  animal_type: 'dog' | 'cat';
+  popularity_rank?: number;
+  is_active: boolean;
+}
+
+export interface CarouselContentFormData {
+  carousel_id: string;
+  selected_themes: string[];
+  selected_dog_breeds: string[];
+  selected_cat_breeds: string[];
+}
+
+export interface CarouselWithContent extends Carousel {
+  content: CarouselContentWithDetails[];
+}

@@ -36,7 +36,7 @@ import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
 import PublicNavigation from '@/components/PublicNavigation';
-import EnhancedHeroCarousel from '@/components/EnhancedHeroCarousel';
+import ContentBasedCarousel from '@/components/ContentBasedCarousel';
 
 
 interface Review {
@@ -479,7 +479,7 @@ function HomePageContent() {
       {/* Hero Carousel Section */}
       <section className="relative bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <EnhancedHeroCarousel 
+          <ContentBasedCarousel 
             pageType="home"
             className="h-[40vh] md:h-[45vh]"
             showControls={true}

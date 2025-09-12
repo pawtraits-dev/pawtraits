@@ -22,7 +22,6 @@ import { useCountryPricing } from '@/lib/country-context';
 import ShareModal from '@/components/share-modal';
 import PartnerQRModal from '@/components/PartnerQRModal';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
-import ImageModal from '@/components/ImageModal';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import { extractDescriptionTitle } from '@/lib/utils';
 import StickyFilterHeader from '@/components/StickyFilterHeader';
@@ -59,8 +58,6 @@ export default function PartnerShopPage() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [partnerInfo, setPartnerInfo] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [showImageModal, setShowImageModal] = useState(false);
-  const [modalImage, setModalImage] = useState<ImageCatalogWithDetails | null>(null);
 
   const supabaseService = new SupabaseService();
   // Using SupabaseService for partner access
@@ -440,8 +437,7 @@ export default function PartnerShopPage() {
   };
 
   const handleImageClick = (image: ImageCatalogWithDetails) => {
-    setModalImage(image);
-    setShowImageModal(true);
+    router.push(`/image/${image.id}`);
   };
 
   const handleShareComplete = (platform: string) => {
@@ -895,40 +891,6 @@ export default function PartnerShopPage() {
           />
         )}
 
-        {/* Image Modal */}
-        {modalImage && (
-          <ImageModal
-            isOpen={showImageModal}
-            onClose={() => {
-              setShowImageModal(false);
-              setModalImage(null);
-            }}
-            imageId={modalImage.id}
-            imageData={{
-              id: modalImage.id,
-              description: modalImage.description,
-              prompt_text: modalImage.prompt_text,
-              breed_name: modalImage.breed_name,
-              theme_name: modalImage.theme_name,
-              style_name: modalImage.style_name,
-              coat_name: modalImage.coat_name,
-              is_featured: modalImage.is_featured,
-              rating: modalImage.rating,
-              tags: modalImage.tags,
-              public_url: modalImage.public_url,
-              image_url: modalImage.image_url
-            }}
-            onBuyClick={() => handleBuyClick(modalImage)}
-            onLikeClick={() => handleLike(modalImage.id)}
-            onShareClick={() => handleShare(modalImage)}
-            isLiked={likedImages.has(modalImage.id)}
-            isShared={sharedImages.has(modalImage.id)}
-            isPurchased={purchasedImages.has(modalImage.id)}
-            showActions={true}
-            products={products}
-            pricing={pricing}
-          />
-        )}
       </div>
     </div>
   );

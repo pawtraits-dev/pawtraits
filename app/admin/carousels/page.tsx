@@ -179,10 +179,10 @@ export default function CarouselManagementPage() {
 
               <div className="flex items-center justify-between pt-4 border-t">
                 <div className="flex items-center gap-2">
-                  <Link href={`/admin/carousels/${carousel.id}`}>
+                  <Link href={`/admin/carousels/${carousel.id}/content`}>
                     <Button size="sm" variant="outline">
                       <Images className="w-4 h-4 mr-1" />
-                      Slides
+                      Content
                     </Button>
                   </Link>
                   <Button size="sm" variant="outline" disabled>
