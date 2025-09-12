@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SupabaseService } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseService = new SupabaseService();
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function GET(
   request: NextRequest,
@@ -11,7 +12,12 @@ export async function GET(
     // TODO: Add admin authentication check
     const { id } = await params;
     
-    const { data, error } = await supabaseService['supabase']
+    // Create service role client to bypass RLS
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+    
+    const { data, error } = await supabase
       .from('partners')
       .select('*')
       .eq('id', id)
@@ -46,7 +52,12 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
     
-    const { data, error } = await supabaseService['supabase']
+    // Create service role client to bypass RLS
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+    
+    const { data, error } = await supabase
       .from('partners')
       .update(body)
       .eq('id', id)
