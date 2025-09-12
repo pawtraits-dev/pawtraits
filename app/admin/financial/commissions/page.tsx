@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Users, DollarSign, TrendingUp, CheckCircle, Clock, AlertCircle, RefreshCw } from 'lucide-react';
-import { SupabaseService } from '@/lib/supabase';
 
 interface Commission {
   id: string;
@@ -61,7 +60,6 @@ export default function CommissionTrackingPage() {
   const [selectedCommissions, setSelectedCommissions] = useState<string[]>([]);
   const [processingPayment, setProcessingPayment] = useState(false);
 
-  const supabaseService = new SupabaseService();
 
   useEffect(() => {
     loadCommissionData();
@@ -75,16 +73,21 @@ export default function CommissionTrackingPage() {
     try {
       setLoading(true);
       
-      console.log('Loading commission data from client_orders table...');
+      console.log('🔄 Client: Loading commission data from /api/admin/commissions...');
       
       // Load commission data from client_orders table (the actual commission records)
       const commissionsResponse = await fetch('/api/admin/commissions');
+      console.log('📡 Client: API response status:', commissionsResponse.status, commissionsResponse.statusText);
+      
       if (!commissionsResponse.ok) {
+        const errorText = await commissionsResponse.text();
+        console.error('❌ Client: API Error:', errorText);
         throw new Error('Failed to fetch commission data');
       }
       
       const commissionsData = await commissionsResponse.json();
-      console.log('Commission data loaded:', commissionsData.length, 'records');
+      console.log('📥 Client: Commission data loaded:', commissionsData.length, 'records');
+      console.log('📋 Client: Sample commission data:', commissionsData[0] || 'No data');
       
       // Apply date filter if needed
       let filteredCommissions = commissionsData;
@@ -114,10 +117,13 @@ export default function CommissionTrackingPage() {
         customer_name: commission.client_name || commission.client_email
       }));
 
-      console.log('Processed commissions:', processedCommissions.length);
+      console.log('🔄 Client: Processed commissions:', processedCommissions.length);
+      console.log('📋 Client: Sample processed commission:', processedCommissions[0] || 'No processed data');
 
       setCommissions(processedCommissions);
-      setCommissionSummary(calculateCommissionSummary(processedCommissions));
+      const summary = calculateCommissionSummary(processedCommissions);
+      console.log('📊 Client: Commission summary:', summary);
+      setCommissionSummary(summary);
 
     } catch (error) {
       console.error('Error loading commission data:', error);
