@@ -13,8 +13,8 @@ CREATE TABLE public.api_keys (
   created_at timestamp with time zone DEFAULT now(),
   created_by uuid,
   CONSTRAINT api_keys_pkey PRIMARY KEY (id),
-  CONSTRAINT api_keys_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-  CONSTRAINT api_keys_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
+  CONSTRAINT api_keys_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id),
+  CONSTRAINT api_keys_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.audit_events (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -135,8 +135,8 @@ CREATE TABLE public.cart_items (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT cart_items_pkey PRIMARY KEY (id),
-  CONSTRAINT cart_items_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id),
-  CONSTRAINT cart_items_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id)
+  CONSTRAINT cart_items_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id),
+  CONSTRAINT cart_items_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id)
 );
 CREATE TABLE public.client_orders (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -155,11 +155,14 @@ CREATE TABLE public.client_orders (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   customer_id uuid,
+  order_type text,
+  order_id uuid,
   CONSTRAINT client_orders_pkey PRIMARY KEY (id),
   CONSTRAINT client_orders_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES public.commission_payments(id),
-  CONSTRAINT client_orders_referral_id_fkey FOREIGN KEY (referral_id) REFERENCES public.referrals(id),
+  CONSTRAINT client_orders_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT client_orders_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
   CONSTRAINT client_orders_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id),
-  CONSTRAINT client_orders_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
+  CONSTRAINT client_orders_referral_id_fkey FOREIGN KEY (referral_id) REFERENCES public.referrals(id)
 );
 CREATE TABLE public.coats (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -413,6 +416,7 @@ CREATE TABLE public.order_items (
   image_url text,
   unit_price integer,
   total_price integer,
+  original_price integer,
   CONSTRAINT order_items_pkey PRIMARY KEY (id),
   CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id)
 );
@@ -442,7 +446,14 @@ CREATE TABLE public.orders (
   gelato_order_id text,
   gelato_status text CHECK (gelato_status IS NULL OR (gelato_status = ANY (ARRAY['pending'::text, 'processing'::text, 'shipped'::text, 'delivered'::text, 'error'::text]))),
   error_message text,
-  CONSTRAINT orders_pkey PRIMARY KEY (id)
+  placed_by_partner_id uuid,
+  client_email character varying,
+  client_name character varying,
+  order_type character varying DEFAULT 'customer'::character varying CHECK (order_type::text = ANY (ARRAY['customer'::character varying, 'partner'::character varying, 'partner_for_client'::character varying]::text[])),
+  shipping_address_line_1 character varying CHECK (shipping_address_line_1 IS NULL OR length(TRIM(BOTH FROM shipping_address_line_1)) > 0),
+  shipping_address_line_2 character varying,
+  CONSTRAINT orders_pkey PRIMARY KEY (id),
+  CONSTRAINT orders_placed_by_partner_id_fkey FOREIGN KEY (placed_by_partner_id) REFERENCES public.partners(id)
 );
 CREATE TABLE public.outfits (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -520,9 +531,9 @@ CREATE TABLE public.pets (
   updated_at timestamp with time zone DEFAULT now(),
   animal_type text NOT NULL DEFAULT 'dog'::text CHECK (animal_type = ANY (ARRAY['dog'::text, 'cat'::text])),
   CONSTRAINT pets_pkey PRIMARY KEY (id),
+  CONSTRAINT pets_coat_id_fkey FOREIGN KEY (coat_id) REFERENCES public.coats(id),
   CONSTRAINT pets_breed_id_fkey FOREIGN KEY (breed_id) REFERENCES public.breeds(id),
   CONSTRAINT pets_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-  CONSTRAINT pets_coat_id_fkey FOREIGN KEY (coat_id) REFERENCES public.coats(id),
   CONSTRAINT pets_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
 );
 CREATE TABLE public.platform_analytics (
@@ -679,8 +690,8 @@ CREATE TABLE public.referrals (
   client_first_name text,
   client_last_name text,
   CONSTRAINT referrals_pkey PRIMARY KEY (id),
-  CONSTRAINT referrals_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id),
   CONSTRAINT referrals_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id),
+  CONSTRAINT referrals_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id),
   CONSTRAINT referrals_pet_breed_id_fkey FOREIGN KEY (pet_breed_id) REFERENCES public.breeds(id),
   CONSTRAINT referrals_pet_coat_id_fkey FOREIGN KEY (pet_coat_id) REFERENCES public.coats(id)
 );
@@ -697,8 +708,8 @@ CREATE TABLE public.share_events (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT share_events_pkey PRIMARY KEY (id),
-  CONSTRAINT share_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-  CONSTRAINT share_events_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id)
+  CONSTRAINT share_events_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id),
+  CONSTRAINT share_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.share_social_accounts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -706,8 +717,8 @@ CREATE TABLE public.share_social_accounts (
   social_account_id uuid NOT NULL,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT share_social_accounts_pkey PRIMARY KEY (id),
-  CONSTRAINT share_social_accounts_share_event_id_fkey FOREIGN KEY (share_event_id) REFERENCES public.share_events(id),
-  CONSTRAINT share_social_accounts_social_account_id_fkey FOREIGN KEY (social_account_id) REFERENCES public.social_accounts(id)
+  CONSTRAINT share_social_accounts_social_account_id_fkey FOREIGN KEY (social_account_id) REFERENCES public.social_accounts(id),
+  CONSTRAINT share_social_accounts_share_event_id_fkey FOREIGN KEY (share_event_id) REFERENCES public.share_events(id)
 );
 CREATE TABLE public.social_accounts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -803,7 +814,7 @@ CREATE TABLE public.user_profiles (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT user_profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT user_profiles_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
   CONSTRAINT user_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-  CONSTRAINT user_profiles_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id),
-  CONSTRAINT user_profiles_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
+  CONSTRAINT user_profiles_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id)
 );

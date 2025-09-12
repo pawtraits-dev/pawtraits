@@ -83,16 +83,16 @@ export async function GET(request: NextRequest) {
       throw error;
     }
 
-    // Calculate totals
+    // Calculate totals (convert from pennies to pounds)
     const unpaidCommissions = orders?.filter(o => !o.commission_paid) || [];
     const paidCommissions = orders?.filter(o => o.commission_paid) || [];
     
     const unpaidTotal = unpaidCommissions.reduce((sum, order) => 
-      sum + (parseFloat(order.commission_amount) || 0), 0
+      sum + ((parseFloat(order.commission_amount) || 0) / 100), 0
     );
     
     const paidTotal = paidCommissions.reduce((sum, order) => 
-      sum + (parseFloat(order.commission_amount) || 0), 0
+      sum + ((parseFloat(order.commission_amount) || 0) / 100), 0
     );
 
     const totalCommissions = unpaidTotal + paidTotal;

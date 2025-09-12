@@ -53,8 +53,6 @@ function CommissionsPageContent() {
   const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [selectedOrders, setSelectedOrders] = useState<string[]>([])
-
   useEffect(() => {
     fetchCommissions()
   }, [statusFilter])
@@ -101,39 +99,6 @@ function CommissionsPageContent() {
     }
   }
 
-  const handleMarkPaid = async () => {
-    if (selectedOrders.length === 0) return
-
-    try {
-      // Get session for authorization
-      const supabase = getSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error('Not authenticated')
-
-      const response = await fetch('/api/partner/commissions', {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          orderIds: selectedOrders,
-          action: 'markPaid'
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to update commission status')
-      }
-
-      // Refresh data and clear selection
-      await fetchCommissions()
-      setSelectedOrders([])
-    } catch (error) {
-      console.error('Error marking commissions as paid:', error)
-      setError('Failed to update commission status')
-    }
-  }
 
   const getOrderTypeDisplay = (orderType: string, isInitial: boolean) => {
     if (isInitial) {
@@ -261,14 +226,6 @@ function CommissionsPageContent() {
                   <SelectItem value="paid">Paid Only</SelectItem>
                 </SelectContent>
               </Select>
-              {selectedOrders.length > 0 && (
-                <Button 
-                  onClick={handleMarkPaid}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  Mark {selectedOrders.length} as Paid
-                </Button>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -293,19 +250,6 @@ function CommissionsPageContent() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12">
-                        <input
-                          type="checkbox"
-                          checked={selectedOrders.length === ordersToDisplay.length && ordersToDisplay.length > 0}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedOrders(ordersToDisplay.map(order => order.id))
-                            } else {
-                              setSelectedOrders([])
-                            }
-                          }}
-                        />
-                      </TableHead>
                       <TableHead>Order ID</TableHead>
                       <TableHead>Client</TableHead>
                       <TableHead>Type</TableHead>
@@ -320,20 +264,11 @@ function CommissionsPageContent() {
                       const orderType = getOrderTypeDisplay(order.order_type, order.is_initial_order)
                       return (
                         <TableRow key={order.id}>
-                          <TableCell>
-                            <input
-                              type="checkbox"
-                              checked={selectedOrders.includes(order.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedOrders([...selectedOrders, order.id])
-                                } else {
-                                  setSelectedOrders(selectedOrders.filter(id => id !== order.id))
-                                }
-                              }}
-                            />
+                          <TableCell className="font-mono text-sm">
+                            <Link href={`/partners/orders/${order.order_id}`} className="text-blue-600 hover:underline">
+                              {order.order_id}
+                            </Link>
                           </TableCell>
-                          <TableCell className="font-mono text-sm">{order.order_id}</TableCell>
                           <TableCell>
                             <div className="text-sm">
                               <div className="font-medium">{order.client_name || 'N/A'}</div>
@@ -349,7 +284,7 @@ function CommissionsPageContent() {
                             <Badge className={orderType.color}>{orderType.label}</Badge>
                           </TableCell>
                           <TableCell className="font-medium">
-                            £{order.commission_amount.toFixed(2)}
+                            £{(order.commission_amount / 100).toFixed(2)}
                           </TableCell>
                           <TableCell>{order.commission_rate}%</TableCell>
                           <TableCell>

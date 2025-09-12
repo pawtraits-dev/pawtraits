@@ -19,6 +19,7 @@ function ReferralsPageContent() {
   const [sortBy, setSortBy] = useState("date")
 
   const [referrals, setReferrals] = useState<Referral[]>([])
+  const [commissionData, setCommissionData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -43,26 +44,40 @@ function ReferralsPageContent() {
         throw new Error('Not authenticated')
       }
 
-      console.log('Fetching referrals from /api/referrals...')
-      const response = await fetch('/api/referrals', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      })
+      console.log('Fetching referrals and commissions...')
       
-      console.log('Response status:', response.status)
-      console.log('Response ok:', response.ok)
+      // Fetch both referrals and commission data
+      const [referralsResponse, commissionsResponse] = await Promise.all([
+        fetch('/api/referrals', {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        }),
+        fetch('/api/partner/commissions', {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        })
+      ])
       
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Response error:', errorText)
+      console.log('Referrals response status:', referralsResponse.status)
+      console.log('Commissions response status:', commissionsResponse.status)
+      
+      if (!referralsResponse.ok) {
+        const errorText = await referralsResponse.text()
+        console.error('Referrals response error:', errorText)
         throw new Error('Failed to fetch referrals')
       }
       
-      const data = await response.json()
-      console.log('Referrals data received:', data)
-      console.log('Number of referrals:', data.length)
-      setReferrals(data)
+      const referralsData = await referralsResponse.json()
+      console.log('Referrals data received:', referralsData.length, 'referrals')
+      setReferrals(referralsData)
+      
+      // Commission data is optional - don't fail if it's not available
+      if (commissionsResponse.ok) {
+        const commissionDataResult = await commissionsResponse.json()
+        console.log('Commission data received:', commissionDataResult.summary)
+        setCommissionData(commissionDataResult)
+      } else {
+        console.warn('Commission data not available')
+        setCommissionData(null)
+      }
     } catch (error) {
       console.error('Error fetching referrals:', error)
       setError('Failed to load referrals')
@@ -92,15 +107,17 @@ function ReferralsPageContent() {
     )
   })
 
-  const totalCommissions = referrals
-    .reduce((sum, r) => sum + (r.total_commission_amount || 0), 0)
+  // Use commission data if available, otherwise fallback to referrals
+  const totalCommissions = commissionData 
+    ? parseFloat(commissionData.summary.totalCommissions) 
+    : referrals.reduce((sum, r) => sum + (r.total_commission_amount || 0), 0) / 100;
 
   const successfulReferrals = referrals.filter((r) => (r.order_count || 0) > 0).length
   
   const stats = [
     { label: "Total Referrals", value: referrals.length.toString() },
     { label: "Successful", value: successfulReferrals.toString() },
-    { label: "Total Commissions", value: `£${(totalCommissions / 100).toFixed(2)}` },
+    { label: "Total Commissions", value: `£${totalCommissions.toFixed(2)}` },
     {
       label: "Conversion Rate",
       value: referrals.length > 0 ? `${((successfulReferrals / referrals.length) * 100).toFixed(1)}%` : "0%",

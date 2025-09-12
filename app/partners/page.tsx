@@ -460,16 +460,24 @@ export default function PartnerDashboard() {
       setPartner(partnerData);
 
       if (partnerData) {
-        // Load referrals and other stats
-        const referrals = await fetch('/api/referrals', {
-          headers: {
-            'Authorization': `Bearer ${(await supabaseService.getClient().auth.getSession()).data.session?.access_token}`
-          }
-        }).then(res => res.ok ? res.json() : []).catch(() => []);
+        const sessionToken = (await supabaseService.getClient().auth.getSession()).data.session?.access_token;
+        
+        // Load referrals and commission data concurrently
+        const [referrals, commissionData] = await Promise.all([
+          fetch('/api/referrals', {
+            headers: { 'Authorization': `Bearer ${sessionToken}` }
+          }).then(res => res.ok ? res.json() : []).catch(() => []),
+          
+          fetch('/api/partner/commissions', {
+            headers: { 'Authorization': `Bearer ${sessionToken}` }
+          }).then(res => res.ok ? res.json() : null).catch(() => null)
+        ]);
 
         const activeReferrals = referrals.filter((r: any) => r.status === 'pending' || r.status === 'sent');
-        const totalCommissions = referrals.reduce((sum: number, r: any) => sum + (r.total_commission_amount || 0), 0);
-        const pendingCommissions = referrals.reduce((sum: number, r: any) => sum + (r.pending_commission || 0), 0);
+        
+        // Get commission totals from commission API (already converted from pennies)
+        const totalCommissions = commissionData ? parseFloat(commissionData.summary.totalCommissions) * 100 : 0; // Convert back to pennies for display consistency
+        const pendingCommissions = commissionData ? parseFloat(commissionData.summary.unpaidTotal) * 100 : 0; // Convert back to pennies for display consistency
 
         setStats({
           totalReferrals: referrals.length,
