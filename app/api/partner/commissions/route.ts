@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     const { data: partner, error: partnerError } = await supabase
       .from('partners')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('id', user.id)
       .single();
 
     if (partnerError || !partner) {
@@ -161,7 +161,7 @@ export async function PATCH(request: NextRequest) {
     const { data: partner, error: partnerError } = await supabase
       .from('partners')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('id', user.id)
       .single();
 
     if (partnerError || !partner) {
