@@ -35,23 +35,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user profile to find the partner_id
-    const { data: userProfile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('partner_id')
-      .eq('user_id', user.id)
-      .eq('user_type', 'partner')
-      .single();
-
-    if (profileError || !userProfile?.partner_id) {
-      console.error('User profile or partner ID not found:', profileError);
-      return NextResponse.json(
-        { error: 'Partner profile not found' },
-        { status: 404 }
-      );
-    }
-
-    const partnerId = userProfile.partner_id;
+    const partnerId = user.id; // Partner ID is the user ID
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
@@ -160,23 +144,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Get user profile to find the partner_id
-    const { data: userProfile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('partner_id')
-      .eq('user_id', user.id)
-      .eq('user_type', 'partner')
-      .single();
-
-    if (profileError || !userProfile?.partner_id) {
-      console.error('User profile or partner ID not found:', profileError);
-      return NextResponse.json(
-        { error: 'Partner profile not found' },
-        { status: 404 }
-      );
-    }
-
-    const partnerId = userProfile.partner_id;
+    const partnerId = user.id; // Partner ID is the user ID
 
     const { orderIds, action } = await request.json();
 
