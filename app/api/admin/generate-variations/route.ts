@@ -157,6 +157,9 @@ export async function POST(request: NextRequest) {
               rarity: breedCoatData.coats.rarity
             };
             
+            // Get original breed for cross-species detection
+            const originalBreedData = breedsData.find((breed: any) => breed.id === currentBreed);
+            
             const breedVariation = await geminiService.generateSingleBreedVariationWithCoat(
               originalImageData,
               originalPrompt,
@@ -164,7 +167,8 @@ export async function POST(request: NextRequest) {
               validCoat,
               currentThemeData,
               currentStyleData,
-              originalFormatData
+              originalFormatData,
+              originalBreedData
             );
             
             if (breedVariation) {
@@ -225,6 +229,9 @@ export async function POST(request: NextRequest) {
 
             for (const selectedCoat of selectedCoats) {
               try {
+                // Get original breed for cross-species detection
+                const originalBreedData = breedsData.find((breed: any) => breed.id === currentBreed);
+                
                 const breedVariation = await geminiService.generateSingleBreedVariationWithCoat(
                   originalImageData,
                   originalPrompt,
@@ -232,7 +239,8 @@ export async function POST(request: NextRequest) {
                   selectedCoat,
                   currentThemeData,
                   currentStyleData,
-                  originalFormatData
+                  originalFormatData,
+                  originalBreedData
                 );
                 
                 if (breedVariation) {

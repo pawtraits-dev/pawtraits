@@ -399,10 +399,11 @@ export class GeminiVariationService {
     validCoat: any,
     currentTheme?: any,
     currentStyle?: any,
-    originalFormat?: any
+    originalFormat?: any,
+    originalBreed?: Breed
   ): Promise<GeneratedVariation | null> {
     try {
-      const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle);
+      const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle, originalBreed);
       
       const prompt = [
         { text: variationPrompt },
@@ -426,7 +427,7 @@ export class GeminiVariationService {
         for (const part of response.candidates[0].content.parts) {
           if (part.inlineData?.data) {
             // Generate Midjourney prompt for catalog storage with valid coat
-            const midjourneyPrompt = this.createMidjourneyPromptForBreedWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle);
+            const midjourneyPrompt = this.createMidjourneyPromptForBreedWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle, originalBreed);
             
             return {
               imageData: part.inlineData.data,
@@ -519,16 +520,28 @@ export class GeminiVariationService {
     targetBreed: Breed, 
     validCoat: any,
     currentTheme?: any, 
-    currentStyle?: any
+    currentStyle?: any,
+    originalBreed?: Breed
   ): string {
     const { breed, outfit } = this.parseOriginalPrompt(originalPrompt);
+    
+    // Detect cross-species transformation
+    const isCrossSpecies = originalBreed && originalBreed.animal_type !== targetBreed.animal_type;
+    const originalAnimalType = originalBreed?.animal_type || (breed.toLowerCase().includes('cat') ? 'cat' : 'dog');
+    const targetAnimalType = targetBreed.animal_type;
     
     // Get fur length instruction for the target breed
     const breedPhysicalTraits = targetBreed.physical_traits as any || {};
     const breedCoatLength = breedPhysicalTraits.coat;
     const furLengthInstruction = this.getFurLengthInstruction(targetBreed.name, breedCoatLength);
     
-    return `Using the provided image of a ${breed.toLowerCase()} wearing ${outfit}, change the breed to a ${targetBreed.name.toLowerCase()} and change the fur color to ${validCoat.coat_name.toLowerCase()}. Apply the ${validCoat.coat_name.toLowerCase()} coloring throughout ALL body parts:\n- Face and head fur\n- Body and torso fur\n- All four legs completely\n- All four paws and feet\n- Tail fur\n- Any visible undercoat\n\n${furLengthInstruction}\n\nChange the breed characteristics (head shape, ear type, body size, facial features) and ensure the ${validCoat.coat_name.toLowerCase()} fur color is realistic and consistent for this ${targetBreed.name.toLowerCase()} breed. Keep the same clothing, pose, lighting, and overall composition.`;
+    if (isCrossSpecies) {
+      // Cross-species transformation prompt
+      return `Using the provided image of a ${originalAnimalType} (${originalBreed?.name || breed}) wearing ${outfit}, transform this ${originalAnimalType} into a ${targetAnimalType} breed: ${targetBreed.name.toLowerCase()}. This is a ${originalAnimalType}-to-${targetAnimalType} transformation. Apply the ${validCoat.coat_name.toLowerCase()} coloring throughout ALL body parts:\n- Face and head fur\n- Body and torso fur\n- All four legs completely\n- All four paws and feet\n- Tail fur\n- Any visible undercoat\n\n${furLengthInstruction}\n\nTransform the anatomy and characteristics completely from ${originalAnimalType} to ${targetAnimalType}: change head shape, ear type, body size, facial features, and tail to match a ${targetBreed.name.toLowerCase()}. Ensure the ${validCoat.coat_name.toLowerCase()} fur color is realistic and consistent for this ${targetBreed.name.toLowerCase()} breed. Keep the same clothing, pose, lighting, and overall composition.`;
+    } else {
+      // Same species breed variation prompt
+      return `Using the provided image of a ${breed.toLowerCase()} wearing ${outfit}, change the breed to a ${targetBreed.name.toLowerCase()} and change the fur color to ${validCoat.coat_name.toLowerCase()}. Apply the ${validCoat.coat_name.toLowerCase()} coloring throughout ALL body parts:\n- Face and head fur\n- Body and torso fur\n- All four legs completely\n- All four paws and feet\n- Tail fur\n- Any visible undercoat\n\n${furLengthInstruction}\n\nChange the breed characteristics (head shape, ear type, body size, facial features) and ensure the ${validCoat.coat_name.toLowerCase()} fur color is realistic and consistent for this ${targetBreed.name.toLowerCase()} breed. Keep the same clothing, pose, lighting, and overall composition.`;
+    }
   }
 
   /**
@@ -670,14 +683,19 @@ Ensure the ${targetCoat.coat_name.toLowerCase()} coloring is consistent across A
     targetBreed: Breed, 
     validCoat: any,
     currentTheme?: any, 
-    currentStyle?: any
+    currentStyle?: any,
+    originalBreed?: Breed
   ): string {
     const { outfit, aspectRatio } = this.parseOriginalPrompt(originalPrompt);
     
     const themePrompt = currentTheme?.base_prompt_template || '';
     const stylePrompt = currentStyle?.prompt_suffix || '';
     
-    return `A ${targetBreed.name.toLowerCase()} with ${validCoat.coat_name.toLowerCase()} fur, wearing ${outfit}, ${themePrompt}, ${stylePrompt}, --ar ${aspectRatio}`.replace(/,\s*,/g, ',').trim();
+    // Detect cross-species transformation for Midjourney prompt
+    const isCrossSpecies = originalBreed && originalBreed.animal_type !== targetBreed.animal_type;
+    const crossSpeciesNote = isCrossSpecies ? `(${originalBreed?.animal_type}-to-${targetBreed.animal_type} transformation) ` : '';
+    
+    return `A ${targetBreed.name.toLowerCase()} ${crossSpeciesNote}with ${validCoat.coat_name.toLowerCase()} fur, wearing ${outfit}, ${themePrompt}, ${stylePrompt}, --ar ${aspectRatio}`.replace(/,\s*,/g, ',').trim();
   }
 
   /**
