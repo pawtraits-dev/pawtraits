@@ -280,6 +280,7 @@ export default function ImageVariantGenerationModal({
   const [outfitSearch, setOutfitSearch] = useState('');
   const [formatSearch, setFormatSearch] = useState('');
   const [selectedAnimalType, setSelectedAnimalType] = useState<AnimalType | ''>('');
+  const [selectedAge, setSelectedAge] = useState<'same' | 'adult' | 'young'>('same');
   
   const [isGenerating, setIsGenerating] = useState(false);
   
@@ -563,6 +564,7 @@ export default function ImageVariantGenerationModal({
           currentTheme: image.theme_id || '',
           currentStyle: image.style_id || '',
           currentFormat: image.format_id || '', // Pass original format for inheritance
+          targetAge: selectedAge, // Pass age selection
           variationConfig: variationConfigToSend
         })
       });
@@ -951,6 +953,52 @@ export default function ImageVariantGenerationModal({
                   />
                   <label htmlFor="animal-all-modal" className="text-sm cursor-pointer">
                     All breeds (🐕🐱)
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Age Selection */}
+            <div>
+              <h3 className="font-medium text-gray-700 mb-3">Target Age</h3>
+              <div className="flex gap-3 mb-4">
+                <div className="flex items-center space-x-2 p-2 border rounded-lg">
+                  <input
+                    type="radio"
+                    id="age-same-modal"
+                    name="ageModal"
+                    checked={selectedAge === 'same'}
+                    onChange={() => setSelectedAge('same')}
+                    className="text-purple-600"
+                  />
+                  <label htmlFor="age-same-modal" className="text-sm cursor-pointer">
+                    Same age as original
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 border rounded-lg">
+                  <input
+                    type="radio"
+                    id="age-adult-modal"
+                    name="ageModal"
+                    checked={selectedAge === 'adult'}
+                    onChange={() => setSelectedAge('adult')}
+                    className="text-purple-600"
+                  />
+                  <label htmlFor="age-adult-modal" className="text-sm cursor-pointer">
+                    Adult {image.breed_animal_type || 'pet'}
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 border rounded-lg">
+                  <input
+                    type="radio"
+                    id="age-young-modal"
+                    name="ageModal"
+                    checked={selectedAge === 'young'}
+                    onChange={() => setSelectedAge('young')}
+                    className="text-purple-600"
+                  />
+                  <label htmlFor="age-young-modal" className="text-sm cursor-pointer">
+                    {image.breed_animal_type === 'cat' ? 'Kitten' : 'Puppy'}
                   </label>
                 </div>
               </div>

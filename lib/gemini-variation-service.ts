@@ -400,10 +400,11 @@ export class GeminiVariationService {
     currentTheme?: any,
     currentStyle?: any,
     originalFormat?: any,
-    originalBreed?: Breed
+    originalBreed?: Breed,
+    targetAge?: string
   ): Promise<GeneratedVariation | null> {
     try {
-      const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle, originalBreed);
+      const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle, originalBreed, targetAge);
       
       const prompt = [
         { text: variationPrompt },
@@ -521,7 +522,8 @@ export class GeminiVariationService {
     validCoat: any,
     currentTheme?: any, 
     currentStyle?: any,
-    originalBreed?: Breed
+    originalBreed?: Breed,
+    targetAge?: string
   ): string {
     const { breed, outfit } = this.parseOriginalPrompt(originalPrompt);
     
@@ -530,6 +532,9 @@ export class GeminiVariationService {
     const originalAnimalType = originalBreed?.animal_type || (breed.toLowerCase().includes('cat') ? 'cat' : 'dog');
     const targetAnimalType = targetBreed.animal_type;
     
+    // Handle age transformation
+    const ageInstruction = this.getAgeTransformationInstruction(targetAge, targetAnimalType);
+    
     // Get fur length instruction for the target breed
     const breedPhysicalTraits = targetBreed.physical_traits as any || {};
     const breedCoatLength = breedPhysicalTraits.coat;
@@ -537,10 +542,10 @@ export class GeminiVariationService {
     
     if (isCrossSpecies) {
       // Cross-species transformation prompt
-      return `Using the provided image of a ${originalAnimalType} (${originalBreed?.name || breed}) wearing ${outfit}, transform this ${originalAnimalType} into a ${targetAnimalType} breed: ${targetBreed.name.toLowerCase()}. This is a ${originalAnimalType}-to-${targetAnimalType} transformation. Apply the ${validCoat.coat_name.toLowerCase()} coloring throughout ALL body parts:\n- Face and head fur\n- Body and torso fur\n- All four legs completely\n- All four paws and feet\n- Tail fur\n- Any visible undercoat\n\n${furLengthInstruction}\n\nTransform the anatomy and characteristics completely from ${originalAnimalType} to ${targetAnimalType}: change head shape, ear type, body size, facial features, and tail to match a ${targetBreed.name.toLowerCase()}. Ensure the ${validCoat.coat_name.toLowerCase()} fur color is realistic and consistent for this ${targetBreed.name.toLowerCase()} breed. Keep the same clothing, pose, lighting, and overall composition.`;
+      return `Using the provided image of a ${originalAnimalType} (${originalBreed?.name || breed}) wearing ${outfit}, transform this ${originalAnimalType} into a ${targetAnimalType} breed: ${targetBreed.name.toLowerCase()}. This is a ${originalAnimalType}-to-${targetAnimalType} transformation. Apply the ${validCoat.coat_name.toLowerCase()} coloring throughout ALL body parts:\n- Face and head fur\n- Body and torso fur\n- All four legs completely\n- All four paws and feet\n- Tail fur\n- Any visible undercoat\n\n${ageInstruction}\n\n${furLengthInstruction}\n\nTransform the anatomy and characteristics completely from ${originalAnimalType} to ${targetAnimalType}: change head shape, ear type, body size, facial features, and tail to match a ${targetBreed.name.toLowerCase()}. Ensure the ${validCoat.coat_name.toLowerCase()} fur color is realistic and consistent for this ${targetBreed.name.toLowerCase()} breed. Keep the same clothing, pose, lighting, and overall composition.`;
     } else {
       // Same species breed variation prompt
-      return `Using the provided image of a ${breed.toLowerCase()} wearing ${outfit}, change the breed to a ${targetBreed.name.toLowerCase()} and change the fur color to ${validCoat.coat_name.toLowerCase()}. Apply the ${validCoat.coat_name.toLowerCase()} coloring throughout ALL body parts:\n- Face and head fur\n- Body and torso fur\n- All four legs completely\n- All four paws and feet\n- Tail fur\n- Any visible undercoat\n\n${furLengthInstruction}\n\nChange the breed characteristics (head shape, ear type, body size, facial features) and ensure the ${validCoat.coat_name.toLowerCase()} fur color is realistic and consistent for this ${targetBreed.name.toLowerCase()} breed. Keep the same clothing, pose, lighting, and overall composition.`;
+      return `Using the provided image of a ${breed.toLowerCase()} wearing ${outfit}, change the breed to a ${targetBreed.name.toLowerCase()} and change the fur color to ${validCoat.coat_name.toLowerCase()}. Apply the ${validCoat.coat_name.toLowerCase()} coloring throughout ALL body parts:\n- Face and head fur\n- Body and torso fur\n- All four legs completely\n- All four paws and feet\n- Tail fur\n- Any visible undercoat\n\n${ageInstruction}\n\n${furLengthInstruction}\n\nChange the breed characteristics (head shape, ear type, body size, facial features) and ensure the ${validCoat.coat_name.toLowerCase()} fur color is realistic and consistent for this ${targetBreed.name.toLowerCase()} breed. Keep the same clothing, pose, lighting, and overall composition.`;
     }
   }
 
@@ -574,6 +579,42 @@ export class GeminiVariationService {
 ${furLengthInstruction}
 
 Ensure the ${targetCoat.coat_name.toLowerCase()} coloring is consistent across ALL visible fur areas. Keep the same breed characteristics, clothing, pose, lighting, and overall composition. Only change the fur/coat color, pattern, and length as specified.`;
+  }
+
+  /**
+   * Get age transformation instruction
+   */
+  private getAgeTransformationInstruction(targetAge?: string, animalType?: string): string {
+    if (!targetAge || targetAge === 'same') {
+      return ''; // No age change
+    }
+    
+    const youngTerm = animalType === 'cat' ? 'kitten' : 'puppy';
+    const adultTerm = animalType === 'cat' ? 'adult cat' : 'adult dog';
+    
+    if (targetAge === 'young') {
+      return `IMPORTANT: Transform this into a ${youngTerm} (young ${animalType}). Make the features smaller, rounder, and more juvenile:
+- Larger eyes relative to head size
+- Shorter muzzle and smaller nose
+- Rounder, more proportioned head
+- Smaller, more compact body
+- Shorter legs relative to body
+- Softer, fluffier fur texture appropriate for a ${youngTerm}
+- Overall more adorable and youthful appearance`;
+    }
+    
+    if (targetAge === 'adult') {
+      return `IMPORTANT: Transform this into an ${adultTerm} (mature ${animalType}). Make the features more mature and fully developed:
+- Properly proportioned adult eyes
+- Full-sized muzzle and nose
+- Adult head proportions
+- Full-sized mature body
+- Adult leg proportions
+- Mature fur texture appropriate for an ${adultTerm}
+- Overall mature and fully-grown appearance`;
+    }
+    
+    return '';
   }
 
   /**

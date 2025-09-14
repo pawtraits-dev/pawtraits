@@ -39,6 +39,7 @@ export function VariationsSelector({
   isGenerating
 }: VariationsSelectorProps) {
   const [selectedAnimalType, setSelectedAnimalType] = useState<AnimalType | ''>(currentAnimalType || '');
+  const [selectedAge, setSelectedAge] = useState<'same' | 'adult' | 'young'>('same');
   const [selectedBreeds, setSelectedBreeds] = useState<string[]>([]);
   const [selectedCoats, setSelectedCoats] = useState<string[]>([]);
   const [selectedOutfits, setSelectedOutfits] = useState<string[]>([]);
@@ -186,6 +187,52 @@ export function VariationsSelector({
               />
               <label htmlFor="animal-all" className="text-sm cursor-pointer">
                 All breeds (🐕🐱)
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Age Selection */}
+        <div>
+          <h3 className="font-medium text-gray-700 mb-3">Target Age</h3>
+          <div className="flex gap-3">
+            <div className="flex items-center space-x-2 p-2 border rounded-lg">
+              <input
+                type="radio"
+                id="age-same"
+                name="ageType"
+                checked={selectedAge === 'same'}
+                onChange={() => setSelectedAge('same')}
+                className="text-purple-600"
+              />
+              <label htmlFor="age-same" className="text-sm cursor-pointer">
+                Same age as original
+              </label>
+            </div>
+            <div className="flex items-center space-x-2 p-2 border rounded-lg">
+              <input
+                type="radio"
+                id="age-adult"
+                name="ageType"
+                checked={selectedAge === 'adult'}
+                onChange={() => setSelectedAge('adult')}
+                className="text-purple-600"
+              />
+              <label htmlFor="age-adult" className="text-sm cursor-pointer">
+                Adult {currentAnimalType || 'pet'}
+              </label>
+            </div>
+            <div className="flex items-center space-x-2 p-2 border rounded-lg">
+              <input
+                type="radio"
+                id="age-young"
+                name="ageType"
+                checked={selectedAge === 'young'}
+                onChange={() => setSelectedAge('young')}
+                className="text-purple-600"
+              />
+              <label htmlFor="age-young" className="text-sm cursor-pointer">
+                {currentAnimalType === 'cat' ? 'Kitten' : 'Puppy'}
               </label>
             </div>
           </div>

@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     });
 
     const body = await request.json();
-    const { originalImageData, originalPrompt, currentBreed, currentCoat, currentTheme, currentStyle, currentFormat, variationConfig } = body;
+    const { originalImageData, originalPrompt, currentBreed, currentCoat, currentTheme, currentStyle, currentFormat, targetAge, variationConfig } = body;
     
     console.log('Received variationConfig:', JSON.stringify(variationConfig, null, 2));
 
@@ -168,7 +168,8 @@ export async function POST(request: NextRequest) {
               currentThemeData,
               currentStyleData,
               originalFormatData,
-              originalBreedData
+              originalBreedData,
+              targetAge
             );
             
             if (breedVariation) {
@@ -240,7 +241,8 @@ export async function POST(request: NextRequest) {
                   currentThemeData,
                   currentStyleData,
                   originalFormatData,
-                  originalBreedData
+                  originalBreedData,
+                  targetAge
                 );
                 
                 if (breedVariation) {
