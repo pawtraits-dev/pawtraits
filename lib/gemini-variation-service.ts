@@ -404,10 +404,18 @@ export class GeminiVariationService {
     targetAge?: string
   ): Promise<GeneratedVariation | null> {
     const generationStartTime = Date.now();
+    const maxRetries = 2; // Retry up to 2 times for 500 errors
+    let lastError: any = null;
     
-    try {
-      
-      const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle, originalBreed, targetAge);
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          const retryDelay = 2000 * attempt; // Progressive delay: 2s, 4s
+          console.log(`🔄 RETRY ${attempt}/${maxRetries}: ${targetBreed.name} after ${retryDelay}ms delay`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+        
+        const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle, originalBreed, targetAge);
       
       const prompt = [
         { text: variationPrompt },
@@ -439,7 +447,8 @@ export class GeminiVariationService {
             const generationEndTime = Date.now();
             const totalDuration = generationEndTime - generationStartTime;
             
-            console.log(`✅ GEMINI SUCCESS: ${targetBreed.name} generated image (total: ${totalDuration}ms)`);
+            const successMessage = attempt > 0 ? `✅ GEMINI RETRY SUCCESS: ${targetBreed.name} on attempt ${attempt + 1} (total: ${totalDuration}ms)` : `✅ GEMINI SUCCESS: ${targetBreed.name} generated image (total: ${totalDuration}ms)`;
+            console.log(successMessage);
             
             // Generate Midjourney prompt for catalog storage with valid coat
             const midjourneyPrompt = this.createMidjourneyPromptForBreedWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle, originalBreed);
@@ -498,9 +507,28 @@ export class GeminiVariationService {
           console.error('🚨 Error code:', error.code);
         }
       }
+      
+      lastError = error;
+      
+      // Only retry on 500 errors (server issues), not 400/429 errors
+      if (error && typeof error === 'object' && 'status' in error && error.status === 500 && attempt < maxRetries) {
+        console.log(`💡 Retryable error (500), will retry attempt ${attempt + 1}/${maxRetries}`);
+        continue; // Continue to next retry attempt
+      } else {
+        // Non-retryable error or max retries reached
+        break;
+      }
     }
-    
-    return null;
+  }
+  
+  // All retries exhausted
+  if (lastError) {
+    const generationEndTime = Date.now();
+    const totalDuration = generationEndTime - generationStartTime;
+    console.log(`💀 ALL RETRIES EXHAUSTED: ${targetBreed.name} after ${maxRetries} retries (${totalDuration}ms total)`);
+  }
+  
+  return null;
   }
 
   /**

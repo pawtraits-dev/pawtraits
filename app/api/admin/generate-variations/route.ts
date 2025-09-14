@@ -90,30 +90,23 @@ export async function POST(request: NextRequest) {
       console.log('🔍 Processing variationConfig.breedCoats:', variationConfig.breedCoats);
       console.log('📊 Available breeds from database:', breedsData?.map(b => ({ id: b.id, name: b.name, type: b.animal_type })) || []);
       
-      const batchSize = 3; // Reduced batch size for better success rate
-      const breedCoatBatches = [];
-      
-      for (let i = 0; i < variationConfig.breedCoats.length; i += batchSize) {
-        breedCoatBatches.push(variationConfig.breedCoats.slice(i, i + batchSize));
-      }
-      
-      console.log(`🎯 Processing ${variationConfig.breedCoats.length} breed-coat combinations in ${breedCoatBatches.length} batches (size: ${batchSize})`);
+      console.log(`🎯 Processing ${variationConfig.breedCoats.length} breed-coat combinations SEQUENTIALLY`);
       
       let totalAttempted = 0;
       let totalSuccessful = 0;
       let totalFailed = 0;
       const startTime = Date.now();
       
-      for (let batchIndex = 0; batchIndex < breedCoatBatches.length; batchIndex++) {
-        const batch = breedCoatBatches[batchIndex];
-        console.log(`\n📦 BATCH ${batchIndex + 1}/${breedCoatBatches.length} START (${batch.length} items)`);
-        const batchStartTime = Date.now();
+      // Process items sequentially instead of in parallel batches
+      for (let itemIndex = 0; itemIndex < variationConfig.breedCoats.length; itemIndex++) {
+        const breedCoat = variationConfig.breedCoats[itemIndex];
+        console.log(`\n🔄 ITEM ${itemIndex + 1}/${variationConfig.breedCoats.length} START`);
         
-        const batchPromises = batch.map(async (breedCoat: any, itemIndex: number) => {
+        const itemResult = await (async () => {
           const itemStartTime = Date.now();
           totalAttempted++;
           try {
-            console.log(`🎯 Processing breed-coat pair ${itemIndex + 1}/${batch.length}:`, breedCoat);
+            console.log(`🎯 Processing breed-coat pair:`, breedCoat);
             
             // Get breed data
             const targetBreed = breedsData.find((breed: any) => breed.id === breedCoat.breedId);
@@ -206,22 +199,18 @@ export async function POST(request: NextRequest) {
             console.error(`🔥 EXCEPTION: Error generating ${breedCoat.breedId}-${breedCoat.coatId} (${itemDuration}ms):`, error);
             return null;
           }
-        });
+        })();
         
-        const batchResults = await Promise.all(batchPromises);
-        const validResults = batchResults.filter(result => result !== null);
-        const batchEndTime = Date.now();
-        const batchDuration = batchEndTime - batchStartTime;
+        if (itemResult) {
+          results.push(itemResult);
+        }
         
-        console.log(`📦 BATCH ${batchIndex + 1} COMPLETE: ${validResults.length}/${batchResults.length} successful (${batchDuration}ms)`);
-        console.log(`📊 Current totals: ${totalSuccessful} success, ${totalFailed} failed, ${totalAttempted} attempted`);
+        console.log(`📊 Progress: ${totalSuccessful} success, ${totalFailed} failed, ${totalAttempted} attempted (${itemIndex + 1}/${variationConfig.breedCoats.length})`);
         
-        results.push(...validResults);
-        
-        // Add delay between batches to prevent API rate limiting
-        if (batchIndex < breedCoatBatches.length - 1) {
-          console.log('⏳ Waiting 2 seconds before next batch...');
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Increased to 2 second delay
+        // Add delay between items to prevent API rate limiting
+        if (itemIndex < variationConfig.breedCoats.length - 1) {
+          console.log('⏳ Waiting 3 seconds before next item...');
+          await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay between items
         }
       }
       
