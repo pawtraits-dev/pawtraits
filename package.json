@@ -88,6 +88,6 @@
     "@types/lodash": "^4.17.7",
     "@types/qrcode": "^1.5.5",
     "@types/stripe": "^8.0.417",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.6.1"
   }
 }
