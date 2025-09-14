@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Wand2, RefreshCw, X, Search } from 'lucide-react';
 import { SupabaseService } from '@/lib/supabase';
-import type { ImageCatalogWithDetails, Breed, Outfit, Format, BreedCoatDetail } from '@/lib/types';
+import type { ImageCatalogWithDetails, Breed, Outfit, Format, BreedCoatDetail, AnimalType } from '@/lib/types';
 import { Textarea } from '@/components/ui/textarea';
 import { Copy, ArrowLeft, CheckCircle, Brain } from 'lucide-react';
 import { uploadImagesDirectBatch } from '@/lib/cloudinary-client';
@@ -279,14 +279,17 @@ export default function ImageVariantGenerationModal({
   const [breedSearch, setBreedSearch] = useState('');
   const [outfitSearch, setOutfitSearch] = useState('');
   const [formatSearch, setFormatSearch] = useState('');
+  const [selectedAnimalType, setSelectedAnimalType] = useState<AnimalType | ''>('');
   
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Filtered arrays based on search - sort breeds alphabetically
+  // Filtered arrays based on search and animal type - sort breeds alphabetically
   const filteredBreeds = breeds
-    .filter(breed => 
-      breed.name.toLowerCase().includes(breedSearch.toLowerCase())
-    )
+    .filter(breed => {
+      const matchesSearch = breed.name.toLowerCase().includes(breedSearch.toLowerCase());
+      const matchesAnimalType = selectedAnimalType ? breed.animal_type === selectedAnimalType : true;
+      return matchesSearch && matchesAnimalType;
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
   
   const filteredOutfits = outfits.filter(outfit =>
@@ -898,6 +901,61 @@ export default function ImageVariantGenerationModal({
               </div>
             </div>
 
+            {/* Animal Type Filter */}
+            <div>
+              <h3 className="font-medium text-gray-700 mb-3">Target Animal Type</h3>
+              <div className="flex gap-3 mb-4">
+                <div className="flex items-center space-x-2 p-2 border rounded-lg">
+                  <input
+                    type="radio"
+                    id="animal-same-modal"
+                    name="animalTypeModal"
+                    checked={selectedAnimalType === image.breed_animal_type}
+                    onChange={() => {
+                      setSelectedAnimalType(image.breed_animal_type || '');
+                      setSelectedBreedCoats({}); // Clear selections when changing animal type
+                    }}
+                    className="text-purple-600"
+                  />
+                  <label htmlFor="animal-same-modal" className="text-sm cursor-pointer">
+                    Same ({image.breed_animal_type === 'dog' ? '🐕 Dog' : '🐱 Cat'}) breeds
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 border rounded-lg">
+                  <input
+                    type="radio"
+                    id="animal-cross-modal"
+                    name="animalTypeModal"
+                    checked={selectedAnimalType !== image.breed_animal_type && selectedAnimalType !== ''}
+                    onChange={() => {
+                      setSelectedAnimalType(image.breed_animal_type === 'dog' ? 'cat' : 'dog');
+                      setSelectedBreedCoats({}); // Clear selections when changing animal type
+                    }}
+                    className="text-purple-600"
+                  />
+                  <label htmlFor="animal-cross-modal" className="text-sm cursor-pointer">
+                    Cross-species ({image.breed_animal_type === 'dog' ? '🐱 Cat' : '🐕 Dog'}) breeds
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 border rounded-lg">
+                  <input
+                    type="radio"
+                    id="animal-all-modal"
+                    name="animalTypeModal"
+                    checked={selectedAnimalType === ''}
+                    onChange={() => {
+                      setSelectedAnimalType('');
+                      setSelectedBreedCoats({}); // Clear selections when changing animal type
+                    }}
+                    className="text-purple-600"
+                  />
+                  <label htmlFor="animal-all-modal" className="text-sm cursor-pointer">
+                    All breeds (🐕🐱)
+                  </label>
+                </div>
+              </div>
+            </div>
+
             {/* Breed & Coat Variations - Nested Structure */}
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -954,7 +1012,9 @@ export default function ImageVariantGenerationModal({
                           <span className={`transform transition-transform ${
                             isExpanded ? 'rotate-90' : ''
                           }`}>▶</span>
-                          <span className="font-medium text-sm">{breed.name}</span>
+                          <span className="font-medium text-sm">
+                            {breed.animal_type === 'cat' ? '🐱' : '🐕'} {breed.name}
+                          </span>
                           {selectedCoatsForBreed.length > 0 && (
                             <Badge variant="secondary" className="text-xs">
                               {selectedCoatsForBreed.length} coat{selectedCoatsForBreed.length > 1 ? 's' : ''}
