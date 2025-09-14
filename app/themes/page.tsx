@@ -31,7 +31,7 @@ import ShareModal from '@/components/share-modal';
 import UserInteractionsService from '@/lib/user-interactions';
 import { useServerCart } from '@/lib/server-cart-context';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
-import EnhancedHeroCarousel from '@/components/EnhancedHeroCarousel';
+import ContentBasedCarousel from '@/components/ContentBasedCarousel';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
@@ -172,11 +172,16 @@ function ThemesPageContent() {
       {/* Hero Carousel Section */}
       <section className="relative bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <EnhancedHeroCarousel 
-            pageType="themes"
-            className="h-[40vh] md:h-[45vh]"
-            showControls={true}
-          />
+          {/* Container matching width of 3 middle grid cards */}
+          <div className="flex justify-center">
+            <div className="w-full max-w-2xl">
+              <ContentBasedCarousel 
+                pageType="themes"
+                className="aspect-square w-full"
+                showControls={true}
+              />
+            </div>
+          </div>
         </div>
       </section>
 

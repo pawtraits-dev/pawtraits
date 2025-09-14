@@ -155,7 +155,7 @@ export default function ContentBasedCarousel({
     <div className={`relative rounded-lg overflow-hidden ${className}`}>
       {/* Main Carousel */}
       <div className="relative h-full">
-        {/* Background Image - 1:1 aspect ratio centered */}
+        {/* Background Image - 1:1 aspect ratio centered, no masking */}
         <div 
           className="absolute inset-0 bg-cover bg-center"
           style={{
@@ -166,12 +166,11 @@ export default function ContentBasedCarousel({
             backgroundPosition: 'center center'
           }}
         >
-          <div className="absolute inset-0 bg-black bg-opacity-40"></div>
         </div>
 
-        {/* Content Overlay */}
-        <div className="relative h-full flex items-center justify-center">
-          <div className="text-center text-white max-w-4xl px-8">
+        {/* Content Overlay - Positioned at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent">
+          <div className="text-center text-white max-w-4xl mx-auto px-8 py-8">
             {/* Badge */}
             <div className="mb-4">
               <Badge className={`${badge.color} inline-flex items-center gap-2`}>
@@ -181,7 +180,7 @@ export default function ContentBasedCarousel({
             </div>
 
             {/* Title */}
-            <h2 className="text-4xl md:text-6xl font-bold mb-4 font-[family-name:var(--font-life-savers)] drop-shadow-lg">
+            <h2 className="text-2xl md:text-4xl font-bold mb-2 font-[family-name:var(--font-life-savers)] drop-shadow-lg">
               {currentContent.title}
             </h2>
 
@@ -200,7 +199,7 @@ export default function ContentBasedCarousel({
                 : cleanText.split('\n')[0].trim();
               
               return (
-                <p className="text-lg mb-8 opacity-80 max-w-2xl mx-auto drop-shadow-lg">
+                <p className="text-sm md:text-lg mb-4 opacity-90 max-w-2xl mx-auto drop-shadow-lg">
                   <strong>{firstSentence}</strong>
                 </p>
               );
@@ -208,12 +207,12 @@ export default function ContentBasedCarousel({
 
             {/* CTA Button */}
             <Button
-              size="lg"
-              className="bg-white text-purple-600 hover:bg-gray-100 font-semibold px-8 py-3 text-lg"
+              size="sm"
+              className="bg-white text-purple-600 hover:bg-gray-100 font-semibold px-6 py-2 text-sm"
               onClick={() => handleSlideClick(currentContent)}
             >
               {currentContent.cta_text}
-              <ArrowRight className="w-5 h-5 ml-2" />
+              <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
           </div>
         </div>

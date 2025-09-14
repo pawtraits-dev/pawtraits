@@ -34,7 +34,7 @@ import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
-import EnhancedHeroCarousel from '@/components/EnhancedHeroCarousel';
+import ContentBasedCarousel from '@/components/ContentBasedCarousel';
 import StickyFilterHeader from '@/components/StickyFilterHeader';
 
 
@@ -360,6 +360,22 @@ function CatsPageContent() {
           updateUrlParams({ search: null, breed: null, theme: null, featured: null });
         }}
       />
+
+      {/* Hero Carousel Section */}
+      <section className="relative bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Container matching width of 3 middle grid cards */}
+          <div className="flex justify-center">
+            <div className="w-full max-w-2xl">
+              <ContentBasedCarousel 
+                pageType="cats"
+                className="aspect-square w-full"
+                showControls={true}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-purple-50 to-blue-50 py-20">
