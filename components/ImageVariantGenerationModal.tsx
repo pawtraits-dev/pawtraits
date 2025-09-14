@@ -321,7 +321,7 @@ export default function ImageVariantGenerationModal({
     try {
       // Use API endpoints with proper error handling like admin generate page
       const [breedsRes, outfitsRes, formatsRes] = await Promise.all([
-        fetch(`/api/breeds${image.breed_animal_type ? `?animal_type=${image.breed_animal_type}` : ''}`).catch((error) => {
+        fetch('/api/breeds').catch((error) => {
           console.error('Failed to fetch breeds:', error);
           return { ok: false, json: () => [] };
         }),
