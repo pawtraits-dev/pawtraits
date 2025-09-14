@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Wand2, RefreshCw, Upload, Download } from 'lucide-react';
-import type { Breed, Outfit, Format, BreedCoatDetail } from '@/lib/types';
+import type { Breed, Outfit, Format, BreedCoatDetail, AnimalType } from '@/lib/types';
 
 interface VariationsSelectorProps {
   originalImage: File | null;
   originalPrompt: string;
   currentBreed: string;
+  currentAnimalType?: AnimalType;
   breeds: Breed[];
   availableCoats: BreedCoatDetail[];
   outfits: Outfit[];
@@ -29,6 +30,7 @@ export function VariationsSelector({
   originalImage,
   originalPrompt,
   currentBreed,
+  currentAnimalType,
   breeds,
   availableCoats,
   outfits,
@@ -36,6 +38,7 @@ export function VariationsSelector({
   onGenerateVariations,
   isGenerating
 }: VariationsSelectorProps) {
+  const [selectedAnimalType, setSelectedAnimalType] = useState<AnimalType | ''>(currentAnimalType || '');
   const [selectedBreeds, setSelectedBreeds] = useState<string[]>([]);
   const [selectedCoats, setSelectedCoats] = useState<string[]>([]);
   const [selectedOutfits, setSelectedOutfits] = useState<string[]>([]);
@@ -71,6 +74,16 @@ export function VariationsSelector({
         ? prev.filter(id => id !== formatId)
         : [...prev, formatId]
     );
+  };
+
+  const getFilteredBreeds = () => {
+    let filteredBreeds = breeds.filter(breed => breed.id !== currentBreed);
+    
+    if (selectedAnimalType) {
+      filteredBreeds = filteredBreeds.filter(breed => breed.animal_type === selectedAnimalType);
+    }
+    
+    return filteredBreeds;
   };
 
   const getTotalVariations = () => {
@@ -123,6 +136,61 @@ export function VariationsSelector({
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Animal Type Selection */}
+        <div>
+          <h3 className="font-medium text-gray-700 mb-3">Target Animal Type</h3>
+          <div className="flex gap-3">
+            <div className="flex items-center space-x-2 p-2 border rounded-lg">
+              <input
+                type="radio"
+                id="animal-same"
+                name="animalType"
+                checked={selectedAnimalType === currentAnimalType}
+                onChange={() => {
+                  setSelectedAnimalType(currentAnimalType || '');
+                  setSelectedBreeds([]); // Clear breed selection when changing animal type
+                }}
+                className="text-purple-600"
+              />
+              <label htmlFor="animal-same" className="text-sm cursor-pointer">
+                Same ({currentAnimalType === 'dog' ? '🐕 Dog' : '🐱 Cat'}) breeds
+              </label>
+            </div>
+            <div className="flex items-center space-x-2 p-2 border rounded-lg">
+              <input
+                type="radio"
+                id="animal-cross"
+                name="animalType"
+                checked={selectedAnimalType !== currentAnimalType && selectedAnimalType !== ''}
+                onChange={() => {
+                  setSelectedAnimalType(currentAnimalType === 'dog' ? 'cat' : 'dog');
+                  setSelectedBreeds([]); // Clear breed selection when changing animal type
+                }}
+                className="text-purple-600"
+              />
+              <label htmlFor="animal-cross" className="text-sm cursor-pointer">
+                Cross-species ({currentAnimalType === 'dog' ? '🐱 Cat' : '🐕 Dog'}) breeds
+              </label>
+            </div>
+            <div className="flex items-center space-x-2 p-2 border rounded-lg">
+              <input
+                type="radio"
+                id="animal-all"
+                name="animalType"
+                checked={selectedAnimalType === ''}
+                onChange={() => {
+                  setSelectedAnimalType('');
+                  setSelectedBreeds([]); // Clear breed selection when changing animal type
+                }}
+                className="text-purple-600"
+              />
+              <label htmlFor="animal-all" className="text-sm cursor-pointer">
+                All breeds (🐕🐱)
+              </label>
+            </div>
+          </div>
+        </div>
+
         {/* Breed Variations */}
         <div>
           <div className="flex items-center justify-between mb-3">
@@ -131,7 +199,8 @@ export function VariationsSelector({
               variant="outline"
               size="sm"
               onClick={() => {
-                const availableBreedIds = breeds.filter(breed => breed.id !== currentBreed).map(breed => breed.id);
+                const availableBreeds = getFilteredBreeds();
+                const availableBreedIds = availableBreeds.map(breed => breed.id);
                 const allSelected = availableBreedIds.every(id => selectedBreeds.includes(id));
                 if (allSelected) {
                   setSelectedBreeds([]);
@@ -140,11 +209,11 @@ export function VariationsSelector({
                 }
               }}
             >
-              {breeds.filter(breed => breed.id !== currentBreed).every(breed => selectedBreeds.includes(breed.id)) ? 'Deselect All' : 'Select All'}
+              {getFilteredBreeds().every(breed => selectedBreeds.includes(breed.id)) ? 'Deselect All' : 'Select All'}
             </Button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {breeds.filter(breed => breed.id !== currentBreed).map(breed => (
+            {getFilteredBreeds().map(breed => (
               <div key={breed.id} className="flex items-center space-x-2 p-2 border rounded-lg">
                 <Checkbox
                   id={`breed-${breed.id}`}
@@ -152,7 +221,7 @@ export function VariationsSelector({
                   onCheckedChange={() => handleBreedToggle(breed.id)}
                 />
                 <label htmlFor={`breed-${breed.id}`} className="text-sm cursor-pointer flex-1">
-                  {breed.name}
+                  {breed.animal_type === 'cat' ? '🐱' : '🐕'} {breed.name}
                   {breed.popularity_rank && (
                     <span className="text-xs text-gray-500 ml-1">#{breed.popularity_rank}</span>
                   )}

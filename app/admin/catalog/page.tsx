@@ -990,6 +990,7 @@ function ImageDetailModal({
                     originalImage={null}
                     originalPrompt={image.prompt_text || ''}
                     currentBreed={image.breed_id || ''}
+                    currentAnimalType={image.breed_animal_type}
                     breeds={breeds}
                     availableCoats={availableCoats}
                     outfits={outfits}
