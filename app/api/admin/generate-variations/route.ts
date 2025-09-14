@@ -15,9 +15,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { originalImageData, originalPrompt, currentBreed, currentCoat, currentTheme, currentStyle, currentFormat, targetAge, variationConfig } = body;
     
-    console.log('Received variationConfig:', JSON.stringify(variationConfig, null, 2));
+    console.log('🚀 VARIATION GENERATION START');
+    console.log('📊 Received variationConfig:', JSON.stringify(variationConfig, null, 2));
+    console.log('🎯 Target age:', targetAge);
+    console.log('📏 Image size:', Math.round((originalImageData.length * 3) / 4 / 1024), 'KB');
 
     if (!originalImageData || !originalPrompt) {
+      console.error('❌ Missing required data');
       return NextResponse.json({ error: 'Missing required data' }, { status: 400 });
     }
 
@@ -82,22 +86,34 @@ export async function POST(request: NextRequest) {
 
     // Generate breed-coat combinations with batching for performance
     if (variationConfig.breedCoats?.length > 0) {
+      console.log('🐕🐱 BREED-COAT GENERATION START');
       console.log('🔍 Processing variationConfig.breedCoats:', variationConfig.breedCoats);
-      console.log('📊 Available breeds from database:', breedsData?.map(b => ({ id: b.id, name: b.name })) || []);
+      console.log('📊 Available breeds from database:', breedsData?.map(b => ({ id: b.id, name: b.name, type: b.animal_type })) || []);
       
-      const batchSize = 5; // Process 5 at a time to prevent API overload
+      const batchSize = 3; // Reduced batch size for better success rate
       const breedCoatBatches = [];
       
       for (let i = 0; i < variationConfig.breedCoats.length; i += batchSize) {
         breedCoatBatches.push(variationConfig.breedCoats.slice(i, i + batchSize));
       }
       
-      console.log(`Processing ${variationConfig.breedCoats.length} breed-coat combinations in ${breedCoatBatches.length} batches`);
+      console.log(`🎯 Processing ${variationConfig.breedCoats.length} breed-coat combinations in ${breedCoatBatches.length} batches (size: ${batchSize})`);
       
-      for (const batch of breedCoatBatches) {
-        const batchPromises = batch.map(async (breedCoat: any) => {
+      let totalAttempted = 0;
+      let totalSuccessful = 0;
+      let totalFailed = 0;
+      const startTime = Date.now();
+      
+      for (let batchIndex = 0; batchIndex < breedCoatBatches.length; batchIndex++) {
+        const batch = breedCoatBatches[batchIndex];
+        console.log(`\n📦 BATCH ${batchIndex + 1}/${breedCoatBatches.length} START (${batch.length} items)`);
+        const batchStartTime = Date.now();
+        
+        const batchPromises = batch.map(async (breedCoat: any, itemIndex: number) => {
+          const itemStartTime = Date.now();
+          totalAttempted++;
           try {
-            console.log(`🎯 Processing breed-coat pair:`, breedCoat);
+            console.log(`🎯 Processing breed-coat pair ${itemIndex + 1}/${batch.length}:`, breedCoat);
             
             // Get breed data
             const targetBreed = breedsData.find((breed: any) => breed.id === breedCoat.breedId);
@@ -172,28 +188,49 @@ export async function POST(request: NextRequest) {
               targetAge
             );
             
+            const itemEndTime = Date.now();
+            const itemDuration = itemEndTime - itemStartTime;
+            
             if (breedVariation) {
-              console.log(`✅ Generated variation for ${targetBreed.name} with ${validCoat.coat_name}`);
+              totalSuccessful++;
+              console.log(`✅ SUCCESS: Generated variation for ${targetBreed.name} with ${validCoat.coat_name} (${itemDuration}ms)`);
             } else {
-              console.log(`❌ Failed to generate variation for ${targetBreed.name} with ${validCoat.coat_name}`);
+              totalFailed++;
+              console.log(`❌ FAILED: No variation generated for ${targetBreed.name} with ${validCoat.coat_name} (${itemDuration}ms)`);
             }
             return breedVariation;
           } catch (error) {
-            console.error(`Error generating breed-coat variation ${breedCoat.breedId}-${breedCoat.coatId}:`, error);
+            const itemEndTime = Date.now();
+            const itemDuration = itemEndTime - itemStartTime;
+            totalFailed++;
+            console.error(`🔥 EXCEPTION: Error generating ${breedCoat.breedId}-${breedCoat.coatId} (${itemDuration}ms):`, error);
             return null;
           }
         });
         
         const batchResults = await Promise.all(batchPromises);
         const validResults = batchResults.filter(result => result !== null);
-        console.log(`Batch completed: ${validResults.length} valid results out of ${batchResults.length} attempts`);
+        const batchEndTime = Date.now();
+        const batchDuration = batchEndTime - batchStartTime;
+        
+        console.log(`📦 BATCH ${batchIndex + 1} COMPLETE: ${validResults.length}/${batchResults.length} successful (${batchDuration}ms)`);
+        console.log(`📊 Current totals: ${totalSuccessful} success, ${totalFailed} failed, ${totalAttempted} attempted`);
+        
         results.push(...validResults);
         
         // Add delay between batches to prevent API rate limiting
-        if (breedCoatBatches.indexOf(batch) < breedCoatBatches.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+        if (batchIndex < breedCoatBatches.length - 1) {
+          console.log('⏳ Waiting 2 seconds before next batch...');
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Increased to 2 second delay
         }
       }
+      
+      const endTime = Date.now();
+      const totalDuration = endTime - startTime;
+      console.log(`\n🏁 BREED-COAT GENERATION COMPLETE:`);
+      console.log(`📊 Final stats: ${totalSuccessful}/${totalAttempted} successful (${Math.round(totalSuccessful/totalAttempted*100)}% success rate)`);
+      console.log(`⏱️  Total duration: ${totalDuration}ms (avg: ${Math.round(totalDuration/totalAttempted)}ms per item)`);
+      console.log(`📈 Current results count: ${results.length}`);
     }
     
     // Legacy breed variations (maintained for backward compatibility)
@@ -348,7 +385,10 @@ export async function POST(request: NextRequest) {
       style_id: currentStyle
     }));
 
-    console.log(`Generated ${previewResults.length} variations for preview`);
+    console.log(`\n🎉 VARIATION GENERATION COMPLETE`);
+    console.log(`📊 FINAL RESULTS: ${previewResults.length} variations generated for preview`);
+    console.log(`🗂️  Result types:`, previewResults.map(r => `${r.breed_name}-${r.coat_name}`).join(', '));
+    
     return NextResponse.json(previewResults);
     
   } catch (error) {

@@ -404,6 +404,8 @@ export class GeminiVariationService {
     targetAge?: string
   ): Promise<GeneratedVariation | null> {
     try {
+      const generationStartTime = Date.now();
+      
       const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle, originalBreed, targetAge);
       
       const prompt = [
@@ -416,17 +418,28 @@ export class GeminiVariationService {
         },
       ];
 
-      console.log(`Attempting Gemini generation for ${targetBreed.name} with ${validCoat.coat_name}`);
-      console.log(`Image data size: ${Math.round((originalImageData.length * 3) / 4 / 1024)}KB`);
+      console.log(`🤖 GEMINI CALL START: ${targetBreed.name} (${targetBreed.animal_type}) + ${validCoat.coat_name}`);
+      console.log(`📏 Image data size: ${Math.round((originalImageData.length * 3) / 4 / 1024)}KB`);
+      console.log(`📝 Prompt length: ${variationPrompt.length} characters`);
       
+      const geminiCallStart = Date.now();
       const response = await this.ai.models.generateContent({
         model: "gemini-2.5-flash-image-preview",
         contents: prompt,
       });
+      const geminiCallEnd = Date.now();
+      const geminiDuration = geminiCallEnd - geminiCallStart;
+      
+      console.log(`🤖 GEMINI CALL END: ${targetBreed.name} (${geminiDuration}ms)`);
 
       if (response.candidates?.[0]?.content?.parts) {
         for (const part of response.candidates[0].content.parts) {
           if (part.inlineData?.data) {
+            const generationEndTime = Date.now();
+            const totalDuration = generationEndTime - generationStartTime;
+            
+            console.log(`✅ GEMINI SUCCESS: ${targetBreed.name} generated image (total: ${totalDuration}ms)`);
+            
             // Generate Midjourney prompt for catalog storage with valid coat
             const midjourneyPrompt = this.createMidjourneyPromptForBreedWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle, originalBreed);
             
@@ -447,15 +460,41 @@ export class GeminiVariationService {
           }
         }
       }
+      
+      const generationEndTime = Date.now();
+      const totalDuration = generationEndTime - generationStartTime;
+      console.log(`❌ GEMINI NO IMAGE: ${targetBreed.name} - no image data in response (total: ${totalDuration}ms)`);
+      console.log(`📊 Response structure:`, {
+        hasCandidates: !!response.candidates,
+        candidatesLength: response.candidates?.length,
+        firstCandidateHasContent: !!response.candidates?.[0]?.content,
+        firstCandidateHasParts: !!response.candidates?.[0]?.content?.parts,
+        partsLength: response.candidates?.[0]?.content?.parts?.length
+      });
     } catch (error) {
-      console.error(`Failed to generate breed variation for ${targetBreed.name} with ${validCoat.coat_name}:`, error);
+      const generationEndTime = Date.now();
+      const totalDuration = generationEndTime - generationStartTime;
+      
+      console.error(`🔥 GEMINI ERROR: ${targetBreed.name} with ${validCoat.coat_name} (${totalDuration}ms)`);
+      console.error(`💀 Error details:`, error);
       
       // Add specific error handling for common Gemini issues
       if (error && typeof error === 'object') {
-        if ('status' in error && error.status === 500) {
-          console.error('Gemini API returned 500 - possible quota exceeded or service unavailable');
-        } else if ('message' in error) {
-          console.error('Gemini API error message:', error.message);
+        if ('status' in error) {
+          console.error(`🚨 HTTP Status: ${error.status}`);
+          if (error.status === 500) {
+            console.error('🚨 Gemini API 500 - possible quota exceeded or service unavailable');
+          } else if (error.status === 429) {
+            console.error('🚨 Gemini API 429 - rate limit exceeded');
+          } else if (error.status === 400) {
+            console.error('🚨 Gemini API 400 - bad request (possibly image too large or invalid format)');
+          }
+        }
+        if ('message' in error) {
+          console.error('🚨 Error message:', error.message);
+        }
+        if ('code' in error) {
+          console.error('🚨 Error code:', error.code);
         }
       }
     }
