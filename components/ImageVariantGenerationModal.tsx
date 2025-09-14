@@ -285,7 +285,6 @@ export default function ImageVariantGenerationModal({
   // Filtered arrays based on search - sort breeds alphabetically
   const filteredBreeds = breeds
     .filter(breed => 
-      breed.id !== image?.breed_id && 
       breed.name.toLowerCase().includes(breedSearch.toLowerCase())
     )
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -360,9 +359,9 @@ export default function ImageVariantGenerationModal({
 
       console.log('Loaded data:', { breedsData, outfitsData, formatsData });
 
-      // Filter breeds by active status and exclude current breed
+      // Filter breeds by active status
       const filteredBreeds = breedsData?.filter((breed: any) => 
-        breed.is_active && breed.id !== image.breed_id
+        breed.is_active
       ) || [];
       
       setBreeds(filteredBreeds);

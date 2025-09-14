@@ -77,7 +77,7 @@ export function VariationsSelector({
   };
 
   const getFilteredBreeds = () => {
-    let filteredBreeds = breeds.filter(breed => breed.id !== currentBreed);
+    let filteredBreeds = breeds;
     
     if (selectedAnimalType) {
       filteredBreeds = filteredBreeds.filter(breed => breed.animal_type === selectedAnimalType);
@@ -132,7 +132,7 @@ export function VariationsSelector({
           </Badge>
         </CardTitle>
         <p className="text-sm text-gray-600">
-          Create variations of your generated image with different breeds, coats, outfits, and formats
+          Create variations of your generated image with different breeds (including same breed with different coats), outfits, and formats
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
