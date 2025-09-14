@@ -403,8 +403,9 @@ export class GeminiVariationService {
     originalBreed?: Breed,
     targetAge?: string
   ): Promise<GeneratedVariation | null> {
+    const generationStartTime = Date.now();
+    
     try {
-      const generationStartTime = Date.now();
       
       const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle, originalBreed, targetAge);
       
