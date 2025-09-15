@@ -92,6 +92,18 @@ export class BatchProcessingService {
 
       // Process items one by one with progressive saving
       for (let i = 0; i < items.length; i++) {
+        // Check if job was cancelled
+        const { data: currentJob } = await this.supabase
+          .from('batch_jobs')
+          .select('status')
+          .eq('id', jobId)
+          .single();
+
+        if (currentJob?.status === 'cancelled') {
+          console.log('🚫 Job was cancelled, stopping processing');
+          return;
+        }
+
         const item = items[i];
         console.log(`\n🔄 ITEM ${i + 1}/${items.length}: Processing item ${item.id}`);
 

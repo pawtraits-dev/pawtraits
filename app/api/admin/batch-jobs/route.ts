@@ -195,6 +195,75 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const jobId = searchParams.get('jobId');
+
+    if (!jobId) {
+      return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // Check if job exists and can be cancelled
+    const { data: job, error: jobError } = await supabase
+      .from('batch_jobs')
+      .select('status')
+      .eq('id', jobId)
+      .single();
+
+    if (jobError || !job) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
+    if (job.status === 'completed') {
+      return NextResponse.json({ error: 'Cannot cancel completed job' }, { status: 400 });
+    }
+
+    if (job.status === 'cancelled') {
+      return NextResponse.json({ error: 'Job already cancelled' }, { status: 400 });
+    }
+
+    // Cancel the job
+    const { error: cancelError } = await supabase
+      .from('batch_jobs')
+      .update({
+        status: 'cancelled',
+        completed_at: new Date().toISOString()
+      })
+      .eq('id', jobId);
+
+    if (cancelError) {
+      console.error('Failed to cancel job:', cancelError);
+      return NextResponse.json({ error: 'Failed to cancel job' }, { status: 500 });
+    }
+
+    // Also cancel any pending items
+    await supabase
+      .from('batch_job_items')
+      .update({
+        status: 'skipped',
+        completed_at: new Date().toISOString()
+      })
+      .eq('job_id', jobId)
+      .eq('status', 'pending');
+
+    console.log(`🚫 Cancelled batch job: ${jobId}`);
+
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Job cancelled successfully' 
+    });
+
+  } catch (error) {
+    console.error('Error cancelling batch job:', error);
+    return NextResponse.json({ error: 'Failed to cancel job' }, { status: 500 });
+  }
+}
+
 // Background processing function (runs async)
 async function processBatchJob(jobId: string) {
   const { BatchProcessingService } = await import('@/lib/batch-processing-service');

@@ -18,7 +18,8 @@ import {
   Tag,
   ArrowUpRight,
   ArrowDownRight,
-  Activity
+  Activity,
+  Clock
 } from 'lucide-react';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
@@ -181,6 +182,13 @@ export default function AdminDashboard() {
       icon: TrendingUp,
       href: '/admin/image-analytics',
       color: 'from-orange-500 to-red-500'
+    },
+    {
+      title: 'Batch Jobs',
+      description: 'Monitor background processing',
+      icon: Clock,
+      href: '/admin/batch-jobs',
+      color: 'from-indigo-500 to-purple-500'
     }
   ];
 

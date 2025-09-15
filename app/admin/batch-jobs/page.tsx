@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { RefreshCw, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { RefreshCw, Clock, CheckCircle, XCircle, AlertCircle, StopCircle } from 'lucide-react';
 
 interface BatchJob {
   id: string;
@@ -32,6 +32,7 @@ export default function BatchJobsPage() {
   const [jobs, setJobs] = useState<BatchJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [cancelling, setCancelling] = useState<string | null>(null);
 
   const fetchJobs = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -48,6 +49,34 @@ export default function BatchJobsPage() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const cancelJob = async (jobId: string) => {
+    if (!confirm('Are you sure you want to cancel this batch job? This will stop processing any remaining items.')) {
+      return;
+    }
+
+    setCancelling(jobId);
+    
+    try {
+      const response = await fetch(`/api/admin/batch-jobs?jobId=${jobId}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        console.log(`✅ Job ${jobId} cancelled successfully`);
+        // Refresh the jobs list
+        await fetchJobs(true);
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to cancel job: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Failed to cancel job:', error);
+      alert('Failed to cancel job. Please try again.');
+    } finally {
+      setCancelling(null);
     }
   };
 
@@ -174,9 +203,32 @@ export default function BatchJobsPage() {
                           {job.job_type} • Created {formatDate(job.created_at)}
                         </p>
                       </div>
-                      <Badge className={getStatusColor(job.status)}>
-                        {job.status.toUpperCase()}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {(job.status === 'pending' || job.status === 'running') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => cancelJob(job.id)}
+                            disabled={cancelling === job.id}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            {cancelling === job.id ? (
+                              <>
+                                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                                Cancelling...
+                              </>
+                            ) : (
+                              <>
+                                <StopCircle className="w-3 h-3 mr-1" />
+                                Cancel
+                              </>
+                            )}
+                          </Button>
+                        )}
+                        <Badge className={getStatusColor(job.status)}>
+                          {job.status.toUpperCase()}
+                        </Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
