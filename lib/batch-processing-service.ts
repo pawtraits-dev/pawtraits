@@ -6,6 +6,13 @@ import { ImageDescriptionGenerator } from './image-description-generator';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+// Batch processing configuration
+const BATCH_CONFIG = {
+  DELAY_BETWEEN_ITEMS_MS: 1500, // Reduced from 3000ms to 1.5s
+  RETRY_ATTEMPTS: 1,
+  TIMEOUT_PER_ITEM_MS: 300000, // 5 minutes per item max
+};
+
 export class BatchProcessingService {
   private supabase;
   private geminiService;
@@ -20,7 +27,8 @@ export class BatchProcessingService {
   }
 
   async processBatchJob(jobId: string): Promise<void> {
-    console.log(`🚀 BATCH PROCESSING START: ${jobId}`);
+    const overallStartTime = Date.now();
+    console.log(`🚀 BATCH PROCESSING START: ${jobId} at ${new Date().toISOString()}`);
 
     try {
       // Mark job as running
@@ -92,6 +100,8 @@ export class BatchProcessingService {
       }
 
       console.log(`📊 Processing ${items.length} items sequentially`);
+      console.log(`⚙️  BATCH PARAMETERS: ${BATCH_CONFIG.DELAY_BETWEEN_ITEMS_MS}ms delay between items, ~60-120s per Gemini call`);
+      console.log(`⏱️  ESTIMATED TOTAL TIME: ${Math.round(items.length * 90 / 60)} minutes (${Math.round(items.length * 90)} seconds)`);
 
       // Process items one by one with progressive saving
       for (let i = 0; i < items.length; i++) {
@@ -108,7 +118,9 @@ export class BatchProcessingService {
         }
 
         const item = items[i];
-        console.log(`\n🔄 ITEM ${i + 1}/${items.length}: Processing item ${item.id}`);
+        const itemOverallStartTime = Date.now();
+        console.log(`\n🔄 ITEM ${i + 1}/${items.length}: Processing item ${item.id} at ${new Date().toISOString()}`);
+        console.log(`📋 Item details: breed_id=${item.breed_id}, coat_id=${item.coat_id}, status=${item.status}`);
 
         try {
           await this.processItem(
@@ -126,10 +138,13 @@ export class BatchProcessingService {
           // Update job progress after each successful item
           await this.updateJobProgress(jobId);
           
+          const itemTotalTime = Date.now() - itemOverallStartTime;
+          console.log(`✅ ITEM ${i + 1} COMPLETE: ${itemTotalTime}ms (${Math.round(itemTotalTime/1000)}s)`);
+          
           // Add delay between items to prevent rate limiting
           if (i < items.length - 1) {
-            console.log('⏳ Waiting 3 seconds before next item...');
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.log(`⏳ Waiting ${BATCH_CONFIG.DELAY_BETWEEN_ITEMS_MS}ms before next item...`);
+            await new Promise(resolve => setTimeout(resolve, BATCH_CONFIG.DELAY_BETWEEN_ITEMS_MS));
           }
 
         } catch (error) {
@@ -141,7 +156,9 @@ export class BatchProcessingService {
 
       // Mark job as completed
       await this.updateJobStatus(jobId, 'completed', { completed_at: new Date().toISOString() });
+      const totalTime = Date.now() - overallStartTime;
       console.log(`🏁 BATCH JOB COMPLETE: ${jobId}`);
+      console.log(`⏱️  TOTAL PROCESSING TIME: ${totalTime}ms (${Math.round(totalTime/1000/60)}m ${Math.round((totalTime/1000) % 60)}s)`);
 
     } catch (error) {
       console.error(`Batch job ${jobId} failed:`, error);
@@ -164,9 +181,11 @@ export class BatchProcessingService {
     targetAge?: string
   ): Promise<void> {
     const itemStartTime = Date.now();
+    console.log(`🏗️  PROCESS ITEM START: ${item.id}`);
 
     try {
       // Mark item as running
+      console.log(`📝 Marking item ${item.id} as running...`);
       await this.supabase
         .from('batch_job_items')
         .update({
@@ -180,9 +199,11 @@ export class BatchProcessingService {
       // Process based on item type
       if (item.breed_id && item.coat_id) {
         // Breed-coat variation
+        console.log(`🔍 Looking up breed ${item.breed_id}...`);
         const targetBreed = breedsData.find((breed: any) => breed.id === item.breed_id);
         
         if (targetBreed) {
+          console.log(`✅ Found target breed: ${targetBreed.name}`);
           // Get coat data
           const { data: breedCoatData } = await this.supabase
             .from('breed_coats')
@@ -206,6 +227,7 @@ export class BatchProcessingService {
               rarity: breedCoatData.coats.rarity
             };
 
+            console.log(`🎨 Starting Gemini generation for ${targetBreed.name} with ${validCoat.coat_name}...`);
             const geminiStartTime = Date.now();
             generatedVariation = await this.geminiService.generateSingleBreedVariationWithCoat(
               originalImageData,
@@ -219,6 +241,7 @@ export class BatchProcessingService {
               targetAge
             );
             const geminiDuration = Date.now() - geminiStartTime;
+            console.log(`🎨 Gemini generation completed in ${geminiDuration}ms (${Math.round(geminiDuration/1000)}s)`);
 
             if (generatedVariation) {
               // Generate AI description for the variation
@@ -238,7 +261,10 @@ export class BatchProcessingService {
               }
 
               // Save to database immediately
+              console.log(`💾 Uploading to Cloudinary and saving to database...`);
+              const saveStartTime = Date.now();
               const imageId = await this.saveGeneratedImage(generatedVariation);
+              console.log(`💾 Save completed in ${Date.now() - saveStartTime}ms, image ID: ${imageId}`);
               
               const itemEndTime = Date.now();
               await this.supabase
