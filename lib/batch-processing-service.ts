@@ -218,6 +218,22 @@ export class BatchProcessingService {
             const geminiDuration = Date.now() - geminiStartTime;
 
             if (generatedVariation) {
+              // Generate AI description for the variation
+              console.log('🧠 Generating AI description...');
+              const descriptionStartTime = Date.now();
+              
+              try {
+                const aiDescription = await this.generateAIDescription(
+                  generatedVariation.imageData,
+                  targetBreed.name
+                );
+                generatedVariation.description = aiDescription;
+                console.log(`✅ AI description generated (${Date.now() - descriptionStartTime}ms)`);
+              } catch (error) {
+                console.warn('⚠️ AI description generation failed:', error);
+                generatedVariation.description = `Generated ${targetBreed.name} with ${validCoat.coat_name} coat`;
+              }
+
               // Save to database immediately
               const imageId = await this.saveGeneratedImage(generatedVariation);
               
@@ -233,7 +249,7 @@ export class BatchProcessingService {
                 })
                 .eq('id', item.id);
 
-              console.log(`✅ ITEM SUCCESS: Saved image ${imageId}`);
+              console.log(`✅ ITEM SUCCESS: Saved image ${imageId} with AI description`);
               return;
             }
           }
@@ -301,7 +317,7 @@ export class BatchProcessingService {
           storage_path: `cloudinary:${cloudinaryResult.public_id}`,
           public_url: cloudinaryResult.secure_url,
           prompt_text: variation.prompt,
-          description: `Batch generated variation: ${variation.metadata.variation_type}`,
+          description: variation.description || `Batch generated variation: ${variation.metadata.variation_type}`,
           tags: variation.metadata.tags || ['batch-generated', 'gemini-variation'],
           breed_id: variation.metadata.breed_id || null,
           theme_id: variation.metadata.theme_id || null,
@@ -370,6 +386,31 @@ export class BatchProcessingService {
           failed_items: failed
         })
         .eq('id', jobId);
+    }
+  }
+
+  private async generateAIDescription(imageData: string, breedName: string): Promise<string> {
+    try {
+      // Use the same endpoint as the immediate processing
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/generate-description/base64`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageData,
+          breedName
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Description API returned ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result.description || `A beautiful AI-generated ${breedName} portrait`;
+      
+    } catch (error) {
+      console.error('Failed to generate AI description:', error);
+      throw error;
     }
   }
 }
