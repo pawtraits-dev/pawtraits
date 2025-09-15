@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { GeminiVariationService } from './gemini-variation-service';
 import { uploadImageBufferToCloudinary } from './cloudinary-server';
+import { ImageDescriptionGenerator } from './image-description-generator';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -8,12 +9,14 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 export class BatchProcessingService {
   private supabase;
   private geminiService;
+  private descriptionGenerator;
 
   constructor() {
     this.supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
     this.geminiService = new GeminiVariationService();
+    this.descriptionGenerator = new ImageDescriptionGenerator();
   }
 
   async processBatchJob(jobId: string): Promise<void> {
@@ -225,7 +228,7 @@ export class BatchProcessingService {
               try {
                 const aiDescription = await this.generateAIDescription(
                   generatedVariation.imageData,
-                  targetBreed.name
+                  targetBreed
                 );
                 generatedVariation.description = aiDescription;
                 console.log(`✅ AI description generated (${Date.now() - descriptionStartTime}ms)`);
@@ -389,24 +392,27 @@ export class BatchProcessingService {
     }
   }
 
-  private async generateAIDescription(imageData: string, breedName: string): Promise<string> {
+  private async generateAIDescription(imageData: string, breed: any): Promise<string> {
     try {
-      // Use the same endpoint as the immediate processing
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/generate-description/base64`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageData,
-          breedName
-        })
-      });
+      // Create a File object from the base64 image data
+      const imageBuffer = Buffer.from(imageData, 'base64');
+      const tempFile = new File([imageBuffer], 'temp.png', { type: 'image/png' });
 
-      if (!response.ok) {
-        throw new Error(`Description API returned ${response.status}`);
-      }
+      // Get personality traits from breed data if available
+      const personalityTraits = breed.personality_traits ? 
+        (Array.isArray(breed.personality_traits) ? breed.personality_traits : [breed.personality_traits]) : 
+        undefined;
 
-      const result = await response.json();
-      return result.description || `A beautiful AI-generated ${breedName} portrait`;
+      console.log(`🧠 Generating description for ${breed.name} with traits:`, personalityTraits);
+
+      // Use ImageDescriptionGenerator directly - same as the working API endpoint
+      const description = await this.descriptionGenerator.generateDescriptionFromFile(
+        tempFile,
+        breed.name,
+        personalityTraits
+      );
+
+      return description;
       
     } catch (error) {
       console.error('Failed to generate AI description:', error);
