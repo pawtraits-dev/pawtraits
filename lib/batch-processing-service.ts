@@ -290,18 +290,16 @@ export class BatchProcessingService {
         }
       );
 
-      // Save to database
+      // Save to database - match the actual schema from complete_schema.sql
       const { data: savedImage, error } = await this.supabase
         .from('image_catalog')
         .insert({
-          cloudinary_public_id: cloudinaryResult.public_id,
-          cloudinary_secure_url: cloudinaryResult.secure_url,
-          cloudinary_signature: cloudinaryResult.signature,
+          filename: filename, // Required field
           original_filename: filename,
           file_size: cloudinaryResult.bytes,
           mime_type: 'image/png',
-          width: cloudinaryResult.width,
-          height: cloudinaryResult.height,
+          storage_path: `cloudinary:${cloudinaryResult.public_id}`,
+          public_url: cloudinaryResult.secure_url,
           prompt_text: variation.prompt,
           description: `Batch generated variation: ${variation.metadata.variation_type}`,
           tags: variation.metadata.tags || ['batch-generated', 'gemini-variation'],
@@ -310,6 +308,9 @@ export class BatchProcessingService {
           style_id: variation.metadata.style_id || null,
           format_id: variation.metadata.format_id || null,
           coat_id: variation.metadata.coat_id || null,
+          cloudinary_public_id: cloudinaryResult.public_id,
+          cloudinary_version: cloudinaryResult.version?.toString(),
+          cloudinary_signature: cloudinaryResult.signature,
           rating: 4,
           is_featured: false,
           is_public: true
