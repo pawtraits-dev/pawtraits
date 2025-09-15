@@ -10,7 +10,8 @@ import { Wand2, RefreshCw, X, Search } from 'lucide-react';
 import { SupabaseService } from '@/lib/supabase';
 import type { ImageCatalogWithDetails, Breed, Outfit, Format, BreedCoatDetail, AnimalType } from '@/lib/types';
 import { Textarea } from '@/components/ui/textarea';
-import { Copy, ArrowLeft, CheckCircle, Brain } from 'lucide-react';
+import { Copy, ArrowLeft, CheckCircle, Brain, Clock, Zap } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { uploadImagesDirectBatch } from '@/lib/cloudinary-client';
 
 interface ImageVariantGenerationModalProps {
@@ -281,6 +282,7 @@ export default function ImageVariantGenerationModal({
   const [formatSearch, setFormatSearch] = useState('');
   const [selectedAnimalType, setSelectedAnimalType] = useState<AnimalType | ''>('');
   const [selectedAge, setSelectedAge] = useState<'same' | 'adult' | 'young'>('same');
+  const [useBatchMode, setUseBatchMode] = useState(false);
   
   const [isGenerating, setIsGenerating] = useState(false);
   
@@ -552,19 +554,31 @@ export default function ImageVariantGenerationModal({
       console.log('🎯 Breed-coat pairs:', getSelectedBreedCoatPairs());
       console.log('📊 Selected breed coats state:', selectedBreedCoats);
       console.log('🗂️ Breed coats data cache:', breedCoatsData);
+      console.log('⚡ Batch mode enabled:', useBatchMode);
       
-      const response = await fetch('/api/admin/generate-variations', {
+      const apiEndpoint = useBatchMode ? '/api/admin/batch-jobs' : '/api/admin/generate-variations';
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(useBatchMode ? {
+          originalImageId: image.id,
+          originalPrompt: image.prompt_text,
+          currentBreed: image.breed_id || '',
+          currentCoat: image.coat_id || '',
+          currentTheme: image.theme_id || '',
+          currentStyle: image.style_id || '',
+          currentFormat: image.format_id || '',
+          targetAge: selectedAge,
+          variationConfig: variationConfigToSend
+        } : {
           originalImageData: imageData64,
           originalPrompt: image.prompt_text,
           currentBreed: image.breed_id || '',
-          currentCoat: image.coat_id || '', // Pass original coat for inheritance
+          currentCoat: image.coat_id || '',
           currentTheme: image.theme_id || '',
           currentStyle: image.style_id || '',
-          currentFormat: image.format_id || '', // Pass original format for inheritance
-          targetAge: selectedAge, // Pass age selection
+          currentFormat: image.format_id || '',
+          targetAge: selectedAge,
           variationConfig: variationConfigToSend
         })
       });
@@ -578,6 +592,16 @@ export default function ImageVariantGenerationModal({
       }
       
       const results = await response.json();
+      
+      if (useBatchMode) {
+        // Handle batch job response
+        console.log('✅ Batch job created:', results);
+        alert(`Batch job started successfully! Job ID: ${results.jobId}\n\nProcessing ${results.totalItems} variations in the background. You can monitor progress in the admin dashboard.`);
+        onClose();
+        return;
+      }
+      
+      // Handle immediate generation response
       console.log('✅ Received variations from API:', results);
       console.log('📊 Number of variations received:', results?.length || 0);
       console.log('🔍 Results structure check:', {
@@ -1225,12 +1249,46 @@ export default function ImageVariantGenerationModal({
               </div>
             </div>
 
+            {/* Batch Mode Toggle */}
+            {getTotalVariations() > 10 && (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-yellow-600" />
+                    <span className="text-sm font-medium text-yellow-800">Large batch detected ({getTotalVariations()} variations)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="batch-mode"
+                      checked={useBatchMode}
+                      onCheckedChange={setUseBatchMode}
+                    />
+                    <label htmlFor="batch-mode" className="text-sm font-medium text-yellow-800 cursor-pointer">
+                      Background Batch Mode
+                    </label>
+                  </div>
+                </div>
+                <p className="text-xs text-yellow-700">
+                  {useBatchMode ? (
+                    <>⚡ Batch mode enabled: Processing will run in the background to prevent timeouts. Images will be saved progressively as they're generated.</>
+                  ) : (
+                    <>⚠️ Immediate mode: Large batches may timeout. Enable batch mode for reliable processing of many variations.</>
+                  )}
+                </p>
+              </div>
+            )}
+
             {/* Generate Button */}
             <div className="flex items-center justify-between pt-4 border-t">
               <div className="flex items-center gap-3 text-sm text-gray-600">
                 {getTotalVariations() > 0 && (
                   <span>
                     Will generate {getTotalVariations()} variation{getTotalVariations() > 1 ? 's' : ''}
+                    {useBatchMode && getTotalVariations() > 10 && (
+                      <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                        Background Processing
+                      </span>
+                    )}
                   </span>
                 )}
                 {getTotalVariations() > 0 && (
@@ -1256,12 +1314,19 @@ export default function ImageVariantGenerationModal({
                 {isGenerating ? (
                   <>
                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Generating Variations...
+                    {useBatchMode ? 'Starting Batch Job...' : 'Generating Variations...'}
                   </>
                 ) : (
                   <>
-                    <Wand2 className="w-4 h-4 mr-2" />
-                    Generate {getTotalVariations()} Variation{getTotalVariations() > 1 ? 's' : ''}
+                    {useBatchMode ? (
+                      <Clock className="w-4 h-4 mr-2" />
+                    ) : (
+                      <Wand2 className="w-4 h-4 mr-2" />
+                    )}
+                    {useBatchMode ? 
+                      `Start Batch Job (${getTotalVariations()} variation${getTotalVariations() > 1 ? 's' : ''})` :
+                      `Generate ${getTotalVariations()} Variation${getTotalVariations() > 1 ? 's' : ''}`
+                    }
                   </>
                 )}
               </Button>
