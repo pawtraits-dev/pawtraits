@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { GeminiVariationService } from './gemini-variation-service';
-import { uploadImagesDirectBatch } from './cloudinary-client';
+import { uploadImageBufferToCloudinary } from './cloudinary-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -261,25 +261,22 @@ export class BatchProcessingService {
 
   private async saveGeneratedImage(variation: any): Promise<string> {
     try {
-      // Convert base64 to file for Cloudinary upload
+      // Convert base64 to buffer for server-side upload
       const imageBuffer = Buffer.from(variation.imageData, 'base64');
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `batch-variation-${timestamp}.png`;
-      const file = new File([imageBuffer], filename, { type: 'image/png' });
 
-      // Upload to Cloudinary
-      const cloudinaryResults = await uploadImagesDirectBatch(
-        [file],
+      // Upload to Cloudinary using server-side method
+      const cloudinaryResult = await uploadImageBufferToCloudinary(
+        imageBuffer,
+        filename,
         {
-          tags: ['batch-generated', 'gemini-variation', 'admin-upload']
+          tags: ['batch-generated', 'gemini-variation', 'admin-upload'],
+          breed: variation.metadata.breed?.name,
+          theme: variation.metadata.theme?.name,
+          style: variation.metadata.style?.name
         }
       );
-
-      if (cloudinaryResults.length === 0) {
-        throw new Error('Failed to upload to Cloudinary');
-      }
-
-      const cloudinaryResult = cloudinaryResults[0];
 
       // Save to database
       const { data: savedImage, error } = await this.supabase

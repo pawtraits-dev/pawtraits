@@ -53,7 +53,9 @@ export default function BatchJobsPage() {
 
   useEffect(() => {
     fetchJobs();
-    
+  }, []);
+
+  useEffect(() => {
     // Auto-refresh every 10 seconds for running jobs
     const interval = setInterval(() => {
       if (jobs.some(job => job.status === 'running' || job.status === 'pending')) {
