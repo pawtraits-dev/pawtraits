@@ -295,8 +295,7 @@ function BrowsePageContent() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
       <PublicNavigation />
 
-
-      {/* Breed/Theme Detail View OR Cards Grid Section */}
+      {/* Breed/Theme Detail View OR Browse View */}
       {selectedBreedId || selectedThemeId ? (
         // Detailed breed/theme view with filtered images
         <>
@@ -471,7 +470,105 @@ function BrowsePageContent() {
           </section>
         </>
       ) : (
-        // Cards Grid Section (default browse view)
+        // Browse view with carousel and cards
+        <>
+          {/* Hero Carousel - Dynamic based on active tab */}
+          <section className="relative">
+            <ContentBasedCarousel
+              pageType={getCarouselPageType()}
+              className="h-96 lg:h-[500px]"
+            />
+          </section>
+
+          {/* Filter Tabs and Search */}
+          <section className="py-8 bg-white/50 backdrop-blur-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+              {/* Tab Navigation */}
+              <div className="flex justify-center mb-8">
+                <div className="flex bg-white rounded-lg p-1 shadow-lg">
+                  <Button
+                    variant={activeTab === 'dogs' ? 'default' : 'ghost'}
+                    onClick={() => handleTabChange('dogs')}
+                    className={`px-6 py-3 rounded-md transition-all ${
+                      activeTab === 'dogs'
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'text-gray-700 hover:text-purple-600'
+                    }`}
+                  >
+                    <Dog className="w-5 h-5 mr-2" />
+                    Dogs ({dogBreeds.length})
+                  </Button>
+                  <Button
+                    variant={activeTab === 'cats' ? 'default' : 'ghost'}
+                    onClick={() => handleTabChange('cats')}
+                    className={`px-6 py-3 rounded-md transition-all ${
+                      activeTab === 'cats'
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'text-gray-700 hover:text-purple-600'
+                    }`}
+                  >
+                    <Cat className="w-5 h-5 mr-2" />
+                    Cats ({catBreeds.length})
+                  </Button>
+                  <Button
+                    variant={activeTab === 'themes' ? 'default' : 'ghost'}
+                    onClick={() => handleTabChange('themes')}
+                    className={`px-6 py-3 rounded-md transition-all ${
+                      activeTab === 'themes'
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'text-gray-700 hover:text-purple-600'
+                    }`}
+                  >
+                    <Palette className="w-5 h-5 mr-2" />
+                    Themes ({themes.length})
+                  </Button>
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div className="max-w-2xl mx-auto">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    type="text"
+                    placeholder={`Search ${activeTab}...`}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-4 py-3 text-lg border-2 border-gray-200 focus:border-purple-500 rounded-xl"
+                  />
+                  {searchTerm && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                    >
+                      ×
+                    </Button>
+                  )}
+                </div>
+
+                {searchTerm && (
+                  <div className="mt-4 text-center">
+                    <Badge variant="secondary" className="text-sm">
+                      Searching for: "{searchTerm}"
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSearchTerm('')}
+                        className="ml-2 p-0 h-auto"
+                      >
+                        ×
+                      </Button>
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+        {/* Cards Grid Section (default browse view) */}
         <section className="py-12 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
@@ -689,6 +786,7 @@ function BrowsePageContent() {
           )}
         </div>
       </section>
+        </>
       )}
 
       {/* Modals */}
