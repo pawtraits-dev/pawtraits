@@ -26,7 +26,6 @@ import PublicNavigation from '@/components/PublicNavigation';
 import type { Breed, Theme, AnimalType, ImageCatalogWithDetails } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
-import ProductSelectionModal from '@/components/ProductSelectionModal';
 import ShareModal from '@/components/share-modal';
 import UserInteractionsService from '@/lib/user-interactions';
 import { useServerCart } from '@/lib/server-cart-context';
@@ -63,8 +62,6 @@ function BrowsePageContent() {
   const [pricing, setPricing] = useState<ProductPricing[]>([]);
 
   // Modal states
-  const [selectedImage, setSelectedImage] = useState<ImageCatalogWithDetails | null>(null);
-  const [showProductModal, setShowProductModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [imageToShare, setImageToShare] = useState<ImageCatalogWithDetails | null>(null);
 
@@ -298,255 +295,6 @@ function BrowsePageContent() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
       <PublicNavigation />
 
-      {selectedBreedId || selectedThemeId ? (
-        // Specific breed/theme view with hero section
-        <section className="py-8 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mb-6">
-              <Button
-                onClick={handleBackToBrowse}
-                variant="outline"
-                className="mb-4"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Browse
-              </Button>
-
-              {/* Breed Description */}
-              {selectedBreedId && (() => {
-                const selectedBreed = getSelectedBreed();
-                if (!selectedBreed) return null;
-
-                return (
-                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-6">
-                    <div className="flex flex-col lg:flex-row gap-6">
-                      {selectedBreed.hero_image_url && (
-                        <div className="lg:w-1/3 flex-shrink-0">
-                          <img
-                            src={selectedBreed.hero_image_url}
-                            alt={selectedBreed.hero_image_alt || `${selectedBreed.name} hero image`}
-                            className="w-full h-48 lg:h-64 object-cover bg-gray-50 rounded-lg shadow-md"
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex-1">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                          {selectedBreed.animal_type === 'dog' ? '🐕' : '🐱'} {selectedBreed.name}
-                        </h1>
-                        {selectedBreed.description && (
-                          <div className="text-gray-700 text-lg leading-relaxed prose prose-gray max-w-none mb-4">
-                            <ReactMarkdown>{selectedBreed.description}</ReactMarkdown>
-                          </div>
-                        )}
-                        {selectedBreed.personality_traits && selectedBreed.personality_traits.length > 0 && (
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">Personality Traits:</h4>
-                            <div className="flex flex-wrap gap-2">
-                              {selectedBreed.personality_traits.map((trait, index) => (
-                                <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-800">
-                                  {trait}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Theme Description */}
-              {selectedThemeId && (() => {
-                const selectedTheme = getSelectedTheme();
-                if (!selectedTheme) return null;
-
-                return (
-                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
-                    <div className="flex flex-col lg:flex-row gap-6">
-                      {selectedTheme.hero_image_url && (
-                        <div className="lg:w-1/3 flex-shrink-0">
-                          <img
-                            src={selectedTheme.hero_image_url}
-                            alt={selectedTheme.hero_image_alt || `${selectedTheme.name} hero image`}
-                            className="w-full h-48 lg:h-64 object-cover bg-gray-50 rounded-lg shadow-md"
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex-1">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                          🎨 {selectedTheme.name}
-                        </h1>
-                        {selectedTheme.description && (
-                          <div className="text-gray-700 text-lg leading-relaxed prose prose-gray max-w-none">
-                            <ReactMarkdown>{selectedTheme.description}</ReactMarkdown>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Filtered Images Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-              {getFilteredImages().map((image) => (
-                <div key={image.id} className="group cursor-pointer" onClick={() => handleImageClick(image)}>
-                  <div className="relative aspect-square overflow-hidden rounded-lg bg-gray-50 group-hover:shadow-xl transition-all duration-300">
-                    <img
-                      src={image.cloudinary_public_id ?
-                        `https://res.cloudinary.com/pawtraits/image/upload/c_fill,w_300,h_300,q_auto,f_auto/${image.cloudinary_public_id}` :
-                        image.public_url || '/assets/placeholder-pet.jpg'
-                      }
-                      alt={image.description || 'Pet portrait'}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-
-                    {/* Hover overlay */}
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300 flex items-center justify-center">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-center">
-                        <Button className="bg-white text-purple-600 hover:bg-gray-100 mb-2">
-                          View Details
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-white/10 border-white text-white hover:bg-white/20"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleShareImage(image);
-                          }}
-                        >
-                          <Share2 className="w-4 h-4 mr-1" />
-                          Share
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {getFilteredImages().length === 0 && (
-              <div className="text-center py-12">
-                <div className="mx-auto mb-4">
-                  {selectedBreedId ? (
-                    activeTab === 'dogs' ? <Dog className="w-12 h-12 text-gray-300 mx-auto" /> : <Cat className="w-12 h-12 text-gray-300 mx-auto" />
-                  ) : (
-                    <Palette className="w-12 h-12 text-gray-300 mx-auto" />
-                  )}
-                </div>
-                <p className="text-gray-600">
-                  No images available yet for this {selectedBreedId ? 'breed' : 'theme'}.
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-      ) : (
-        // Browse view with carousel and cards
-        <>
-          {/* Hero Carousel - Dynamic based on active tab */}
-          <section className="relative">
-            <ContentBasedCarousel
-              pageType={getCarouselPageType()}
-              className="h-96 lg:h-[500px]"
-            />
-          </section>
-
-          {/* Filter Tabs and Search */}
-          <section className="py-8 bg-white/50 backdrop-blur-sm">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
-          {/* Tab Navigation */}
-          <div className="flex justify-center mb-8">
-            <div className="flex bg-white rounded-lg p-1 shadow-lg">
-              <Button
-                variant={activeTab === 'dogs' ? 'default' : 'ghost'}
-                onClick={() => handleTabChange('dogs')}
-                className={`px-6 py-3 rounded-md transition-all ${
-                  activeTab === 'dogs'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'text-gray-700 hover:text-purple-600'
-                }`}
-              >
-                <Dog className="w-5 h-5 mr-2" />
-                Dogs ({dogBreeds.length})
-              </Button>
-              <Button
-                variant={activeTab === 'cats' ? 'default' : 'ghost'}
-                onClick={() => handleTabChange('cats')}
-                className={`px-6 py-3 rounded-md transition-all ${
-                  activeTab === 'cats'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'text-gray-700 hover:text-purple-600'
-                }`}
-              >
-                <Cat className="w-5 h-5 mr-2" />
-                Cats ({catBreeds.length})
-              </Button>
-              <Button
-                variant={activeTab === 'themes' ? 'default' : 'ghost'}
-                onClick={() => handleTabChange('themes')}
-                className={`px-6 py-3 rounded-md transition-all ${
-                  activeTab === 'themes'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'text-gray-700 hover:text-purple-600'
-                }`}
-              >
-                <Palette className="w-5 h-5 mr-2" />
-                Themes ({themes.length})
-              </Button>
-            </div>
-          </div>
-
-          {/* Search Bar */}
-          <div className="max-w-2xl mx-auto">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <Input
-                type="text"
-                placeholder={`Search ${activeTab}...`}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-3 text-lg border-2 border-gray-200 focus:border-purple-500 rounded-xl"
-              />
-              {searchTerm && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                >
-                  ×
-                </Button>
-              )}
-            </div>
-
-            {searchTerm && (
-              <div className="mt-4 text-center">
-                <Badge variant="secondary" className="text-sm">
-                  Searching for: "{searchTerm}"
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSearchTerm('')}
-                    className="ml-2 p-0 h-auto"
-                  >
-                    ×
-                  </Button>
-                </Badge>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-          </>
-        )
-      }
 
       {/* Breed/Theme Detail View OR Cards Grid Section */}
       {selectedBreedId || selectedThemeId ? (
@@ -667,7 +415,7 @@ function BrowsePageContent() {
                     <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
                       <div
                         className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
-                        onClick={() => router.push(`/browse/${image.id}`)}
+                        onClick={() => router.push(`/customer/shop/${image.id}`)}
                       >
                         <CatalogImage
                           imageId={image.id}
@@ -708,7 +456,7 @@ function BrowsePageContent() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            router.push(`/browse/${image.id}`);
+                            router.push(`/customer/shop/${image.id}`);
                           }}
                         >
                           <ShoppingCart className="w-4 h-4 mr-2" />
@@ -944,20 +692,6 @@ function BrowsePageContent() {
       )}
 
       {/* Modals */}
-      {selectedImage && (
-        <ProductSelectionModal
-          isOpen={showProductModal}
-          onClose={() => {
-            setShowProductModal(false);
-            setSelectedImage(null);
-          }}
-          image={selectedImage}
-          products={products}
-          pricing={pricing}
-          onAddToBasket={() => {}} // TODO: implement
-        />
-      )}
-
       {imageToShare && (
         <ShareModal
           isOpen={showShareModal}
