@@ -134,6 +134,35 @@ function BrowsePageContent() {
     setPurchasedImages(new Set(purchased));
   };
 
+  const handleLike = (imageId: string) => {
+    const image = images.find(img => img.id === imageId);
+    const isNowLiked = UserInteractionsService.toggleLikeSync(imageId, image);
+
+    setLikedImages(prev => {
+      const newLiked = new Set(prev);
+      if (isNowLiked) {
+        newLiked.add(imageId);
+      } else {
+        newLiked.delete(imageId);
+      }
+      return newLiked;
+    });
+  };
+
+  const handleShare = (image: ImageCatalogWithDetails) => {
+    setImageToShare(image);
+    setShowShareModal(true);
+  };
+
+  const handleShareComplete = (platform: string) => {
+    if (imageToShare) {
+      UserInteractionsService.recordShare(imageToShare.id, platform, imageToShare);
+      setSharedImages(prev => new Set(prev).add(imageToShare.id));
+    }
+    setShowShareModal(false);
+    setImageToShare(null);
+  };
+
   const getCarouselPageType = (): PageType => {
     switch (activeTab) {
       case 'dogs': return 'dogs';
@@ -410,26 +439,63 @@ function BrowsePageContent() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                  {getFilteredImages().map((image) => (
-                    <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
-                      <div
-                        className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
-                        onClick={() => router.push(`/shop/${image.id}`)}
-                      >
-                        <CatalogImage
-                          imageId={image.id}
-                          alt={image.description || 'Generated image'}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          fallbackUrl={image.image_url || image.public_url}
-                        />
-                        {image.rating && image.rating > 0 && (
-                          <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs flex items-center">
-                            {[...Array(Math.floor(image.rating))].map((_, i) => (
-                              <Star key={i} className="w-3 h-3 text-yellow-500 fill-current" />
-                            ))}
+                  {getFilteredImages().map((image) => {
+                    const isLiked = likedImages.has(image.id);
+                    const isShared = sharedImages.has(image.id);
+                    const isPurchased = purchasedImages.has(image.id);
+
+                    return (
+                      <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
+                        <div
+                          className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
+                          onClick={() => router.push(`/shop/${image.id}`)}
+                        >
+                          <CatalogImage
+                            imageId={image.id}
+                            alt={image.description || 'Generated image'}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            fallbackUrl={image.image_url || image.public_url}
+                          />
+
+                          {/* Like, Share, and Purchase status overlay */}
+                          <div className="absolute top-2 right-2 flex gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleLike(image.id);
+                              }}
+                              className={`p-2 rounded-full transition-all ${
+                                isLiked
+                                  ? 'bg-red-500 text-white'
+                                  : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
+                              }`}
+                              title={isLiked ? 'Unlike' : 'Like'}
+                            >
+                              <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                            </button>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleShare(image);
+                              }}
+                              className={`p-2 rounded-full transition-all ${
+                                isShared
+                                  ? 'bg-blue-500 text-white'
+                                  : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
+                              }`}
+                              title={isShared ? 'Shared' : 'Share'}
+                            >
+                              <Share2 className="w-4 h-4" />
+                            </button>
+
+                            {isPurchased && (
+                              <div className="bg-green-500 text-white p-2 rounded-full" title="Purchased">
+                                <ShoppingCart className="w-4 h-4 fill-current" />
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
+                        </div>
 
                       <CardContent className="p-4">
                         {image.description && (
@@ -463,7 +529,8 @@ function BrowsePageContent() {
                         </Button>
                       </CardContent>
                     </Card>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -798,7 +865,7 @@ function BrowsePageContent() {
             setImageToShare(null);
           }}
           image={imageToShare as any}
-          onShare={() => {}} // TODO: implement
+          onShare={handleShareComplete}
         />
       )}
     </div>
