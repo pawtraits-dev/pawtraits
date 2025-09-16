@@ -30,20 +30,24 @@ CREATE TABLE IF NOT EXISTS carousel_content_selections (
 );
 
 -- Add indexes for performance
-CREATE INDEX idx_carousel_content_selections_carousel_id ON carousel_content_selections(carousel_id);
-CREATE INDEX idx_carousel_content_selections_content ON carousel_content_selections(content_type, content_id);
-CREATE INDEX idx_carousel_content_selections_active ON carousel_content_selections(is_active);
-CREATE INDEX idx_carousel_content_selections_sort ON carousel_content_selections(carousel_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_carousel_content_selections_carousel_id ON carousel_content_selections(carousel_id);
+CREATE INDEX IF NOT EXISTS idx_carousel_content_selections_content ON carousel_content_selections(content_type, content_id);
+CREATE INDEX IF NOT EXISTS idx_carousel_content_selections_active ON carousel_content_selections(is_active);
+CREATE INDEX IF NOT EXISTS idx_carousel_content_selections_sort ON carousel_content_selections(carousel_id, sort_order);
 
 -- Add RLS policies
 ALTER TABLE carousel_content_selections ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Admin can manage carousel content selections" ON carousel_content_selections;
+DROP POLICY IF EXISTS "Public can view active carousel content selections" ON carousel_content_selections;
 
 -- Admin can manage all carousel selections
 CREATE POLICY "Admin can manage carousel content selections" ON carousel_content_selections
     FOR ALL USING (
         EXISTS (
-            SELECT 1 FROM user_profiles 
-            WHERE user_profiles.id = auth.uid() 
+            SELECT 1 FROM user_profiles
+            WHERE user_profiles.id = auth.uid()
             AND user_profiles.user_type = 'admin'
         )
     );
@@ -61,6 +65,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Drop existing trigger if it exists
+DROP TRIGGER IF EXISTS update_carousel_content_selections_updated_at ON carousel_content_selections;
+
 CREATE TRIGGER update_carousel_content_selections_updated_at
     BEFORE UPDATE ON carousel_content_selections
     FOR EACH ROW
@@ -74,7 +81,10 @@ COMMENT ON COLUMN carousel_content_selections.custom_title IS 'Optional override
 COMMENT ON COLUMN carousel_content_selections.custom_cta_text IS 'Optional override for CTA button text (defaults to "View [Type]")';
 
 -- Create view for easy carousel content retrieval with all data
-CREATE OR REPLACE VIEW carousel_content_with_details AS
+-- Drop existing view to handle column name changes
+DROP VIEW IF EXISTS carousel_content_with_details;
+
+CREATE VIEW carousel_content_with_details AS
 SELECT 
     ccs.id,
     ccs.carousel_id,
@@ -141,12 +151,12 @@ SELECT
         END
     ) as cta_text,
     
-    -- Generate CTA URL for filtered shop view
-    CASE ccs.content_type 
-        WHEN 'theme' THEN CONCAT('/customer/shop?theme=', REPLACE(LOWER(t.name), ' ', '+'))
-        WHEN 'dog_breed' THEN CONCAT('/customer/shop?breed=', REPLACE(LOWER(b.name), ' ', '+'), '&animal=dog')
-        WHEN 'cat_breed' THEN CONCAT('/customer/shop?breed=', REPLACE(LOWER(b.name), ' ', '+'), '&animal=cat')
-        ELSE '/customer/shop'
+    -- Generate CTA URL for filtered browse view
+    CASE ccs.content_type
+        WHEN 'theme' THEN CONCAT('/browse?type=themes&theme=', t.id)
+        WHEN 'dog_breed' THEN CONCAT('/browse?type=dogs&breed=', b.id)
+        WHEN 'cat_breed' THEN CONCAT('/browse?type=cats&breed=', b.id)
+        ELSE '/browse'
     END as cta_url,
     
     -- Additional metadata
