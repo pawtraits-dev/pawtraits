@@ -325,7 +325,7 @@ function BrowsePageContent() {
                             <img
                               src={selectedBreed.hero_image_url}
                               alt={selectedBreed.hero_image_alt || `${selectedBreed.name} hero image`}
-                              className="w-full h-48 lg:h-64 object-cover bg-gray-50 rounded-lg shadow-md"
+                              className="w-full aspect-square object-cover bg-gray-50 rounded-lg shadow-md"
                             />
                           </div>
                         )}
@@ -370,7 +370,7 @@ function BrowsePageContent() {
                             <img
                               src={selectedTheme.hero_image_url}
                               alt={selectedTheme.hero_image_alt || `${selectedTheme.name} theme hero image`}
-                              className="w-full h-48 lg:h-32 object-cover rounded-lg shadow-md"
+                              className="w-full aspect-square object-cover rounded-lg shadow-md"
                             />
                           </div>
                         )}
@@ -414,7 +414,7 @@ function BrowsePageContent() {
                     <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
                       <div
                         className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
-                        onClick={() => router.push(`/customer/shop/${image.id}`)}
+                        onClick={() => router.push(`/shop/${image.id}`)}
                       >
                         <CatalogImage
                           imageId={image.id}
@@ -455,7 +455,7 @@ function BrowsePageContent() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            router.push(`/customer/shop/${image.id}`);
+                            router.push(`/shop/${image.id}`);
                           }}
                         >
                           <ShoppingCart className="w-4 h-4 mr-2" />
