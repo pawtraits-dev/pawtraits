@@ -46,6 +46,11 @@ tsx scripts/run-carousel-migration.ts   # Migrate carousel data
 tsx scripts/test-enhanced-cart.ts       # Test enhanced cart data structure
 tsx scripts/test-cart-api-integration.ts # Test cart API integration with enhanced data
 
+# Database Management & Migration Scripts
+tsx scripts/create-batch-tables-direct.ts # Create batch processing tables
+tsx scripts/fix-foreign-key-constraint.ts # Fix foreign key constraints
+tsx scripts/debug-partner-lookup.ts     # Debug partner lookup functionality
+
 # End-to-End Testing (Playwright)
 npx playwright test                      # Run all E2E tests
 npx playwright test --ui                 # Run tests with UI mode

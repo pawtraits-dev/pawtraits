@@ -467,7 +467,7 @@ export default function CustomerShopPage() {
   };
 
   const handleImageClick = (image: ImageCatalogWithDetails) => {
-    router.push(`/image/${image.id}`);
+    router.push(`/customer/shop/${image.id}`);
   };
 
   const handleShareComplete = (platform: string) => {
@@ -1058,16 +1058,22 @@ export default function CustomerShopPage() {
             
             <div className="flex items-center space-x-2">
               <Button
-                onClick={() => setPage(Math.max(1, page - 1))}
+                onClick={() => {
+                  setPage(Math.max(1, page - 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 disabled={page === 1 || loading}
                 variant="outline"
                 size="sm"
               >
                 ← Previous
               </Button>
-              
+
               <Button
-                onClick={() => setPage(page + 1)}
+                onClick={() => {
+                  setPage(page + 1);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 disabled={loading || images.length < pageSize}
                 variant="outline"
                 size="sm"
