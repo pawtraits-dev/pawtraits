@@ -145,7 +145,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                     <p className="text-sm font-medium text-gray-900">Popular Dog Breeds</p>
                   </div>
                   <button
-                    onClick={() => handleDropdownClick('/dogs')}
+                    onClick={() => handleDropdownClick('/browse?type=dogs')}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                   >
                     View All Dogs
@@ -153,7 +153,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                   {dogBreeds.map((breed) => (
                     <button
                       key={breed.id}
-                      onClick={() => handleDropdownClick('/dogs', { breed: breed.id })}
+                      onClick={() => handleDropdownClick('/browse?type=dogs&breed=' + breed.id)}
                       className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                     >
                       {breed.name}
@@ -180,7 +180,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                     <p className="text-sm font-medium text-gray-900">Popular Cat Breeds</p>
                   </div>
                   <button
-                    onClick={() => handleDropdownClick('/cats')}
+                    onClick={() => handleDropdownClick('/browse?type=cats')}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                   >
                     View All Cats
@@ -188,7 +188,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                   {catBreeds.map((breed) => (
                     <button
                       key={breed.id}
-                      onClick={() => handleDropdownClick('/cats', { breed: breed.id })}
+                      onClick={() => handleDropdownClick('/browse?type=cats&breed=' + breed.id)}
                       className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                     >
                       {breed.name}
@@ -225,7 +225,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                     <p className="text-sm font-medium text-gray-900">Popular Themes</p>
                   </div>
                   <button
-                    onClick={() => handleDropdownClick('/themes')}
+                    onClick={() => handleDropdownClick('/browse?type=themes')}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                   >
                     View All Themes
@@ -233,7 +233,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                   {themes.map((theme) => (
                     <button
                       key={theme.id}
-                      onClick={() => handleDropdownClick('/themes', { theme: theme.id })}
+                      onClick={() => handleDropdownClick('/browse?type=themes&theme=' + theme.id)}
                       className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                     >
                       {theme.name}
