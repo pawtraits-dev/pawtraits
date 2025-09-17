@@ -148,8 +148,12 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
   const loadGuestCart = () => {
     try {
       const stored = localStorage.getItem(GUEST_CART_STORAGE_KEY);
+      console.log('Loading guest cart from localStorage:', stored);
+
       if (stored) {
         const guestItems = JSON.parse(stored);
+        console.log('Parsed guest items:', guestItems);
+
         if (Array.isArray(guestItems)) {
           // Validate guest cart items
           const validatedItems = guestItems.filter((item: any) => {
@@ -159,11 +163,14 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
             }
             return true;
           });
+          console.log(`Guest cart validation: ${guestItems.length} items → ${validatedItems.length} valid items`);
           setItems(validatedItems);
         } else {
+          console.log('Guest cart data is not an array, clearing items');
           setItems([]);
         }
       } else {
+        console.log('No guest cart data found in localStorage');
         setItems([]);
       }
     } catch (error) {
@@ -174,7 +181,9 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
 
   const saveGuestCart = (newItems: CartItem[]) => {
     try {
+      console.log('Saving guest cart to localStorage:', newItems);
       localStorage.setItem(GUEST_CART_STORAGE_KEY, JSON.stringify(newItems));
+      console.log('Guest cart saved successfully');
     } catch (error) {
       console.error('Error saving guest cart:', error);
     }
@@ -229,11 +238,15 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
   };
 
   const addToGuestCart = (itemData: Omit<CartItem, 'id' | 'addedAt'>) => {
+    console.log('Adding item to guest cart:', itemData);
+
     const newItem: CartItem = {
       ...itemData,
       id: `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       addedAt: new Date().toISOString(),
     };
+
+    console.log('Created new cart item:', newItem);
 
     // Check if item already exists (same product + image combination)
     const existingItemIndex = items.findIndex(
