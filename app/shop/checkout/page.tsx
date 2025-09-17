@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
 import { ArrowLeft, ArrowRight, CreditCard, Shield, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { useServerCart } from "@/lib/server-cart-context"
+import { useHybridCart } from "@/lib/hybrid-cart-context"
 import { useRouter } from "next/navigation"
 import { useUserRouting } from "@/hooks/use-user-routing"
 
@@ -31,9 +31,18 @@ export default function CheckoutPage() {
   const [referralValidation, setReferralValidation] = useState<any>(null)
   const [validatingReferral, setValidatingReferral] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const { cart, getShippingCost, getCartTotal, clearCart } = useServerCart()
+  const { items, totalItems, totalPrice, clearCart } = useHybridCart()
   const router = useRouter()
   const { userProfile } = useUserRouting()
+
+  // Calculate shipping cost - note: this is temporary for checkout, actual shipping will be via Gelato API
+  const getShippingCost = () => {
+    return totalPrice >= 7500 ? 0 : 999 // £9.99 in pence, free over £75
+  }
+
+  const getCartTotal = () => {
+    return totalPrice + getShippingCost()
+  }
 
   // Update shipping data when user profile loads
   useEffect(() => {
@@ -63,12 +72,12 @@ export default function CheckoutPage() {
 
   // Validate referral code when it changes and user email is available
   useEffect(() => {
-    if (referralCode && shippingData.email && cart.totalPrice > 0) {
+    if (referralCode && shippingData.email && totalPrice > 0) {
       validateReferralCode()
     } else {
       setReferralValidation(null)
     }
-  }, [referralCode, shippingData.email, cart.totalPrice])
+  }, [referralCode, shippingData.email, totalPrice])
 
   const validateReferralCode = async () => {
     if (!referralCode || !shippingData.email) return
@@ -81,7 +90,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           referralCode: referralCode,
           customerEmail: shippingData.email,
-          orderTotal: cart.totalPrice / 100 // Convert to pounds
+          orderTotal: totalPrice / 100 // Convert to pounds
         })
       })
 
@@ -103,16 +112,16 @@ export default function CheckoutPage() {
   }
 
   const orderSummary = {
-    subtotal: cart.totalPrice / 100, // Convert from pence to pounds
+    subtotal: totalPrice / 100, // Convert from pence to pounds
     shipping: getShippingCost() / 100,
     discount: referralValidation?.valid && referralValidation?.discount?.eligible 
       ? referralValidation.discount.amount / 100 
       : 0,
     // Apply discount to subtotal only, then add shipping
-    total: (cart.totalPrice / 100) - (referralValidation?.valid && referralValidation?.discount?.eligible 
-      ? referralValidation.discount.amount / 100 
+    total: (totalPrice / 100) - (referralValidation?.valid && referralValidation?.discount?.eligible
+      ? referralValidation.discount.amount / 100
       : 0) + (getShippingCost() / 100),
-    items: cart.items.map(item => ({
+    items: items.map(item => ({
       title: item.imageTitle,
       price: item.pricing.sale_price / 100, // Convert from pence to pounds
       quantity: item.quantity
@@ -146,7 +155,7 @@ export default function CheckoutPage() {
     try {
       // Create order data
       const orderData = {
-        items: cart.items.map(item => ({
+        items: items.map(item => ({
           productId: item.productId,
           imageId: item.imageId,
           imageUrl: item.imageUrl,
