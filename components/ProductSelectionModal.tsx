@@ -27,7 +27,7 @@ interface GenericImage {
 }
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice, formatProductDimensions } from '@/lib/product-types';
-import { useServerCart } from '@/lib/server-cart-context';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { useCountryPricing } from '@/lib/country-context';
 import { useRouter } from 'next/navigation';
 
@@ -54,7 +54,7 @@ export default function ProductSelectionModal({
   onAddToBasket
 }: ProductSelectionModalProps) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const { addToCart } = useServerCart();
+  const { addToCart } = useHybridCart();
   const { selectedCountry, getCountryPricing } = useCountryPricing();
   const router = useRouter();
 

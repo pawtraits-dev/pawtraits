@@ -289,20 +289,23 @@ function QRLandingPageContent() {
             </CardContent>
           </Card>
 
+          {/* Image Description */}
+          {image.description && (
+            <Card>
+              <CardContent className="pt-6">
+                <ReactMarkdown className="prose prose-sm max-w-none">
+                  {image.description}
+                </ReactMarkdown>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Product Details */}
           <div className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <div className="flex-1">
-                    {image.description ? (
-                      <ReactMarkdown className="prose prose-sm max-w-none">
-                        {image.description}
-                      </ReactMarkdown>
-                    ) : (
-                      <span>Custom Pet Portrait</span>
-                    )}
-                  </div>
+                  <span>Custom Pet Portrait</span>
                   <div className="flex space-x-2 ml-4">
                     <Button
                       variant="outline"
@@ -347,17 +350,6 @@ function QRLandingPageContent() {
                   </div>
                 )}
 
-                {/* Non-partner regular pricing notice */}
-                {!partner && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-blue-800 mb-2">
-                      Premium Pet Portrait
-                    </h4>
-                    <p className="text-sm text-blue-700">
-                      High-quality AI-generated portrait available in multiple formats.
-                    </p>
-                  </div>
-                )}
 
                 {/* Products */}
                 <div className="space-y-3">
@@ -421,21 +413,6 @@ function QRLandingPageContent() {
           </div>
         </div>
 
-        {/* Browse more */}
-        <Card className="mt-8">
-          <CardContent className="pt-6 text-center">
-            <h3 className="text-lg font-semibold mb-2">Love this style?</h3>
-            <p className="text-gray-600 mb-4">
-              Browse our complete collection of AI-generated pet portraits
-            </p>
-            <Button 
-              variant="outline"
-              onClick={() => router.push('/shop')}
-            >
-              Browse All Portraits
-            </Button>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Modals */}
