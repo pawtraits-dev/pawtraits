@@ -64,6 +64,10 @@ function BrowsePageContent() {
   const [selectedThemeId, setSelectedThemeId] = useState(searchParams.get('theme') || '');
   const [loading, setLoading] = useState(true);
 
+  // Theme-specific filtering when viewing a specific theme
+  const [themeAnimalFilter, setThemeAnimalFilter] = useState<'all' | 'dogs' | 'cats'>('all');
+  const [themeBreedSearch, setThemeBreedSearch] = useState('');
+
   // Data states
   const [dogBreeds, setDogBreeds] = useState<Breed[]>([]);
   const [catBreeds, setCatBreeds] = useState<Breed[]>([]);
@@ -316,6 +320,23 @@ function BrowsePageContent() {
     // Filter by theme
     if (selectedThemeId) {
       filteredImages = filteredImages.filter(img => img.theme_id === selectedThemeId);
+
+      // Additional theme-specific filtering
+      if (themeAnimalFilter !== 'all') {
+        const animalType = themeAnimalFilter === 'dogs' ? 'dog' : 'cat';
+        filteredImages = filteredImages.filter(img =>
+          img.breed?.animal_type === animalType ||
+          img.tags?.includes(animalType) ||
+          (!img.breed?.animal_type && !img.tags?.includes('cat') && animalType === 'dog')
+        );
+      }
+
+      // Theme breed search
+      if (themeBreedSearch) {
+        filteredImages = filteredImages.filter(img =>
+          img.breed_name?.toLowerCase().includes(themeBreedSearch.toLowerCase())
+        );
+      }
     }
 
     // Filter by animal type based on active tab (if no specific breed/theme selected)
@@ -338,6 +359,9 @@ function BrowsePageContent() {
     // Clear breed/theme selection when switching tabs
     setSelectedBreedId('');
     setSelectedThemeId('');
+    // Clear theme-specific filters
+    setThemeAnimalFilter('all');
+    setThemeBreedSearch('');
     // Scroll to top smoothly when changing tabs
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -366,6 +390,9 @@ function BrowsePageContent() {
     setSelectedBreedId('');
     setSelectedThemeId('');
     setSearchTerm('');
+    // Clear theme-specific filters
+    setThemeAnimalFilter('all');
+    setThemeBreedSearch('');
   };
 
   const getImageProductInfo = (imageId: string) => {
@@ -514,6 +541,77 @@ function BrowsePageContent() {
               <h2 className="text-2xl font-bold text-gray-900 mb-6">
                 Available Portraits ({getFilteredImages().length})
               </h2>
+
+              {/* Theme-specific filtering controls */}
+              {selectedThemeId && (
+                <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    {/* Animal Type Filter */}
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Animal Type
+                      </label>
+                      <div className="flex gap-2">
+                        <Button
+                          variant={themeAnimalFilter === 'all' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setThemeAnimalFilter('all')}
+                        >
+                          All
+                        </Button>
+                        <Button
+                          variant={themeAnimalFilter === 'dogs' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setThemeAnimalFilter('dogs')}
+                        >
+                          <Dog className="w-4 h-4 mr-1" />
+                          Dogs
+                        </Button>
+                        <Button
+                          variant={themeAnimalFilter === 'cats' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setThemeAnimalFilter('cats')}
+                        >
+                          <Cat className="w-4 h-4 mr-1" />
+                          Cats
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Breed Search */}
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Search Breeds
+                      </label>
+                      <div className="relative">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                        <Input
+                          type="text"
+                          placeholder="Search for specific breeds..."
+                          value={themeBreedSearch}
+                          onChange={(e) => setThemeBreedSearch(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Clear Filters */}
+                    <div className="flex items-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setThemeAnimalFilter('all');
+                          setThemeBreedSearch('');
+                        }}
+                        disabled={themeAnimalFilter === 'all' && !themeBreedSearch}
+                      >
+                        Clear Filters
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {getFilteredImages().length === 0 ? (
                 <div className="text-center py-12">
@@ -870,7 +968,7 @@ function BrowsePageContent() {
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          className="flex-1 text-xs bg-orange-600 hover:bg-orange-700"
+                          className="flex-1 text-xs bg-purple-600 hover:bg-purple-700"
                           onClick={() => handleThemeClick(theme, 'dogs')}
                           disabled={dogImageCount === 0}
                         >
@@ -878,7 +976,7 @@ function BrowsePageContent() {
                         </Button>
                         <Button
                           size="sm"
-                          className="flex-1 text-xs bg-blue-600 hover:bg-blue-700"
+                          className="flex-1 text-xs bg-purple-600 hover:bg-purple-700"
                           onClick={() => handleThemeClick(theme, 'cats')}
                           disabled={catImageCount === 0}
                         >
