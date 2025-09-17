@@ -29,7 +29,7 @@ export function getContinueShoppingRoute(userType: UserType | null): string {
     case 'customer':
       return '/customer/shop'; // Customers shop in their customer shop area
     default:
-      return '/catalog'; // Unauthenticated users go to main catalog
+      return '/browse'; // Unauthenticated users go to public browse page
   }
 }
 

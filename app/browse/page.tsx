@@ -522,9 +522,9 @@ function BrowsePageContent() {
                             🎨 {selectedTheme.name}
                           </h1>
                           {selectedTheme.description && (
-                            <p className="text-gray-700 text-lg leading-relaxed mb-4">
-                              {selectedTheme.description}
-                            </p>
+                            <div className="text-gray-700 text-lg leading-relaxed prose prose-gray max-w-none mb-4">
+                              <ReactMarkdown>{selectedTheme.description}</ReactMarkdown>
+                            </div>
                           )}
                         </div>
                       </div>
