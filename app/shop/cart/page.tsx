@@ -7,14 +7,14 @@ import { Separator } from "@/components/ui/separator"
 import { Minus, Plus, Trash2, ShoppingCart, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { useServerCart } from "@/lib/server-cart-context"
+import { useHybridCart } from "@/lib/hybrid-cart-context"
 import { formatPrice } from "@/lib/product-types"
 import { useUserRouting } from "@/hooks/use-user-routing"
 import { getSupabaseClient } from '@/lib/supabase-client'
 import { extractDescriptionTitle } from '@/lib/utils'
 
 export default function ShoppingCartPage() {
-  const { cart, updateQuantity, removeFromCart, getShippingCost, getCartTotal } = useServerCart();
+  const { items, totalItems, totalPrice, updateQuantity, removeFromCart, isGuest } = useHybridCart();
   const { continueShoppingRoute, userProfile } = useUserRouting();
   const [referralCode, setReferralCode] = useState("")
   const [referralValidation, setReferralValidation] = useState<any>(null)
@@ -53,12 +53,12 @@ export default function ShoppingCartPage() {
 
   // Validate referral code when it changes and user email is available
   useEffect(() => {
-    if (referralCode && userEmail && cart.totalPrice > 0) {
+    if (referralCode && userEmail && totalPrice > 0) {
       validateReferralCode()
     } else {
       setReferralValidation(null)
     }
-  }, [referralCode, userEmail, cart.totalPrice])
+  }, [referralCode, userEmail, totalPrice])
 
   const validateReferralCode = async () => {
     if (!referralCode || !userEmail) return
@@ -70,7 +70,7 @@ export default function ShoppingCartPage() {
         body: JSON.stringify({
           referralCode: referralCode,
           customerEmail: userEmail,
-          orderTotal: cart.totalPrice / 100 // Convert to pounds
+          orderTotal: totalPrice / 100 // Convert to pounds
         })
       })
 
@@ -95,15 +95,14 @@ export default function ShoppingCartPage() {
   };
 
   // Convert pricing from minor units (pence) to major units (pounds) for display
-  const subtotal = cart.totalPrice / 100;
-  const shipping = getShippingCost() / 100;
-  const discount = referralValidation?.valid && referralValidation?.discount?.eligible 
-    ? referralValidation.discount.amount / 100 
+  const subtotal = totalPrice / 100;
+  const discount = referralValidation?.valid && referralValidation?.discount?.eligible
+    ? referralValidation.discount.amount / 100
     : 0;
-  // Apply discount to subtotal only, then add shipping
-  const total = subtotal - discount + shipping;
+  // Cart total is subtotal minus discount (shipping calculated at checkout)
+  const total = subtotal - discount;
 
-  if (cart.items.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -147,14 +146,14 @@ export default function ShoppingCartPage() {
           </Link>
           <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
           <p className="text-gray-600 mt-2">
-            {cart.items.length} item{cart.items.length !== 1 ? "s" : ""} in your cart
+            {items.length} item{items.length !== 1 ? "s" : ""} in your cart
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
-            {cart.items.map((item) => (
+            {items.map((item) => (
               <Card key={item.id} className="shadow-sm">
                 <CardContent className="p-6">
                   <div className="flex items-start space-x-4">
@@ -233,11 +232,6 @@ export default function ShoppingCartPage() {
                   <span className="text-gray-600">Subtotal</span>
                   <span className="font-medium">£{subtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Shipping</span>
-                  <span className="font-medium">{shipping === 0 ? "Free" : `£${shipping.toFixed(2)}`}</span>
-                </div>
-                {shipping > 0 && <p className="text-sm text-gray-500">Free shipping on orders over £75</p>}
                 
                 {/* Referral Discount Section */}
                 {referralCode && (
@@ -264,6 +258,10 @@ export default function ShoppingCartPage() {
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
                   <span>£{total.toFixed(2)}</span>
+                </div>
+
+                <div className="text-sm text-gray-500 text-center">
+                  <p>Shipping costs calculated at checkout</p>
                 </div>
 
                 <Link href={userProfile?.user_type === 'partner' ? '/partners/checkout' : userProfile?.user_type === 'customer' ? '/customer/checkout' : '/shop/checkout'} className="block">

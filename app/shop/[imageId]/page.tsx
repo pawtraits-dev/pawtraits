@@ -13,7 +13,7 @@ import type { ImageCatalogWithDetails } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
-import { useServerCart } from '@/lib/server-cart-context';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ShareModal from '@/components/share-modal';
 import { getSupabaseClient } from '@/lib/supabase-client';
@@ -25,7 +25,7 @@ function QRLandingPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { addToCart } = useServerCart();
+  const { addToCart } = useHybridCart();
   const { getCountryPricing } = useCountryPricing();
 
   const imageId = params.imageId as string;
@@ -134,29 +134,18 @@ function QRLandingPageContent() {
     if (!image) return;
 
     const product = products.find(p => p.id === productId);
-    const productPricing = pricing.find(p => p.product_id === productId);
-    
+    const countryPricing = getCountryPricing(pricing);
+    const productPricing = countryPricing.find(p => p.product_id === productId);
+
     if (!product || !productPricing) return;
 
-    // Check if user is authenticated
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      // Redirect to QR-specific signup with context
-      const signupUrl = new URL('/signup/user-qr', window.location.origin);
-      signupUrl.searchParams.set('imageId', imageId);
-      signupUrl.searchParams.set('productId', productId);
-      signupUrl.searchParams.set('quantity', quantity.toString());
-      if (partnerId) signupUrl.searchParams.set('partner', partnerId);
-      if (referralCode) signupUrl.searchParams.set('ref', referralCode);
-      if (discountCode) signupUrl.searchParams.set('discount', discountCode);
-      
-      router.push(signupUrl.toString());
-      return;
+    try {
+      // Use hybrid cart - will work for both guest and authenticated users
+      await addProductToCart(product, productPricing, productId, quantity);
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      // Handle error (could show toast notification)
     }
-
-    // User is authenticated, proceed with add to cart
-    addProductToCart(product, productPricing, productId, quantity);
   };
 
   const handleAutoAddToCart = async (productId: string, quantity: number = 1) => {
@@ -180,7 +169,7 @@ function QRLandingPageContent() {
     addProductToCart(product, productPricing, productId, quantity);
   };
 
-  const addProductToCart = (product: any, productPricing: any, productId: string, quantity: number) => {
+  const addProductToCart = async (product: any, productPricing: any, productId: string, quantity: number) => {
     const discountedPrice = partnerId ? productPricing.sale_price * (1 - discountAmount / 100) : productPricing.sale_price;
     const finalPricing = partnerId ? {
       ...productPricing,
@@ -188,7 +177,7 @@ function QRLandingPageContent() {
       original_price: productPricing.sale_price
     } : productPricing;
 
-    addToCart({
+    await addToCart({
       imageId: image.id,
       productId: productId,
       imageUrl: image.image_variants?.catalog_watermarked?.url || image.public_url,
@@ -200,8 +189,16 @@ function QRLandingPageContent() {
       discountCode: partnerId ? discountCode : undefined
     });
 
-    // Redirect to customer checkout (protected route)
-    router.push('/customer/checkout');
+    // Check if user is authenticated to determine checkout route
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      // Authenticated user: go to customer checkout
+      router.push('/customer/checkout');
+    } else {
+      // Guest user: go to public cart page or show signup prompt
+      router.push('/shop/cart');
+    }
   };
 
   if (loading) {

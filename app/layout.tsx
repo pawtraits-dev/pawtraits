@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Margarine, Life_Savers } from 'next/font/google';
 import './globals.css';
-import { ServerCartProvider } from '@/lib/server-cart-context';
+import { HybridCartProvider } from '@/lib/hybrid-cart-context';
 
 const inter = Inter({ subsets: ['latin'] });
 const margarine = Margarine({ 
@@ -53,9 +53,9 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} ${margarine.variable} ${lifeSavers.variable}`}>
         <div id="root">
-          <ServerCartProvider>
+          <HybridCartProvider>
             {children}
-          </ServerCartProvider>
+          </HybridCartProvider>
         </div>
       </body>
     </html>
