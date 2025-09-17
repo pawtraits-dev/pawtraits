@@ -939,7 +939,10 @@ function BrowsePageContent() {
 
                 return (
                   <Card key={theme.id} className="group hover:shadow-xl transition-all duration-300 overflow-hidden">
-                    <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50">
+                    <div
+                      className="relative aspect-square overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50 cursor-pointer"
+                      onClick={() => handleThemeClick(theme)}
+                    >
                       {theme.hero_image_url ? (
                         <img
                           src={theme.hero_image_url}

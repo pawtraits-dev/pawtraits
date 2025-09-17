@@ -17,12 +17,16 @@ import { useServerCart } from '@/lib/server-cart-context';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ShareModal from '@/components/share-modal';
 import { getSupabaseClient } from '@/lib/supabase-client';
+import PublicNavigation from '@/components/PublicNavigation';
+import { CountryProvider, useCountryPricing } from '@/lib/country-context';
+import ReactMarkdown from 'react-markdown';
 
-export default function QRLandingPage() {
+function QRLandingPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
   const { addToCart } = useServerCart();
+  const { getCountryPricing } = useCountryPricing();
 
   const imageId = params.imageId as string;
   const partnerId = searchParams.get('partner');
@@ -227,8 +231,10 @@ export default function QRLandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
-      <div className="container mx-auto px-4 py-8">
+    <>
+      <PublicNavigation />
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+        <div className="container mx-auto px-4 py-8">
         
         {/* Partner Header */}
         {partner && (
@@ -291,8 +297,16 @@ export default function QRLandingPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>{image.description || 'Custom Pet Portrait'}</span>
-                  <div className="flex space-x-2">
+                  <div className="flex-1">
+                    {image.description ? (
+                      <ReactMarkdown className="prose prose-sm max-w-none">
+                        {image.description}
+                      </ReactMarkdown>
+                    ) : (
+                      <span>Custom Pet Portrait</span>
+                    )}
+                  </div>
+                  <div className="flex space-x-2 ml-4">
                     <Button
                       variant="outline"
                       size="sm"
@@ -351,11 +365,12 @@ export default function QRLandingPage() {
                 {/* Products */}
                 <div className="space-y-3">
                   <h4 className="font-semibold">Available Products</h4>
-                  {products.filter(product => 
-                    product.is_active && 
+                  {products.filter(product =>
+                    product.is_active &&
                     (!image.format_id || product.format_id === image.format_id)
                   ).slice(0, 3).map((product) => {
-                    const productPricing = pricing.find(p => p.product_id === product.id);
+                    const countryPricing = getCountryPricing(pricing);
+                    const productPricing = countryPricing.find(p => p.product_id === product.id);
                     if (!productPricing) return null;
 
                     const originalPrice = productPricing.sale_price;
@@ -431,7 +446,7 @@ export default function QRLandingPage() {
         <ProductSelectionModal
           image={image}
           products={products}
-          pricing={pricing}
+          pricing={getCountryPricing(pricing)}
           isOpen={showProductModal}
           onClose={() => setShowProductModal(false)}
           onAddToBasket={handleAddToCart}
@@ -450,6 +465,15 @@ export default function QRLandingPage() {
           }}
         />
       )}
-    </div>
+      </div>
+    </>
+  );
+}
+
+export default function QRLandingPage() {
+  return (
+    <CountryProvider>
+      <QRLandingPageContent />
+    </CountryProvider>
   );
 }
