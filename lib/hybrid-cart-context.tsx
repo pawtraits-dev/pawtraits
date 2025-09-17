@@ -132,10 +132,39 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
       const data = await response.json();
       const validatedItems = (data.items || []).filter((item: any) => {
         // Validate that cart items have required pricing data
-        if (!item.pricing || typeof item.pricing.sale_price !== 'number') {
-          console.warn('Removing cart item with invalid pricing:', item);
+        if (!item.pricing) {
+          console.warn('Removing server cart item - missing pricing object:', {
+            id: item.id,
+            imageId: item.imageId,
+            productId: item.productId
+          });
           return false;
         }
+
+        // Check for sale_price or other price fields that might be used
+        const hasValidPrice = (
+          (typeof item.pricing.sale_price === 'number' && item.pricing.sale_price > 0) ||
+          (typeof item.pricing.price === 'number' && item.pricing.price > 0) ||
+          (typeof item.pricing.amount === 'number' && item.pricing.amount > 0) ||
+          (typeof item.pricing.total === 'number' && item.pricing.total > 0)
+        );
+
+        if (!hasValidPrice) {
+          console.warn('Removing server cart item - no valid price field found:', {
+            id: item.id,
+            imageId: item.imageId,
+            productId: item.productId,
+            pricing: item.pricing,
+            available_price_fields: {
+              sale_price: item.pricing.sale_price,
+              price: item.pricing.price,
+              amount: item.pricing.amount,
+              total: item.pricing.total
+            }
+          });
+          return false;
+        }
+
         return true;
       });
       setItems(validatedItems);
@@ -157,10 +186,48 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
         if (Array.isArray(guestItems)) {
           // Validate guest cart items
           const validatedItems = guestItems.filter((item: any) => {
-            if (!item.pricing || typeof item.pricing.sale_price !== 'number') {
-              console.warn('Removing guest cart item with invalid pricing:', item);
+            // Check if item has basic structure
+            if (!item) {
+              console.warn('Removing null/undefined cart item');
               return false;
             }
+
+            // Check pricing structure more thoroughly
+            if (!item.pricing) {
+              console.warn('Removing cart item - missing pricing object:', {
+                id: item.id,
+                imageId: item.imageId,
+                productId: item.productId,
+                hasPricing: !!item.pricing
+              });
+              return false;
+            }
+
+            // Check for sale_price or other price fields that might be used
+            const hasValidPrice = (
+              (typeof item.pricing.sale_price === 'number' && item.pricing.sale_price > 0) ||
+              (typeof item.pricing.price === 'number' && item.pricing.price > 0) ||
+              (typeof item.pricing.amount === 'number' && item.pricing.amount > 0) ||
+              (typeof item.pricing.total === 'number' && item.pricing.total > 0)
+            );
+
+            if (!hasValidPrice) {
+              console.warn('Removing cart item - no valid price field found:', {
+                id: item.id,
+                imageId: item.imageId,
+                productId: item.productId,
+                pricing: item.pricing,
+                available_price_fields: {
+                  sale_price: item.pricing.sale_price,
+                  price: item.pricing.price,
+                  amount: item.pricing.amount,
+                  total: item.pricing.total
+                }
+              });
+              return false;
+            }
+
+            // Item is valid
             return true;
           });
           console.log(`Guest cart validation: ${guestItems.length} items → ${validatedItems.length} valid items`);
@@ -455,11 +522,24 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = items.reduce((sum, item) => {
     // Safety check for pricing data
-    if (!item.pricing || typeof item.pricing.sale_price !== 'number') {
+    if (!item.pricing) {
       console.warn('Cart item missing pricing data:', item);
       return sum;
     }
-    return sum + (item.pricing.sale_price * item.quantity);
+
+    // Get the price from whatever field is available
+    const itemPrice = item.pricing.sale_price ||
+                     item.pricing.price ||
+                     item.pricing.amount ||
+                     item.pricing.total ||
+                     0;
+
+    if (typeof itemPrice !== 'number' || itemPrice <= 0) {
+      console.warn('Cart item has no valid price field:', item);
+      return sum;
+    }
+
+    return sum + (itemPrice * item.quantity);
   }, 0);
 
   const value: CartContextType = {
