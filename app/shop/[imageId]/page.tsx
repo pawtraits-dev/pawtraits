@@ -189,16 +189,8 @@ function QRLandingPageContent() {
       discountCode: partnerId ? discountCode : undefined
     });
 
-    // Check if user is authenticated to determine checkout route
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (user) {
-      // Authenticated user: go to main checkout
-      router.push('/shop/checkout');
-    } else {
-      // Guest user: go to public cart page or show signup prompt
-      router.push('/shop/cart');
-    }
+    // After adding to cart, always redirect to cart page first
+    router.push('/shop/cart');
   };
 
   if (loading) {
