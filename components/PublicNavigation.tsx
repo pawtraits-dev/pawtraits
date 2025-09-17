@@ -13,6 +13,7 @@ import {
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
 import CountrySelector from '@/components/CountrySelector';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
 
 interface Breed {
   id: string;
@@ -38,9 +39,10 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
   const [catBreeds, setCatBreeds] = useState<Breed[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   const dropdownRef = useRef<HTMLDivElement>(null);
   const supabaseService = new SupabaseService();
+  const { totalItems } = useHybridCart();
 
   useEffect(() => {
     loadNavigationData();
@@ -262,8 +264,13 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
               className="mr-4"
             />
 
-            <Link href="/cart" className="relative">
+            <Link href="/shop/cart" className="relative">
               <ShoppingCart className="w-6 h-6 text-gray-700 hover:text-purple-600 transition-colors" />
+              {totalItems > 0 && (
+                <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {totalItems > 99 ? '99+' : totalItems}
+                </span>
+              )}
             </Link>
           </div>
 
@@ -337,8 +344,15 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                 ))}
               </div>
 
-              <Link href="/cart" className="block px-3 py-2 text-gray-700 hover:text-purple-600">
-                Basket
+              <Link href="/shop/cart" className="relative block px-3 py-2 text-gray-700 hover:text-purple-600">
+                <div className="flex items-center">
+                  Basket
+                  {totalItems > 0 && (
+                    <span className="ml-2 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      {totalItems > 99 ? '99+' : totalItems}
+                    </span>
+                  )}
+                </div>
               </Link>
             </div>
           </div>

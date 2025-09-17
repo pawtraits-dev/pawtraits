@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { ShoppingCart, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
 
 interface StickyFilterHeaderProps {
   // Search props
@@ -35,6 +36,7 @@ export default function StickyFilterHeader({
   onClearFilters
 }: StickyFilterHeaderProps) {
   const [isSticky, setIsSticky] = useState(false);
+  const { totalItems } = useHybridCart();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -125,8 +127,13 @@ export default function StickyFilterHeader({
           </div>
 
           {/* Cart Icon */}
-          <Link href="/cart" className="relative">
+          <Link href="/shop/cart" className="relative">
             <ShoppingCart className="w-6 h-6 text-gray-700 hover:text-purple-600 transition-colors" />
+            {totalItems > 0 && (
+              <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {totalItems > 99 ? '99+' : totalItems}
+              </span>
+            )}
           </Link>
         </div>
       </div>
