@@ -15,8 +15,9 @@ import { useHybridCart } from "@/lib/hybrid-cart-context"
 import { useRouter } from "next/navigation"
 import { useUserRouting } from "@/hooks/use-user-routing"
 import PublicNavigation from '@/components/PublicNavigation'
+import { CountryProvider } from '@/lib/country-context'
 
-export default function CheckoutPage() {
+function CheckoutPageContent() {
   const [currentStep, setCurrentStep] = useState(1)
   const [isProcessing, setIsProcessing] = useState(false)
   const [shippingData, setShippingData] = useState({
@@ -486,5 +487,13 @@ export default function CheckoutPage() {
       </div>
       </div>
     </>
+  )
+}
+
+export default function CheckoutPage() {
+  return (
+    <CountryProvider>
+      <CheckoutPageContent />
+    </CountryProvider>
   )
 }
