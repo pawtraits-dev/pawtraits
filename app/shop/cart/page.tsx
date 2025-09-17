@@ -15,7 +15,7 @@ import { extractDescriptionTitle } from '@/lib/utils'
 import PublicNavigation from '@/components/PublicNavigation'
 import { CountryProvider } from '@/lib/country-context'
 
-export default function ShoppingCartPage() {
+function ShoppingCartPageContent() {
   const { items, totalItems, totalPrice, updateQuantity, removeFromCart, isGuest } = useHybridCart();
   const { continueShoppingRoute, userProfile } = useUserRouting();
   const [referralCode, setReferralCode] = useState("")
@@ -288,5 +288,13 @@ export default function ShoppingCartPage() {
       </div>
       </div>
     </>
+  )
+}
+
+export default function ShoppingCartPage() {
+  return (
+    <CountryProvider>
+      <ShoppingCartPageContent />
+    </CountryProvider>
   )
 }
