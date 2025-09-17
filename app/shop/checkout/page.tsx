@@ -111,6 +111,7 @@ export default function CheckoutPage() {
 
   const orderSummary = {
     subtotal: totalPrice / 100, // Convert from pence to pounds
+    shipping: 0, // Shipping calculated by Gelato at fulfillment
     discount: referralValidation?.valid && referralValidation?.discount?.eligible
       ? referralValidation.discount.amount / 100
       : 0,
@@ -411,7 +412,7 @@ export default function CheckoutPage() {
                       onClick={handlePayment}
                       className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 text-lg font-semibold"
                     >
-                      Complete Order - £{orderSummary.total.toFixed(2)}
+                      Complete Order - £{orderSummary.total.toFixed(2)} + shipping
                     </Button>
                   )}
                 </CardContent>
@@ -441,8 +442,8 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
-                  <span className="font-medium">
-                    {orderSummary.shipping === 0 ? "Free" : `£${orderSummary.shipping.toFixed(2)}`}
+                  <span className="font-medium text-gray-500">
+                    Calculated at checkout
                   </span>
                 </div>
                 {referralCode && (
@@ -472,8 +473,11 @@ export default function CheckoutPage() {
                 )}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
+                  <span>Subtotal</span>
                   <span>£{orderSummary.total.toFixed(2)}</span>
+                </div>
+                <div className="text-xs text-gray-500 text-right">
+                  + shipping (calculated by Gelato)
                 </div>
               </CardContent>
             </Card>
