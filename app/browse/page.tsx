@@ -254,6 +254,20 @@ function BrowsePageContent() {
     return images.filter(img => img.theme_id === themeId).length;
   };
 
+  const getThemeDogImageCount = (themeId: string) => {
+    return images.filter(img =>
+      img.theme_id === themeId &&
+      dogBreeds.some(breed => breed.id === img.breed_id)
+    ).length;
+  };
+
+  const getThemeCatImageCount = (themeId: string) => {
+    return images.filter(img =>
+      img.theme_id === themeId &&
+      catBreeds.some(breed => breed.id === img.breed_id)
+    ).length;
+  };
+
   const getLowestPriceForBreed = (breedId: string) => {
     const breedImages = images.filter(img => img.breed_id === breedId);
     if (breedImages.length === 0) return null;
@@ -577,35 +591,39 @@ function BrowsePageContent() {
                           </p>
                         )}
 
-                        <div className="flex gap-1 flex-wrap mb-3">
+                        <div className="space-y-1 mb-3">
                           {image.breed_name && image.breed_id && (
-                            <Badge
-                              variant="secondary"
-                              className="text-xs cursor-pointer hover:bg-blue-200 transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedBreedId(image.breed_id);
-                                setSelectedThemeId('');
-                                setSearchTerm('');
-                              }}
-                            >
-                              {image.breed_name}
-                            </Badge>
+                            <div>
+                              <Badge
+                                variant="secondary"
+                                className="text-xs cursor-pointer hover:bg-blue-200 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedBreedId(image.breed_id);
+                                  setSelectedThemeId('');
+                                  setSearchTerm('');
+                                }}
+                              >
+                                {image.breed_name}
+                              </Badge>
+                            </div>
                           )}
                           {image.theme_name && image.theme_id && (
-                            <Badge
-                              variant="secondary"
-                              className="text-xs cursor-pointer hover:bg-purple-200 transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedThemeId(image.theme_id);
-                                setSelectedBreedId('');
-                                setSearchTerm('');
-                                setActiveTab('themes');
-                              }}
-                            >
-                              {image.theme_name}
-                            </Badge>
+                            <div>
+                              <Badge
+                                variant="secondary"
+                                className="text-xs cursor-pointer hover:bg-purple-200 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedThemeId(image.theme_id);
+                                  setSelectedBreedId('');
+                                  setSearchTerm('');
+                                  setActiveTab('themes');
+                                }}
+                              >
+                                {image.theme_name}
+                              </Badge>
+                            </div>
                           )}
                         </div>
 
@@ -818,7 +836,8 @@ function BrowsePageContent() {
           {activeTab === 'themes' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {currentThemes.map((theme) => {
-                const imageCount = getThemeImageCount(theme.id);
+                const dogImageCount = getThemeDogImageCount(theme.id);
+                const catImageCount = getThemeCatImageCount(theme.id);
 
                 return (
                   <Card key={theme.id} className="group hover:shadow-xl transition-all duration-300 overflow-hidden">
@@ -834,54 +853,38 @@ function BrowsePageContent() {
                           <Palette className="w-16 h-16 text-purple-400" />
                         </div>
                       )}
-
-                      {/* Theme style preview overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <div className="absolute bottom-4 left-4 right-4 text-white">
-                          <div className="flex gap-2">
-                            <Badge className="bg-white/20 text-white text-xs">Dogs</Badge>
-                            <Badge className="bg-white/20 text-white text-xs">Cats</Badge>
-                          </div>
-                        </div>
-                      </div>
                     </div>
 
                     <CardContent className="p-4">
-                      <h3 className="font-semibold text-lg text-gray-900 mb-2 flex items-center gap-2">
-                        <Palette className="w-5 h-5 text-purple-600" />
-                        {theme.name}
-                      </h3>
+                      <h3 className="font-semibold text-lg text-gray-900 mb-2">{theme.name}</h3>
                       {theme.description && (
-                        <p className="text-sm text-gray-600 line-clamp-2 mb-4">{theme.description}</p>
+                        <p className="text-sm text-gray-600 line-clamp-3 mb-3">
+                          {(() => {
+                            const match = theme.description.match(/\*\*(.*?)\*\*/);
+                            return match ? match[1] : theme.description;
+                          })()}
+                        </p>
                       )}
 
                       {/* Quick navigation buttons */}
                       <div className="flex gap-2">
                         <Button
-                          variant="outline"
                           size="sm"
-                          className="flex-1 text-xs"
+                          className="flex-1 text-xs bg-orange-600 hover:bg-orange-700"
                           onClick={() => handleThemeClick(theme, 'dogs')}
-                          disabled={imageCount === 0}
+                          disabled={dogImageCount === 0}
                         >
-                          🐕 Dogs
+                          View {dogImageCount} Dogs
                         </Button>
                         <Button
-                          variant="outline"
                           size="sm"
-                          className="flex-1 text-xs"
+                          className="flex-1 text-xs bg-blue-600 hover:bg-blue-700"
                           onClick={() => handleThemeClick(theme, 'cats')}
-                          disabled={imageCount === 0}
+                          disabled={catImageCount === 0}
                         >
-                          🐱 Cats
+                          View {catImageCount} Cats
                         </Button>
                       </div>
-
-                      {imageCount > 0 && (
-                        <p className="text-xs text-center text-gray-500 mt-2">
-                          {imageCount} portrait{imageCount > 1 ? 's' : ''} available
-                        </p>
-                      )}
                     </CardContent>
                   </Card>
                 );
