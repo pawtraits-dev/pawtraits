@@ -276,7 +276,7 @@ export default function CustomerCartPage() {
                   Final total including shipping will be shown at checkout
                 </p>
 
-                <Link href="/customer/checkout" className="block">
+                <Link href="/shop/checkout" className="block">
                   <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 text-lg font-semibold">
                     Proceed to Checkout
                   </Button>

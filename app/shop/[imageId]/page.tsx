@@ -193,8 +193,8 @@ function QRLandingPageContent() {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (user) {
-      // Authenticated user: go to customer checkout
-      router.push('/customer/checkout');
+      // Authenticated user: go to main checkout
+      router.push('/shop/checkout');
     } else {
       // Guest user: go to public cart page or show signup prompt
       router.push('/shop/cart');
