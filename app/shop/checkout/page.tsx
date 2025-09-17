@@ -14,6 +14,7 @@ import Link from "next/link"
 import { useHybridCart } from "@/lib/hybrid-cart-context"
 import { useRouter } from "next/navigation"
 import { useUserRouting } from "@/hooks/use-user-routing"
+import PublicNavigation from '@/components/PublicNavigation'
 
 export default function CheckoutPage() {
   const [currentStep, setCurrentStep] = useState(1)
@@ -33,7 +34,7 @@ export default function CheckoutPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const { items, totalItems, totalPrice, clearCart } = useHybridCart()
   const router = useRouter()
-  const { userProfile } = useUserRouting()
+  const { userProfile, loading: userLoading } = useUserRouting()
 
   // Note: Shipping costs will be calculated via Gelato API at checkout time
   // For now, we just show the cart total without shipping
@@ -207,19 +208,21 @@ export default function CheckoutPage() {
   ]
 
   // Show loading state while user profile is loading
-  if (!userProfile) {
+  if (userLoading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-purple-600" />
-          <p className="text-gray-600">Loading your account information...</p>
+          <p className="text-gray-600">Loading checkout...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <>
+      <PublicNavigation />
+      <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
@@ -477,6 +480,7 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }

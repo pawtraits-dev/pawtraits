@@ -12,6 +12,8 @@ import { formatPrice } from "@/lib/product-types"
 import { useUserRouting } from "@/hooks/use-user-routing"
 import { getSupabaseClient } from '@/lib/supabase-client'
 import { extractDescriptionTitle } from '@/lib/utils'
+import PublicNavigation from '@/components/PublicNavigation'
+import { CountryProvider } from '@/lib/country-context'
 
 export default function ShoppingCartPage() {
   const { items, totalItems, totalPrice, updateQuantity, removeFromCart, isGuest } = useHybridCart();
@@ -104,7 +106,9 @@ export default function ShoppingCartPage() {
 
   if (items.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <>
+        <PublicNavigation />
+        <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-8">
@@ -132,11 +136,14 @@ export default function ShoppingCartPage() {
           </Card>
         </div>
       </div>
+      </>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <>
+      <PublicNavigation />
+      <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
@@ -279,6 +286,7 @@ export default function ShoppingCartPage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }
