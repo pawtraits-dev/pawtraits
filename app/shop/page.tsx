@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 
-// Shop root should redirect to customer shop
+// Shop root should redirect to main browse page
 export default function ShopPage() {
-  redirect('/customer/shop')
+  redirect('/browse')
 }

@@ -27,7 +27,7 @@ export function getContinueShoppingRoute(userType: UserType | null): string {
     case 'partner':
       return '/partners/shop'; // Partners shop in their partner shop area
     case 'customer':
-      return '/customer/shop'; // Customers shop in their customer shop area
+      return '/browse'; // Customers use the main browse page for shopping
     default:
       return '/browse'; // Unauthenticated users go to public browse page
   }

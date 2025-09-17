@@ -9,25 +9,29 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, ArrowRight, CreditCard, Shield, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useHybridCart } from "@/lib/hybrid-cart-context"
 import { useRouter } from "next/navigation"
 import { useUserRouting } from "@/hooks/use-user-routing"
 import PublicNavigation from '@/components/PublicNavigation'
-import { CountryProvider } from '@/lib/country-context'
+import { CountryProvider, useCountryPricing } from '@/lib/country-context'
 
 function CheckoutPageContent() {
   const [currentStep, setCurrentStep] = useState(1)
   const [isProcessing, setIsProcessing] = useState(false)
+  const { selectedCountry, getCountryPricing } = useCountryPricing()
   const [shippingData, setShippingData] = useState({
     firstName: "",
     lastName: "",
     email: "",
-    address: "",
+    address: "", // Keep for backward compatibility
+    addressLine1: "",
+    addressLine2: "",
     city: "",
     postcode: "",
-    country: "United Kingdom",
+    country: selectedCountry || "GB",
   })
   const [referralCode, setReferralCode] = useState("")
   const [referralValidation, setReferralValidation] = useState<any>(null)
@@ -54,6 +58,16 @@ function CheckoutPageContent() {
       }))
     }
   }, [userProfile])
+
+  // Update country when selectedCountry changes
+  useEffect(() => {
+    if (selectedCountry) {
+      setShippingData(prev => ({
+        ...prev,
+        country: selectedCountry,
+      }))
+    }
+  }, [selectedCountry])
 
   // Check for referral code in URL or localStorage
   useEffect(() => {
@@ -133,9 +147,10 @@ function CheckoutPageContent() {
     if (!shippingData.firstName.trim()) newErrors.firstName = "First name is required"
     if (!shippingData.lastName.trim()) newErrors.lastName = "Last name is required"
     // Email validation removed since it's auto-populated from user profile
-    if (!shippingData.address.trim()) newErrors.address = "Address is required"
+    if (!shippingData.addressLine1.trim()) newErrors.addressLine1 = "Address line 1 is required"
     if (!shippingData.city.trim()) newErrors.city = "City is required"
     if (!shippingData.postcode.trim()) newErrors.postcode = "Postcode is required"
+    if (!shippingData.country.trim()) newErrors.country = "Country is required"
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -383,15 +398,29 @@ function CheckoutPageContent() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="address">Address *</Label>
+                      <Label htmlFor="addressLine1">Address Line 1 *</Label>
                       <Input
-                        id="address"
-                        value={shippingData.address}
-                        onChange={(e) => handleInputChange("address", e.target.value)}
-                        className={errors.address ? "border-red-500" : ""}
+                        id="addressLine1"
+                        value={shippingData.addressLine1}
+                        onChange={(e) => {
+                          handleInputChange("addressLine1", e.target.value);
+                          // Update the old address field for backward compatibility
+                          handleInputChange("address", e.target.value);
+                        }}
+                        className={errors.addressLine1 ? "border-red-500" : ""}
                         placeholder="123 Main Street"
                       />
-                      {errors.address && <p className="text-sm text-red-600">{errors.address}</p>}
+                      {errors.addressLine1 && <p className="text-sm text-red-600">{errors.addressLine1}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="addressLine2">Address Line 2 (Optional)</Label>
+                      <Input
+                        id="addressLine2"
+                        value={shippingData.addressLine2}
+                        onChange={(e) => handleInputChange("addressLine2", e.target.value)}
+                        placeholder="Apartment, suite, etc."
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -417,6 +446,34 @@ function CheckoutPageContent() {
                         />
                         {errors.postcode && <p className="text-sm text-red-600">{errors.postcode}</p>}
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="country">Country *</Label>
+                      <Select value={shippingData.country} onValueChange={(value) => handleInputChange("country", value)}>
+                        <SelectTrigger className={errors.country ? "border-red-500" : ""}>
+                          <SelectValue placeholder="Select country" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GB">United Kingdom</SelectItem>
+                          <SelectItem value="US">United States</SelectItem>
+                          <SelectItem value="CA">Canada</SelectItem>
+                          <SelectItem value="AU">Australia</SelectItem>
+                          <SelectItem value="DE">Germany</SelectItem>
+                          <SelectItem value="FR">France</SelectItem>
+                          <SelectItem value="ES">Spain</SelectItem>
+                          <SelectItem value="IT">Italy</SelectItem>
+                          <SelectItem value="NL">Netherlands</SelectItem>
+                          <SelectItem value="BE">Belgium</SelectItem>
+                          <SelectItem value="CH">Switzerland</SelectItem>
+                          <SelectItem value="AT">Austria</SelectItem>
+                          <SelectItem value="DK">Denmark</SelectItem>
+                          <SelectItem value="SE">Sweden</SelectItem>
+                          <SelectItem value="NO">Norway</SelectItem>
+                          <SelectItem value="IE">Ireland</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errors.country && <p className="text-sm text-red-600">{errors.country}</p>}
                     </div>
 
                     <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3">

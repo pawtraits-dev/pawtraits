@@ -80,7 +80,7 @@ function HomePageContent() {
       id: '2', 
       customer_name: 'James L.',
       rating: 5,
-      comment: 'I was skeptical about AI art, but this exceeded all expectations. My cat Luna looks majestic in the Renaissance style portrait!',
+      comment: 'I was skeptical at first, but this exceeded all expectations. My cat Luna looks majestic in the Renaissance style portrait!',
       date: '2024-03-10',
       pet_name: 'Luna',
       image_url: '/api/placeholder/200/200'
@@ -170,8 +170,9 @@ function HomePageContent() {
               router.push('/partners/shop');
               return;
             case 'customer':
-              router.push('/customer/shop');
-              return;
+              // Let customers browse the home page instead of redirecting
+              // They can navigate to /browse or /shop via the UI
+              break;
           }
         }
       }
@@ -645,7 +646,7 @@ function HomePageContent() {
               Ready to Create Your Pet's Portrait?
             </h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90">
-              Join thousands of happy pet parents who have transformed their beloved companions into beautiful artwork
+              Join thousands of happy pet parents
             </p>
             <div className="flex items-center justify-center space-x-4">
               <Button 
@@ -686,7 +687,7 @@ function HomePageContent() {
                 <span className="text-xl font-bold font-[family-name:var(--font-life-savers)]">Pawtraits</span>
               </div>
               <p className="text-gray-400">
-                Creating beautiful memories of your beloved pets through AI-powered artwork.
+                Perfect Pet Pawtrits
               </p>
             </div>
             

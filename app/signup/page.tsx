@@ -122,7 +122,7 @@ function CustomerSignupPageContent() {
             <p className="text-gray-600 mb-6">
               Your account has been created! Check your email to verify your account, then start creating amazing pet portraits.
             </p>
-            <Link href={returnTo ? decodeURIComponent(returnTo) : "/customer/shop"}>
+            <Link href={returnTo ? decodeURIComponent(returnTo) : "/browse"}>
               <Button className="w-full bg-gradient-to-r from-pink-600 to-purple-600">
                 {returnTo ? "Continue to Checkout" : "Create Your First Portrait"}
                 <Camera className="w-4 h-4 ml-2" />
@@ -236,7 +236,7 @@ function CustomerSignupPageContent() {
                   <p className="text-sm text-purple-700 text-center mb-3">
                     Use your groomer's QR code for 20% off your first portrait!
                   </p>
-                  <Link href="/customer/shop">
+                  <Link href="/browse">
                     <Button variant="outline" size="sm" className="w-full">
                       I Have a Referral Code
                     </Button>
