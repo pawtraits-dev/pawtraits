@@ -35,13 +35,10 @@ export default function CheckoutPage() {
   const router = useRouter()
   const { userProfile } = useUserRouting()
 
-  // Calculate shipping cost - note: this is temporary for checkout, actual shipping will be via Gelato API
-  const getShippingCost = () => {
-    return totalPrice >= 7500 ? 0 : 999 // £9.99 in pence, free over £75
-  }
-
+  // Note: Shipping costs will be calculated via Gelato API at checkout time
+  // For now, we just show the cart total without shipping
   const getCartTotal = () => {
-    return totalPrice + getShippingCost()
+    return totalPrice
   }
 
   // Update shipping data when user profile loads
@@ -113,14 +110,13 @@ export default function CheckoutPage() {
 
   const orderSummary = {
     subtotal: totalPrice / 100, // Convert from pence to pounds
-    shipping: getShippingCost() / 100,
-    discount: referralValidation?.valid && referralValidation?.discount?.eligible 
-      ? referralValidation.discount.amount / 100 
+    discount: referralValidation?.valid && referralValidation?.discount?.eligible
+      ? referralValidation.discount.amount / 100
       : 0,
-    // Apply discount to subtotal only, then add shipping
+    // Apply discount to subtotal only - shipping calculated at checkout via Gelato
     total: (totalPrice / 100) - (referralValidation?.valid && referralValidation?.discount?.eligible
       ? referralValidation.discount.amount / 100
-      : 0) + (getShippingCost() / 100),
+      : 0),
     items: items.map(item => ({
       title: item.imageTitle,
       price: item.pricing.sale_price / 100, // Convert from pence to pounds
@@ -165,8 +161,7 @@ export default function CheckoutPage() {
           totalPrice: item.pricing.sale_price * item.quantity // in pence
         })),
         shippingAddress: shippingData,
-        totalAmount: getCartTotal(), // in pence
-        shippingCost: getShippingCost(), // in pence
+        totalAmount: getCartTotal(), // in pence, shipping added by Gelato
         currency: 'GBP',
         referralCode: referralCode || undefined
       }
