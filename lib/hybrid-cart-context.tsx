@@ -130,7 +130,15 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
       }
 
       const data = await response.json();
-      setItems(data.items || []);
+      const validatedItems = (data.items || []).filter((item: any) => {
+        // Validate that cart items have required pricing data
+        if (!item.pricing || typeof item.pricing.sale_price !== 'number') {
+          console.warn('Removing cart item with invalid pricing:', item);
+          return false;
+        }
+        return true;
+      });
+      setItems(validatedItems);
     } catch (error) {
       console.error('Error loading server cart:', error);
       setItems([]);
@@ -142,7 +150,19 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
       const stored = localStorage.getItem(GUEST_CART_STORAGE_KEY);
       if (stored) {
         const guestItems = JSON.parse(stored);
-        setItems(Array.isArray(guestItems) ? guestItems : []);
+        if (Array.isArray(guestItems)) {
+          // Validate guest cart items
+          const validatedItems = guestItems.filter((item: any) => {
+            if (!item.pricing || typeof item.pricing.sale_price !== 'number') {
+              console.warn('Removing guest cart item with invalid pricing:', item);
+              return false;
+            }
+            return true;
+          });
+          setItems(validatedItems);
+        } else {
+          setItems([]);
+        }
       } else {
         setItems([]);
       }
@@ -420,7 +440,14 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
 
   // Calculate totals
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = items.reduce((sum, item) => sum + (item.pricing.sale_price * item.quantity), 0);
+  const totalPrice = items.reduce((sum, item) => {
+    // Safety check for pricing data
+    if (!item.pricing || typeof item.pricing.sale_price !== 'number') {
+      console.warn('Cart item missing pricing data:', item);
+      return sum;
+    }
+    return sum + (item.pricing.sale_price * item.quantity);
+  }, 0);
 
   const value: CartContextType = {
     items,
