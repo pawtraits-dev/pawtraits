@@ -13,8 +13,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { Eye, EyeOff, Loader2, Heart, Camera } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 
 // Security imports temporarily disabled for debugging
 // import { SecureWrapper } from '@/components/security/SecureWrapper'
@@ -149,13 +150,31 @@ function LoginPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-emerald-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <Card className="shadow-xl">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl">Welcome Back</CardTitle>
-              <CardDescription>Sign in to your Pawtraits account</CardDescription>
-            </CardHeader>
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Brand Header */}
+        <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/assets/logos/paw-svgrepo-200x200-purple.svg"
+              alt="Pawtraits Logo"
+              width={60}
+              height={60}
+              className="w-15 h-15"
+            />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2 font-[family-name:var(--font-life-savers)]">
+            Welcome Back to Pawtraits! 🎨
+          </h1>
+          <p className="text-gray-600">
+            Sign in to continue creating beautiful pet portraits
+          </p>
+        </div>
+
+        <Card className="shadow-xl border-0 bg-white/80 backdrop-blur">
+          <CardHeader className="text-center pb-4">
+            <CardTitle className="text-xl text-gray-800">Sign In</CardTitle>
+          </CardHeader>
             <CardContent>
               {errors.general && (
                 <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
@@ -195,17 +214,27 @@ function LoginPageContent() {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <Link href="/auth/forgot-password" className="text-sm text-indigo-600 hover:text-indigo-700">
+                  <Link href="/auth/forgot-password" className="text-sm text-purple-600 hover:text-purple-700">
                     Forgot password?
                   </Link>
                 </div>
 
                 <Button
                   type="submit"
-                  className="w-full"
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-3"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Signing In..." : "Sign In"}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Signing In...
+                    </>
+                  ) : (
+                    <>
+                      <Heart className="w-4 h-4 mr-2" />
+                      Sign In
+                    </>
+                  )}
                 </Button>
               </form>
 
@@ -214,10 +243,26 @@ function LoginPageContent() {
               <div className="text-center">
                 <p className="text-sm text-gray-600">
                   Don't have an account?{" "}
-                  <Link href="/" className="text-indigo-600 hover:text-indigo-700 font-medium">
+                  <Link href={returnTo ? `/signup?returnTo=${encodeURIComponent(returnTo)}` : "/signup"} className="text-purple-600 hover:text-purple-700 font-medium">
                     Sign up here
                   </Link>
                 </p>
+              </div>
+
+              {/* Additional Features */}
+              <div className="mt-6 text-center">
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4">
+                  <div className="flex items-center justify-center space-x-4 text-sm text-gray-600">
+                    <div className="flex items-center">
+                      <Camera className="w-4 h-4 mr-1 text-purple-500" />
+                      <span>Create Portraits</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Heart className="w-4 h-4 mr-1 text-pink-500" />
+                      <span>Track Orders</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

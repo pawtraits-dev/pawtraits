@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +18,10 @@ export default function CustomerSignupPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
 
   const supabaseService = new SupabaseService();
 
@@ -85,6 +90,12 @@ export default function CustomerSignupPage() {
 
       if (authResult.user) {
         setSuccess(true);
+        // Redirect to returnTo URL after successful signup if provided
+        if (returnTo) {
+          setTimeout(() => {
+            router.push(decodeURIComponent(returnTo));
+          }, 2000); // Give user time to see success message
+        }
       }
     } catch (error) {
       console.error('Signup error:', error);
@@ -111,9 +122,9 @@ export default function CustomerSignupPage() {
             <p className="text-gray-600 mb-6">
               Your account has been created! Check your email to verify your account, then start creating amazing pet portraits.
             </p>
-            <Link href="/customer/shop">
+            <Link href={returnTo ? decodeURIComponent(returnTo) : "/customer/shop"}>
               <Button className="w-full bg-gradient-to-r from-pink-600 to-purple-600">
-                Create Your First Portrait
+                {returnTo ? "Continue to Checkout" : "Create Your First Portrait"}
                 <Camera className="w-4 h-4 ml-2" />
               </Button>
             </Link>

@@ -221,6 +221,70 @@ function CheckoutPageContent() {
     )
   }
 
+  // Redirect to signup/login if user is not authenticated
+  if (!userLoading && !userProfile) {
+    const returnUrl = encodeURIComponent('/shop/checkout')
+    return (
+      <>
+        <PublicNavigation />
+        <div className="min-h-screen bg-gray-50 py-8">
+          <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8">
+            <Card className="text-center">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-center space-x-2">
+                  <Shield className="w-6 h-6 text-purple-600" />
+                  <span>Sign In Required</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <p className="text-gray-600">
+                    Please create an account or sign in to complete your purchase.
+                  </p>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-900 mb-2">Why do I need an account?</h4>
+                    <ul className="text-sm text-blue-800 space-y-1 text-left">
+                      <li>• Track your orders and delivery status</li>
+                      <li>• Save your shipping information</li>
+                      <li>• Access your order history</li>
+                      <li>• Receive updates about your portraits</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Link href={`/signup?returnTo=${returnUrl}`} className="block">
+                    <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3">
+                      Create Account & Continue
+                    </Button>
+                  </Link>
+
+                  <div className="flex items-center">
+                    <div className="flex-1 border-t border-gray-300"></div>
+                    <span className="px-3 text-sm text-gray-500">or</span>
+                    <div className="flex-1 border-t border-gray-300"></div>
+                  </div>
+
+                  <Link href={`/auth/login?returnTo=${returnUrl}`} className="block">
+                    <Button variant="outline" className="w-full py-3">
+                      Sign In to Existing Account
+                    </Button>
+                  </Link>
+                </div>
+
+                <div className="text-center">
+                  <Link href="/shop/cart" className="text-sm text-gray-600 hover:text-purple-600">
+                    ← Back to Cart
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       <PublicNavigation />
