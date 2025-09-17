@@ -151,10 +151,10 @@ SELECT
         END
     ) as cta_text,
     
-    -- Generate CTA URL for filtered browse view
+    -- Generate CTA URL for filtered browse view (dogs default, no type param needed)
     CASE ccs.content_type
         WHEN 'theme' THEN CONCAT('/browse?type=themes&theme=', t.id)
-        WHEN 'dog_breed' THEN CONCAT('/browse?type=dogs&breed=', b.id)
+        WHEN 'dog_breed' THEN CONCAT('/browse?breed=', b.id)
         WHEN 'cat_breed' THEN CONCAT('/browse?type=cats&breed=', b.id)
         ELSE '/browse'
     END as cta_url,
@@ -178,7 +178,12 @@ WHERE (
     (ccs.content_type = 'theme' AND t.id IS NOT NULL) OR
     (ccs.content_type IN ('dog_breed', 'cat_breed') AND b.id IS NOT NULL)
 )
-ORDER BY ccs.carousel_id, ccs.sort_order;
+ORDER BY ccs.carousel_id, ccs.sort_order,
+    CASE ccs.content_type
+        WHEN 'theme' THEN t.name
+        WHEN 'dog_breed' THEN b.name
+        WHEN 'cat_breed' THEN b.name
+    END;
 
 -- Grant permissions on the view
 GRANT SELECT ON carousel_content_with_details TO authenticated;

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
+import CountrySelector from '@/components/CountrySelector';
 
 interface Breed {
   id: string;
@@ -253,6 +254,13 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                 Sign Up
               </button>
             )}
+
+            <CountrySelector
+              compact={true}
+              showLabel={false}
+              showDefault={false}
+              className="mr-4"
+            />
 
             <Link href="/cart" className="relative">
               <ShoppingCart className="w-6 h-6 text-gray-700 hover:text-purple-600 transition-colors" />

@@ -36,6 +36,17 @@ import ReactMarkdown from 'react-markdown';
 
 type BrowseTab = 'dogs' | 'cats' | 'themes';
 
+// Simple in-memory cache to prevent rate limiting
+const dataCache = {
+  breeds: null as Breed[] | null,
+  themes: null as Theme[] | null,
+  images: null as any | null,
+  products: null as Product[] | null,
+  pricing: null as ProductPricing[] | null,
+  lastCacheTime: 0,
+  cacheTimeout: 60000 // 1 minute
+};
+
 function BrowsePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -79,8 +90,21 @@ function BrowsePageContent() {
     loadUserInteractions();
   }, []);
 
+  // Listen for URL parameter changes and update state
   useEffect(() => {
-    // Update URL when tab changes
+    const newTab = getInitialTab();
+    const newSearch = searchParams.get('search') || '';
+    const newBreed = searchParams.get('breed') || '';
+    const newTheme = searchParams.get('theme') || '';
+
+    setActiveTab(newTab);
+    setSearchTerm(newSearch);
+    setSelectedBreedId(newBreed);
+    setSelectedThemeId(newTheme);
+  }, [searchParams]);
+
+  useEffect(() => {
+    // Update URL when tab changes (but prevent infinite loop)
     updateUrl();
   }, [activeTab, searchTerm, selectedBreedId, selectedThemeId]);
 
@@ -92,31 +116,65 @@ function BrowsePageContent() {
     if (selectedThemeId) params.set('theme', selectedThemeId);
 
     const newUrl = `/browse${params.toString() ? '?' + params.toString() : ''}`;
-    router.push(newUrl, { scroll: false });
+    const currentUrl = window.location.pathname + window.location.search;
+
+    // Only push if URL is actually different
+    if (newUrl !== currentUrl) {
+      router.push(newUrl, { scroll: false });
+    }
   };
 
   const loadData = async () => {
     try {
       setLoading(true);
 
-      const [breedsData, themesData, imagesData, productsData, pricingData] = await Promise.all([
-        supabaseService.getBreeds(),
-        supabaseService.getThemes(),
-        fetch('/api/images?public=true&limit=1000').then(res => res.json()),
-        supabaseService.getPublicProducts(),
-        supabaseService.getPublicProductPricing()
-      ]);
+      // Check if cache is valid
+      const now = Date.now();
+      const cacheIsValid = dataCache.lastCacheTime > 0 &&
+        (now - dataCache.lastCacheTime) < dataCache.cacheTimeout &&
+        dataCache.breeds && dataCache.themes && dataCache.images &&
+        dataCache.products && dataCache.pricing;
 
-      // Separate dog and cat breeds
-      const dogs = breedsData.filter(breed => breed.animal_type === 'dog');
-      const cats = breedsData.filter(breed => breed.animal_type === 'cat');
+      if (cacheIsValid) {
+        // Use cached data
+        const dogs = dataCache.breeds!.filter(breed => breed.animal_type === 'dog').sort((a, b) => a.name.localeCompare(b.name));
+        const cats = dataCache.breeds!.filter(breed => breed.animal_type === 'cat').sort((a, b) => a.name.localeCompare(b.name));
 
-      setDogBreeds(dogs);
-      setCatBreeds(cats);
-      setThemes(themesData.filter(theme => theme.is_active));
-      setImages(imagesData.images || []);
-      setProducts(productsData || []);
-      setPricing(pricingData || []);
+        setDogBreeds(dogs);
+        setCatBreeds(cats);
+        setThemes(dataCache.themes!.filter(theme => theme.is_active).sort((a, b) => a.name.localeCompare(b.name)));
+        setImages(dataCache.images!.images || []);
+        setProducts(dataCache.products! || []);
+        setPricing(dataCache.pricing! || []);
+      } else {
+        // Fetch fresh data
+        const [breedsData, themesData, imagesData, productsData, pricingData] = await Promise.all([
+          supabaseService.getBreeds(),
+          supabaseService.getThemes(),
+          fetch('/api/images?public=true&limit=1000').then(res => res.json()),
+          supabaseService.getPublicProducts(),
+          supabaseService.getPublicProductPricing()
+        ]);
+
+        // Cache the data
+        dataCache.breeds = breedsData;
+        dataCache.themes = themesData;
+        dataCache.images = imagesData;
+        dataCache.products = productsData;
+        dataCache.pricing = pricingData;
+        dataCache.lastCacheTime = now;
+
+        // Separate dog and cat breeds and sort alphabetically
+        const dogs = breedsData.filter(breed => breed.animal_type === 'dog').sort((a, b) => a.name.localeCompare(b.name));
+        const cats = breedsData.filter(breed => breed.animal_type === 'cat').sort((a, b) => a.name.localeCompare(b.name));
+
+        setDogBreeds(dogs);
+        setCatBreeds(cats);
+        setThemes(themesData.filter(theme => theme.is_active).sort((a, b) => a.name.localeCompare(b.name)));
+        setImages(imagesData.images || []);
+        setProducts(productsData || []);
+        setPricing(pricingData || []);
+      }
     } catch (error) {
       console.error('Error loading browse data:', error);
     } finally {
@@ -176,11 +234,7 @@ function BrowsePageContent() {
     if (!searchTerm) return breeds;
 
     return breeds.filter(breed =>
-      breed.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      breed.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      breed.personality_traits?.some(trait =>
-        trait.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+      breed.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   };
 
@@ -188,8 +242,7 @@ function BrowsePageContent() {
     if (!searchTerm) return themes;
 
     return themes.filter(theme =>
-      theme.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      theme.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      theme.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   };
 
@@ -261,15 +314,7 @@ function BrowsePageContent() {
       );
     }
 
-    // Apply search filter
-    if (searchTerm) {
-      filteredImages = filteredImages.filter((img) =>
-        img.prompt_text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        img.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        img.breed?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        img.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-    }
+    // Note: Search filtering is handled at the breed/theme level, not individual images
 
     return filteredImages;
   };
@@ -289,6 +334,8 @@ function BrowsePageContent() {
     setSelectedBreedId(breed.id);
     setSelectedThemeId(''); // Clear theme selection
     setSearchTerm(''); // Clear search when selecting specific breed
+    // Scroll to top smoothly when viewing breed pawtraits
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleThemeClick = (theme: Theme, animalType?: 'dogs' | 'cats') => {
@@ -297,12 +344,49 @@ function BrowsePageContent() {
     setSelectedThemeId(theme.id);
     setSelectedBreedId(''); // Clear breed selection
     setSearchTerm(''); // Clear search when selecting specific theme
+    // Scroll to top smoothly when viewing theme pawtraits
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleBackToBrowse = () => {
     setSelectedBreedId('');
     setSelectedThemeId('');
     setSearchTerm('');
+  };
+
+  const getImageProductInfo = (imageId: string) => {
+    const image = images.find(img => img.id === imageId);
+
+    if (!image || !image.format_id) {
+      return { productCount: 0, lowestPrice: null, currency: null, currencySymbol: null };
+    }
+
+    const availableProducts = (products || []).filter(p =>
+      p.is_active && p.format_id === image.format_id
+    );
+
+    if (availableProducts.length === 0) {
+      return { productCount: 0, lowestPrice: null, currency: null, currencySymbol: null };
+    }
+
+    const countryPricing = getCountryPricing(pricing || []).filter(p =>
+      availableProducts.some(product => product.id === p.product_id)
+    );
+
+    if (countryPricing.length === 0) {
+      return { productCount: availableProducts.length, lowestPrice: null, currency: null, currencySymbol: null };
+    }
+
+    const lowestPricing = countryPricing.reduce((lowest, current) =>
+      current.sale_price < lowest.sale_price ? current : lowest
+    );
+
+    return {
+      productCount: availableProducts.length,
+      lowestPrice: lowestPricing.sale_price,
+      currency: lowestPricing.currency_code,
+      currencySymbol: lowestPricing.currency_symbol
+    };
   };
 
   if (loading) {
@@ -368,18 +452,6 @@ function BrowsePageContent() {
                               <ReactMarkdown>{selectedBreed.description}</ReactMarkdown>
                             </div>
                           )}
-                          {selectedBreed.personality_traits && selectedBreed.personality_traits.length > 0 && (
-                            <div>
-                              <h4 className="font-semibold text-gray-900 mb-2">Personality Traits:</h4>
-                              <div className="flex flex-wrap gap-2">
-                                {selectedBreed.personality_traits.map((trait, index) => (
-                                  <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-800">
-                                    {trait}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -443,6 +515,7 @@ function BrowsePageContent() {
                     const isLiked = likedImages.has(image.id);
                     const isShared = sharedImages.has(image.id);
                     const isPurchased = purchasedImages.has(image.id);
+                    const productInfo = getImageProductInfo(image.id);
 
                     return (
                       <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
@@ -500,21 +573,55 @@ function BrowsePageContent() {
                       <CardContent className="p-4">
                         {image.description && (
                           <p className="text-sm text-gray-900 font-medium line-clamp-2 mb-2">
-                            {image.description.split('\n')[0]}
+                            {image.description.split('\n')[0].replace(/\*\*(.*?)\*\*/g, '$1')}
                           </p>
                         )}
 
                         <div className="flex gap-1 flex-wrap mb-3">
-                          {image.breed_name && (
-                            <Badge variant="secondary" className="text-xs">{image.breed_name}</Badge>
+                          {image.breed_name && image.breed_id && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs cursor-pointer hover:bg-blue-200 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedBreedId(image.breed_id);
+                                setSelectedThemeId('');
+                                setSearchTerm('');
+                              }}
+                            >
+                              {image.breed_name}
+                            </Badge>
                           )}
-                          {image.theme_name && (
-                            <Badge variant="secondary" className="text-xs">{image.theme_name}</Badge>
-                          )}
-                          {image.style_name && (
-                            <Badge variant="secondary" className="text-xs">{image.style_name}</Badge>
+                          {image.theme_name && image.theme_id && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs cursor-pointer hover:bg-purple-200 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedThemeId(image.theme_id);
+                                setSelectedBreedId('');
+                                setSearchTerm('');
+                                setActiveTab('themes');
+                              }}
+                            >
+                              {image.theme_name}
+                            </Badge>
                           )}
                         </div>
+
+                        {/* Country-aware pricing */}
+                        {productInfo.lowestPrice && (
+                          <div className="mb-3">
+                            <p className="text-sm font-medium text-green-600">
+                              from {formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol)}
+                            </p>
+                            {productInfo.productCount > 1 && (
+                              <p className="text-xs text-gray-500">
+                                {productInfo.productCount} size{productInfo.productCount > 1 ? 's' : ''} available
+                              </p>
+                            )}
+                          </div>
+                        )}
 
                         <Button
                           className="w-full bg-purple-600 hover:bg-purple-700"
@@ -639,19 +746,6 @@ function BrowsePageContent() {
         <section className="py-12 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-            {/* Section Header */}
-            <div className="text-center mb-12">
-              <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
-                {activeTab === 'dogs' && 'Popular Dog Breeds'}
-                {activeTab === 'cats' && 'Popular Cat Breeds'}
-                {activeTab === 'themes' && 'Artistic Themes'}
-              </h2>
-              <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                {activeTab === 'dogs' && 'Discover beautiful AI-generated portraits for your favorite dog breeds'}
-                {activeTab === 'cats' && 'Explore stunning AI-generated portraits for popular cat breeds'}
-                {activeTab === 'themes' && 'Choose from our curated collection of artistic styles and themes'}
-              </p>
-            </div>
 
           {/* Breed Cards (Dogs/Cats) */}
           {(activeTab === 'dogs' || activeTab === 'cats') && (
@@ -696,31 +790,21 @@ function BrowsePageContent() {
                     <CardContent className="p-4" onClick={() => handleBreedClick(breed)}>
                       <h3 className="font-semibold text-lg text-gray-900 mb-2">{breed.name}</h3>
                       {breed.description && (
-                        <p className="text-sm text-gray-600 line-clamp-2 mb-3">{breed.description}</p>
+                        <p className="text-sm text-gray-600 line-clamp-3 mb-3">
+                          {(() => {
+                            const match = breed.description.match(/\*\*(.*?)\*\*/);
+                            return match ? match[1] : breed.description;
+                          })()}
+                        </p>
                       )}
 
-                      {/* Personality traits */}
-                      {breed.personality_traits && breed.personality_traits.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-3">
-                          {breed.personality_traits.slice(0, 3).map((trait, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs bg-blue-100 text-blue-800">
-                              {trait}
-                            </Badge>
-                          ))}
-                          {breed.personality_traits.length > 3 && (
-                            <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
-                              +{breed.personality_traits.length - 3}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
 
                       <Button
                         className="w-full bg-purple-600 hover:bg-purple-700"
                         size="sm"
                         disabled={imageCount === 0}
                       >
-                        View {breed.name} Portraits
+                        View {imageCount} Pawtraits
                         <ArrowRight className="w-4 h-4 ml-2" />
                       </Button>
                     </CardContent>
@@ -874,16 +958,16 @@ function BrowsePageContent() {
 
 export default function BrowsePage() {
   return (
-    <CountryProvider>
-      <Suspense fallback={
-        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-          </div>
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
         </div>
-      }>
+      </div>
+    }>
+      <CountryProvider>
         <BrowsePageContent />
-      </Suspense>
-    </CountryProvider>
+      </CountryProvider>
+    </Suspense>
   );
 }

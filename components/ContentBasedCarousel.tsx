@@ -5,17 +5,26 @@ import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Palette, 
-  Dog, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Palette,
+  Dog,
   Cat,
   ArrowRight,
   Play,
   Pause
 } from 'lucide-react';
 import { CarouselContentWithDetails, PageType } from '@/lib/carousel-types';
+
+// Simple cache for carousel content to prevent rate limiting
+const carouselCache = new Map<PageType, {
+  content: CarouselContentWithDetails[];
+  autoPlayInterval: number;
+  lastCacheTime: number;
+}>();
+
+const CACHE_TIMEOUT = 300000; // 5 minutes
 
 interface ContentBasedCarouselProps {
   pageType: PageType;
@@ -59,19 +68,40 @@ export default function ContentBasedCarousel({
       setLoading(true);
       setError('');
 
+      // Check cache first
+      const cached = carouselCache.get(pageType);
+      const now = Date.now();
+
+      if (cached && (now - cached.lastCacheTime) < CACHE_TIMEOUT) {
+        // Use cached data
+        setAutoPlayInterval(cached.autoPlayInterval);
+        setContent(cached.content);
+        return;
+      }
+
       // Get carousel and content for this page type
       const response = await fetch(`/api/public/carousel-content?page_type=${pageType}`);
       if (!response.ok) throw new Error('Failed to load carousel content');
-      
+
       const data = await response.json();
-      
+
       if (!data.carousel) {
         setContent([]);
         return;
       }
 
-      setAutoPlayInterval(data.carousel.auto_play_interval || 6000);
-      setContent(data.content || []);
+      const interval = data.carousel.auto_play_interval || 6000;
+      const content = data.content || [];
+
+      // Cache the results
+      carouselCache.set(pageType, {
+        content,
+        autoPlayInterval: interval,
+        lastCacheTime: now
+      });
+
+      setAutoPlayInterval(interval);
+      setContent(content);
 
     } catch (err) {
       console.error('Error loading carousel content:', err);
@@ -184,25 +214,23 @@ export default function ContentBasedCarousel({
               {currentContent.title}
             </h2>
 
-            {/* Subtitle/Description - First sentence only in bold, trim leading asterisks */}
+            {/* Subtitle/Description - Extract and clean text between asterisks */}
             {currentContent.subtitle && (() => {
               // Clean up the subtitle text
               let cleanText = currentContent.subtitle;
-              
-              // Remove leading asterisks and whitespace
-              cleanText = cleanText.replace(/^\*+\s*/, '');
-              
-              // Extract first sentence (ending with ., !, or ?) or first line
-              const sentences = cleanText.match(/[^\.!?]*[\.!?]/);
-              const firstSentence = sentences 
-                ? sentences[0].trim()
-                : cleanText.split('\n')[0].trim();
-              
-              return (
+
+              // Remove prefixes like "Dog Breed •", "Cat Breed •", etc.
+              cleanText = cleanText.replace(/^(Dog|Cat)\s+Breed\s*[•·]\s*/i, '');
+
+              // Extract text between first set of asterisks, or use cleaned text
+              const asteriskMatch = cleanText.match(/\*\*(.*?)\*\*/);
+              const displayText = asteriskMatch ? asteriskMatch[1].trim() : cleanText.trim();
+
+              return displayText ? (
                 <p className="text-sm md:text-lg mb-4 opacity-90 max-w-2xl mx-auto drop-shadow-lg">
-                  <strong>{firstSentence}</strong>
+                  <strong>{displayText}</strong>
                 </p>
-              );
+              ) : null;
             })()}
 
             {/* CTA Button */}

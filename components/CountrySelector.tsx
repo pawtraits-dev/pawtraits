@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,16 +15,17 @@ interface CountrySelectorProps {
   compact?: boolean;
 }
 
-export default function CountrySelector({ 
+export default function CountrySelector({
   className = '',
   showLabel = true,
   showDefault = true,
-  compact = false 
+  compact = false
 }: CountrySelectorProps) {
-  const { 
-    selectedCountry, 
-    setSelectedCountry, 
-    countries, 
+  const [isMounted, setIsMounted] = useState(false);
+  const {
+    selectedCountry,
+    setSelectedCountry,
+    countries,
     selectedCountryData,
     isLoading,
     userDefaultCountry,
@@ -32,7 +33,19 @@ export default function CountrySelector({
     resetToDefault,
   } = useCountry();
 
-  if (isLoading) {
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return (
+      <div className={`flex items-center space-x-2 ${className}`}>
+        <div className="animate-pulse bg-gray-200 rounded h-8 w-32"></div>
+      </div>
+    );
+  }
+
+  if (isLoading || !countries.length) {
     return (
       <div className={`flex items-center space-x-2 ${className}`}>
         <div className="animate-pulse bg-gray-200 rounded h-8 w-32"></div>
