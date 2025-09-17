@@ -53,7 +53,7 @@ function HomePageContent() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
-  const [activeFilter, setActiveFilter] = useState('popular');
+  const [activeFilter, setActiveFilter] = useState('new');
   const [images, setImages] = useState<ImageCatalogWithDetails[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [pricing, setPricing] = useState<ProductPricing[]>([]);
@@ -326,9 +326,12 @@ function HomePageContent() {
 
 
   // Filter images by category
-  const popularImages = images.filter(img => img.rating && img.rating >= 4.5).slice(0, 6);
-  const newImages = images.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 6);
-  const featuredImages = images.filter(img => img.is_featured).slice(0, 6);
+  const popularImages = images
+    .filter(img => img.rating && img.rating > 0)
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    .slice(0, 5);
+  const newImages = images.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5);
+  const featuredImages = images.filter(img => img.is_featured).slice(0, 5);
 
   const renderImageCard = (image: ImageCatalogWithDetails, badgeType: 'popular' | 'new' | 'featured') => {
     const isLiked = likedImages.has(image.id);
@@ -477,19 +480,11 @@ function HomePageContent() {
       <PublicNavigation />
 
       {/* Hero Carousel Section */}
-      <section className="relative bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Container matching width of 3 middle grid cards */}
-          <div className="flex justify-center">
-            <div className="w-full max-w-2xl">
-              <ContentBasedCarousel 
-                pageType="home"
-                className="aspect-square w-full"
-                showControls={true}
-              />
-            </div>
-          </div>
-        </div>
+      <section className="relative">
+        <ContentBasedCarousel
+          pageType="home"
+          className="h-96 lg:h-[500px]"
+        />
       </section>
 
       {/* Filter Bar Section */}
@@ -553,10 +548,10 @@ function HomePageContent() {
           })()}
 
           <div className="text-center mt-8">
-            <Button 
+            <Button
               size="default"
               variant="outline"
-              onClick={() => router.push('/customer/gallery')}
+              onClick={() => router.push('/browse')}
               className="rounded-full px-8"
             >
               see all
@@ -681,7 +676,13 @@ function HomePageContent() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="space-y-4">
               <div className="flex items-center space-x-2">
-                <Sparkles className="w-6 h-6 text-purple-400" />
+                <Image
+                  src="/assets/logos/paw-svgrepo-200x200-purple.svg"
+                  alt="Pawtraits Logo"
+                  width={24}
+                  height={24}
+                  className="w-6 h-6"
+                />
                 <span className="text-xl font-bold font-[family-name:var(--font-life-savers)]">Pawtraits</span>
               </div>
               <p className="text-gray-400">
@@ -695,7 +696,6 @@ function HomePageContent() {
                 <Link href="/dogs" className="block text-gray-400 hover:text-white transition-colors">Dogs</Link>
                 <Link href="/cats" className="block text-gray-400 hover:text-white transition-colors">Cats</Link>
                 <Link href="/themes" className="block text-gray-400 hover:text-white transition-colors">Themes</Link>
-                <Link href="/customer/gallery" className="block text-gray-400 hover:text-white transition-colors">Gallery</Link>
               </div>
             </div>
             
