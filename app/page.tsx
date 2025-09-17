@@ -30,7 +30,7 @@ import { formatPrice } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
 import ShareModal from '@/components/share-modal';
 import UserInteractionsService from '@/lib/user-interactions';
-import { useServerCart } from '@/lib/server-cart-context';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
@@ -108,7 +108,7 @@ function HomePageContent() {
   
   const supabase = getSupabaseClient();
   const supabaseService = new SupabaseService();
-  const { addToCart } = useServerCart();
+  const { addToCart } = useHybridCart();
   const { selectedCountry, selectedCountryData, getCountryPricing, getLowestPrice } = useCountryPricing();
 
   useEffect(() => {

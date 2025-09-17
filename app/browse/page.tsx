@@ -28,7 +28,7 @@ import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
 import ShareModal from '@/components/share-modal';
 import UserInteractionsService from '@/lib/user-interactions';
-import { useServerCart } from '@/lib/server-cart-context';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
 import ContentBasedCarousel from '@/components/ContentBasedCarousel';
 import { PageType } from '@/lib/carousel-types';
@@ -86,7 +86,7 @@ function BrowsePageContent() {
   const [purchasedImages, setPurchasedImages] = useState<Set<string>>(new Set());
 
   const supabaseService = new SupabaseService();
-  const { addToCart } = useServerCart();
+  const { addToCart } = useHybridCart();
   const { selectedCountry, getCountryPricing } = useCountryPricing();
 
   useEffect(() => {
