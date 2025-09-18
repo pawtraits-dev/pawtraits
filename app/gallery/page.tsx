@@ -15,7 +15,6 @@ import type { Product, ProductPricing } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
 import ShareModal from '@/components/share-modal';
 import UserInteractionsService from '@/lib/user-interactions';
-import { useServerCart } from '@/lib/server-cart-context';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
@@ -70,8 +69,6 @@ export default function MyPawtraitsGallery() {
   const [modalImage, setModalImage] = useState<GalleryImage | null>(null);
 
   const supabaseService = new SupabaseService();
-  // Using SupabaseService for customer access
-  const { cart } = useServerCart();
 
   useEffect(() => {
     loadUserData();
@@ -80,7 +77,7 @@ export default function MyPawtraitsGallery() {
 
   useEffect(() => {
     loadGalleryImages();
-  }, [userProfile, cart.items]);
+  }, [userProfile]);
 
   useEffect(() => {
     filterImages();
@@ -226,30 +223,8 @@ export default function MyPawtraitsGallery() {
         console.log('Customer Gallery: No user profile email available');
       }
 
-      // Load basket items from cart
-      const basketTempImages: TempGalleryImage[] = cart.items.map(cartItem => ({
-        id: cartItem.imageId,
-        filename: cartItem.imageTitle?.replace(/[^a-zA-Z0-9]/g, '_') + '.jpg' || 'basket.jpg',
-        public_url: cartItem.imageUrl,
-        prompt_text: cartItem.imageTitle || 'In Basket',
-        description: `Added to basket on ${new Date(cartItem.addedAt).toLocaleDateString()}`,
-        tags: ['in_basket', cartItem.product.name],
-        breed_id: undefined,
-        theme_id: undefined,
-        style_id: undefined,
-        format_id: undefined,
-        rating: undefined,
-        is_featured: false,
-        created_at: cartItem.addedAt,
-        interaction_type: 'in_basket' as const,
-        interaction_date: cartItem.addedAt,
-        breed: undefined,
-        theme: undefined,
-        style: undefined
-      }));
-
-      // Combine all temporary images
-      const allTempImages = [...localTempImages, ...purchasedTempImages, ...basketTempImages];
+      // Combine all temporary images (no basket items since cart is in navigation)
+      const allTempImages = [...localTempImages, ...purchasedTempImages];
       
       // Group by image ID and combine interaction types
       const imageMap = new Map<string, GalleryImage>();
