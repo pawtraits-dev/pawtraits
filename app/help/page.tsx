@@ -67,7 +67,7 @@ export default function HelpPage() {
               <div className="pt-4">
                 <h4 className="font-semibold mb-2">Quick Links</h4>
                 <div className="space-y-2 text-sm">
-                  <Link href="/customer" className="block text-blue-600 hover:underline">
+                  <Link href="/customer/shop" className="block text-blue-600 hover:underline">
                     Customer Dashboard
                   </Link>
                   <Link href="/partners" className="block text-blue-600 hover:underline">

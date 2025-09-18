@@ -29,6 +29,7 @@ import { SupabaseService } from '@/lib/supabase';
 import { getSupabaseClient } from '@/lib/supabase-client';
 import { CountryProvider } from '@/lib/country-context';
 import CountrySelector from '@/components/CountrySelector';
+import { ServerCartProvider } from '@/lib/server-cart-context';
 
 // Security imports
 import { SecureWrapper } from '@/components/security/SecureWrapper';
