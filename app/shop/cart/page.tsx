@@ -166,7 +166,20 @@ function ShoppingCartPageContent() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
-            {items.map((item) => (
+            {items.map((item) => {
+              // Debug pricing data structure
+              if (item.pricing) {
+                console.log('Cart item pricing structure:', {
+                  itemId: item.id,
+                  pricing: item.pricing,
+                  pricingKeys: Object.keys(item.pricing),
+                  hasSalePrice: !!item.pricing.sale_price,
+                  hasCurrencyCode: !!item.pricing.currency_code,
+                  hasCurrencySymbol: !!item.pricing.currency_symbol
+                });
+              }
+
+              return (
               <Card key={item.id} className="shadow-sm">
                 <CardContent className="p-6">
                   <div className="flex items-start space-x-4">
@@ -193,7 +206,10 @@ function ShoppingCartPageContent() {
                     {/* Price and Controls */}
                     <div className="flex flex-col items-end space-y-4">
                       <p className="text-xl font-bold text-gray-900">
-                        {formatPrice(item.pricing.sale_price, item.pricing.currency_code, item.pricing.currency_symbol)}
+                        {item.pricing && item.pricing.sale_price ?
+                          formatPrice(item.pricing.sale_price, item.pricing.currency_code, item.pricing.currency_symbol) :
+                          'Price unavailable'
+                        }
                       </p>
 
                       {/* Quantity Controls */}
@@ -231,7 +247,8 @@ function ShoppingCartPageContent() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
 
           {/* Order Summary */}
