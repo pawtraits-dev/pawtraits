@@ -10,13 +10,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, ArrowRight, CreditCard, Shield, Loader2 } from "lucide-react"
+import { ArrowLeft, ArrowRight, CreditCard, Shield, Loader2, Truck } from "lucide-react"
 import Link from "next/link"
 import { useHybridCart } from "@/lib/hybrid-cart-context"
 import { useRouter } from "next/navigation"
 import { useUserRouting } from "@/hooks/use-user-routing"
 import PublicNavigation from '@/components/PublicNavigation'
 import { CountryProvider, useCountryPricing } from '@/lib/country-context'
+import { Elements } from '@stripe/react-stripe-js'
+import { getStripe } from '@/lib/stripe-client'
+import StripePaymentForm from '@/components/StripePaymentForm'
+import { checkoutValidation } from '@/lib/checkout-validation'
 
 function CheckoutPageContent() {
   const [currentStep, setCurrentStep] = useState(1)
@@ -37,9 +41,15 @@ function CheckoutPageContent() {
   const [referralValidation, setReferralValidation] = useState<any>(null)
   const [validatingReferral, setValidatingReferral] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [shippingOptions, setShippingOptions] = useState<any[]>([])
+  const [selectedShippingOption, setSelectedShippingOption] = useState<any>(null)
+  const [loadingShipping, setLoadingShipping] = useState(false)
+  const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
   const { items, totalItems, totalPrice, clearCart } = useHybridCart()
   const router = useRouter()
   const { userProfile, loading: userLoading } = useUserRouting()
+  const stripePromise = getStripe()
 
   // Note: Shipping costs will be calculated via Gelato API at checkout time
   // For now, we just show the cart total without shipping
@@ -124,16 +134,18 @@ function CheckoutPageContent() {
     }
   }
 
+  const subtotal = totalPrice / 100; // Convert from pence to pounds
+  const shipping = selectedShippingOption ? (selectedShippingOption.price / 100) : 0;
+  const discount = referralValidation?.valid && referralValidation?.discount?.eligible
+    ? referralValidation.discount.amount / 100
+    : 0;
+  const total = subtotal - discount + shipping;
+
   const orderSummary = {
-    subtotal: totalPrice / 100, // Convert from pence to pounds
-    shipping: 0, // Shipping calculated by Gelato at fulfillment
-    discount: referralValidation?.valid && referralValidation?.discount?.eligible
-      ? referralValidation.discount.amount / 100
-      : 0,
-    // Apply discount to subtotal only - shipping calculated at checkout via Gelato
-    total: (totalPrice / 100) - (referralValidation?.valid && referralValidation?.discount?.eligible
-      ? referralValidation.discount.amount / 100
-      : 0),
+    subtotal: subtotal,
+    shipping: shipping,
+    discount: discount,
+    total: total,
     items: items.map(item => ({
       title: item.imageTitle,
       price: item.pricing.sale_price / 100, // Convert from pence to pounds
@@ -142,74 +154,230 @@ function CheckoutPageContent() {
   }
 
   const validateShipping = () => {
-    const newErrors: Record<string, string> = {}
+    // Use the shared checkout validation service
+    const addressValidation = checkoutValidation.validateAddress(shippingData, []);
 
-    if (!shippingData.firstName.trim()) newErrors.firstName = "First name is required"
-    if (!shippingData.lastName.trim()) newErrors.lastName = "Last name is required"
-    // Email validation removed since it's auto-populated from user profile
-    if (!shippingData.addressLine1.trim()) newErrors.addressLine1 = "Address line 1 is required"
-    if (!shippingData.city.trim()) newErrors.city = "City is required"
-    if (!shippingData.postcode.trim()) newErrors.postcode = "Postcode is required"
-    if (!shippingData.country.trim()) newErrors.country = "Country is required"
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleShippingSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (validateShipping()) {
-      setCurrentStep(2)
+    if (addressValidation.isValid) {
+      setErrors({});
+      return true;
+    } else {
+      const newErrors: Record<string, string> = {};
+      if (addressValidation.error) {
+        newErrors.general = addressValidation.error;
+      }
+      setErrors(newErrors);
+      return false;
     }
   }
 
-  const handlePayment = async () => {
-    setIsProcessing(true)
+  // Fetch shipping options from Gelato after address validation
+  const fetchShippingOptions = async () => {
+    if (!validateShipping()) {
+      return;
+    }
+
+    setLoadingShipping(true);
+    setErrors(prev => ({ ...prev, shipping: '' }));
 
     try {
-      // Create order data
-      const orderData = {
-        items: items.map(item => ({
-          productId: item.productId,
-          imageId: item.imageId,
-          imageUrl: item.imageUrl,
-          imageTitle: item.imageTitle,
-          quantity: item.quantity,
-          unitPrice: item.pricing.sale_price, // in pence
-          totalPrice: item.pricing.sale_price * item.quantity // in pence
-        })),
-        shippingAddress: shippingData,
-        totalAmount: getCartTotal(), // in pence, shipping added by Gelato
-        currency: 'GBP',
-        referralCode: referralCode || undefined
-      }
+      console.log('🚚 Fetching shipping options from Gelato...');
 
-      // Create order via API
-      const response = await fetch('/api/shop/orders', {
+      // Create shipping address object using the new address lines
+      const addressLines = checkoutValidation.getAddressLinesForGelato(shippingData);
+      const shippingAddress = {
+        firstName: shippingData.firstName,
+        lastName: shippingData.lastName,
+        address1: addressLines.address1,
+        address2: addressLines.address2,
+        city: shippingData.city,
+        postalCode: shippingData.postcode,
+        country: shippingData.country === 'GB' ? 'GB' : shippingData.country
+      };
+
+      // Call our shipping API endpoint
+      const response = await fetch('/api/shipping/options', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(orderData)
-      })
+        credentials: 'include',
+        body: JSON.stringify({
+          shippingAddress,
+          cartItems: items.map(item => ({
+            gelatoProductUid: item.gelatoProductUid,
+            quantity: item.quantity,
+            printSpecs: item.printSpecs
+          }))
+        })
+      });
 
       if (!response.ok) {
-        throw new Error('Failed to create order')
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch shipping options');
       }
 
-      const result = await response.json()
-      
-      // Clear cart and redirect to confirmation with order details
-      clearCart()
-      const confirmationRoute = userProfile?.user_type === 'partner' ? '/partners/order-confirmation' : userProfile?.user_type === 'customer' ? '/customer/order-confirmation' : '/shop/order-confirmation';
-      router.push(`${confirmationRoute}?orderId=${result.order.id}&orderNumber=${result.order.orderNumber}`)
-      
+      const { shippingOptions: options } = await response.json();
+
+      console.log('🚚 Received shipping options:', options);
+
+      if (!options || options.length === 0) {
+        throw new Error('No shipping options available for this address');
+      }
+
+      setShippingOptions(options);
+
+      // Auto-select the first option
+      setSelectedShippingOption(options[0]);
+
+      // Move to step 2 (shipping selection)
+      setCurrentStep(2);
+
     } catch (error) {
-      console.error('Error creating order:', error)
-      alert('There was an error processing your order. Please try again.')
+      console.error('Error fetching shipping options:', error);
+      setErrors(prev => ({
+        ...prev,
+        shipping: error instanceof Error ? error.message : 'Failed to fetch shipping options'
+      }));
+    } finally {
+      setLoadingShipping(false);
+    }
+  };
+
+  const handleShippingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    // Step 1: Validate shipping address and fetch shipping options
+    await fetchShippingOptions();
+  }
+
+  // Handle shipping option selection and move to payment
+  const handleShippingOptionSubmit = async () => {
+    if (!selectedShippingOption) {
+      setErrors({ shipping: 'Please select a shipping option' });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      console.log('✅ Shipping option selected, proceeding with payment setup...');
+      await createPaymentIntent()
+      setCurrentStep(3) // Now step 3 since we added shipping selection
+    } finally {
       setIsProcessing(false)
     }
   }
+
+  // Create PaymentIntent when moving to payment step
+  const createPaymentIntent = async () => {
+    try {
+      const totalAmount = Math.round(total * 100); // Total including shipping in pence
+      const customerName = `${shippingData.firstName} ${shippingData.lastName}`.trim();
+
+      // Client-side validation
+      if (totalAmount <= 0) {
+        throw new Error('Cart is empty - cannot create payment');
+      }
+
+      if (!shippingData.email || shippingData.email.trim() === '') {
+        throw new Error('Email is required');
+      }
+
+      if (!customerName || customerName === '') {
+        throw new Error('Name is required');
+      }
+
+      const paymentData = {
+        amount: totalAmount, // Total including shipping in pence
+        currency: 'gbp',
+        customerEmail: shippingData.email.trim(),
+        customerName: customerName,
+        userType: 'customer',
+        shippingAddress: shippingData,
+        shippingOption: selectedShippingOption,
+        cartItems: items.map(item => ({
+          productId: item.productId,
+          imageId: item.imageId,
+          imageTitle: item.imageTitle,
+          quantity: item.quantity,
+          unitPrice: item.pricing.sale_price, // in pence
+          totalPrice: item.pricing.sale_price * item.quantity, // in pence
+          // Enhanced Gelato data for order fulfillment
+          gelatoProductUid: item.gelatoProductUid,
+          printSpecs: item.printSpecs
+        })),
+        // Customer-specific metadata
+        referralCode: referralCode || undefined
+      };
+
+      console.log('Creating Customer PaymentIntent with data:', {
+        amount: paymentData.amount,
+        customerEmail: paymentData.customerEmail,
+        customerName: paymentData.customerName,
+        cartItemsCount: paymentData.cartItems.length,
+      });
+
+      const response = await fetch('/api/payments/create-intent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(paymentData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Customer PaymentIntent creation error:', errorData);
+        throw new Error(errorData.error || errorData.details || 'Failed to create payment intent');
+      }
+
+      const data = await response.json();
+      setClientSecret(data.clientSecret);
+      setPaymentIntentId(data.paymentIntentId);
+
+      console.log('Customer PaymentIntent created:', {
+        id: data.paymentIntentId,
+        amount: data.amount,
+        currency: data.currency,
+      });
+    } catch (error) {
+      console.error('Error creating Customer PaymentIntent:', error);
+      alert('Failed to set up payment. Please try again.');
+      setCurrentStep(1); // Go back to shipping step
+    }
+  };
+
+  // Handle successful payment completion
+  const handlePaymentSuccess = async (paymentIntent: any) => {
+    try {
+      console.log('Customer payment succeeded:', paymentIntent.id);
+
+      // Clear cart
+      await clearCart();
+
+      // Redirect to order confirmation
+      router.push(`/shop/order-confirmation?payment_intent=${paymentIntent.id}`);
+
+    } catch (error) {
+      console.error('Error handling customer payment success:', error);
+      // Still redirect to confirmation since payment succeeded
+      router.push(`/shop/order-confirmation?payment_intent=${paymentIntent.id}`);
+    }
+  };
+
+  // Handle payment errors
+  const handlePaymentError = (error: any) => {
+    console.error('Customer payment failed:', error);
+    setIsProcessing(false);
+
+    // Show user-friendly error message
+    let errorMessage = 'Payment failed. Please try again.';
+
+    if (error.type === 'card_error' || error.type === 'validation_error') {
+      errorMessage = error.message;
+    }
+
+    alert(errorMessage);
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setShippingData((prev) => ({ ...prev, [field]: value }))
@@ -219,9 +387,9 @@ function CheckoutPageContent() {
   }
 
   const steps = [
-    { number: 1, title: "Shipping", completed: currentStep > 1 },
-    { number: 2, title: "Payment", completed: false },
-    { number: 3, title: "Confirmation", completed: false },
+    { number: 1, title: "Address", completed: currentStep > 1 },
+    { number: 2, title: "Shipping", completed: currentStep > 2 },
+    { number: 3, title: "Payment", completed: false },
   ]
 
   // Show loading state while user profile is loading
@@ -359,6 +527,13 @@ function CheckoutPageContent() {
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleShippingSubmit} className="space-y-6">
+                    {/* General validation errors */}
+                    {errors.general && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <p className="text-red-600 text-sm">{errors.general}</p>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="firstName">First Name *</Label>
@@ -476,17 +651,122 @@ function CheckoutPageContent() {
                       {errors.country && <p className="text-sm text-red-600">{errors.country}</p>}
                     </div>
 
-                    <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3">
-                      Continue to Payment
-                      <ArrowRight className="w-4 h-4 ml-2" />
+                    <Button
+                      type="submit"
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3"
+                      disabled={loadingShipping}
+                    >
+                      {loadingShipping ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Finding shipping options...
+                        </>
+                      ) : (
+                        <>
+                          Continue to Shipping Options
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </>
+                      )}
                     </Button>
                   </form>
                 </CardContent>
               </Card>
             )}
 
-            {/* Step 2: Payment */}
+            {/* Step 2: Shipping Options */}
             {currentStep === 2 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Truck className="w-5 h-5 mr-2" />
+                    Select Shipping Option
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {loadingShipping ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-purple-600" />
+                      <p className="text-gray-600">Finding shipping options...</p>
+                    </div>
+                  ) : (
+                    <>
+                      {errors.shipping && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                          <p className="text-red-600 text-sm">{errors.shipping}</p>
+                        </div>
+                      )}
+
+                      <div className="space-y-4">
+                        {shippingOptions.map((option, index) => (
+                          <div
+                            key={index}
+                            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                              selectedShippingOption?.id === option.id
+                                ? 'border-purple-500 bg-purple-50'
+                                : 'border-gray-200 hover:border-purple-300'
+                            }`}
+                            onClick={() => setSelectedShippingOption(option)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h3 className="font-medium text-gray-900">{option.name}</h3>
+                                <p className="text-sm text-gray-600">{option.description}</p>
+                                {option.estimatedDeliveryDays && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Estimated delivery: {option.estimatedDeliveryDays} business days
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="font-medium text-lg">
+                                  {option.price === 0 ? 'Free' : `£${(option.price / 100).toFixed(2)}`}
+                                </p>
+                                {selectedShippingOption?.id === option.id && (
+                                  <p className="text-purple-600 text-sm">Selected</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex gap-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setCurrentStep(1)}
+                          className="flex-1"
+                        >
+                          <ArrowLeft className="w-4 h-4 mr-2" />
+                          Back to Address
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={handleShippingOptionSubmit}
+                          disabled={!selectedShippingOption || isProcessing}
+                          className="flex-1 bg-purple-600 hover:bg-purple-700"
+                        >
+                          {isProcessing ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              Continue to Payment
+                              <ArrowRight className="w-4 h-4 ml-2" />
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Step 3: Payment */}
+            {currentStep === 3 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
@@ -509,10 +789,18 @@ function CheckoutPageContent() {
                     <p className="text-sm text-gray-600">
                       {shippingData.firstName} {shippingData.lastName}
                       <br />
-                      {shippingData.address}
+                      {shippingData.addressLine1 || shippingData.address}
                       <br />
                       {shippingData.city}, {shippingData.postcode}
                     </p>
+                    {selectedShippingOption && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <p className="text-sm font-medium text-gray-900">Shipping: {selectedShippingOption.name}</p>
+                        <p className="text-sm text-gray-600">
+                          {selectedShippingOption.price === 0 ? 'Free' : `£${(selectedShippingOption.price / 100).toFixed(2)}`}
+                        </p>
+                      </div>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -523,19 +811,61 @@ function CheckoutPageContent() {
                     </Button>
                   </div>
 
-                  {isProcessing ? (
+                  {/* Stripe Payment Form */}
+                  {clientSecret && stripePromise ? (
+                    <Elements
+                      stripe={stripePromise}
+                      options={{
+                        clientSecret,
+                        appearance: {
+                          theme: 'stripe',
+                          variables: {
+                            colorPrimary: '#9333ea', // Purple theme for customers
+                            colorBackground: '#ffffff',
+                            colorText: '#1f2937',
+                            colorDanger: '#dc2626',
+                            fontFamily: 'system-ui, sans-serif',
+                            spacingUnit: '4px',
+                            borderRadius: '8px',
+                          },
+                          rules: {
+                            '.Input': {
+                              border: '1px solid #d1d5db',
+                              boxShadow: 'none',
+                            },
+                            '.Input:focus': {
+                              border: '1px solid #9333ea',
+                              boxShadow: '0 0 0 2px rgba(147, 51, 234, 0.1)',
+                            },
+                          },
+                        },
+                      }}
+                    >
+                      <StripePaymentForm
+                        orderSummary={orderSummary}
+                        customerDetails={{
+                          email: shippingData.email,
+                          name: `${shippingData.firstName} ${shippingData.lastName}`,
+                          address: {
+                            line1: shippingData.addressLine1 || shippingData.address,
+                            line2: shippingData.addressLine2,
+                            city: shippingData.city,
+                            postal_code: shippingData.postcode,
+                            country: shippingData.country,
+                          },
+                        }}
+                        onSuccess={handlePaymentSuccess}
+                        onError={handlePaymentError}
+                        isProcessing={isProcessing}
+                        setIsProcessing={setIsProcessing}
+                      />
+                    </Elements>
+                  ) : (
                     <div className="text-center py-8">
                       <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-purple-600" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Processing your order...</h3>
-                      <p className="text-gray-600">Please don't close this page</p>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Setting up secure payment...</h3>
+                      <p className="text-gray-600">Please wait</p>
                     </div>
-                  ) : (
-                    <Button
-                      onClick={handlePayment}
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 text-lg font-semibold"
-                    >
-                      Complete Order - £{orderSummary.total.toFixed(2)} + shipping
-                    </Button>
                   )}
                 </CardContent>
               </Card>
@@ -564,8 +894,12 @@ function CheckoutPageContent() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
-                  <span className="font-medium text-gray-500">
-                    Calculated at checkout
+                  <span className="font-medium">
+                    {selectedShippingOption ? (
+                      selectedShippingOption.price === 0 ? 'Free' : `£${orderSummary.shipping.toFixed(2)}`
+                    ) : (
+                      <span className="text-gray-500">Select shipping option</span>
+                    )}
                   </span>
                 </div>
                 {referralCode && (
@@ -595,12 +929,14 @@ function CheckoutPageContent() {
                 )}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
-                  <span>Subtotal</span>
+                  <span>Total</span>
                   <span>£{orderSummary.total.toFixed(2)}</span>
                 </div>
-                <div className="text-xs text-gray-500 text-right">
-                  + shipping (calculated by Gelato)
-                </div>
+                {!selectedShippingOption && (
+                  <div className="text-xs text-gray-500 text-center">
+                    Shipping will be added after selecting delivery option
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
