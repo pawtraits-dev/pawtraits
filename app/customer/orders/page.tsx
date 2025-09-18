@@ -9,6 +9,8 @@ import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Loader2
 import Link from "next/link"
 import Image from "next/image"
 import { productDescriptionService } from '@/lib/product-utils'
+import UserAwareNavigation from '@/components/UserAwareNavigation'
+import { CountryProvider } from '@/lib/country-context'
 
 interface OrderItem {
   id: string;
@@ -156,73 +158,84 @@ export default function CustomerOrdersPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">My Orders</h1>
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-purple-600" />
-              <p className="text-gray-600">Loading your orders...</p>
+      <CountryProvider>
+        <UserAwareNavigation />
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-3xl font-bold text-gray-900 mb-8">My Orders</h1>
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-purple-600" />
+                <p className="text-gray-600">Loading your orders...</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </CountryProvider>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">My Orders</h1>
-          <Card className="text-center py-16">
-            <CardContent>
-              <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Package className="w-12 h-12 text-red-400" />
-              </div>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">Error Loading Orders</h2>
-              <p className="text-gray-600 mb-8">{error}</p>
-              <Button 
-                onClick={loadOrders}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 text-lg"
-              >
-                Try Again
-              </Button>
-            </CardContent>
-          </Card>
+      <CountryProvider>
+        <UserAwareNavigation />
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-3xl font-bold text-gray-900 mb-8">My Orders</h1>
+            <Card className="text-center py-16">
+              <CardContent>
+                <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Package className="w-12 h-12 text-red-400" />
+                </div>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Error Loading Orders</h2>
+                <p className="text-gray-600 mb-8">{error}</p>
+                <Button
+                  onClick={loadOrders}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 text-lg"
+                >
+                  Try Again
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      </CountryProvider>
     )
   }
 
   if (orders.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">My Orders</h1>
-          
-          <Card className="text-center py-16">
-            <CardContent>
-              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <ShoppingBag className="w-12 h-12 text-gray-400" />
-              </div>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">No orders yet</h2>
-              <p className="text-gray-600 mb-8">When you place an order, it will appear here.</p>
-              <Link href="/browse">
-                <Button className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 text-lg">
-                  Start Shopping
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+      <CountryProvider>
+        <UserAwareNavigation />
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-3xl font-bold text-gray-900 mb-8">My Orders</h1>
+
+            <Card className="text-center py-16">
+              <CardContent>
+                <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <ShoppingBag className="w-12 h-12 text-gray-400" />
+                </div>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2">No orders yet</h2>
+                <p className="text-gray-600 mb-8">When you place an order, it will appear here.</p>
+                <Link href="/browse">
+                  <Button className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 text-lg">
+                    Start Shopping
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      </CountryProvider>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
-      <div className="max-w-4xl mx-auto">
+    <CountryProvider>
+      <UserAwareNavigation />
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
+        <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">My Orders</h1>
           <div className="flex space-x-3">

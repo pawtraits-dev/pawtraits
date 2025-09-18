@@ -547,7 +547,7 @@ export default function MyPawtraitsGallery() {
           {type === 'purchased' && "Purchase Pawtraits to access them anytime"}
           {type === 'in_basket' && "Add Pawtraits to your basket to see them here"}
         </p>
-        <Button variant="outline" onClick={() => window.location.href = '/customer'}>
+        <Button variant="outline" onClick={() => window.location.href = '/browse'}>
           Browse Pawtraits
         </Button>
       </CardContent>

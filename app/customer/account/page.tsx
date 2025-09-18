@@ -13,6 +13,8 @@ import { User, Shield, Bell, Eye, EyeOff, Save, Loader2, Check, Camera } from 'l
 import { SupabaseService } from '@/lib/supabase';
 import type { UserProfile } from '@/lib/user-types';
 import { getUserDisplayName } from '@/lib/user-types';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
+import { CountryProvider } from '@/lib/country-context';
 
 export default function CustomerAccountPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -175,26 +177,34 @@ export default function CustomerAccountPage() {
 
   if (isDataLoading) {
     return (
-      <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Account Settings</h1>
-          <p className="text-gray-600 mt-2">Manage your profile and preferences</p>
+      <CountryProvider>
+        <UserAwareNavigation />
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6">
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Account Settings</h1>
+              <p className="text-gray-600 mt-2">Manage your profile and preferences</p>
+            </div>
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+              <span className="ml-2 text-gray-600">Loading your account information...</span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
-          <span className="ml-2 text-gray-600">Loading your account information...</span>
-        </div>
-      </div>
+      </CountryProvider>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Account Settings</h1>
-        <p className="text-gray-600 mt-2">Manage your profile and preferences</p>
-      </div>
+    <CountryProvider>
+      <UserAwareNavigation />
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Header */}
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Account Settings</h1>
+            <p className="text-gray-600 mt-2">Manage your profile and preferences</p>
+          </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
@@ -510,6 +520,8 @@ export default function CustomerAccountPage() {
           </Button>
         </TabsContent>
       </Tabs>
-    </div>
+        </div>
+      </div>
+    </CountryProvider>
   );
 }

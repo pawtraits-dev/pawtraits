@@ -79,10 +79,16 @@ export default function UserAwareNavigation({
   // Expandable menu items (from brand/logo click) - exclude admin
   const getExpandableMenuItems = (): NavigationItem[] => {
     const baseItems: NavigationItem[] = [
-      { name: 'Browse', href: '/browse', icon: ShoppingBag },
-      { name: 'Gallery', href: '/gallery', icon: Images },
-      { name: 'Pets', href: '/pets', icon: PawPrint }
+      { name: 'Browse', href: '/browse', icon: ShoppingBag }
     ]
+
+    // Add user-specific items only if user is logged in
+    if (userProfile) {
+      baseItems.push(
+        { name: 'Gallery', href: '/gallery', icon: Images },
+        { name: 'Pets', href: '/pets', icon: PawPrint }
+      )
+    }
 
     if (isPartner) {
       return [
@@ -94,12 +100,17 @@ export default function UserAwareNavigation({
       ]
     }
 
-    // Customer/Guest expandable menu (same for both)
-    return [
-      ...baseItems,
-      { name: 'Orders', href: userProfile ? '/customer/orders' : '/auth/login?redirect=/customer/orders', icon: Package },
-      { name: 'Account', href: userProfile ? '/customer/account' : '/auth/login?redirect=/customer/account', icon: User }
-    ]
+    // Customer expandable menu - only add user-specific items if logged in
+    if (userProfile) {
+      return [
+        ...baseItems,
+        { name: 'Orders', href: '/customer/orders', icon: Package },
+        { name: 'Account', href: '/customer/account', icon: User }
+      ]
+    }
+
+    // Guest menu - only public items
+    return baseItems
   }
 
   // Top permanent menu items
