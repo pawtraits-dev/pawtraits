@@ -150,10 +150,37 @@ function BrowsePageContent() {
         setProducts(dataCache.products! || []);
         setPricing(dataCache.pricing! || []);
       } else {
-        // Fetch fresh data via API endpoints
-        const [breedsData, themesData, imagesData, productsData, pricingData] = await Promise.all([
-          fetch('/api/public/breeds').then(res => res.json()),
-          fetch('/api/public/themes').then(res => res.json()),
+        // Fetch data via API endpoints with individual error handling
+        console.log('Fetching fresh data from API endpoints...');
+
+        // Fetch breeds with fallback
+        let breedsData = [];
+        try {
+          const breedsResponse = await fetch('/api/public/breeds');
+          if (breedsResponse.ok) {
+            breedsData = await breedsResponse.json();
+          } else {
+            console.warn('Breeds API failed, using empty array');
+          }
+        } catch (error) {
+          console.warn('Breeds API error, using empty array:', error);
+        }
+
+        // Fetch themes with fallback
+        let themesData = [];
+        try {
+          const themesResponse = await fetch('/api/public/themes');
+          if (themesResponse.ok) {
+            themesData = await themesResponse.json();
+          } else {
+            console.warn('Themes API failed, using empty array');
+          }
+        } catch (error) {
+          console.warn('Themes API error, using empty array:', error);
+        }
+
+        // Fetch other data that usually works
+        const [imagesData, productsData, pricingData] = await Promise.all([
           fetch('/api/images?public=true&limit=1000').then(res => res.json()),
           fetch('/api/public/products').then(res => res.json()),
           fetch('/api/public/pricing').then(res => res.json())
@@ -168,12 +195,12 @@ function BrowsePageContent() {
         dataCache.lastCacheTime = now;
 
         // Separate dog and cat breeds and sort alphabetically
-        const dogs = breedsData.filter(breed => breed.animal_type === 'dog').sort((a, b) => a.name.localeCompare(b.name));
-        const cats = breedsData.filter(breed => breed.animal_type === 'cat').sort((a, b) => a.name.localeCompare(b.name));
+        const dogs = (breedsData || []).filter(breed => breed.animal_type === 'dog').sort((a, b) => a.name.localeCompare(b.name));
+        const cats = (breedsData || []).filter(breed => breed.animal_type === 'cat').sort((a, b) => a.name.localeCompare(b.name));
 
         setDogBreeds(dogs);
         setCatBreeds(cats);
-        setThemes(themesData.filter(theme => theme.is_active).sort((a, b) => a.name.localeCompare(b.name)));
+        setThemes((themesData || []).filter(theme => theme.is_active).sort((a, b) => a.name.localeCompare(b.name)));
         setImages(imagesData.images || []);
         setProducts(productsData || []);
         setPricing(pricingData || []);
