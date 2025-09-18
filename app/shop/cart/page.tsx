@@ -166,20 +166,7 @@ function ShoppingCartPageContent() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
-            {items.map((item) => {
-              // Debug pricing data structure
-              if (item.pricing) {
-                console.log('Cart item pricing structure:', {
-                  itemId: item.id,
-                  pricing: item.pricing,
-                  pricingKeys: Object.keys(item.pricing),
-                  hasSalePrice: !!item.pricing.sale_price,
-                  hasCurrencyCode: !!item.pricing.currency_code,
-                  hasCurrencySymbol: !!item.pricing.currency_symbol
-                });
-              }
-
-              return (
+            {items.map((item) => (
               <Card key={item.id} className="shadow-sm">
                 <CardContent className="p-6">
                   <div className="flex items-start space-x-4">
@@ -247,8 +234,7 @@ function ShoppingCartPageContent() {
                   </div>
                 </CardContent>
               </Card>
-              );
-            })}
+            ))}
           </div>
 
           {/* Order Summary */}

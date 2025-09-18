@@ -47,23 +47,34 @@ function OrderConfirmationContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('orderId')
   const orderNumber = searchParams.get('orderNumber')
+  const paymentIntent = searchParams.get('payment_intent')
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { continueShoppingRoute } = useUserRouting()
 
   useEffect(() => {
-    if (orderId && orderNumber) {
+    if (orderId || orderNumber || paymentIntent) {
       fetchOrderDetails()
     } else {
       setError('Order information not found')
       setLoading(false)
     }
-  }, [orderId, orderNumber])
+  }, [orderId, orderNumber, paymentIntent])
 
   const fetchOrderDetails = async () => {
     try {
-      const response = await fetch(`/api/shop/orders?orderNumber=${orderNumber}`)
+      let apiUrl = '/api/shop/orders?'
+
+      if (paymentIntent) {
+        apiUrl += `paymentIntent=${paymentIntent}`
+      } else if (orderNumber) {
+        apiUrl += `orderNumber=${orderNumber}`
+      } else if (orderId) {
+        apiUrl += `orderId=${orderId}`
+      }
+
+      const response = await fetch(apiUrl)
       if (!response.ok) {
         if (response.status === 404) {
           setError('Order not found')

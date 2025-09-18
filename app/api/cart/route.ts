@@ -49,12 +49,67 @@ export async function GET(request: NextRequest) {
     //   }))
     // });
 
+    // Debug: Log cart data structure
+    console.log('🛒 [CART API DEBUG] Raw cart data:', {
+      itemCount: cartItems?.length || 0,
+      sampleItem: cartItems?.[0] ? {
+        keys: Object.keys(cartItems[0]),
+        hasProductData: !!cartItems[0].product_data,
+        hasPricingData: !!cartItems[0].pricing_data,
+        cartItemId: cartItems[0].cart_item_id,
+        productId: cartItems[0].product_id,
+        imageId: cartItems[0].image_id
+      } : null
+    });
+
+    // Transform the cart items to match frontend expectations
+    const transformedItems = cartItems?.map((item: any) => ({
+      id: item.cart_item_id,            // cart_item_id -> id
+      productId: item.product_id,       // product_id -> productId
+      imageId: item.image_id,           // image_id -> imageId
+      imageUrl: item.image_url,         // image_url -> imageUrl
+      imageTitle: item.image_title,     // image_title -> imageTitle
+      product: item.product_data,       // product_data -> product
+      pricing: item.pricing_data,       // pricing_data -> pricing
+      quantity: item.quantity,
+      addedAt: item.created_at,
+      partnerId: item.partner_id,
+      discountCode: item.discount_code,
+      // Gelato integration fields for shipping calculations
+      gelatoProductUid: item.product_data?.gelato_sku || item.product_data?.sku,
+      printSpecs: item.product_data ? {
+        width_cm: item.product_data.width_cm || 0,
+        height_cm: item.product_data.height_cm || 0,
+        medium: item.product_data.medium?.name || item.product_data.medium_name || '',
+        format: item.product_data.format?.name || item.product_data.format_name || '',
+        print_ready_url: undefined // Generated at checkout time
+      } : undefined,
+      // Keep raw data for debugging
+      _raw: item
+    })) || [];
+
     // Calculate totals
-    const totalItems = cartItems?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
-    const totalPrice = cartItems?.reduce((sum: number, item: any) => sum + item.item_total, 0) || 0;
+    const totalItems = transformedItems.reduce((sum: number, item: any) => sum + item.quantity, 0);
+    const totalPrice = transformedItems.reduce((sum: number, item: any) => sum + (item.pricing?.sale_price || 0) * item.quantity, 0);
+
+    console.log('🛒 [CART API DEBUG] Transformed cart data:', {
+      itemCount: transformedItems.length,
+      sampleItem: transformedItems[0] ? {
+        id: transformedItems[0].id,
+        productId: transformedItems[0].productId,
+        imageId: transformedItems[0].imageId,
+        hasPricing: !!transformedItems[0].pricing,
+        hasProduct: !!transformedItems[0].product,
+        gelatoProductUid: transformedItems[0].gelatoProductUid,
+        hasPrintSpecs: !!transformedItems[0].printSpecs,
+        printSpecsContent: transformedItems[0].printSpecs,
+        pricingKeys: transformedItems[0].pricing ? Object.keys(transformedItems[0].pricing) : [],
+        productKeys: transformedItems[0].product ? Object.keys(transformedItems[0].product) : []
+      } : null
+    });
 
     return NextResponse.json({
-      items: cartItems || [],
+      items: transformedItems,
       totalItems,
       totalPrice
     });
