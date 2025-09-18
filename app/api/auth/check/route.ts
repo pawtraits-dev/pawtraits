@@ -1,33 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get the session from the cookie/header
-    const authHeader = request.headers.get('authorization');
-    const sessionToken = authHeader?.replace('Bearer ', '') || null;
+    const cookieStore = cookies();
 
-    // If no session token, return unauthenticated immediately
-    if (!sessionToken) {
-      return NextResponse.json({
-        isAuthenticated: false,
-        user: null
-      });
-    }
-
-    // Create Supabase client with the session
+    // Create Supabase client that can read from cookies
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
-        global: {
-          headers: { Authorization: `Bearer ${sessionToken}` }
-        }
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value;
+          },
+        },
       }
     );
 
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(sessionToken);
+    // Get current user from session
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
       return NextResponse.json({
