@@ -185,8 +185,8 @@ function ShoppingCartPageContent() {
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg font-semibold text-gray-900 mb-1">{extractDescriptionTitle(item.imageTitle) || item.imageTitle}</h3>
                       <div className="text-sm text-gray-600 space-y-1">
-                        <p>{item.product.format?.name} {item.product.medium?.name}</p>
-                        <p>{item.product.size_name} ({item.product.width_cm} x {item.product.height_cm}cm)</p>
+                        <p>{item.product?.format?.name || 'Format'} {item.product?.medium?.name || 'Medium'}</p>
+                        <p>{item.product?.size_name || 'Size'} ({item.product?.width_cm || 0} x {item.product?.height_cm || 0}cm)</p>
                       </div>
                     </div>
 

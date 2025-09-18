@@ -123,9 +123,19 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
 
       if (response.ok) {
         const { items: serverItems } = await response.json();
+        console.log('🛒 Server cart loaded:', {
+          itemCount: serverItems?.length || 0,
+          sampleItem: serverItems?.[0] ? {
+            id: serverItems[0].id,
+            hasProduct: !!serverItems[0].product,
+            hasPricing: !!serverItems[0].pricing,
+            productKeys: serverItems[0].product ? Object.keys(serverItems[0].product) : [],
+            pricingKeys: serverItems[0].pricing ? Object.keys(serverItems[0].pricing) : []
+          } : null
+        });
         setItems(serverItems || []);
       } else {
-        console.error('Failed to load server cart');
+        console.error('Failed to load server cart, status:', response.status);
         setItems([]);
       }
     } catch (error) {
@@ -369,7 +379,13 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
   const totalPrice = items.reduce((sum, item) => {
     // Safety check for pricing data
     if (!item.pricing) {
-      console.warn('Cart item missing pricing data:', item);
+      console.warn('Cart item missing pricing data:', {
+        itemId: item.id,
+        productId: item.productId,
+        hasProduct: !!item.product,
+        hasPricing: !!item.pricing,
+        item: item
+      });
       return sum;
     }
 
