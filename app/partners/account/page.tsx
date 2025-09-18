@@ -16,6 +16,8 @@ import Link from "next/link"
 import { PartnerOnly } from '@/components/user-access-control'
 import { SupabaseService } from "@/lib/supabase"
 import type { Partner } from "@/lib/types"
+import UserAwareNavigation from '@/components/UserAwareNavigation'
+import { CountryProvider } from '@/lib/country-context'
 
 function AccountPageContent() {
   const [isLoading, setIsLoading] = useState(false)
@@ -209,18 +211,23 @@ function AccountPageContent() {
 
   if (isDataLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading your account information...</p>
+      <CountryProvider>
+        <UserAwareNavigation />
+        <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading your account information...</p>
+          </div>
         </div>
-      </div>
+      </CountryProvider>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <CountryProvider>
+      <UserAwareNavigation />
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 p-8">
+        <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -747,8 +754,9 @@ function AccountPageContent() {
             </Button>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
-    </div>
+    </CountryProvider>
   )
 }
 

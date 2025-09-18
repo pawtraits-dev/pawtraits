@@ -10,6 +10,8 @@ import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Users, 
 import Link from 'next/link';
 import Image from 'next/image';
 import { productDescriptionService } from '@/lib/product-utils';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
+import { CountryProvider } from '@/lib/country-context';
 
 interface OrderItem {
   id: string;
@@ -174,36 +176,44 @@ export default function PartnerOrdersPage() {
 
   if (loading) {
     return (
-      <PartnerOnly>
-        <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-green-600" />
-            <p className="text-gray-600">Loading your orders...</p>
+      <CountryProvider>
+        <PartnerOnly>
+          <UserAwareNavigation />
+          <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-green-600" />
+              <p className="text-gray-600">Loading your orders...</p>
+            </div>
           </div>
-        </div>
-      </PartnerOnly>
+        </PartnerOnly>
+      </CountryProvider>
     );
   }
 
   if (error) {
     return (
-      <PartnerOnly>
-        <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
-          <div className="text-center">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Orders</h2>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <Button onClick={loadOrders}>Try Again</Button>
+      <CountryProvider>
+        <PartnerOnly>
+          <UserAwareNavigation />
+          <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+            <div className="text-center">
+              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Orders</h2>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <Button onClick={loadOrders}>Try Again</Button>
+            </div>
           </div>
-        </div>
-      </PartnerOnly>
+        </PartnerOnly>
+      </CountryProvider>
     );
   }
 
   return (
-    <PartnerOnly>
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <CountryProvider>
+      <PartnerOnly>
+        <UserAwareNavigation />
+        <div className="min-h-screen bg-gray-50 py-8">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Your Orders</h1>
             <p className="text-gray-600 mt-2">Track and manage your partner orders</p>
@@ -360,36 +370,37 @@ export default function PartnerOrdersPage() {
               ))}
             </div>
           )}
+          </div>
+
+          {/* Image Modal */}
+          <Dialog open={showImageModal} onOpenChange={setShowImageModal}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>{selectedImageTitle}</DialogTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-4 top-4"
+                  onClick={() => setShowImageModal(false)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </DialogHeader>
+              {selectedImageUrl && (
+                <div className="mt-4">
+                  <Image
+                    src={selectedImageUrl}
+                    alt={selectedImageTitle}
+                    width={800}
+                    height={600}
+                    className="rounded-lg object-contain mx-auto"
+                  />
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
-        
-        {/* Image Modal */}
-        <Dialog open={showImageModal} onOpenChange={setShowImageModal}>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader>
-              <DialogTitle>{selectedImageTitle}</DialogTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-4 top-4"
-                onClick={() => setShowImageModal(false)}
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </DialogHeader>
-            {selectedImageUrl && (
-              <div className="mt-4">
-                <Image
-                  src={selectedImageUrl}
-                  alt={selectedImageTitle}
-                  width={800}
-                  height={600}
-                  className="rounded-lg object-contain mx-auto"
-                />
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      </div>
-    </PartnerOnly>
+      </PartnerOnly>
+    </CountryProvider>
   );
 }

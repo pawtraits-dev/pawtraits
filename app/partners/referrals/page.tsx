@@ -12,6 +12,8 @@ import { Search, Plus, Download, MoreHorizontal } from "lucide-react"
 import Link from "next/link"
 import { PartnerOnly } from '@/components/user-access-control'
 import type { Referral } from "@/lib/types"
+import UserAwareNavigation from '@/components/UserAwareNavigation'
+import { CountryProvider } from '@/lib/country-context'
 
 function ReferralsPageContent() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -126,18 +128,23 @@ function ReferralsPageContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading referrals...</p>
+      <CountryProvider>
+        <UserAwareNavigation />
+        <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading referrals...</p>
+          </div>
         </div>
-      </div>
+      </CountryProvider>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <CountryProvider>
+      <UserAwareNavigation />
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 p-8">
+        <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -289,8 +296,9 @@ function ReferralsPageContent() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
-    </div>
+    </CountryProvider>
   )
 }
 

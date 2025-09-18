@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DollarSign, TrendingUp, Clock, CheckCircle, Filter } from "lucide-react"
 import Link from "next/link"
 import { PartnerOnly } from '@/components/user-access-control'
+import UserAwareNavigation from '@/components/UserAwareNavigation'
+import { CountryProvider } from '@/lib/country-context'
 
 interface CommissionOrder {
   id: string
@@ -116,29 +118,37 @@ function CommissionsPageContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading commission data...</p>
+      <CountryProvider>
+        <UserAwareNavigation />
+        <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading commission data...</p>
+          </div>
         </div>
-      </div>
+      </CountryProvider>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <Button onClick={fetchCommissions}>Try Again</Button>
+      <CountryProvider>
+        <UserAwareNavigation />
+        <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">{error}</p>
+            <Button onClick={fetchCommissions}>Try Again</Button>
+          </div>
         </div>
-      </div>
+      </CountryProvider>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <CountryProvider>
+      <UserAwareNavigation />
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 p-8">
+        <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -307,8 +317,9 @@ function CommissionsPageContent() {
             )}
           </CardContent>
         </Card>
+        </div>
       </div>
-    </div>
+    </CountryProvider>
   )
 }
 

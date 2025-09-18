@@ -167,7 +167,7 @@ function HomePageContent() {
               router.push('/admin');
               return;
             case 'partner':
-              router.push('/partners/shop');
+              router.push('/browse');
               return;
             case 'customer':
               // Let customers browse the home page instead of redirecting
