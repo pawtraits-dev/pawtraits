@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, ArrowRight, CreditCard, Shield, Loader2, Users, Percent, Truck } from "lucide-react"
 import Link from "next/link"
-import { useServerCart } from "@/lib/server-cart-context"
+import { useHybridCart } from "@/lib/hybrid-cart-context"
 import { useRouter } from "next/navigation"
 import { SupabaseService } from '@/lib/supabase'
 import { Elements } from '@stripe/react-stripe-js'
@@ -46,7 +46,7 @@ export default function PartnerCheckoutPage() {
   const [loadingShipping, setLoadingShipping] = useState(false)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
-  const { cart, clearCart } = useServerCart()
+  const { items, totalItems, totalPrice, clearCart } = useHybridCart()
   const router = useRouter()
   const supabaseService = new SupabaseService()
   const stripePromise = getStripe()
@@ -105,7 +105,7 @@ export default function PartnerCheckoutPage() {
     loadUserProfile();
   }, []);
 
-  const subtotal = cart.totalPrice / 100;
+  const subtotal = totalPrice / 100;
   const partnerDiscount = subtotal * 0.15; // 15% partner discount
   const discountedSubtotal = subtotal - partnerDiscount;
   const shipping = selectedShippingOption ? (selectedShippingOption.price / 100) : 0;
@@ -117,7 +117,7 @@ export default function PartnerCheckoutPage() {
     discountedSubtotal: discountedSubtotal,
     shipping: shipping,
     total: total,
-    items: cart.items.map(item => ({
+    items: items.map(item => ({
       title: item.imageTitle,
       price: item.pricing.sale_price / 100, // Convert from pence to pounds
       discountedPrice: (item.pricing.sale_price * 0.85) / 100, // Partner discount applied
@@ -213,7 +213,7 @@ export default function PartnerCheckoutPage() {
         },
         body: JSON.stringify({
           shippingAddress,
-          cartItems: cart.items.map(item => ({
+          cartItems: items.map(item => ({
             gelatoProductUid: item.gelatoProductUid,
             quantity: item.quantity,
             printSpecs: item.printSpecs
@@ -329,7 +329,7 @@ export default function PartnerCheckoutPage() {
         userType: 'partner',
         shippingAddress: shippingData,
         shippingOption: selectedShippingOption,
-        cartItems: cart.items.map(item => ({
+        cartItems: items.map(item => ({
           productId: item.productId,
           imageId: item.imageId,
           imageTitle: item.imageTitle,
