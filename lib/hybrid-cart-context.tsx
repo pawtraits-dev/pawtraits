@@ -2,9 +2,6 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { Product, ProductPricing } from '@/lib/product-types';
-import { getSupabaseClient } from '@/lib/supabase-client';
-import { SupabaseService } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
 
 export interface CartItem {
   id: string; // Unique cart item ID
@@ -49,128 +46,45 @@ const GUEST_CART_STORAGE_KEY = 'pawtraits_guest_cart';
 export function HybridCartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
-  const [initialized, setInitialized] = useState(false);
+  const [isGuest, setIsGuest] = useState(true);
 
-  const supabase = getSupabaseClient();
-  const supabaseService = new SupabaseService();
-  const router = useRouter();
-
-  // Check authentication status
+  // Check auth status and load appropriate cart
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        setUser(currentUser);
-      } catch (error) {
-        console.error('Error checking auth status:', error);
-        setUser(null);
-      }
-    };
-
-    checkAuth();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const currentUser = session?.user || null;
-      const previousUser = user;
-      setUser(currentUser);
-
-      // If user just logged in and had guest cart, migrate it
-      if (!previousUser && currentUser && !initialized) {
-        await migrateGuestCartToServer();
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    initializeCart();
   }, []);
 
-  // Initialize cart based on auth status
-  useEffect(() => {
-    if (user === null || user) { // Run for both guest (null) and authenticated users
-      initializeCart();
-    }
-  }, [user]);
-
   const initializeCart = async () => {
-    setLoading(true);
-
     try {
-      if (user) {
-        // Authenticated user: load from server
-        await loadServerCart();
+      setLoading(true);
+
+      // Check if user is authenticated (without direct database access)
+      const authCheckResponse = await fetch('/api/auth/check', {
+        credentials: 'include'
+      });
+
+      if (authCheckResponse.ok) {
+        const { isAuthenticated } = await authCheckResponse.json();
+        setIsGuest(!isAuthenticated);
+
+        if (isAuthenticated) {
+          // Load from server via API
+          await loadServerCart();
+        } else {
+          // Load from localStorage
+          loadGuestCart();
+        }
       } else {
-        // Guest user: load from localStorage
+        // Not authenticated, load guest cart
+        setIsGuest(true);
         loadGuestCart();
       }
     } catch (error) {
       console.error('Error initializing cart:', error);
+      // Fallback to guest cart
+      setIsGuest(true);
+      loadGuestCart();
     } finally {
       setLoading(false);
-      setInitialized(true);
-    }
-  };
-
-  const loadServerCart = async () => {
-    try {
-      const token = await getAuthToken();
-      if (!token) {
-        throw new Error('No auth token available');
-      }
-
-      const response = await fetch('/api/cart', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to load cart: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const validatedItems = (data.items || []).filter((item: any) => {
-        // Validate that cart items have required pricing data
-        if (!item.pricing) {
-          console.warn('Removing server cart item - missing pricing object:', {
-            id: item.id,
-            imageId: item.imageId,
-            productId: item.productId
-          });
-          return false;
-        }
-
-        // Check for sale_price or other price fields that might be used
-        const hasValidPrice = (
-          (typeof item.pricing.sale_price === 'number' && item.pricing.sale_price > 0) ||
-          (typeof item.pricing.price === 'number' && item.pricing.price > 0) ||
-          (typeof item.pricing.amount === 'number' && item.pricing.amount > 0) ||
-          (typeof item.pricing.total === 'number' && item.pricing.total > 0)
-        );
-
-        if (!hasValidPrice) {
-          console.warn('Removing server cart item - no valid price field found:', {
-            id: item.id,
-            imageId: item.imageId,
-            productId: item.productId,
-            pricing: item.pricing,
-            available_price_fields: {
-              sale_price: item.pricing.sale_price,
-              price: item.pricing.price,
-              amount: item.pricing.amount,
-              total: item.pricing.total
-            }
-          });
-          return false;
-        }
-
-        return true;
-      });
-      setItems(validatedItems);
-    } catch (error) {
-      console.error('Error loading server cart:', error);
-      setItems([]);
     }
   };
 
@@ -184,52 +98,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
         console.log('Parsed guest items:', guestItems);
 
         if (Array.isArray(guestItems)) {
-          // Validate guest cart items
-          const validatedItems = guestItems.filter((item: any) => {
-            // Check if item has basic structure
-            if (!item) {
-              console.warn('Removing null/undefined cart item');
-              return false;
-            }
-
-            // Check pricing structure more thoroughly
-            if (!item.pricing) {
-              console.warn('Removing cart item - missing pricing object:', {
-                id: item.id,
-                imageId: item.imageId,
-                productId: item.productId,
-                hasPricing: !!item.pricing
-              });
-              return false;
-            }
-
-            // Check for sale_price or other price fields that might be used
-            const hasValidPrice = (
-              (typeof item.pricing.sale_price === 'number' && item.pricing.sale_price > 0) ||
-              (typeof item.pricing.price === 'number' && item.pricing.price > 0) ||
-              (typeof item.pricing.amount === 'number' && item.pricing.amount > 0) ||
-              (typeof item.pricing.total === 'number' && item.pricing.total > 0)
-            );
-
-            if (!hasValidPrice) {
-              console.warn('Removing cart item - no valid price field found:', {
-                id: item.id,
-                imageId: item.imageId,
-                productId: item.productId,
-                pricing: item.pricing,
-                available_price_fields: {
-                  sale_price: item.pricing.sale_price,
-                  price: item.pricing.price,
-                  amount: item.pricing.amount,
-                  total: item.pricing.total
-                }
-              });
-              return false;
-            }
-
-            // Item is valid
-            return true;
-          });
+          const validatedItems = validateCartItems(guestItems);
           console.log(`Guest cart validation: ${guestItems.length} items → ${validatedItems.length} valid items`);
           setItems(validatedItems);
         } else {
@@ -246,6 +115,60 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  const loadServerCart = async () => {
+    try {
+      const response = await fetch('/api/cart', {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const { items: serverItems } = await response.json();
+        setItems(serverItems || []);
+      } else {
+        console.error('Failed to load server cart');
+        setItems([]);
+      }
+    } catch (error) {
+      console.error('Error loading server cart:', error);
+      setItems([]);
+    }
+  };
+
+  const validateCartItems = (items: any[]): CartItem[] => {
+    return items.filter((item: any) => {
+      if (!item) {
+        console.warn('Removing null/undefined cart item');
+        return false;
+      }
+
+      if (!item.pricing) {
+        console.warn('Removing cart item - missing pricing object:', {
+          id: item.id,
+          imageId: item.imageId,
+          productId: item.productId
+        });
+        return false;
+      }
+
+      const hasValidPrice = (
+        (typeof item.pricing.sale_price === 'number' && item.pricing.sale_price > 0) ||
+        (typeof item.pricing.price === 'number' && item.pricing.price > 0) ||
+        (typeof item.pricing.amount === 'number' && item.pricing.amount > 0) ||
+        (typeof item.pricing.total === 'number' && item.pricing.total > 0)
+      );
+
+      if (!hasValidPrice) {
+        console.warn('Removing cart item - no valid price field found:', {
+          id: item.id,
+          pricing: item.pricing
+        });
+        return false;
+      }
+
+      return true;
+    });
+  };
+
   const saveGuestCart = (newItems: CartItem[]) => {
     try {
       console.log('Saving guest cart to localStorage:', newItems);
@@ -256,51 +179,11 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
-  const getAuthToken = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      return session?.access_token || null;
-    } catch (error) {
-      console.error('Error getting auth token:', error);
-      return null;
-    }
-  };
-
   const addToCart = async (itemData: Omit<CartItem, 'id' | 'addedAt'>) => {
-    if (user) {
-      // Authenticated user: add to server
-      await addToServerCart(itemData);
-    } else {
-      // Guest user: add to localStorage
+    if (isGuest) {
       addToGuestCart(itemData);
-    }
-  };
-
-  const addToServerCart = async (itemData: Omit<CartItem, 'id' | 'addedAt'>) => {
-    try {
-      const token = await getAuthToken();
-      if (!token) {
-        throw new Error('No auth token available');
-      }
-
-      const response = await fetch('/api/cart', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(itemData),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to add to cart: ${response.status}`);
-      }
-
-      // Reload cart from server
-      await loadServerCart();
-    } catch (error) {
-      console.error('Error adding to server cart:', error);
-      throw error;
+    } else {
+      await addToServerCart(itemData);
     }
   };
 
@@ -313,30 +196,45 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
       addedAt: new Date().toISOString(),
     };
 
-    console.log('Created new cart item:', newItem);
-
-    // Check if item already exists (same product + image combination)
     const existingItemIndex = items.findIndex(
-      item => item.productId === itemData.productId &&
-               item.imageId === itemData.imageId
+      item => item.productId === itemData.productId && item.imageId === itemData.imageId
     );
 
     let newItems: CartItem[];
-
     if (existingItemIndex >= 0) {
-      // Update quantity of existing item
       newItems = items.map((item, index) =>
         index === existingItemIndex
           ? { ...item, quantity: item.quantity + itemData.quantity }
           : item
       );
     } else {
-      // Add new item
       newItems = [...items, newItem];
     }
 
     setItems(newItems);
     saveGuestCart(newItems);
+  };
+
+  const addToServerCart = async (itemData: Omit<CartItem, 'id' | 'addedAt'>) => {
+    try {
+      const response = await fetch('/api/cart', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(itemData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to add to cart: ${response.status}`);
+      }
+
+      await loadServerCart();
+    } catch (error) {
+      console.error('Error adding to server cart:', error);
+      throw error;
+    }
   };
 
   const updateQuantity = async (itemId: string, quantity: number) => {
@@ -345,28 +243,25 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
       return;
     }
 
-    if (user) {
-      // Authenticated user: update server
-      await updateServerCartQuantity(itemId, quantity);
+    if (isGuest) {
+      const newItems = items.map(item =>
+        item.id === itemId ? { ...item, quantity } : item
+      );
+      setItems(newItems);
+      saveGuestCart(newItems);
     } else {
-      // Guest user: update localStorage
-      updateGuestCartQuantity(itemId, quantity);
+      await updateServerCartQuantity(itemId, quantity);
     }
   };
 
   const updateServerCartQuantity = async (itemId: string, quantity: number) => {
     try {
-      const token = await getAuthToken();
-      if (!token) {
-        throw new Error('No auth token available');
-      }
-
       const response = await fetch(`/api/cart/${itemId}`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ quantity }),
       });
 
@@ -374,7 +269,6 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
         throw new Error(`Failed to update cart: ${response.status}`);
       }
 
-      // Reload cart from server
       await loadServerCart();
     } catch (error) {
       console.error('Error updating server cart:', error);
@@ -382,43 +276,27 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
-  const updateGuestCartQuantity = (itemId: string, quantity: number) => {
-    const newItems = items.map(item =>
-      item.id === itemId ? { ...item, quantity } : item
-    );
-    setItems(newItems);
-    saveGuestCart(newItems);
-  };
-
   const removeFromCart = async (itemId: string) => {
-    if (user) {
-      // Authenticated user: remove from server
-      await removeFromServerCart(itemId);
+    if (isGuest) {
+      const newItems = items.filter(item => item.id !== itemId);
+      setItems(newItems);
+      saveGuestCart(newItems);
     } else {
-      // Guest user: remove from localStorage
-      removeFromGuestCart(itemId);
+      await removeFromServerCart(itemId);
     }
   };
 
   const removeFromServerCart = async (itemId: string) => {
     try {
-      const token = await getAuthToken();
-      if (!token) {
-        throw new Error('No auth token available');
-      }
-
       const response = await fetch(`/api/cart/${itemId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'include'
       });
 
       if (!response.ok) {
         throw new Error(`Failed to remove from cart: ${response.status}`);
       }
 
-      // Reload cart from server
       await loadServerCart();
     } catch (error) {
       console.error('Error removing from server cart:', error);
@@ -426,34 +304,20 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
-  const removeFromGuestCart = (itemId: string) => {
-    const newItems = items.filter(item => item.id !== itemId);
-    setItems(newItems);
-    saveGuestCart(newItems);
-  };
-
   const clearCart = async () => {
-    if (user) {
-      // Authenticated user: clear server cart
-      await clearServerCart();
+    if (isGuest) {
+      setItems([]);
+      localStorage.removeItem(GUEST_CART_STORAGE_KEY);
     } else {
-      // Guest user: clear localStorage cart
-      clearGuestCart();
+      await clearServerCart();
     }
   };
 
   const clearServerCart = async () => {
     try {
-      const token = await getAuthToken();
-      if (!token) {
-        throw new Error('No auth token available');
-      }
-
       const response = await fetch('/api/cart', {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -467,16 +331,8 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
-  const clearGuestCart = () => {
-    setItems([]);
-    localStorage.removeItem(GUEST_CART_STORAGE_KEY);
-  };
-
   const migrateGuestCartToServer = async () => {
-    if (!user) return;
-
     try {
-      // Get guest cart items
       const stored = localStorage.getItem(GUEST_CART_STORAGE_KEY);
       if (!stored) return;
 
@@ -485,34 +341,24 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
 
       console.log(`Migrating ${guestItems.length} guest cart items to server...`);
 
-      // Add each item to server cart
-      for (const item of guestItems) {
-        try {
-          const itemData = {
-            productId: item.productId,
-            imageId: item.imageId,
-            imageUrl: item.imageUrl,
-            imageTitle: item.imageTitle,
-            product: item.product,
-            pricing: item.pricing,
-            quantity: item.quantity,
-            partnerId: item.partnerId,
-            discountCode: item.discountCode,
-            gelatoProductUid: item.gelatoProductUid,
-            printSpecs: item.printSpecs,
-          };
+      const response = await fetch('/api/cart/migrate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ items: guestItems }),
+      });
 
-          await addToServerCart(itemData);
-        } catch (error) {
-          console.error('Error migrating cart item:', error);
-          // Continue with other items even if one fails
-        }
+      if (!response.ok) {
+        throw new Error(`Failed to migrate cart: ${response.status}`);
       }
 
-      // Clear guest cart after successful migration
       localStorage.removeItem(GUEST_CART_STORAGE_KEY);
-      console.log('Guest cart migration completed');
+      setIsGuest(false);
+      await loadServerCart();
 
+      console.log('Guest cart migration completed');
     } catch (error) {
       console.error('Error during cart migration:', error);
     }
@@ -547,7 +393,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     totalItems,
     totalPrice,
     loading,
-    isGuest: !user,
+    isGuest,
     addToCart,
     updateQuantity,
     removeFromCart,

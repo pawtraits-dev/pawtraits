@@ -10,7 +10,7 @@ import Image from "next/image"
 import { useHybridCart } from "@/lib/hybrid-cart-context"
 import { formatPrice } from "@/lib/product-types"
 import { useUserRouting } from "@/hooks/use-user-routing"
-import { getSupabaseClient } from '@/lib/supabase-client'
+// Removed getSupabaseClient import - using API endpoints for auth checks
 import { extractDescriptionTitle } from '@/lib/utils'
 import PublicNavigation from '@/components/PublicNavigation'
 import { CountryProvider } from '@/lib/country-context'
@@ -21,14 +21,20 @@ function ShoppingCartPageContent() {
   const [referralCode, setReferralCode] = useState("")
   const [referralValidation, setReferralValidation] = useState<any>(null)
   const [userEmail, setUserEmail] = useState("")
-  const supabase = getSupabaseClient()
 
   // Load user data and referral code
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user?.email) return
+        // Check auth status via API
+        const authResponse = await fetch('/api/auth/check', {
+          credentials: 'include'
+        })
+
+        if (!authResponse.ok) return
+
+        const { isAuthenticated, user } = await authResponse.json()
+        if (!isAuthenticated || !user?.email) return
 
         setUserEmail(user.email)
 

@@ -20,7 +20,7 @@ import {
   Cat,
   Palette
 } from 'lucide-react';
-import { SupabaseService } from '@/lib/supabase';
+// Removed SupabaseService import - using API endpoints instead
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import PublicNavigation from '@/components/PublicNavigation';
 import type { Breed, Theme, AnimalType, ImageCatalogWithDetails } from '@/lib/types';
@@ -85,7 +85,6 @@ function BrowsePageContent() {
   const [sharedImages, setSharedImages] = useState<Set<string>>(new Set());
   const [purchasedImages, setPurchasedImages] = useState<Set<string>>(new Set());
 
-  const supabaseService = new SupabaseService();
   const { addToCart } = useHybridCart();
   const { selectedCountry, getCountryPricing } = useCountryPricing();
 
@@ -151,13 +150,13 @@ function BrowsePageContent() {
         setProducts(dataCache.products! || []);
         setPricing(dataCache.pricing! || []);
       } else {
-        // Fetch fresh data
+        // Fetch fresh data via API endpoints
         const [breedsData, themesData, imagesData, productsData, pricingData] = await Promise.all([
-          supabaseService.getBreeds(),
-          supabaseService.getThemes(),
+          fetch('/api/public/breeds').then(res => res.json()),
+          fetch('/api/public/themes').then(res => res.json()),
           fetch('/api/images?public=true&limit=1000').then(res => res.json()),
-          supabaseService.getPublicProducts(),
-          supabaseService.getPublicProductPricing()
+          fetch('/api/public/products').then(res => res.json()),
+          fetch('/api/public/pricing').then(res => res.json())
         ]);
 
         // Cache the data
