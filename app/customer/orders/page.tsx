@@ -473,7 +473,8 @@ export default function CustomerOrdersPage() {
             )}
           </DialogContent>
         </Dialog>
+        </div>
       </div>
-    </div>
+    </CountryProvider>
   )
 }
