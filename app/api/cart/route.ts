@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const supabase = createClient(supabaseUrl, serviceRoleKey, {
+const serviceRoleSupabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
@@ -14,21 +16,18 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 // GET /api/cart - Get user's cart
 export async function GET(request: NextRequest) {
   try {
-    // Get user from Authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
+    // Get user from session cookies
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
-    const token = authHeader.substring(7);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     // Get user's cart using database function
-    const { data: cartItems, error: cartError } = await supabase
+    const { data: cartItems, error: cartError } = await serviceRoleSupabase
       .rpc('get_user_cart', { p_user_id: user.id });
 
     if (cartError) {
@@ -72,17 +71,14 @@ export async function GET(request: NextRequest) {
 // POST /api/cart - Add item to cart
 export async function POST(request: NextRequest) {
   try {
-    // Get user from Authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
+    // Get user from session cookies
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
-    const token = authHeader.substring(7);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     const requestData = await request.json();
@@ -117,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Add item to cart using database function
-    const { data: cartItem, error: cartError } = await supabase
+    const { data: cartItem, error: cartError } = await serviceRoleSupabase
       .rpc('upsert_cart_item', {
         p_user_id: user.id,
         p_product_id: productId,
@@ -150,21 +146,18 @@ export async function POST(request: NextRequest) {
 // DELETE /api/cart - Clear cart
 export async function DELETE(request: NextRequest) {
   try {
-    // Get user from Authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
+    // Get user from session cookies
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
-    const token = authHeader.substring(7);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     // Clear user's cart
-    const { data: deletedCount, error: deleteError } = await supabase
+    const { data: deletedCount, error: deleteError } = await serviceRoleSupabase
       .rpc('clear_user_cart', { p_user_id: user.id });
 
     if (deleteError) {
