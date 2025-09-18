@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       const { data: profile, error: profileError } = await serviceRoleSupabase
         .from('user_profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
       if (profileError) {
@@ -71,14 +71,19 @@ export async function GET(request: NextRequest) {
         user: {
           id: user.id,
           email: user.email,
-          ...profile
+          ...profile,
+          // Ensure user_type defaults to customer if not set
+          user_type: profile?.user_type || 'customer'
         }
       };
       console.log(`📤 [${timestamp}] Returning with profile:`, {
         isAuthenticated: response.isAuthenticated,
         user_id: response.user.id,
         user_email: response.user.email,
-        user_type: response.user.user_type
+        user_type: response.user.user_type,
+        profileFetch: profile ? 'SUCCESS' : 'FAILED',
+        profileUserType: profile?.user_type || 'MISSING',
+        profileKeys: profile ? Object.keys(profile) : []
       });
       return NextResponse.json(response);
     } catch (profileError) {
