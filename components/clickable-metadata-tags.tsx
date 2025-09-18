@@ -36,8 +36,8 @@ interface ClickableMetadataTagsProps {
   coat_id?: string;
   coat_hex_color?: string;
   coat_animal_type?: 'dog' | 'cat';
-  // Optional target page override (defaults to customer shop)
-  targetShopPage?: '/customer/shop' | '/partners/shop';
+  // Optional target page override (defaults to browse)
+  targetShopPage?: '/browse';
 }
 
 export default function ClickableMetadataTags({
@@ -56,7 +56,7 @@ export default function ClickableMetadataTags({
   coat_id,
   coat_hex_color,
   coat_animal_type,
-  targetShopPage = '/customer/shop'
+  targetShopPage = '/browse'
 }: ClickableMetadataTagsProps) {
   const router = useRouter();
   const pathname = usePathname();

@@ -208,7 +208,7 @@ export default function CustomerOrdersPage() {
               </div>
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">No orders yet</h2>
               <p className="text-gray-600 mb-8">When you place an order, it will appear here.</p>
-              <Link href="/customer/shop">
+              <Link href="/browse">
                 <Button className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 text-lg">
                   Start Shopping
                 </Button>
@@ -234,7 +234,7 @@ export default function CustomerOrdersPage() {
               {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               Refresh
             </Button>
-            <Link href="/customer/shop">
+            <Link href="/browse">
               <Button className="bg-purple-600 hover:bg-purple-700 text-white">
                 Continue Shopping
               </Button>

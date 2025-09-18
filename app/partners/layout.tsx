@@ -39,11 +39,11 @@ interface PartnerLayoutProps {
 
 const navigationItems = [
   { name: 'Dashboard', href: '/partners', icon: Home },
-  { name: 'Partner Shop', href: '/partners/shop', icon: ShoppingBag },
+  { name: 'Browse Shop', href: '/browse', icon: ShoppingBag },
   { name: 'Referrals', href: '/partners/referrals', icon: Target },
   { name: 'Commissions', href: '/partners/commissions', icon: DollarSign },
   { name: 'Orders', href: '/partners/orders', icon: Package },
-  { name: 'Cart', href: '/partners/cart', icon: ShoppingCart },
+  { name: 'Cart', href: '/shop/cart', icon: ShoppingCart },
   { name: 'Account', href: '/partners/account', icon: User },
 ];
 
@@ -115,7 +115,7 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchTerm.trim()) {
-      router.push(`/partners/shop?search=${encodeURIComponent(searchTerm.trim())}`);
+      router.push(`/browse?search=${encodeURIComponent(searchTerm.trim())}`);
     }
   };
 

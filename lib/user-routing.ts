@@ -25,7 +25,7 @@ export function getContinueShoppingRoute(userType: UserType | null): string {
     case 'admin':
       return '/catalog'; // Admin can use the main catalog for shopping
     case 'partner':
-      return '/partners/shop'; // Partners shop in their partner shop area
+      return '/browse'; // Partners now use the unified browse page
     case 'customer':
       return '/browse'; // Customers use the main browse page for shopping
     default:

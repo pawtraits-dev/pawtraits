@@ -41,12 +41,12 @@ interface CustomerLayoutProps {
 
 const navigationItems = [
   { name: 'Home', href: '/customer', icon: Home },
-  { name: 'Browse Shop', href: '/customer/shop', icon: ShoppingBag },
+  { name: 'Browse Shop', href: '/browse', icon: ShoppingBag },
   { name: 'Products', href: '/customer/products', icon: Grid3X3 },
   { name: 'My Gallery', href: '/customer/gallery', icon: ImageIcon },
   { name: 'My Pets', href: '/customer/pets', icon: Heart },
   { name: 'My Orders', href: '/customer/orders', icon: Package },
-  { name: 'Cart', href: '/customer/cart', icon: ShoppingCart },
+  { name: 'Cart', href: '/shop/cart', icon: ShoppingCart },
   { name: 'My Account', href: '/customer/account', icon: User },
 ];
 
@@ -114,7 +114,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchTerm.trim()) {
-      router.push(`/customer/shop?search=${encodeURIComponent(searchTerm.trim())}`);
+      router.push(`/browse?search=${encodeURIComponent(searchTerm.trim())}`);
     }
   };
 

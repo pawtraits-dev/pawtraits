@@ -96,7 +96,7 @@ function LoginPageContent() {
         }
       }
       
-      let redirectUrl = "/customer/shop"; // default for customers
+      let redirectUrl = "/browse"; // default for customers
 
       // Use returnTo parameter if provided and valid
       if (returnTo && returnTo.startsWith('/')) {
@@ -112,10 +112,10 @@ function LoginPageContent() {
             redirectUrl = "/partners";
             break;
           case 'customer':
-            redirectUrl = "/customer/shop";
+            redirectUrl = "/browse";
             break;
           default:
-            redirectUrl = "/customer/shop";
+            redirectUrl = "/browse";
         }
       } else {
         console.log("Login - No profile found after all attempts, using default redirect");

@@ -18,18 +18,22 @@ import {
   Filter,
   Dog,
   Cat,
-  Palette
+  Palette,
+  QrCode
 } from 'lucide-react';
-// Removed SupabaseService import - using API endpoints instead
+// Import SupabaseService for authentication checking
+import { SupabaseService } from '@/lib/supabase';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import PublicNavigation from '@/components/PublicNavigation';
-import type { Breed, Theme, AnimalType, ImageCatalogWithDetails } from '@/lib/types';
+import type { Breed, Theme, AnimalType, ImageCatalogWithDetails, UserProfile } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
 import ShareModal from '@/components/share-modal';
+import PartnerQRModal from '@/components/PartnerQRModal';
 import UserInteractionsService from '@/lib/user-interactions';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
+import { useUserRouting } from '@/hooks/use-user-routing';
 import ContentBasedCarousel from '@/components/ContentBasedCarousel';
 import { PageType } from '@/lib/carousel-types';
 import ReactMarkdown from 'react-markdown';
@@ -78,7 +82,13 @@ function BrowsePageContent() {
 
   // Modal states
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
   const [imageToShare, setImageToShare] = useState<ImageCatalogWithDetails | null>(null);
+  const [imageForQR, setImageForQR] = useState<ImageCatalogWithDetails | null>(null);
+
+  // Authentication and user states
+  const { userProfile, userLoading } = useUserRouting();
+  const [partnerInfo, setPartnerInfo] = useState<any>(null);
 
   // Interaction states
   const [likedImages, setLikedImages] = useState<Set<string>>(new Set());
@@ -92,6 +102,25 @@ function BrowsePageContent() {
     loadData();
     loadUserInteractions();
   }, []);
+
+  // Load partner info when user is authenticated and is a partner
+  useEffect(() => {
+    const loadPartnerInfo = async () => {
+      if (userProfile?.user_type === 'partner') {
+        try {
+          const supabaseService = new SupabaseService();
+          const partnerData = await supabaseService.getCurrentPartner();
+          setPartnerInfo(partnerData);
+        } catch (error) {
+          console.error('Error loading partner info:', error);
+        }
+      }
+    };
+
+    if (!userLoading && userProfile) {
+      loadPartnerInfo();
+    }
+  }, [userProfile, userLoading]);
 
   // Listen for URL parameter changes and update state
   useEffect(() => {
@@ -249,6 +278,11 @@ function BrowsePageContent() {
     }
     setShowShareModal(false);
     setImageToShare(null);
+  };
+
+  const handleQRShare = (image: ImageCatalogWithDetails) => {
+    setImageForQR(image);
+    setShowQRModal(true);
   };
 
   const getCarouselPageType = (): PageType => {
@@ -700,6 +734,20 @@ function BrowsePageContent() {
                               <Share2 className="w-4 h-4" />
                             </button>
 
+                            {/* Partner QR Code Sharing Button */}
+                            {userProfile?.user_type === 'partner' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleQRShare(image);
+                                }}
+                                className="p-2 rounded-full transition-all bg-white bg-opacity-80 text-gray-700 hover:bg-green-500 hover:text-white"
+                                title="Generate QR Code for Client"
+                              >
+                                <QrCode className="w-4 h-4" />
+                              </button>
+                            )}
+
                             {isPurchased && (
                               <div className="bg-green-500 text-white p-2 rounded-full" title="Purchased">
                                 <ShoppingCart className="w-4 h-4 fill-current" />
@@ -1080,6 +1128,20 @@ function BrowsePageContent() {
           }}
           image={imageToShare as any}
           onShare={handleShareComplete}
+        />
+      )}
+
+      {/* Partner QR Modal */}
+      {imageForQR && userProfile?.user_type === 'partner' && (
+        <PartnerQRModal
+          isOpen={showQRModal}
+          onClose={() => {
+            setShowQRModal(false);
+            setImageForQR(null);
+          }}
+          image={imageForQR}
+          partnerId={userProfile.id}
+          partnerInfo={partnerInfo}
         />
       )}
     </div>

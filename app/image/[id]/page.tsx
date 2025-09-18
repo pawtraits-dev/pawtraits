@@ -187,11 +187,8 @@ export default function ImagePage({}: ImagePageProps) {
   };
 
   const getReturnPath = () => {
-    // Determine return path based on referrer or user type
-    const referrer = document.referrer;
-    if (referrer.includes('/partners/shop')) return '/partners/shop';
-    if (referrer.includes('/customer/shop')) return '/customer/shop';
-    return userType === 'partner' ? '/partners/shop' : '/customer/shop';
+    // All users now use the unified browse page
+    return '/browse';
   };
 
   if (loading) {
