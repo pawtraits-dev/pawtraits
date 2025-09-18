@@ -7,13 +7,21 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     const sessionToken = authHeader?.replace('Bearer ', '') || null;
 
+    // If no session token, return unauthenticated immediately
+    if (!sessionToken) {
+      return NextResponse.json({
+        isAuthenticated: false,
+        user: null
+      });
+    }
+
     // Create Supabase client with the session
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         global: {
-          headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}
+          headers: { Authorization: `Bearer ${sessionToken}` }
         }
       }
     );
