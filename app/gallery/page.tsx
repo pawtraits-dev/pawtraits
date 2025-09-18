@@ -114,15 +114,10 @@ export default function MyPawtraitsGallery() {
       // Load user interactions from database (liked and shared images)
       let databaseInteractions: any[] = [];
 
-      console.log('Gallery: Loading interactions from database for user:', userProfile?.email);
-      const { data: { session } } = await supabaseService.getClient().auth.getSession();
-
-      if (session?.access_token) {
-        const response = await fetch('/api/user-interactions', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        });
+      // Follow customer API pattern - use email-based authentication
+      if (userProfile?.email) {
+        console.log('Gallery: Loading interactions from database for user:', userProfile.email);
+        const response = await fetch(`/api/user-interactions?email=${encodeURIComponent(userProfile.email)}`);
 
         if (response.ok) {
           databaseInteractions = await response.json();
@@ -131,7 +126,7 @@ export default function MyPawtraitsGallery() {
           console.error('Gallery: Failed to load database interactions:', response.status, response.statusText);
         }
       } else {
-        console.error('Gallery: No session available for database interactions');
+        console.error('Gallery: No user email available for database interactions');
       }
       
       // Convert interactions to a temporary format for processing

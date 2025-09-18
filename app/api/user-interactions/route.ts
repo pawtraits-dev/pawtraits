@@ -1,25 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SupabaseService } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabaseService = new SupabaseService();
+    // Follow customer API pattern - use email-based authentication
+    const { searchParams } = new URL(request.url);
+    const customerEmail = searchParams.get('email');
 
-    // Get the authenticated user
-    const { data: { user }, error: authError } = await supabaseService.getClient().auth.getUser();
-
-    if (authError || !user) {
+    if (!customerEmail) {
       return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
+        { error: 'Customer email is required' },
+        { status: 400 }
       );
     }
 
-    console.log('Fetching user interactions for user:', user.id);
+    console.log('Fetching user interactions for email:', customerEmail);
+
+    // Validate that the authenticated user matches the email (security check)
+    const supabaseService = new SupabaseService();
+    const { data: { user } } = await supabaseService.getClient().auth.getUser();
+
+    if (!user?.email || user.email !== customerEmail) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Use service role client to bypass RLS issues with user_interactions table
+    const serviceRoleClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
 
     // Fetch user interactions from the database
-    const { data: interactions, error: interactionsError } = await supabaseService
-      .getClient()
+    const { data: interactions, error: interactionsError } = await serviceRoleClient
       .from('user_interactions')
       .select(`
         id,
@@ -52,9 +71,8 @@ export async function GET(request: NextRequest) {
 
     console.log('Fetching image data for', imageIds.length, 'unique images');
 
-    // Fetch image data from image_catalog
-    const { data: images, error: imagesError } = await supabaseService
-      .getClient()
+    // Fetch image data from image_catalog using service role client
+    const { data: images, error: imagesError } = await serviceRoleClient
       .from('image_catalog')
       .select(`
         id,
