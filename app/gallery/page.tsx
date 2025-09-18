@@ -14,13 +14,13 @@ import type { UserProfile } from '@/lib/user-types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
 import ShareModal from '@/components/share-modal';
-import UserInteractionsService from '@/lib/user-interactions';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
 import StickyFilterHeader from '@/components/StickyFilterHeader';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
 
 interface GalleryImage {
   id: string;
@@ -69,6 +69,7 @@ export default function MyPawtraitsGallery() {
   const [modalImage, setModalImage] = useState<GalleryImage | null>(null);
 
   const supabaseService = new SupabaseService();
+  const { totalItems, items: cartItems } = useHybridCart();
 
   useEffect(() => {
     loadUserData();
@@ -77,7 +78,7 @@ export default function MyPawtraitsGallery() {
 
   useEffect(() => {
     loadGalleryImages();
-  }, [userProfile]);
+  }, [userProfile, cartItems]);
 
   useEffect(() => {
     filterImages();
@@ -110,8 +111,28 @@ export default function MyPawtraitsGallery() {
 
   const loadGalleryImages = async () => {
     try {
-      // Load user interactions from localStorage (liked and shared images)
-      const localInteractions = UserInteractionsService.getGalleryImages();
+      // Load user interactions from database (liked and shared images)
+      let databaseInteractions: any[] = [];
+
+      console.log('Gallery: Loading interactions from database for user:', userProfile?.email);
+      const { data: { session } } = await supabaseService.getClient().auth.getSession();
+
+      if (session?.access_token) {
+        const response = await fetch('/api/user-interactions', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        });
+
+        if (response.ok) {
+          databaseInteractions = await response.json();
+          console.log('Gallery: Loaded', databaseInteractions.length, 'interactions from database');
+        } else {
+          console.error('Gallery: Failed to load database interactions:', response.status, response.statusText);
+        }
+      } else {
+        console.error('Gallery: No session available for database interactions');
+      }
       
       // Convert interactions to a temporary format for processing
       interface TempGalleryImage {
@@ -135,26 +156,26 @@ export default function MyPawtraitsGallery() {
         style?: { id: string; name: string };
       }
 
-      // Map localStorage interactions to temporary format
-      const localTempImages: TempGalleryImage[] = localInteractions.map(item => ({
-        id: (item as any).id || (item as any).imageId,
-        filename: (item as any).filename || 'unknown.jpg',
-        public_url: (item as any).public_url || '',
-        prompt_text: (item as any).prompt_text || 'Untitled Portrait',
-        description: (item as any).description || '',
-        tags: (item as any).tags || [],
-        breed_id: (item as any).breed_id,
-        theme_id: (item as any).theme_id,
-        style_id: (item as any).style_id,
-        format_id: (item as any).format_id,
-        rating: (item as any).rating,
-        is_featured: (item as any).is_featured || false,
-        created_at: (item as any).created_at || (item as any).timestamp,
+      // Process database interactions (only source for logged-in users)
+      const databaseTempImages: TempGalleryImage[] = databaseInteractions.map(item => ({
+        id: item.imageData.id,
+        filename: item.imageData.filename,
+        public_url: item.imageData.public_url,
+        prompt_text: item.imageData.prompt_text,
+        description: item.imageData.description,
+        tags: item.imageData.tags,
+        breed_id: item.imageData.breed_id,
+        theme_id: item.imageData.theme_id,
+        style_id: item.imageData.style_id,
+        format_id: item.imageData.format_id,
+        rating: item.imageData.rating,
+        is_featured: item.imageData.is_featured,
+        created_at: item.imageData.created_at,
         interaction_type: item.interaction_type,
         interaction_date: item.interaction_date,
-        breed: (item as any).breed,
-        theme: (item as any).theme,
-        style: (item as any).style
+        breed: item.imageData.breed,
+        theme: item.imageData.theme,
+        style: item.imageData.style
       }));
 
       // Load purchased images from orders API if user profile is available
@@ -223,8 +244,30 @@ export default function MyPawtraitsGallery() {
         console.log('Customer Gallery: No user profile email available');
       }
 
-      // Combine all temporary images (no basket items since cart is in navigation)
-      const allTempImages = [...localTempImages, ...purchasedTempImages];
+      // Load basket items from cart
+      const basketTempImages: TempGalleryImage[] = cartItems.map(cartItem => ({
+        id: cartItem.imageId,
+        filename: cartItem.imageTitle?.replace(/[^a-zA-Z0-9]/g, '_') + '.jpg' || 'basket.jpg',
+        public_url: cartItem.imageUrl,
+        prompt_text: cartItem.imageTitle || 'In Basket',
+        description: `Added to basket on ${new Date(cartItem.addedAt).toLocaleDateString()}`,
+        tags: ['in_basket', cartItem.product.name],
+        breed_id: undefined,
+        theme_id: undefined,
+        style_id: undefined,
+        format_id: undefined,
+        rating: undefined,
+        is_featured: false,
+        created_at: cartItem.addedAt,
+        interaction_type: 'in_basket' as const,
+        interaction_date: cartItem.addedAt,
+        breed: undefined,
+        theme: undefined,
+        style: undefined
+      }));
+
+      // Combine all temporary images (database interactions, purchased, and basket)
+      const allTempImages = [...databaseTempImages, ...purchasedTempImages, ...basketTempImages];
       
       // Group by image ID and combine interaction types
       const imageMap = new Map<string, GalleryImage>();
