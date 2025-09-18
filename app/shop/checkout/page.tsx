@@ -394,6 +394,7 @@ function CheckoutPageContent() {
 
   // Show loading state while user profile is loading
   if (userLoading) {
+    console.log('🔄 CHECKOUT - User loading, showing loading spinner');
     return (
       <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
         <div className="text-center">
@@ -405,7 +406,17 @@ function CheckoutPageContent() {
   }
 
   // Redirect to signup/login if user is not authenticated
+  console.log('🔍 CHECKOUT - Auth check:', {
+    userLoading,
+    userProfile: userProfile ? {
+      id: userProfile.id,
+      email: userProfile.email,
+      user_type: userProfile.user_type
+    } : null
+  });
+
   if (!userLoading && !userProfile) {
+    console.log('❌ CHECKOUT - User not authenticated, showing sign-in prompt');
     const returnUrl = encodeURIComponent('/shop/checkout')
     return (
       <>

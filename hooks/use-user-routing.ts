@@ -10,38 +10,58 @@ export function useUserRouting() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const loadUserProfile = async () => {
+    const timestamp = new Date().toISOString();
     try {
-      console.log('useUserRouting - Checking auth via API...');
+      console.log(`\n🔄 [${timestamp}] useUserRouting - Starting auth check`);
 
       // Use the same auth check pattern as HybridCartProvider
       const authCheckResponse = await fetch('/api/auth/check', {
         credentials: 'include'
       });
 
+      console.log(`📡 [${timestamp}] useUserRouting - Auth check response:`, {
+        status: authCheckResponse.status,
+        ok: authCheckResponse.ok,
+        statusText: authCheckResponse.statusText
+      });
+
       if (!authCheckResponse.ok) {
-        console.log('useUserRouting - Auth check failed, user is guest');
+        console.log(`❌ [${timestamp}] useUserRouting - Auth check failed, user is guest`);
         setUserProfile(null);
         setLoading(false);
         return;
       }
 
-      const { isAuthenticated, user } = await authCheckResponse.json();
+      const responseData = await authCheckResponse.json();
+      console.log(`📋 [${timestamp}] useUserRouting - Response data:`, {
+        isAuthenticated: responseData.isAuthenticated,
+        user: responseData.user ? {
+          id: responseData.user.id,
+          email: responseData.user.email,
+          user_type: responseData.user.user_type
+        } : null
+      });
 
-      if (!isAuthenticated || !user) {
-        console.log('useUserRouting - User not authenticated');
+      if (!responseData.isAuthenticated || !responseData.user) {
+        console.log(`❌ [${timestamp}] useUserRouting - User not authenticated`);
         setUserProfile(null);
         setLoading(false);
         return;
       }
 
       // The auth/check endpoint now returns the full user profile
-      console.log('useUserRouting - Profile loaded:', user);
-      setUserProfile(user);
+      console.log(`✅ [${timestamp}] useUserRouting - Setting profile:`, {
+        id: responseData.user.id,
+        email: responseData.user.email,
+        user_type: responseData.user.user_type
+      });
+      setUserProfile(responseData.user);
 
     } catch (error) {
-      console.error('useUserRouting - Error loading user profile:', error);
+      console.error(`💥 [${timestamp}] useUserRouting - Error loading user profile:`, error);
       setUserProfile(null);
     } finally {
+      console.log(`🏁 [${timestamp}] useUserRouting - Setting loading to false`);
       setLoading(false);
     }
   };
