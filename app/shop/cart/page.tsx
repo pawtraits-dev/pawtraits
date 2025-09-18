@@ -12,7 +12,7 @@ import { formatPrice } from "@/lib/product-types"
 import { useUserRouting } from "@/hooks/use-user-routing"
 // Removed getSupabaseClient import - using API endpoints for auth checks
 import { extractDescriptionTitle } from '@/lib/utils'
-import PublicNavigation from '@/components/PublicNavigation'
+import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider } from '@/lib/country-context'
 
 function ShoppingCartPageContent() {
@@ -113,7 +113,7 @@ function ShoppingCartPageContent() {
   if (items.length === 0) {
     return (
       <>
-        <PublicNavigation />
+        <UserAwareNavigation />
         <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
@@ -148,7 +148,7 @@ function ShoppingCartPageContent() {
 
   return (
     <>
-      <PublicNavigation />
+      <UserAwareNavigation />
       <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}

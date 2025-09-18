@@ -35,7 +35,7 @@ import { CountryProvider, useCountryPricing } from '@/lib/country-context';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
-import PublicNavigation from '@/components/PublicNavigation';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
 import ContentBasedCarousel from '@/components/ContentBasedCarousel';
 
 
@@ -478,7 +478,7 @@ function HomePageContent() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation Header */}
-      <PublicNavigation />
+      <UserAwareNavigation />
 
       {/* Hero Carousel Section */}
       <section className="relative">

@@ -24,7 +24,7 @@ import {
 // Import SupabaseService for authentication checking
 import { SupabaseService } from '@/lib/supabase';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
-import PublicNavigation from '@/components/PublicNavigation';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
 import type { Breed, Theme, AnimalType, ImageCatalogWithDetails, UserProfile } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
@@ -493,7 +493,7 @@ function BrowsePageContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
-        <PublicNavigation />
+        <UserAwareNavigation />
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
         </div>
@@ -507,7 +507,7 @@ function BrowsePageContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
-      <PublicNavigation />
+      <UserAwareNavigation />
 
       {/* Breed/Theme Detail View OR Browse View */}
       {selectedBreedId || selectedThemeId ? (

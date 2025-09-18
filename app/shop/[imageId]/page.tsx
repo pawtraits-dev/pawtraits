@@ -17,7 +17,7 @@ import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ShareModal from '@/components/share-modal';
 import { getSupabaseClient } from '@/lib/supabase-client';
-import PublicNavigation from '@/components/PublicNavigation';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
 import ReactMarkdown from 'react-markdown';
 
@@ -221,7 +221,7 @@ function QRLandingPageContent() {
 
   return (
     <>
-      <PublicNavigation />
+      <UserAwareNavigation />
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
         <div className="container mx-auto px-4 py-8">
         

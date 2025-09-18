@@ -15,7 +15,7 @@ import Link from "next/link"
 import { useHybridCart } from "@/lib/hybrid-cart-context"
 import { useRouter } from "next/navigation"
 import { useUserRouting } from "@/hooks/use-user-routing"
-import PublicNavigation from '@/components/PublicNavigation'
+import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider, useCountryPricing } from '@/lib/country-context'
 import { Elements } from '@stripe/react-stripe-js'
 import { getStripe } from '@/lib/stripe-client'
@@ -420,7 +420,7 @@ function CheckoutPageContent() {
     const returnUrl = encodeURIComponent('/shop/checkout')
     return (
       <>
-        <PublicNavigation />
+        <UserAwareNavigation />
         <div className="min-h-screen bg-gray-50 py-8">
           <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8">
             <Card className="text-center">
@@ -481,7 +481,7 @@ function CheckoutPageContent() {
 
   return (
     <>
-      <PublicNavigation />
+      <UserAwareNavigation />
       <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
