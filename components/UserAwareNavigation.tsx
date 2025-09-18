@@ -5,7 +5,9 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter, usePathname } from 'next/navigation'
 import { useUserRouting } from '@/hooks/use-user-routing'
+import { useCountryPricing } from '@/lib/country-context'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Home,
   ShoppingBag,
@@ -20,10 +22,17 @@ import {
   QrCode,
   DollarSign,
   Package,
-  Heart
+  Heart,
+  Dog,
+  Cat,
+  Palette,
+  Images,
+  PawPrint,
+  Share2
 } from 'lucide-react'
 import { SupabaseService } from '@/lib/supabase'
 import { useHybridCart } from '@/lib/hybrid-cart-context'
+import CountrySelector from '@/components/CountrySelector'
 
 interface NavigationItem {
   name: string
@@ -41,9 +50,11 @@ export default function UserAwareNavigation({
   className = '',
   variant = 'header'
 }: UserAwareNavigationProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { userProfile, loading: userLoading } = useUserRouting()
   const { totalItems } = useHybridCart()
+  const { selectedCountry, selectedCountryData, availableCountries, setSelectedCountry } = useCountryPricing()
   const router = useRouter()
   const pathname = usePathname()
   const supabaseService = new SupabaseService()
@@ -65,42 +76,41 @@ export default function UserAwareNavigation({
           '/assets/logos/paw-svgrepo-200x200-purple.svg'
   }
 
-  // Navigation items based on user type
-  const getNavigationItems = (): NavigationItem[] => {
-    if (isAdmin) {
-      return [
-        { name: 'Dashboard', href: '/admin', icon: BarChart3 },
-        { name: 'Shop', href: '/browse', icon: ShoppingBag },
-        { name: 'Orders', href: '/admin/orders', icon: Package },
-        { name: 'Partners', href: '/admin/partners', icon: Users },
-        { name: 'Products', href: '/admin/products', icon: Settings }
-      ]
-    }
+  // Expandable menu items (from brand/logo click) - exclude admin
+  const getExpandableMenuItems = (): NavigationItem[] => {
+    const baseItems: NavigationItem[] = [
+      { name: 'Browse', href: '/browse', icon: ShoppingBag },
+      { name: 'Gallery', href: '/gallery', icon: Images },
+      { name: 'Pets', href: '/pets', icon: PawPrint }
+    ]
 
     if (isPartner) {
       return [
-        { name: 'Dashboard', href: '/partners', icon: Home },
-        { name: 'Shop', href: '/browse', icon: ShoppingBag },
-        { name: 'Cart', href: '/shop/cart', icon: ShoppingCart, badge: totalItems > 0 ? totalItems.toString() : undefined },
-        { name: 'My Orders', href: '/partners/orders', icon: Package },
-        { name: 'QR Codes', href: '/partners/qr-codes', icon: QrCode },
+        ...baseItems,
+        { name: 'Orders', href: '/partners/orders', icon: Package },
         { name: 'Commissions', href: '/partners/commissions', icon: DollarSign },
+        { name: 'Referrals', href: '/partners/referrals', icon: Share2 },
         { name: 'Account', href: '/partners/account', icon: User }
       ]
     }
 
-    // Customer navigation
+    // Customer/Guest expandable menu (same for both)
     return [
-      { name: 'Home', href: '/', icon: Home },
-      { name: 'Shop', href: '/browse', icon: ShoppingBag },
-      { name: 'Cart', href: '/shop/cart', icon: ShoppingCart, badge: totalItems > 0 ? totalItems.toString() : undefined },
-      { name: 'Favorites', href: '/customer/favorites', icon: Heart },
-      { name: 'My Orders', href: '/customer/orders', icon: Package },
-      { name: 'Account', href: '/customer/account', icon: User }
+      ...baseItems,
+      { name: 'Orders', href: userProfile ? '/customer/orders' : '/auth/login?redirect=/customer/orders', icon: Package },
+      { name: 'Account', href: userProfile ? '/customer/account' : '/auth/login?redirect=/customer/account', icon: User }
     ]
   }
 
-  const navigationItems = getNavigationItems()
+  // Top permanent menu items
+  const getTopMenuItems = () => [
+    { name: 'Dogs', href: '/browse', icon: Dog },
+    { name: 'Cats', href: '/browse?type=cats', icon: Cat },
+    { name: 'Themes', href: '/browse?type=themes', icon: Palette }
+  ]
+
+  const expandableMenuItems = getExpandableMenuItems()
+  const topMenuItems = getTopMenuItems()
 
   const handleSignOut = async () => {
     try {
@@ -216,14 +226,18 @@ export default function UserAwareNavigation({
     )
   }
 
-  // Header variant
+  // Header variant with new expandable menu structure
   return (
     <nav className={`bg-white shadow-sm border-b ${className}`}>
+      {/* Main Navigation Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          {/* Logo and Brand */}
+        <div className="flex justify-between items-center h-16">
+          {/* Expandable Logo/Brand (left side) */}
           <div className="flex items-center">
-            <Link href={isAdmin ? '/admin' : isPartner ? '/partners' : '/'} className="flex items-center">
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="flex items-center hover:bg-gray-50 rounded-lg px-2 py-1 transition-colors"
+            >
               <Image
                 src={theme.logo}
                 alt="Pawtraits Logo"
@@ -231,7 +245,7 @@ export default function UserAwareNavigation({
                 height={40}
                 className="w-10 h-10 transition-transform duration-500 ease-in-out"
                 style={{
-                  transform: isOpen ? 'rotate(360deg)' : 'rotate(0deg)'
+                  transform: isMenuOpen ? 'rotate(360deg)' : 'rotate(0deg)'
                 }}
               />
               <span className={`ml-3 text-xl font-bold ${theme.primary} font-[family-name:var(--font-life-savers)]`}>
@@ -242,25 +256,21 @@ export default function UserAwareNavigation({
                   Partner
                 </span>
               )}
-              {isAdmin && (
-                <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                  Admin
-                </span>
-              )}
-            </Link>
+            </button>
           </div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            {navigationItems.map((item) => {
+          {/* Permanent Top Menu (desktop) */}
+          <div className="hidden md:flex items-center space-x-6">
+            {/* Dogs, Cats, Themes */}
+            {topMenuItems.map((item) => {
               const Icon = item.icon
-              const isActive = isActivePath(item.href)
+              const isActive = isActivePath(item.href.split('?')[0])
 
               return (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors relative ${
+                  className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isActive
                       ? theme.primary
                       : `text-gray-700 ${theme.primaryHover}`
@@ -268,43 +278,52 @@ export default function UserAwareNavigation({
                 >
                   <Icon className="w-4 h-4 mr-2" />
                   {item.name}
-                  {item.badge && (
-                    <span className={`ml-2 px-2 py-1 text-xs rounded-full ${theme.primaryBg} text-white`}>
-                      {item.badge}
-                    </span>
-                  )}
                 </Link>
               )
             })}
 
-            {/* User Menu */}
-            {userProfile && (
-              <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-700">
-                  {userProfile.first_name}
+            {/* Country Selector */}
+            <div className="border-l border-gray-200 pl-6">
+              <CountrySelector compact={true} showLabel={false} />
+            </div>
+
+            {/* Cart */}
+            <Link
+              href="/shop/cart"
+              className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors relative ${
+                isActivePath('/shop/cart')
+                  ? theme.primary
+                  : `text-gray-700 ${theme.primaryHover}`
+              }`}
+            >
+              <ShoppingCart className="w-4 h-4 mr-2" />
+              Cart
+              {totalItems > 0 && (
+                <span className={`ml-2 px-2 py-1 text-xs rounded-full ${theme.primaryBg} text-white`}>
+                  {totalItems}
                 </span>
-                <Button
-                  onClick={handleSignOut}
-                  variant="outline"
-                  size="sm"
-                  className={`${theme.primary} border-current hover:bg-current hover:text-white`}
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </Button>
-              </div>
-            )}
+              )}
+            </Link>
           </div>
 
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
+          <div className="md:hidden flex items-center space-x-2">
+            {/* Mobile cart */}
+            <Link href="/shop/cart" className="relative p-2">
+              <ShoppingCart className="w-6 h-6 text-gray-600" />
+              {totalItems > 0 && (
+                <span className={`absolute -top-1 -right-1 px-2 py-1 text-xs rounded-full ${theme.primaryBg} text-white`}>
+                  {totalItems}
+                </span>
+              )}
+            </Link>
             <Button
-              onClick={() => setIsOpen(!isOpen)}
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               variant="ghost"
               size="sm"
               className="text-gray-500"
             >
-              {isOpen ? (
+              {isMobileMenuOpen ? (
                 <X className="w-6 h-6" />
               ) : (
                 <Menu className="w-6 h-6" />
@@ -313,19 +332,73 @@ export default function UserAwareNavigation({
           </div>
         </div>
 
-        {/* Mobile Navigation */}
-        {isOpen && (
+        {/* Expandable Menu Dropdown */}
+        {isMenuOpen && (
+          <div className="absolute left-0 right-0 top-16 bg-white shadow-lg border-b z-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {expandableMenuItems.map((item) => {
+                  const Icon = item.icon
+                  const isActive = isActivePath(item.href.split('?')[0])
+
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      onClick={() => setIsMenuOpen(false)}
+                      className={`flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                        isActive
+                          ? `${theme.accent} ${theme.primary}`
+                          : `text-gray-700 hover:bg-gray-50 ${theme.primaryHover}`
+                      }`}
+                    >
+                      <Icon className="w-5 h-5 mr-3" />
+                      {item.name}
+                    </Link>
+                  )
+                })}
+
+                {/* Sign Out button in expandable menu */}
+                {userProfile ? (
+                  <button
+                    onClick={() => {
+                      handleSignOut()
+                      setIsMenuOpen(false)
+                    }}
+                    className="flex items-center px-4 py-3 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <LogOut className="w-5 h-5 mr-3" />
+                    Sign Out
+                  </button>
+                ) : (
+                  <Link
+                    href="/auth/login"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex items-center px-4 py-3 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <User className="w-5 h-5 mr-3" />
+                    Sign In
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Navigation Menu */}
+        {isMobileMenuOpen && (
           <div className="md:hidden border-t bg-white">
             <div className="px-2 pt-2 pb-3 space-y-1">
-              {navigationItems.map((item) => {
+              {/* Mobile top menu items */}
+              {topMenuItems.map((item) => {
                 const Icon = item.icon
-                const isActive = isActivePath(item.href)
+                const isActive = isActivePath(item.href.split('?')[0])
 
                 return (
                   <Link
                     key={item.name}
                     href={item.href}
-                    onClick={() => setIsOpen(false)}
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className={`flex items-center px-3 py-2 rounded-lg text-base font-medium transition-colors ${
                       isActive
                         ? `${theme.accent} ${theme.primary}`
@@ -334,39 +407,79 @@ export default function UserAwareNavigation({
                   >
                     <Icon className="w-5 h-5 mr-3" />
                     {item.name}
-                    {item.badge && (
-                      <span className={`ml-auto px-2 py-1 text-xs rounded-full ${theme.primaryBg} text-white`}>
-                        {item.badge}
-                      </span>
-                    )}
                   </Link>
                 )
               })}
 
+              {/* Mobile expandable menu items */}
+              <div className="pt-2 border-t">
+                {expandableMenuItems.map((item) => {
+                  const Icon = item.icon
+                  const isActive = isActivePath(item.href.split('?')[0])
+
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center px-3 py-2 rounded-lg text-base font-medium transition-colors ${
+                        isActive
+                          ? `${theme.accent} ${theme.primary}`
+                          : `text-gray-700 hover:bg-gray-50 ${theme.primaryHover}`
+                      }`}
+                    >
+                      <Icon className="w-5 h-5 mr-3" />
+                      {item.name}
+                    </Link>
+                  )
+                })}
+              </div>
+
+              {/* Mobile Country Selector */}
+              <div className="pt-2 border-t">
+                <div className="px-3 py-2">
+                  <CountrySelector compact={false} showLabel={true} />
+                </div>
+              </div>
+
               {/* Mobile User Menu */}
-              {userProfile && (
-                <div className="pt-4 border-t">
-                  <div className="flex items-center px-3 py-2">
-                    <User className="w-5 h-5 mr-3 text-gray-400" />
-                    <div>
-                      <div className="text-base font-medium text-gray-900">
-                        {userProfile.first_name} {userProfile.last_name}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {userProfile.email}
+              <div className="pt-2 border-t">
+                {userProfile ? (
+                  <>
+                    <div className="flex items-center px-3 py-2">
+                      <User className="w-5 h-5 mr-3 text-gray-400" />
+                      <div>
+                        <div className="text-base font-medium text-gray-900">
+                          {userProfile.first_name} {userProfile.last_name}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {userProfile.email}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <Button
-                    onClick={handleSignOut}
-                    variant="ghost"
-                    className="w-full justify-start px-3 py-2 text-gray-700 hover:bg-gray-50"
+                    <Button
+                      onClick={() => {
+                        handleSignOut()
+                        setIsMobileMenuOpen(false)
+                      }}
+                      variant="ghost"
+                      className="w-full justify-start px-3 py-2 text-gray-700 hover:bg-gray-50"
+                    >
+                      <LogOut className="w-5 h-5 mr-3" />
+                      Sign Out
+                    </Button>
+                  </>
+                ) : (
+                  <Link
+                    href="/auth/login"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center px-3 py-2 rounded-lg text-base font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                   >
-                    <LogOut className="w-5 h-5 mr-3" />
-                    Sign Out
-                  </Button>
-                </div>
-              )}
+                    <User className="w-5 h-5 mr-3" />
+                    Sign In
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         )}
