@@ -1265,7 +1265,7 @@ export class SupabaseService {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            imageId: 'system_login',
+            imageId: null,
             interactionType: 'login',
             metadata: {
               userEmail: data.user.email,

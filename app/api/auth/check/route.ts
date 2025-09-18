@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
@@ -19,22 +19,8 @@ export async function GET(request: NextRequest) {
       console.log(`  - ${cookie.name}: ${cookie.value.substring(0, 50)}...`);
     });
 
-    // Create Supabase client that can read from cookies
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            const value = cookieStore.get(name)?.value;
-            if (name.startsWith('sb-') && value) {
-              console.log(`🔑 [${timestamp}] Reading cookie ${name}: ${value.substring(0, 50)}...`);
-            }
-            return value;
-          },
-        },
-      }
-    );
+    // Create Supabase route handler client
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
     console.log(`⚡ [${timestamp}] Calling supabase.auth.getUser()`);
     // Get current user from session
@@ -58,6 +44,7 @@ export async function GET(request: NextRequest) {
     console.log(`✅ [${timestamp}] User authenticated, fetching profile...`);
 
     // Try to get basic user profile using service role
+    const { createClient } = await import('@supabase/supabase-js');
     const serviceRoleSupabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
