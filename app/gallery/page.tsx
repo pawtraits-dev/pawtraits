@@ -505,13 +505,17 @@ export default function MyPawtraitsGallery() {
           <div className="absolute top-2 left-2 flex flex-col gap-1">
             {image.interaction_types.includes('purchased') && (
               <Badge className={`text-xs ${
-                image.order_type === 'partner' || image.order_type === 'partner_for_client'
+                image.order_type === 'partner_for_client'
                   ? 'bg-purple-100 text-purple-800'
-                  : 'bg-green-100 text-green-800'
+                  : image.order_type === 'partner'
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-blue-100 text-blue-800'
               }`}>
-                💳 {image.order_type === 'partner' || image.order_type === 'partner_for_client'
+                💳 {image.order_type === 'partner_for_client'
+                  ? 'Partner for Client'
+                  : image.order_type === 'partner'
                   ? 'Partner Purchase'
-                  : 'Purchased'}
+                  : 'Customer Purchase'}
               </Badge>
             )}
             {image.interaction_types.includes('liked') && (
@@ -583,7 +587,9 @@ export default function MyPawtraitsGallery() {
                 <p key={interaction.type}>
                   {interaction.type === 'purchased' && image.order_id ? (
                     <a
-                      href={`/customer/orders/${image.order_id}`}
+                      href={userProfile?.user_type === 'partner'
+                        ? `/partners/orders/${image.order_id}`
+                        : `/customer/orders/${image.order_id}`}
                       className="text-purple-600 hover:text-purple-800 hover:underline"
                     >
                       Purchased on {new Date(interaction.date).toLocaleDateString()}
@@ -601,19 +607,9 @@ export default function MyPawtraitsGallery() {
             }
           </div>
 
-          {/* Breed and Theme badges as hyperlinks */}
-          <div className="flex flex-wrap gap-1 mb-3">
-            {image.breed && (
-              <a
-                href={`/browse?breed=${image.breed.id}`}
-                className="inline-block"
-              >
-                <Badge variant="secondary" className="text-xs hover:bg-purple-100 hover:text-purple-800 transition-colors cursor-pointer">
-                  🐕 {image.breed.name}
-                </Badge>
-              </a>
-            )}
-            {image.theme && (
+          {/* Theme badge as hyperlink */}
+          {image.theme && (
+            <div className="flex flex-wrap gap-1 mb-3">
               <a
                 href={`/browse?theme=${image.theme.id}`}
                 className="inline-block"
@@ -622,13 +618,8 @@ export default function MyPawtraitsGallery() {
                   🎨 {image.theme.name}
                 </Badge>
               </a>
-            )}
-            {image.style && (
-              <Badge variant="secondary" className="text-xs">
-                ✨ {image.style.name}
-              </Badge>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Additional tags (excluding breed/theme) */}
           {image.tags && image.tags.filter(tag => !['purchased', 'customer', 'partner', 'partner_for_client'].includes(tag)).length > 0 && (
