@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { headers } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { headers, cookies } from 'next/headers';
 
 // Use service role client to bypass RLS issues
 function getServiceRoleClient() {
@@ -58,22 +59,20 @@ export async function POST(request: NextRequest) {
     let userId = null;
     let sessionId = null;
 
-    // For interactions API, we'll get the sessionId from the request body
-    // and userId from the Authorization header if present
-    const authHeader = request.headers.get('authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        // Try to get user from client-side Supabase client
-        const { createClient } = await import('@supabase/supabase-js');
-        const clientSupabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
-        const { data: { user } } = await clientSupabase.auth.getUser();
-        userId = user?.id || null;
-      } catch (error) {
-        console.log('Could not get authenticated user, using session ID');
+    // Use cookie-based authentication like other APIs in the codebase
+    try {
+      const cookieStore = await cookies();
+      const authSupabase = createRouteHandlerClient({ cookies: () => cookieStore });
+      const { data: { user }, error: authError } = await authSupabase.auth.getUser();
+
+      if (!authError && user) {
+        userId = user.id;
+        console.log('🔍 INTERACTIONS API: Found authenticated user:', user.id, user.email);
+      } else {
+        console.log('🔍 INTERACTIONS API: No authenticated user, proceeding as anonymous');
       }
+    } catch (error) {
+      console.log('🔍 INTERACTIONS API: Authentication check failed, proceeding as anonymous:', error);
     }
 
     // Use sessionId from request metadata
@@ -84,12 +83,12 @@ export async function POST(request: NextRequest) {
       sessionId = 'anon_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 
-    console.log('Recording interaction:', {
+    console.log('🔍 INTERACTIONS API: Recording interaction:', {
       imageId,
       interactionType,
       platform,
-      userId: userId ? 'authenticated' : null,
-      sessionId: sessionId ? 'present' : null
+      userId: userId ? userId : null,
+      sessionId: sessionId ? sessionId : null
     });
 
     const supabase = getServiceRoleClient();

@@ -38,11 +38,13 @@ export async function trackInteraction(data: InteractionData): Promise<{
   error?: string;
 }> {
   try {
+    // Use cookie-based authentication - no need for manual headers
     const response = await fetch('/api/interactions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // Include cookies for authentication
       body: JSON.stringify({
         ...data,
         metadata: {
@@ -96,6 +98,7 @@ export async function trackInteractionsBatch(interactions: InteractionData[]): P
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // Include cookies for authentication
       body: JSON.stringify({ interactions: processedInteractions }),
     });
 
