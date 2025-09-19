@@ -5,6 +5,79 @@
     "react/no-unescaped-entities": "warn",
     "@next/next/no-img-element": "warn",
     "@next/next/no-async-client-component": "warn",
-    "react-hooks/rules-of-hooks": "error"
-  }
+    "react-hooks/rules-of-hooks": "error",
+
+    // 🏗️ ARCHITECTURAL GOVERNANCE RULES
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["@supabase/supabase-js"],
+            "importNames": ["createClient"],
+            "message": "❌ ARCHITECTURAL VIOLATION: Direct createClient usage in components. Use API endpoints instead. See docs/patterns/data-access.md"
+          }
+        ],
+        "paths": [
+          {
+            "name": "@/lib/supabase",
+            "importNames": ["SupabaseService"],
+            "message": "❌ ARCHITECTURAL VIOLATION: SupabaseService in API routes. Use createRouteHandlerClient instead. See docs/patterns/authentication.md"
+          }
+        ]
+      }
+    ],
+
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.type='MemberExpression'][callee.object.name='supabase'][callee.property.name='from']",
+        "message": "❌ ARCHITECTURAL VIOLATION: Direct database queries in components. Use API endpoints instead. See docs/patterns/data-access.md"
+      },
+      {
+        "selector": "CallExpression[callee.type='MemberExpression'][callee.property.name='auth'] CallExpression[callee.property.name='getUser'] :not([arguments.length=1])",
+        "message": "❌ ARCHITECTURAL VIOLATION: auth.getUser() without token in API routes. Use createRouteHandlerClient with cookies. See docs/patterns/authentication.md"
+      }
+    ]
+  },
+
+  "overrides": [
+    {
+      "files": ["app/api/**/route.ts", "app/api/**/route.js"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@supabase/auth-helpers-nextjs"],
+                "importNames": ["createClientComponentClient"],
+                "message": "❌ ARCHITECTURAL VIOLATION: Client auth in server route. Use createRouteHandlerClient. See docs/patterns/authentication.md"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["app/**/page.tsx", "app/**/page.js", "components/**/*.tsx", "components/**/*.js"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@supabase/supabase-js"],
+                "message": "❌ ARCHITECTURAL VIOLATION: Direct Supabase client in component. Use API endpoints. See docs/patterns/data-access.md"
+              },
+              {
+                "group": ["@/lib/admin-supabase"],
+                "message": "❌ ARCHITECTURAL VIOLATION: AdminSupabaseService in non-admin component. Use appropriate API endpoints. See docs/patterns/data-access.md"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

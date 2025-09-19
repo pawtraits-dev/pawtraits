@@ -93,10 +93,10 @@ export default function UserAwareNavigation({
     if (isPartner) {
       return [
         ...baseItems,
-        { name: 'Orders', href: '/partners/orders', icon: Package },
+        { name: 'Orders', href: '/orders', icon: Package },
         { name: 'Commissions', href: '/partners/commissions', icon: DollarSign },
         { name: 'Referrals', href: '/partners/referrals', icon: Share2 },
-        { name: 'Account', href: '/partners/account', icon: User }
+        { name: 'Account', href: '/account', icon: User }
       ]
     }
 
@@ -104,8 +104,8 @@ export default function UserAwareNavigation({
     if (userProfile) {
       return [
         ...baseItems,
-        { name: 'Orders', href: '/customer/orders', icon: Package },
-        { name: 'Account', href: '/customer/account', icon: User }
+        { name: 'Orders', href: '/orders', icon: Package },
+        { name: 'Account', href: '/account', icon: User }
       ]
     }
 
