@@ -25,7 +25,6 @@ import {
   Grid3X3
 } from 'lucide-react';
 import Image from 'next/image';
-import { SupabaseService } from '@/lib/supabase';
 import { getSupabaseClient } from '@/lib/supabase-client';
 import { CountryProvider } from '@/lib/country-context';
 import CountrySelector from '@/components/CountrySelector';
@@ -59,7 +58,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const supabaseService = new SupabaseService();
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
     checkCustomerAccess();
@@ -67,9 +66,12 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
 
   const checkCustomerAccess = async () => {
     try {
-      const { data: { user } } = await supabaseService.getClient().auth.getUser();
-      
-      if (!user) {
+      // Check authentication via API endpoint instead of direct database access
+      const authResponse = await fetch('/api/auth/check', {
+        credentials: 'include'
+      });
+
+      if (!authResponse.ok) {
         // Allow marketing pages to show on root /customer route
         if (pathname === '/customer') {
           setLoading(false);
@@ -79,8 +81,18 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
         return;
       }
 
-      const userProfile = await supabaseService.getCurrentUserProfile();
-      
+      const { isAuthenticated, user: userData, profile: userProfile } = await authResponse.json();
+
+      if (!isAuthenticated || !userData) {
+        // Allow marketing pages to show on root /customer route
+        if (pathname === '/customer') {
+          setLoading(false);
+          return;
+        }
+        router.push('/auth/login');
+        return;
+      }
+
       if (!userProfile || userProfile.user_type !== 'customer') {
         // Allow marketing pages to show on root /customer route for non-customers
         if (pathname === '/customer') {
@@ -91,7 +103,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
         return;
       }
 
-      setUser(user);
+      setUser(userData);
       setProfile(userProfile);
     } catch (error) {
       console.error('Error checking customer access:', error);
@@ -107,7 +119,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   };
 
   const handleSignOut = async () => {
-    await supabaseService.getClient().auth.signOut();
+    await supabase.auth.signOut();
     router.push('/');
   };
 

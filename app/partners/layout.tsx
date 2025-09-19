@@ -25,7 +25,7 @@ import {
   Search
 } from 'lucide-react';
 import Image from 'next/image';
-import { SupabaseService } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase-client';
 import { CountryProvider } from '@/lib/country-context';
 import CountrySelector from '@/components/CountrySelector';
 
@@ -57,7 +57,7 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const supabaseService = new SupabaseService();
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
     checkPartnerAccess();
