@@ -177,29 +177,40 @@ export default function MyPawtraitsGallery() {
       let purchasedTempImages: TempGalleryImage[] = [];
       if (userProfile?.email) {
         try {
-          console.log('Customer Gallery: Loading purchased images for email:', userProfile.email);
-          const ordersResponse = await fetch(`/api/shop/orders?email=${encodeURIComponent(userProfile.email)}`);
-          console.log('Customer Gallery: Orders API response status:', ordersResponse.status);
-          
+          console.log('Gallery: Loading purchased images for user type:', userProfile.user_type, 'email:', userProfile.email);
+
+          // Use different API endpoints based on user type
+          let ordersResponse;
+          if (userProfile.user_type === 'partner') {
+            console.log('Gallery: Using partner orders API for partner user');
+            ordersResponse = await fetch(`/api/partners/orders`);
+          } else {
+            console.log('Gallery: Using shop orders API for customer user');
+            ordersResponse = await fetch(`/api/shop/orders?email=${encodeURIComponent(userProfile.email)}`);
+          }
+
+          console.log('Gallery: Orders API response status:', ordersResponse.status);
+
           if (ordersResponse.ok) {
             const orders = await ordersResponse.json();
-            console.log('Customer Gallery: Found orders:', orders?.length || 0);
+            console.log('Gallery: Found orders:', orders?.length || 0);
             
             // Convert order items to temporary gallery images
             if (Array.isArray(orders) && orders.length > 0) {
-              console.log('Customer Gallery: Processing orders:', orders.map(o => ({ 
-                id: o.id, 
-                order_number: o.order_number, 
-                items_count: o.order_items?.length || 0 
+              console.log('Gallery: Processing orders:', orders.map(o => ({
+                id: o.id,
+                order_number: o.order_number,
+                order_type: o.order_type || 'customer',
+                items_count: o.order_items?.length || 0
               })));
-              
+
               purchasedTempImages = orders.flatMap((order: any) => {
                 if (!order.order_items || !Array.isArray(order.order_items)) {
-                  console.log('Customer Gallery: Order missing items:', order.id);
+                  console.log('Gallery: Order missing items:', order.id);
                   return [];
                 }
-                
-                console.log('Customer Gallery: Processing order items:', order.order_items.map((item: any) => ({
+
+                console.log('Gallery: Processing order items:', order.order_items.map((item: any) => ({
                   image_id: item.image_id,
                   image_title: item.image_title,
                   image_url: item.image_url
@@ -226,17 +237,17 @@ export default function MyPawtraitsGallery() {
                   style: undefined
                 }));
               }).filter(Boolean); // Remove any null/undefined items
-              
-              console.log('Customer Gallery: Created purchased temp images:', purchasedTempImages.length);
+
+              console.log('Gallery: Created purchased temp images:', purchasedTempImages.length);
             }
           } else {
-            console.error('Customer Gallery: Orders API failed:', ordersResponse.status, ordersResponse.statusText);
+            console.error('Gallery: Orders API failed:', ordersResponse.status, ordersResponse.statusText);
           }
         } catch (error) {
           console.error('Error loading purchased images from orders:', error);
         }
       } else {
-        console.log('Customer Gallery: No user profile email available');
+        console.log('Gallery: No user profile email available');
       }
 
       // Load basket items from cart
