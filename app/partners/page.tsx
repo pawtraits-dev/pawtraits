@@ -554,7 +554,7 @@ export default function PartnerDashboard() {
       title: 'Check Cart',
       description: `${cart.totalItems} items for clients`,
       icon: ShoppingBag,
-      href: '/partners/cart',
+      href: '/shop/cart',
       color: 'from-orange-500 to-red-500',
       badge: cart.totalItems > 0 ? cart.totalItems : undefined
     }

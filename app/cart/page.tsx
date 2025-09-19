@@ -7,8 +7,8 @@ export default function CartRedirect() {
   const router = useRouter()
   
   useEffect(() => {
-    // Redirect to customer cart by default
-    router.push('/customer/cart')
+    // Redirect to consolidated cart
+    router.push('/shop/cart')
   }, [router])
 
   return (

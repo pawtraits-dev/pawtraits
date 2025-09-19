@@ -486,7 +486,7 @@ function CheckoutPageContent() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <Link href={userProfile?.user_type === 'partner' ? '/partners/cart' : userProfile?.user_type === 'customer' ? '/customer/cart' : '/shop/cart'} className="flex items-center text-gray-600 hover:text-purple-600 mb-4">
+          <Link href="/shop/cart" className="flex items-center text-gray-600 hover:text-purple-600 mb-4">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Cart
           </Link>

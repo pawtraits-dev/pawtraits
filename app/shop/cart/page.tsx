@@ -280,7 +280,7 @@ function ShoppingCartPageContent() {
                   <p>Shipping costs calculated at checkout</p>
                 </div>
 
-                <Link href={userProfile?.user_type === 'partner' ? '/partners/checkout' : '/shop/checkout'} className="block">
+                <Link href="/shop/checkout" className="block">
                   <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 text-lg font-semibold">
                     Proceed to Checkout
                   </Button>

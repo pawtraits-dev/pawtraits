@@ -139,14 +139,8 @@ export default function ProductSelectionModal({
     setCartItems([]);
     onClose();
     
-    // Redirect to appropriate cart page based on current path
-    const currentPath = window.location.pathname;
-    if (currentPath.startsWith('/customer')) {
-      router.push('/customer/cart');
-    } else if (currentPath.startsWith('/partners')) {
-      router.push('/partners/cart');
-    } else {
-      router.push('/shop/cart');
+    // Redirect to consolidated cart page
+    router.push('/shop/cart');
     }
   };
 
