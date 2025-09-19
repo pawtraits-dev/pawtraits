@@ -504,7 +504,7 @@ function BrowsePageContent() {
 
   const currentBreeds = activeTab === 'dogs' ? getFilteredBreeds(dogBreeds) :
                       activeTab === 'cats' ? getFilteredBreeds(catBreeds) :
-                      activeTab === 'all' ? getFilteredBreeds([...dogBreeds, ...catBreeds]) : [];
+                      activeTab === 'all' ? getFilteredBreeds([...dogBreeds, ...catBreeds].sort((a, b) => a.name.localeCompare(b.name))) : [];
   const currentThemes = getFilteredThemes();
 
   return (
