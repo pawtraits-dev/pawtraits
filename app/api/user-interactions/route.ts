@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SupabaseService } from '@/lib/supabase';
 import { createClient } from '@supabase/supabase-js';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,8 +19,9 @@ export async function GET(request: NextRequest) {
     console.log('🔍 USER-INTERACTIONS API: Fetching user interactions for email:', customerEmail);
 
     // Validate that the authenticated user matches the email (security check)
-    const supabaseService = new SupabaseService();
-    const { data: { user } } = await supabaseService.getClient().auth.getUser();
+    const cookieStore = await cookies();
+    const authSupabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const { data: { user } } = await authSupabase.auth.getUser();
 
     console.log('🔍 USER-INTERACTIONS API: Authenticated user ID:', user?.id, 'email:', user?.email);
 
