@@ -53,7 +53,7 @@ interface GalleryImage {
   };
   // Order information for purchased items
   order_type?: string;
-  order_number?: string;
+  order_id?: string;
 }
 
 export default function MyPawtraitsGallery() {
@@ -153,7 +153,7 @@ export default function MyPawtraitsGallery() {
         theme?: { id: string; name: string };
         style?: { id: string; name: string };
         order_type?: string;
-        order_number?: string;
+        order_id?: string;
       }
 
       // Process database interactions (only source for logged-in users)
@@ -209,6 +209,33 @@ export default function MyPawtraitsGallery() {
                 items_count: o.order_items?.length || 0
               })));
 
+              // Get all unique image IDs from orders to fetch catalog data
+              const orderImageIds = [...new Set(orders.flatMap((order: any) =>
+                order.order_items?.map((item: any) => item.image_id) || []
+              ))];
+
+              console.log('Gallery: Fetching catalog data for', orderImageIds.length, 'purchased images');
+
+              // Fetch image catalog data for purchased images via API
+              let catalogImageMap = new Map();
+              if (orderImageIds.length > 0) {
+                try {
+                  const response = await fetch('/api/images/catalog', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ imageIds: orderImageIds })
+                  });
+
+                  if (response.ok) {
+                    const catalogImages = await response.json();
+                    console.log('Gallery: Got catalog data for', catalogImages?.length || 0, 'images');
+                    catalogImageMap = new Map(catalogImages?.map((img: any) => [img.id, img]) || []);
+                  }
+                } catch (error) {
+                  console.error('Gallery: Failed to fetch catalog data for purchased images:', error);
+                }
+              }
+
               purchasedTempImages = orders.flatMap((order: any) => {
                 if (!order.order_items || !Array.isArray(order.order_items)) {
                   console.log('Gallery: Order missing items:', order.id);
@@ -220,30 +247,44 @@ export default function MyPawtraitsGallery() {
                   image_title: item.image_title,
                   image_url: item.image_url
                 })));
-                
-                return order.order_items.map((item: any) => ({
-                  id: item.image_id,
-                  filename: item.image_title?.replace(/[^a-zA-Z0-9]/g, '_') + '.jpg' || 'purchase.jpg',
-                  public_url: item.image_url,
-                  prompt_text: item.image_title || 'Purchased Portrait',
-                  description: `Purchased on ${new Date(order.created_at).toLocaleDateString()}`,
-                  tags: ['purchased', order.order_type || 'customer'],
-                  breed_id: undefined,
-                  theme_id: undefined,
-                  style_id: undefined,
-                  format_id: undefined,
-                  rating: undefined,
-                  is_featured: false,
-                  created_at: order.created_at,
-                  interaction_type: 'purchased' as const,
-                  interaction_date: order.created_at,
-                  breed: undefined,
-                  theme: undefined,
-                  style: undefined,
-                  // Add order type for display differentiation
-                  order_type: order.order_type || 'customer',
-                  order_number: order.order_number
-                }));
+
+                return order.order_items.map((item: any) => {
+                  // Get catalog data for this image if available
+                  const catalogData = catalogImageMap.get(item.image_id);
+
+                  return {
+                    id: item.image_id,
+                    filename: item.image_title?.replace(/[^a-zA-Z0-9]/g, '_') + '.jpg' || 'purchase.jpg',
+                    public_url: item.image_url,
+                    prompt_text: item.image_title || 'Purchased Portrait',
+                    description: catalogData?.description || item.image_title || 'Purchased Portrait',
+                    tags: ['purchased', order.order_type || 'customer'],
+                    breed_id: catalogData?.breed_id,
+                    theme_id: catalogData?.theme_id,
+                    style_id: catalogData?.style_id,
+                    format_id: catalogData?.format_id,
+                    rating: catalogData?.rating,
+                    is_featured: catalogData?.is_featured || false,
+                    created_at: order.created_at,
+                    interaction_type: 'purchased' as const,
+                    interaction_date: order.created_at,
+                    breed: catalogData?.breeds ? {
+                      id: catalogData.breeds.id,
+                      name: catalogData.breeds.name
+                    } : undefined,
+                    theme: catalogData?.themes ? {
+                      id: catalogData.themes.id,
+                      name: catalogData.themes.name
+                    } : undefined,
+                    style: catalogData?.styles ? {
+                      id: catalogData.styles.id,
+                      name: catalogData.styles.name
+                    } : undefined,
+                    // Add order type for display differentiation
+                    order_type: order.order_type || 'customer',
+                    order_id: order.id
+                  };
+                });
               }).filter(Boolean); // Remove any null/undefined items
 
               console.log('Gallery: Created purchased temp images:', purchasedTempImages.length);
@@ -306,7 +347,7 @@ export default function MyPawtraitsGallery() {
             existing.public_url = tempImage.public_url;
             existing.filename = tempImage.filename;
             existing.order_type = tempImage.order_type;
-            existing.order_number = tempImage.order_number;
+            existing.order_id = tempImage.order_id;
           }
         } else {
           // Create new gallery image
@@ -333,7 +374,7 @@ export default function MyPawtraitsGallery() {
             theme: tempImage.theme,
             style: tempImage.style,
             order_type: tempImage.order_type,
-            order_number: tempImage.order_number
+            order_id: tempImage.order_id
           });
         }
       });
@@ -532,12 +573,6 @@ export default function MyPawtraitsGallery() {
             {extractDescriptionHighlight(image.description) || image.prompt_text}
           </h3>
 
-          {/* Order info for purchased items */}
-          {image.interaction_types.includes('purchased') && image.order_number && (
-            <div className="text-xs text-gray-500 mb-2">
-              Order #{image.order_number}
-            </div>
-          )}
 
           {/* Interaction dates - only show most recent, avoid duplicate purchase dates */}
           <div className="text-xs text-gray-500 mb-3">
@@ -546,10 +581,21 @@ export default function MyPawtraitsGallery() {
               .slice(0, 1) // Only show most recent interaction
               .map((interaction) => (
                 <p key={interaction.type}>
-                  {interaction.type === 'purchased' ? 'Purchased' :
-                   interaction.type === 'liked' ? 'Liked' :
-                   interaction.type === 'shared' ? 'Shared' :
-                   'Added'} on {new Date(interaction.date).toLocaleDateString()}
+                  {interaction.type === 'purchased' && image.order_id ? (
+                    <a
+                      href={`/customer/orders/${image.order_id}`}
+                      className="text-purple-600 hover:text-purple-800 hover:underline"
+                    >
+                      Purchased on {new Date(interaction.date).toLocaleDateString()}
+                    </a>
+                  ) : (
+                    <>
+                      {interaction.type === 'purchased' ? 'Purchased' :
+                       interaction.type === 'liked' ? 'Liked' :
+                       interaction.type === 'shared' ? 'Shared' :
+                       'Added'} on {new Date(interaction.date).toLocaleDateString()}
+                    </>
+                  )}
                 </p>
               ))
             }
