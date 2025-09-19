@@ -47,8 +47,11 @@
         "lib/supabase.ts",
         "lib/admin-supabase.ts",
         "lib/prompt-generator.js",
+        "lib/enhanced-prompt-generator.ts",
         "lib/rate-limiter.ts",
         "lib/server-cart-context.tsx",
+        "lib/batch-processing-service.ts",
+        "lib/data-encryption.ts",
         "scripts/**/*"
       ],
       "rules": {

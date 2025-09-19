@@ -53,6 +53,33 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     initializeCart();
   }, [initializeCart]);
 
+  const loadGuestCart = useCallback(() => {
+    try {
+      const stored = localStorage.getItem(GUEST_CART_STORAGE_KEY);
+      console.log('Loading guest cart from localStorage:', stored);
+
+      if (stored) {
+        const guestItems = JSON.parse(stored);
+        console.log('Parsed guest items:', guestItems);
+
+        if (Array.isArray(guestItems)) {
+          const validatedItems = validateCartItems(guestItems);
+          console.log(`Guest cart validation: ${guestItems.length} items → ${validatedItems.length} valid items`);
+          setItems(validatedItems);
+        } else {
+          console.log('Guest cart data is not an array, clearing items');
+          setItems([]);
+        }
+      } else {
+        console.log('No guest cart data found in localStorage');
+        setItems([]);
+      }
+    } catch (error) {
+      console.error('Error loading guest cart:', error);
+      setItems([]);
+    }
+  }, []);
+
   const initializeCart = useCallback(async () => {
     try {
       setLoading(true);
@@ -86,34 +113,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const loadGuestCart = () => {
-    try {
-      const stored = localStorage.getItem(GUEST_CART_STORAGE_KEY);
-      console.log('Loading guest cart from localStorage:', stored);
-
-      if (stored) {
-        const guestItems = JSON.parse(stored);
-        console.log('Parsed guest items:', guestItems);
-
-        if (Array.isArray(guestItems)) {
-          const validatedItems = validateCartItems(guestItems);
-          console.log(`Guest cart validation: ${guestItems.length} items → ${validatedItems.length} valid items`);
-          setItems(validatedItems);
-        } else {
-          console.log('Guest cart data is not an array, clearing items');
-          setItems([]);
-        }
-      } else {
-        console.log('No guest cart data found in localStorage');
-        setItems([]);
-      }
-    } catch (error) {
-      console.error('Error loading guest cart:', error);
-      setItems([]);
-    }
-  };
+  }, [loadGuestCart]);
 
   const loadServerCart = async () => {
     try {
