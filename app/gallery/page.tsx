@@ -119,17 +119,30 @@ export default function MyPawtraitsGallery() {
 
       // Follow customer API pattern - use email-based authentication
       if (userProfile?.email) {
-        console.log('Gallery: Loading interactions from database for user:', userProfile.email);
+        console.log('🎨 GALLERY: Loading interactions from database for user:', userProfile.email, 'type:', userProfile.user_type);
         const response = await fetch(`/api/user-interactions?email=${encodeURIComponent(userProfile.email)}`);
+
+        console.log('🎨 GALLERY: User-interactions API response status:', response.status);
 
         if (response.ok) {
           databaseInteractions = await response.json();
-          console.log('Gallery: Loaded', databaseInteractions.length, 'interactions from database');
+          console.log('🎨 GALLERY: Loaded', databaseInteractions.length, 'interactions from database');
+
+          // Log details of interactions for debugging
+          databaseInteractions.forEach((interaction, index) => {
+            console.log(`🎨 GALLERY: Interaction ${index + 1}:`, {
+              type: interaction.type,
+              imageId: interaction.imageId,
+              timestamp: interaction.timestamp,
+              hasImageData: !!interaction.imageData
+            });
+          });
         } else {
-          console.error('Gallery: Failed to load database interactions:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('❌ GALLERY: Failed to load database interactions:', response.status, response.statusText, errorText);
         }
       } else {
-        console.error('Gallery: No user email available for database interactions');
+        console.error('❌ GALLERY: No user email available for database interactions');
       }
       
       // Convert interactions to a temporary format for processing
@@ -157,6 +170,8 @@ export default function MyPawtraitsGallery() {
       }
 
       // Process database interactions (only source for logged-in users)
+      console.log('🎨 GALLERY: Processing', databaseInteractions.length, 'database interactions');
+
       const databaseTempImages: TempGalleryImage[] = databaseInteractions.map(item => ({
         id: item.imageData.id,
         filename: item.imageData.filename,
@@ -177,6 +192,9 @@ export default function MyPawtraitsGallery() {
         theme: item.imageData.theme,
         style: item.imageData.style
       }));
+
+      console.log('🎨 GALLERY: Converted to', databaseTempImages.length, 'temp images with types:',
+        databaseTempImages.map(img => img.interaction_type));
 
       // Load purchased images from orders API if user profile is available
       let purchasedTempImages: TempGalleryImage[] = [];

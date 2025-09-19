@@ -15,13 +15,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('Fetching user interactions for email:', customerEmail);
+    console.log('🔍 USER-INTERACTIONS API: Fetching user interactions for email:', customerEmail);
 
     // Validate that the authenticated user matches the email (security check)
     const supabaseService = new SupabaseService();
     const { data: { user } } = await supabaseService.getClient().auth.getUser();
 
+    console.log('🔍 USER-INTERACTIONS API: Authenticated user ID:', user?.id, 'email:', user?.email);
+
     if (!user?.email || user.email !== customerEmail) {
+      console.error('❌ USER-INTERACTIONS API: Unauthorized - user email mismatch. User:', user?.email, 'Requested:', customerEmail);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -38,6 +41,8 @@ export async function GET(request: NextRequest) {
     );
 
     // Fetch user interactions from the database
+    console.log('🔍 USER-INTERACTIONS API: Querying user_interactions table for user_id:', user.id);
+
     const { data: interactions, error: interactionsError } = await serviceRoleClient
       .from('user_interactions')
       .select(`
@@ -53,14 +58,28 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (interactionsError) {
-      console.error('Error fetching user interactions:', interactionsError);
+      console.error('❌ USER-INTERACTIONS API: Error fetching user interactions:', interactionsError);
       return NextResponse.json(
         { error: 'Failed to fetch user interactions' },
         { status: 500 }
       );
     }
 
-    console.log('Found', interactions?.length || 0, 'user interactions');
+    console.log('✅ USER-INTERACTIONS API: Found', interactions?.length || 0, 'user interactions');
+
+    // Debug: Let's also check what interactions exist for any user to see if the problem is data or query
+    const { data: allInteractions, error: allError } = await serviceRoleClient
+      .from('user_interactions')
+      .select('id, user_id, interaction_type, created_at')
+      .in('interaction_type', ['like', 'share'])
+      .limit(5);
+
+    console.log('🔍 USER-INTERACTIONS API: Sample of all like/share interactions in DB:', allInteractions?.map(i => ({
+      id: i.id,
+      user_id: i.user_id,
+      type: i.interaction_type,
+      date: i.created_at
+    })));
 
     // Now fetch the image data for these interactions
     const imageIds = [...new Set(interactions?.map(i => i.image_id) || [])];

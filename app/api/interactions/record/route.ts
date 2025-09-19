@@ -44,11 +44,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For anonymous users, we won't have user auth
-    let user = null;
-    
-    // Try to get user from session if available (but don't rely on it due to RLS issues)
-    // We'll primarily use sessionId for tracking
+    // Try to get authenticated user for proper user_id tracking
+    let userId = null;
+
+    try {
+      // Get user from auth headers if available
+      const authHeader = request.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+        if (!authError && user) {
+          userId = user.id;
+          console.log('🔍 INTERACTIONS-RECORD API: Found authenticated user:', user.id, user.email);
+        } else {
+          console.log('🔍 INTERACTIONS-RECORD API: No valid auth token, proceeding as anonymous');
+        }
+      } else {
+        console.log('🔍 INTERACTIONS-RECORD API: No auth header found, proceeding as anonymous');
+      }
+    } catch (authError) {
+      console.log('🔍 INTERACTIONS-RECORD API: Auth check failed, proceeding as anonymous:', authError);
+    }
     
     // Get request metadata
     const userAgent = request.headers.get('user-agent');
@@ -58,8 +75,16 @@ export async function POST(request: NextRequest) {
     const referrer = request.headers.get('referer');
 
     // Use the database function to record the interaction
+    console.log('🔍 INTERACTIONS-RECORD API: Recording interaction:', {
+      imageId,
+      interactionType,
+      userId,
+      platform,
+      sessionId: sessionId || `anon_${Date.now()}_${Math.random().toString(36).substring(2)}`
+    });
+
     const { data: interactionId, error } = await supabase.rpc('record_user_interaction', {
-      p_user_id: null, // Don't try to get user ID to avoid RLS issues
+      p_user_id: userId, // Use actual user_id for authenticated users
       p_session_id: sessionId || `anon_${Date.now()}_${Math.random().toString(36).substring(2)}`,
       p_image_id: imageId,
       p_interaction_type: interactionType,
