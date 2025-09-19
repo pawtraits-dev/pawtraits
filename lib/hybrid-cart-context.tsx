@@ -51,7 +51,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
   // Check auth status and load appropriate cart
   useEffect(() => {
     initializeCart();
-  }, [initializeCart]);
+  }, []); // Remove initializeCart from deps to avoid temporal dead zone
 
   const loadGuestCart = useCallback(() => {
     try {
