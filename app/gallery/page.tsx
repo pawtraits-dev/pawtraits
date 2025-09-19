@@ -51,6 +51,9 @@ interface GalleryImage {
     id: string;
     name: string;
   };
+  // Order information for purchased items
+  order_type?: string;
+  order_number?: string;
 }
 
 export default function MyPawtraitsGallery() {
@@ -149,6 +152,8 @@ export default function MyPawtraitsGallery() {
         breed?: { id: string; name: string };
         theme?: { id: string; name: string };
         style?: { id: string; name: string };
+        order_type?: string;
+        order_number?: string;
       }
 
       // Process database interactions (only source for logged-in users)
@@ -222,7 +227,7 @@ export default function MyPawtraitsGallery() {
                   public_url: item.image_url,
                   prompt_text: item.image_title || 'Purchased Portrait',
                   description: `Purchased on ${new Date(order.created_at).toLocaleDateString()}`,
-                  tags: ['purchased'],
+                  tags: ['purchased', order.order_type || 'customer'],
                   breed_id: undefined,
                   theme_id: undefined,
                   style_id: undefined,
@@ -234,7 +239,10 @@ export default function MyPawtraitsGallery() {
                   interaction_date: order.created_at,
                   breed: undefined,
                   theme: undefined,
-                  style: undefined
+                  style: undefined,
+                  // Add order type for display differentiation
+                  order_type: order.order_type || 'customer',
+                  order_number: order.order_number
                 }));
               }).filter(Boolean); // Remove any null/undefined items
 
@@ -297,6 +305,8 @@ export default function MyPawtraitsGallery() {
             existing.description = tempImage.description;
             existing.public_url = tempImage.public_url;
             existing.filename = tempImage.filename;
+            existing.order_type = tempImage.order_type;
+            existing.order_number = tempImage.order_number;
           }
         } else {
           // Create new gallery image
@@ -321,7 +331,9 @@ export default function MyPawtraitsGallery() {
             }],
             breed: tempImage.breed,
             theme: tempImage.theme,
-            style: tempImage.style
+            style: tempImage.style,
+            order_type: tempImage.order_type,
+            order_number: tempImage.order_number
           });
         }
       });
@@ -389,6 +401,12 @@ export default function MyPawtraitsGallery() {
     window.location.href = '/shop/checkout';
   };
 
+  // Helper function to extract text between asterisks from description
+  const extractDescriptionHighlight = (description: string): string => {
+    const match = description.match(/\*\*(.*?)\*\*/);
+    return match ? match[1] : description;
+  };
+
   const handleDownload = async (image: GalleryImage) => {
     try {
       console.log(`🔄 Starting download for image ${image.id}`);
@@ -445,8 +463,14 @@ export default function MyPawtraitsGallery() {
           {/* Interaction type badges */}
           <div className="absolute top-2 left-2 flex flex-col gap-1">
             {image.interaction_types.includes('purchased') && (
-              <Badge className="bg-green-100 text-green-800 text-xs">
-                💳 Purchased
+              <Badge className={`text-xs ${
+                image.order_type === 'partner' || image.order_type === 'partner_for_client'
+                  ? 'bg-purple-100 text-purple-800'
+                  : 'bg-green-100 text-green-800'
+              }`}>
+                💳 {image.order_type === 'partner' || image.order_type === 'partner_for_client'
+                  ? 'Partner Purchase'
+                  : 'Purchased'}
               </Badge>
             )}
             {image.interaction_types.includes('liked') && (
@@ -505,48 +529,75 @@ export default function MyPawtraitsGallery() {
         
         <div className="p-4">
           <h3 className="font-semibold text-gray-900 mb-2 line-clamp-1">
-            {extractDescriptionTitle(image.description) || image.prompt_text}
+            {extractDescriptionHighlight(image.description) || image.prompt_text}
           </h3>
-          
-          {/* Interaction dates */}
+
+          {/* Order info for purchased items */}
+          {image.interaction_types.includes('purchased') && image.order_number && (
+            <div className="text-xs text-gray-500 mb-2">
+              Order #{image.order_number}
+            </div>
+          )}
+
+          {/* Interaction dates - only show most recent, avoid duplicate purchase dates */}
           <div className="text-xs text-gray-500 mb-3">
             {image.interaction_dates
               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-              .map((interaction, index) => (
+              .slice(0, 1) // Only show most recent interaction
+              .map((interaction) => (
                 <p key={interaction.type}>
                   {interaction.type === 'purchased' ? 'Purchased' :
                    interaction.type === 'liked' ? 'Liked' :
-                   'Shared'} on {new Date(interaction.date).toLocaleDateString()}
+                   interaction.type === 'shared' ? 'Shared' :
+                   'Added'} on {new Date(interaction.date).toLocaleDateString()}
                 </p>
               ))
             }
           </div>
-          
-          {/* Tags */}
-          {image.tags && image.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-3">
-              {image.tags.slice(0, 3).map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-xs">
-                  {tag}
+
+          {/* Breed and Theme badges as hyperlinks */}
+          <div className="flex flex-wrap gap-1 mb-3">
+            {image.breed && (
+              <a
+                href={`/browse?breed=${image.breed.id}`}
+                className="inline-block"
+              >
+                <Badge variant="secondary" className="text-xs hover:bg-purple-100 hover:text-purple-800 transition-colors cursor-pointer">
+                  🐕 {image.breed.name}
                 </Badge>
-              ))}
-              {image.tags.length > 3 && (
-                <Badge variant="secondary" className="text-xs">
-                  +{image.tags.length - 3}
-                </Badge>
-              )}
-            </div>
-          )}
-          
-          {/* Theme and Style info */}
-          <div className="text-sm text-gray-500 mb-3">
+              </a>
+            )}
             {image.theme && (
-              <span className="mr-2">Theme: {image.theme.name}</span>
+              <a
+                href={`/browse?theme=${image.theme.id}`}
+                className="inline-block"
+              >
+                <Badge variant="secondary" className="text-xs hover:bg-blue-100 hover:text-blue-800 transition-colors cursor-pointer">
+                  🎨 {image.theme.name}
+                </Badge>
+              </a>
             )}
             {image.style && (
-              <span>Style: {image.style.name}</span>
+              <Badge variant="secondary" className="text-xs">
+                ✨ {image.style.name}
+              </Badge>
             )}
           </div>
+
+          {/* Additional tags (excluding breed/theme) */}
+          {image.tags && image.tags.filter(tag => !['purchased', 'customer', 'partner', 'partner_for_client'].includes(tag)).length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-3">
+              {image.tags
+                .filter(tag => !['purchased', 'customer', 'partner', 'partner_for_client'].includes(tag))
+                .slice(0, 2)
+                .map((tag) => (
+                  <Badge key={tag} variant="outline" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))
+              }
+            </div>
+          )}
 
           {/* Action buttons */}
           {image.interaction_types.includes('in_basket') && !image.interaction_types.includes('purchased') && (
