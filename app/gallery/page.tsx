@@ -163,7 +163,7 @@ export default function MyPawtraitsGallery() {
         public_url: item.imageData.public_url,
         prompt_text: item.imageData.prompt_text,
         description: item.imageData.description,
-        tags: item.imageData.tags,
+        tags: item.imageData.tags || [],
         breed_id: item.imageData.breed_id,
         theme_id: item.imageData.theme_id,
         style_id: item.imageData.style_id,
@@ -171,8 +171,8 @@ export default function MyPawtraitsGallery() {
         rating: item.imageData.rating,
         is_featured: item.imageData.is_featured,
         created_at: item.imageData.created_at,
-        interaction_type: item.interaction_type,
-        interaction_date: item.interaction_date,
+        interaction_type: item.type, // API returns 'type' not 'interaction_type'
+        interaction_date: item.timestamp, // API returns 'timestamp' not 'interaction_date'
         breed: item.imageData.breed,
         theme: item.imageData.theme,
         style: item.imageData.style
