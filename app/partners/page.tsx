@@ -503,28 +503,28 @@ export default function PartnerDashboard() {
       value: stats.totalReferrals,
       icon: Target,
       color: 'bg-blue-500',
-      href: '/partners/referrals'
+      href: '/referrals'
     },
     {
       title: 'Active Referrals',
       value: stats.activeReferrals,
       icon: Clock,
       color: 'bg-orange-500',
-      href: '/partners/referrals'
+      href: '/referrals'
     },
     {
       title: 'Total Commissions',
       value: `£${(stats.totalCommissions / 100).toFixed(2)}`,
       icon: DollarSign,
       color: 'bg-green-500',
-      href: '/partners/commissions'
+      href: '/commissions'
     },
     {
       title: 'Pending Commissions',
       value: `£${(stats.pendingCommissions / 100).toFixed(2)}`,
       icon: Clock,
       color: 'bg-orange-500',
-      href: '/partners/commissions'
+      href: '/commissions'
     }
   ];
 
@@ -540,14 +540,14 @@ export default function PartnerDashboard() {
       title: 'Create Referral',
       description: 'Add a new client referral',
       icon: Plus,
-      href: '/partners/referrals/create',
+      href: '/referrals/create',
       color: 'from-blue-500 to-cyan-500'
     },
     {
       title: 'View Commissions',
       description: 'Track your earnings and payments',
       icon: DollarSign,
-      href: '/partners/commissions',
+      href: '/commissions',
       color: 'from-purple-500 to-pink-500'
     },
     {
@@ -765,7 +765,7 @@ export default function PartnerDashboard() {
                 <div className="text-center py-8 text-gray-500">
                   <QrCode className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No referrals yet</p>
-                  <Link href="/partners/referrals/create">
+                  <Link href="/referrals/create">
                     <Button className="mt-4">
                       <Plus className="w-4 h-4 mr-2" />
                       Create First Referral
@@ -777,7 +777,7 @@ export default function PartnerDashboard() {
             
             {stats.recentReferrals.length > 0 && (
               <div className="mt-4 pt-4 border-t">
-                <Link href="/partners/referrals">
+                <Link href="/referrals">
                   <Button variant="outline" className="w-full">
                     View All Referrals
                   </Button>

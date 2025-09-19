@@ -94,8 +94,8 @@ export default function UserAwareNavigation({
       return [
         ...baseItems,
         { name: 'Orders', href: '/orders', icon: Package },
-        { name: 'Commissions', href: '/partners/commissions', icon: DollarSign },
-        { name: 'Referrals', href: '/partners/referrals', icon: Share2 },
+        { name: 'Commissions', href: '/commissions', icon: DollarSign },
+        { name: 'Referrals', href: '/referrals', icon: Share2 },
         { name: 'Account', href: '/account', icon: User }
       ]
     }

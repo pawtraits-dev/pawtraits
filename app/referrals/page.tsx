@@ -155,10 +155,10 @@ function ReferralsPageContent() {
             <Link href="/partners">
               <Button variant="outline">Back to Dashboard</Button>
             </Link>
-            <Link href="/partners/commissions">
+            <Link href="/commissions">
               <Button variant="outline">View Commissions</Button>
             </Link>
-            <Link href="/partners/referrals/create">
+            <Link href="/referrals/create">
               <Button className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
                 <Plus className="w-4 h-4 mr-2" />
                 New Referral
@@ -172,7 +172,7 @@ function ReferralsPageContent() {
           {stats.map((stat, index) => {
             const isCommissionStat = stat.label === "Total Commissions"
             const CardWrapper = isCommissionStat ? Link : 'div'
-            const cardProps = isCommissionStat ? { href: "/partners/commissions" } : {}
+            const cardProps = isCommissionStat ? { href: "/commissions" } : {}
             
             return (
               <CardWrapper key={index} {...cardProps}>

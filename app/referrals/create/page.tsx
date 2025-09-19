@@ -171,7 +171,7 @@ function CreateReferralPageContent() {
         <div className="max-w-2xl mx-auto space-y-6">
           {/* Header */}
           <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <Link href="/partners/referrals" className="flex items-center hover:text-green-600">
+            <Link href="/referrals" className="flex items-center hover:text-green-600">
               <ArrowLeft className="w-4 h-4 mr-1" />
               Back to Referrals
             </Link>
@@ -282,7 +282,7 @@ function CreateReferralPageContent() {
                 >
                   Create Another Referral
                 </Button>
-                <Link href="/partners/referrals" className="flex-1">
+                <Link href="/referrals" className="flex-1">
                   <Button variant="outline" className="w-full border-green-300 text-green-700 hover:bg-green-50">
                     View All Referrals
                   </Button>
@@ -308,7 +308,7 @@ function CreateReferralPageContent() {
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center space-x-2 text-sm text-gray-600">
-          <Link href="/partners/referrals" className="flex items-center hover:text-green-600">
+          <Link href="/referrals" className="flex items-center hover:text-green-600">
             <ArrowLeft className="w-4 h-4 mr-1" />
             Back to Referrals
           </Link>

@@ -159,7 +159,7 @@ function CommissionsPageContent() {
             <Link href="/partners">
               <Button variant="outline">Back to Dashboard</Button>
             </Link>
-            <Link href="/partners/referrals">
+            <Link href="/referrals">
               <Button variant="outline">View Referrals</Button>
             </Link>
           </div>
@@ -275,7 +275,7 @@ function CommissionsPageContent() {
                       return (
                         <TableRow key={order.id}>
                           <TableCell className="font-mono text-sm">
-                            <Link href={`/partners/orders/${order.order_id}`} className="text-blue-600 hover:underline">
+                            <Link href={`/orders/${order.order_id}`} className="text-blue-600 hover:underline">
                               {order.order_id}
                             </Link>
                           </TableCell>
