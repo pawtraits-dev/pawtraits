@@ -38,7 +38,7 @@ import ContentBasedCarousel from '@/components/ContentBasedCarousel';
 import { PageType } from '@/lib/carousel-types';
 import ReactMarkdown from 'react-markdown';
 
-type BrowseTab = 'dogs' | 'cats' | 'themes';
+type BrowseTab = 'all' | 'dogs' | 'cats' | 'themes';
 
 // Simple in-memory cache to prevent rate limiting
 const dataCache = {
@@ -58,8 +58,8 @@ function BrowsePageContent() {
   // Get initial tab from URL params
   const getInitialTab = (): BrowseTab => {
     const typeParam = searchParams.get('type');
-    if (typeParam === 'cats' || typeParam === 'themes') return typeParam;
-    return 'dogs'; // default
+    if (typeParam === 'dogs' || typeParam === 'cats' || typeParam === 'themes') return typeParam as BrowseTab;
+    return 'all'; // default to show all breeds
   };
 
   const [activeTab, setActiveTab] = useState<BrowseTab>(getInitialTab);
@@ -142,7 +142,7 @@ function BrowsePageContent() {
 
   const updateUrl = () => {
     const params = new URLSearchParams();
-    if (activeTab !== 'dogs') params.set('type', activeTab);
+    if (activeTab !== 'all') params.set('type', activeTab);
     if (searchTerm) params.set('search', searchTerm);
     if (selectedBreedId) params.set('breed', selectedBreedId);
     if (selectedThemeId) params.set('theme', selectedThemeId);
@@ -290,7 +290,8 @@ function BrowsePageContent() {
       case 'dogs': return 'dogs';
       case 'cats': return 'cats';
       case 'themes': return 'themes';
-      default: return 'dogs';
+      case 'all':
+      default: return 'dogs'; // Default carousel for 'all' tab
     }
   };
 
@@ -502,7 +503,8 @@ function BrowsePageContent() {
   }
 
   const currentBreeds = activeTab === 'dogs' ? getFilteredBreeds(dogBreeds) :
-                      activeTab === 'cats' ? getFilteredBreeds(catBreeds) : [];
+                      activeTab === 'cats' ? getFilteredBreeds(catBreeds) :
+                      activeTab === 'all' ? getFilteredBreeds([...dogBreeds, ...catBreeds]) : [];
   const currentThemes = getFilteredThemes();
 
   return (
@@ -852,6 +854,18 @@ function BrowsePageContent() {
               <div className="flex justify-center mb-8">
                 <div className="flex bg-white rounded-lg p-1 shadow-lg">
                   <Button
+                    variant={activeTab === 'all' ? 'default' : 'ghost'}
+                    onClick={() => handleTabChange('all')}
+                    className={`px-6 py-3 rounded-md transition-all ${
+                      activeTab === 'all'
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'text-gray-700 hover:text-purple-600'
+                    }`}
+                  >
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    All ({dogBreeds.length + catBreeds.length})
+                  </Button>
+                  <Button
                     variant={activeTab === 'dogs' ? 'default' : 'ghost'}
                     onClick={() => handleTabChange('dogs')}
                     className={`px-6 py-3 rounded-md transition-all ${
@@ -937,8 +951,8 @@ function BrowsePageContent() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
 
-          {/* Breed Cards (Dogs/Cats) */}
-          {(activeTab === 'dogs' || activeTab === 'cats') && (
+          {/* Breed Cards (All/Dogs/Cats) */}
+          {(activeTab === 'all' || activeTab === 'dogs' || activeTab === 'cats') && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {currentBreeds.map((breed) => {
                 const imageCount = getBreedImageCount(breed.id);
@@ -958,11 +972,23 @@ function BrowsePageContent() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          {activeTab === 'dogs' ? (
+                          {breed.animal_type === 'dog' ? (
                             <Dog className="w-16 h-16 text-purple-400" />
                           ) : (
                             <Cat className="w-16 h-16 text-purple-400" />
                           )}
+                        </div>
+                      )}
+
+                      {/* Animal type badge for 'all' tab */}
+                      {activeTab === 'all' && (
+                        <div className="absolute top-2 left-2">
+                          <Badge
+                            variant="secondary"
+                            className="bg-white/90 text-gray-700 text-xs"
+                          >
+                            {breed.animal_type === 'dog' ? '🐕 Dog' : '🐱 Cat'}
+                          </Badge>
                         </div>
                       )}
 
@@ -987,7 +1013,6 @@ function BrowsePageContent() {
                           })()}
                         </p>
                       )}
-
 
                       <Button
                         className="w-full bg-purple-600 hover:bg-purple-700"
@@ -1068,17 +1093,19 @@ function BrowsePageContent() {
           )}
 
           {/* Empty states */}
-          {(activeTab === 'dogs' || activeTab === 'cats') && currentBreeds.length === 0 && (
+          {(activeTab === 'all' || activeTab === 'dogs' || activeTab === 'cats') && currentBreeds.length === 0 && (
             <div className="text-center py-12">
-              {activeTab === 'dogs' ? (
+              {activeTab === 'all' ? (
+                <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              ) : activeTab === 'dogs' ? (
                 <Dog className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               ) : (
                 <Cat className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               )}
               <p className="text-gray-600">
                 {searchTerm
-                  ? `No ${activeTab} breeds match your search "${searchTerm}"`
-                  : `${activeTab === 'dogs' ? 'Dog' : 'Cat'} breeds coming soon...`
+                  ? `No ${activeTab === 'all' ? 'pet' : activeTab} breeds match your search "${searchTerm}"`
+                  : activeTab === 'all' ? 'Pet breeds coming soon...' : `${activeTab === 'dogs' ? 'Dog' : 'Cat'} breeds coming soon...`
                 }
               </p>
               {searchTerm && (
