@@ -138,10 +138,9 @@ export default function ProductSelectionModal({
     
     setCartItems([]);
     onClose();
-    
+
     // Redirect to consolidated cart page
     router.push('/shop/cart');
-    }
   };
 
   const getTotalItems = () => {
