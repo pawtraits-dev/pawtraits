@@ -541,3 +541,80 @@ When installing new dependencies, always use `npm install --legacy-peer-deps` du
 - Client-side cart state management with React Context
 - Cart operations integrated with Stripe payment intents
 - Supports both authenticated and guest user sessions
+
+## 📋 FUTURE REFACTORING TASKS (Non-Priority)
+
+These tasks are documented for future improvement but are not immediate priorities:
+
+### Admin Architecture Alignment
+**Status**: Currently exempted from architectural governance for operational needs
+**Future Goal**: Align admin components with API-only patterns
+
+- **Admin Component Modernization**: Migrate `/app/admin/**/*` components from direct `AdminSupabaseService` usage to API endpoint patterns
+  - Create admin-specific API routes in `/api/admin/`
+  - Implement server-side authentication and authorization for admin APIs
+  - Refactor admin components to use fetch() calls with proper error handling
+  - Maintain admin-specific functionality while following architectural patterns
+
+- **Admin Service Layer**: Restructure admin data access
+  - Move admin business logic to API routes
+  - Implement proper caching and performance optimizations
+  - Add comprehensive logging and audit trails for admin actions
+  - Separate admin authentication from data access patterns
+
+### Code Quality Improvements
+**Status**: Minor warnings only, no functional issues
+
+- **Image Optimization**: Replace `<img>` tags with Next.js `<Image />` components in admin pages
+  - Improves LCP (Largest Contentful Paint) performance
+  - Automatic image optimization and responsive sizing
+  - Affects ~15 admin pages with image displays
+
+- **React Component Cleanup**: Address minor React warnings
+  - Fix unescaped entities in JSX (quotes, apostrophes)
+  - Resolve async client component patterns
+  - Clean up React Hook dependency arrays in admin components
+
+- **TypeScript Strictness**: Enhance type safety in admin components
+  - Add proper typing for admin-specific data structures
+  - Implement discriminated unions for user types
+  - Strengthen API response type checking
+
+### Performance Optimization
+**Status**: Current performance acceptable, optimization for scale
+
+- **Admin Dashboard Loading**: Implement progressive loading patterns
+  - Skeleton screens for data-heavy admin pages
+  - Pagination for large datasets (customers, orders, products)
+  - Virtual scrolling for image catalogs
+
+- **Admin Caching Strategy**: Implement intelligent caching
+  - Cache frequently accessed admin data
+  - Implement cache invalidation patterns
+  - Add background data refresh capabilities
+
+### Testing & Documentation
+**Status**: Basic functionality covered, comprehensive testing needed
+
+- **Admin Integration Tests**: Create comprehensive test suites for admin functionality
+  - User management workflow tests
+  - Product catalog management tests
+  - Order processing and fulfillment tests
+  - Partner approval and commission tests
+
+- **Admin Documentation**: Create admin-specific documentation
+  - Admin user guide for common operations
+  - Technical documentation for admin architecture
+  - API documentation for future admin endpoints
+
+### Migration Strategy
+When these tasks become priority:
+
+1. **Phase 1**: Create admin API endpoints while maintaining current functionality
+2. **Phase 2**: Gradually migrate admin components to use new API patterns
+3. **Phase 3**: Remove direct database access from admin components
+4. **Phase 4**: Clean up architectural exemptions in ESLint configuration
+
+**Estimated Effort**: 2-3 weeks full-time development
+**Impact**: Improved consistency, better performance, enhanced maintainability
+**Risk**: Low - current admin system is stable and functional
