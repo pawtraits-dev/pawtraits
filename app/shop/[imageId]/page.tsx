@@ -7,8 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ShoppingCart, Star, Heart, Share2, Tag, MapPin, QrCode, UserPlus } from 'lucide-react';
-import { SupabaseService } from '@/lib/supabase';
-import { AdminSupabaseService } from '@/lib/admin-supabase';
+// Removed direct database service imports - using API endpoints instead
 import type { ImageCatalogWithDetails } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
@@ -46,8 +45,7 @@ function QRLandingPageContent() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(10); // 10% default
 
-  const supabaseService = new SupabaseService();
-  const adminService = new AdminSupabaseService();
+  // Using API endpoints instead of direct database access
   const supabase = getSupabaseClient();
 
   useEffect(() => {
@@ -77,28 +75,43 @@ function QRLandingPageContent() {
         setTrackingComplete(true);
       }
 
-      // Load image data
-      const imageData = await supabaseService.getImage(imageId);
-      if (!imageData) {
+      // Load image data using API endpoint
+      const imageResponse = await fetch(`/api/images/${imageId}`);
+      if (!imageResponse.ok) {
         router.push('/shop');
         return;
       }
+      const imageData = await imageResponse.json();
       setImage(imageData);
 
-      // Load partner data if partner ID provided
+      // Load partner data if partner ID provided using API endpoint
       if (partnerId) {
-        const partnerData = await supabaseService.getPartner(partnerId);
-        setPartner(partnerData);
+        try {
+          const partnerResponse = await fetch(`/api/public/partners/${partnerId}`);
+          if (partnerResponse.ok) {
+            const partnerData = await partnerResponse.json();
+            setPartner(partnerData);
+          }
+        } catch (error) {
+          console.warn('Could not load partner data:', error);
+        }
       }
 
-      // Load products and pricing
-      const [productsData, pricingData] = await Promise.all([
-        adminService.getProducts({ activeOnly: true }),
-        adminService.getAllProductPricing()
+      // Load products and pricing using public API endpoints
+      const [productsResponse, pricingResponse] = await Promise.all([
+        fetch('/api/public/products'),
+        fetch('/api/public/pricing')
       ]);
-      
-      setProducts(productsData || []);
-      setPricing(pricingData || []);
+
+      if (productsResponse.ok && pricingResponse.ok) {
+        const [productsData, pricingData] = await Promise.all([
+          productsResponse.json(),
+          pricingResponse.json()
+        ]);
+
+        setProducts(productsData || []);
+        setPricing(pricingData || []);
+      }
 
     } catch (error) {
       console.error('Error loading data:', error);

@@ -99,9 +99,7 @@
         "**/app/signup/user/page.tsx",
         "**/app/signup/user-qr/page.tsx",
         "**/app/referrals/create/page.tsx",
-        "**/app/home/page.tsx",
-        "**/app/share/image/**/page.tsx",
-        "**/app/shop/*/page.tsx"
+        "**/app/home/page.tsx"
       ],
       "rules": {
         "no-restricted-imports": "off",

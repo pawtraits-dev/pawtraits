@@ -7,8 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Heart, Share2, ShoppingCart, Star } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { SupabaseService } from '@/lib/supabase';
-import { AdminSupabaseService } from '@/lib/admin-supabase';
+// Removed direct database service imports - using API endpoints instead
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
@@ -58,9 +57,6 @@ function SharedImagePageClient({ id }: { id: string }) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [liked, setLiked] = useState(false);
 
-  const supabaseService = new SupabaseService();
-  const adminSupabaseService = new AdminSupabaseService();
-
   useEffect(() => {
     loadImageData(id);
   }, [id]);
@@ -68,25 +64,37 @@ function SharedImagePageClient({ id }: { id: string }) {
   const loadImageData = async (id: string) => {
     try {
       setLoading(true);
-      
-      // Load image data
-      const imageData = await supabaseService.getImage(id);
-      
+
+      // Load image data using API endpoint
+      const imageResponse = await fetch(`/api/images/${id}`);
+      if (!imageResponse.ok) {
+        throw new Error('Failed to fetch image data');
+      }
+
+      const imageData = await imageResponse.json();
+
       if (imageData) {
         setImage({
           ...imageData,
           description: imageData.description || ''
         });
-        
-        // Load product data for this image's format
+
+        // Load product data for this image's format using public API endpoints
         if (imageData.format_id) {
-          const [productsData, pricingData] = await Promise.all([
-            adminSupabaseService.getProducts(),
-            adminSupabaseService.getAllProductPricing()
+          const [productsResponse, pricingResponse] = await Promise.all([
+            fetch('/api/public/products'),
+            fetch('/api/public/pricing')
           ]);
-          
-          setProducts(productsData?.filter(p => p.is_active && p.format_id === imageData.format_id) || []);
-          setPricing(pricingData || []);
+
+          if (productsResponse.ok && pricingResponse.ok) {
+            const [productsData, pricingData] = await Promise.all([
+              productsResponse.json(),
+              pricingResponse.json()
+            ]);
+
+            setProducts(productsData?.filter((p: Product) => p.is_active && p.format_id === imageData.format_id) || []);
+            setPricing(pricingData || []);
+          }
         }
       }
     } catch (error) {
