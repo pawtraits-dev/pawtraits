@@ -92,16 +92,16 @@
     },
     {
       "files": [
-        "app/customer/pets/PetsClient.tsx",
-        "app/pets/PetsClient.tsx",
-        "app/customer/pets/add/page.tsx",
-        "app/pets/add/page.tsx",
-        "app/signup/user/page.tsx",
-        "app/signup/user-qr/page.tsx",
-        "app/referrals/create/page.tsx",
-        "app/home/page.tsx",
-        "app/share/image/[id]/page.tsx",
-        "app/shop/[imageId]/page.tsx"
+        "**/app/customer/pets/PetsClient.tsx",
+        "**/app/pets/PetsClient.tsx",
+        "**/app/customer/pets/add/page.tsx",
+        "**/app/pets/add/page.tsx",
+        "**/app/signup/user/page.tsx",
+        "**/app/signup/user-qr/page.tsx",
+        "**/app/referrals/create/page.tsx",
+        "**/app/home/page.tsx",
+        "**/app/share/image/**/page.tsx",
+        "**/app/shop/*/page.tsx"
       ],
       "rules": {
         "no-restricted-imports": "off",
