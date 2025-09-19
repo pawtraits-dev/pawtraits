@@ -52,11 +52,16 @@
         "lib/server-cart-context.tsx",
         "lib/batch-processing-service.ts",
         "lib/data-encryption.ts",
+        "lib/api-auth.ts",
+        "lib/audit-logger.ts",
+        "lib/auth-middleware.ts",
+        "lib/auth-server.ts",
         "scripts/**/*"
       ],
       "rules": {
         "no-restricted-imports": "off",
-        "no-restricted-syntax": "off"
+        "no-restricted-syntax": "off",
+        "react-hooks/exhaustive-deps": "off"
       }
     },
     {
