@@ -51,9 +51,9 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
   // Check auth status and load appropriate cart
   useEffect(() => {
     initializeCart();
-  }, []);
+  }, [initializeCart]);
 
-  const initializeCart = async () => {
+  const initializeCart = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -86,7 +86,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const loadGuestCart = () => {
     try {

@@ -43,6 +43,20 @@
 
   "overrides": [
     {
+      "files": [
+        "lib/supabase.ts",
+        "lib/admin-supabase.ts",
+        "lib/prompt-generator.js",
+        "lib/rate-limiter.ts",
+        "lib/server-cart-context.tsx",
+        "scripts/**/*"
+      ],
+      "rules": {
+        "no-restricted-imports": "off",
+        "no-restricted-syntax": "off"
+      }
+    },
+    {
       "files": ["app/api/**/route.ts", "app/api/**/route.js"],
       "rules": {
         "no-restricted-imports": [

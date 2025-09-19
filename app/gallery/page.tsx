@@ -639,11 +639,26 @@ export default function MyPawtraitsGallery() {
             </div>
           )}
 
-          {/* Additional tags (excluding breed/theme) */}
-          {image.tags && image.tags.filter(tag => !['purchased', 'customer', 'partner', 'partner_for_client'].includes(tag)).length > 0 && (
+          {/* Additional tags (only relevant descriptive tags) */}
+          {image.tags && image.tags.filter(tag => {
+            // Exclude technical/system tags and keep only relevant descriptive tags
+            const excludedTags = [
+              'purchased', 'customer', 'partner', 'partner_for_client',
+              'ai-generated', 'generated', 'artificial', 'digital',
+              'portrait', 'pet', 'animal', 'image', 'photo', 'picture'
+            ];
+            return !excludedTags.some(excluded => tag.toLowerCase().includes(excluded.toLowerCase()));
+          }).length > 0 && (
             <div className="flex flex-wrap gap-1 mb-3">
               {image.tags
-                .filter(tag => !['purchased', 'customer', 'partner', 'partner_for_client'].includes(tag))
+                .filter(tag => {
+                  const excludedTags = [
+                    'purchased', 'customer', 'partner', 'partner_for_client',
+                    'ai-generated', 'generated', 'artificial', 'digital',
+                    'portrait', 'pet', 'animal', 'image', 'photo', 'picture'
+                  ];
+                  return !excludedTags.some(excluded => tag.toLowerCase().includes(excluded.toLowerCase()));
+                })
                 .slice(0, 2)
                 .map((tag) => (
                   <Badge key={tag} variant="outline" className="text-xs">
