@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { RefreshCw, Clock, CheckCircle, XCircle, AlertCircle, StopCircle } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { RefreshCw, Clock, CheckCircle, XCircle, AlertCircle, StopCircle, ChevronDown, ChevronRight, FileText, Settings, Zap } from 'lucide-react';
 
 interface BatchJob {
   id: string;
@@ -18,6 +19,29 @@ interface BatchJob {
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
+  config?: any;
+  target_age?: string;
+  original_image_id?: string;
+}
+
+interface LogEntry {
+  timestamp: string;
+  level: 'info' | 'success' | 'error' | 'warning';
+  type: string;
+  message: string;
+  details?: any;
+}
+
+interface BatchJobLogs {
+  job: BatchJob;
+  items: any[];
+  logs: LogEntry[];
+  summary: {
+    totalLogs: number;
+    logTypes: string[];
+    levels: string[];
+    lastUpdate: string;
+  };
 }
 
 interface BatchJobProgress {
@@ -33,6 +57,9 @@ export default function BatchJobsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
+  const [jobLogs, setJobLogs] = useState<Record<string, BatchJobLogs>>({});
+  const [loadingLogs, setLoadingLogs] = useState<Set<string>>(new Set());
 
   const fetchJobs = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -50,6 +77,42 @@ export default function BatchJobsPage() {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const fetchJobLogs = async (jobId: string) => {
+    if (loadingLogs.has(jobId)) return;
+
+    setLoadingLogs(prev => new Set([...prev, jobId]));
+
+    try {
+      const response = await fetch(`/api/admin/batch-jobs/${jobId}/logs`);
+      if (response.ok) {
+        const logsData = await response.json();
+        setJobLogs(prev => ({ ...prev, [jobId]: logsData }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch job logs:', error);
+    } finally {
+      setLoadingLogs(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(jobId);
+        return newSet;
+      });
+    }
+  };
+
+  const toggleJobExpansion = (jobId: string) => {
+    const newExpanded = new Set(expandedJobs);
+    if (newExpanded.has(jobId)) {
+      newExpanded.delete(jobId);
+    } else {
+      newExpanded.add(jobId);
+      // Fetch logs when expanding
+      if (!jobLogs[jobId]) {
+        fetchJobLogs(jobId);
+      }
+    }
+    setExpandedJobs(newExpanded);
   };
 
   const cancelJob = async (jobId: string) => {
@@ -89,11 +152,18 @@ export default function BatchJobsPage() {
     const interval = setInterval(() => {
       if (jobs.some(job => job.status === 'running' || job.status === 'pending')) {
         fetchJobs(true);
+        // Also refresh logs for expanded running jobs
+        expandedJobs.forEach(jobId => {
+          const job = jobs.find(j => j.id === jobId);
+          if (job && (job.status === 'running' || job.status === 'pending')) {
+            fetchJobLogs(jobId);
+          }
+        });
       }
-    }, 10000);
+    }, 5000); // Reduced to 5 seconds for more responsive logging
 
     return () => clearInterval(interval);
-  }, [jobs]);
+  }, [jobs, expandedJobs]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -139,11 +209,53 @@ export default function BatchJobsPage() {
     const diffMs = end.getTime() - start.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffSecs = Math.floor((diffMs % 60000) / 1000);
-    
+
     if (diffMins > 0) {
       return `${diffMins}m ${diffSecs}s`;
     }
     return `${diffSecs}s`;
+  };
+
+  const getJobSpecifications = (job: BatchJob) => {
+    const config = job.config;
+    if (!config) return null;
+
+    const specs = [];
+    if (config.variationConfig?.breedCoats?.length) {
+      specs.push(`${config.variationConfig.breedCoats.length} breed-coat combinations`);
+    }
+    if (config.variationConfig?.outfits?.length) {
+      specs.push(`${config.variationConfig.outfits.length} outfit variations`);
+    }
+    if (config.variationConfig?.formats?.length) {
+      specs.push(`${config.variationConfig.formats.length} format variations`);
+    }
+
+    return {
+      variations: specs,
+      originalTheme: config.currentTheme || 'N/A',
+      originalStyle: config.currentStyle || 'N/A',
+      targetAge: job.target_age || 'N/A',
+      originalBreed: config.currentBreed || 'N/A'
+    };
+  };
+
+  const getLevelIcon = (level: string) => {
+    switch (level) {
+      case 'success': return '✅';
+      case 'error': return '❌';
+      case 'warning': return '⚠️';
+      default: return 'ℹ️';
+    }
+  };
+
+  const getLevelColor = (level: string) => {
+    switch (level) {
+      case 'success': return 'text-green-600';
+      case 'error': return 'text-red-600';
+      case 'warning': return 'text-yellow-600';
+      default: return 'text-blue-600';
+    }
   };
 
   if (loading) {
@@ -189,12 +301,15 @@ export default function BatchJobsPage() {
             {jobs.map((job) => {
               const progress = job.total_items > 0 ? Math.round((job.completed_items / job.total_items) * 100) : 0;
               const successRate = job.completed_items > 0 ? Math.round((job.successful_items / job.completed_items) * 100) : 0;
+              const specs = getJobSpecifications(job);
+              const isExpanded = expandedJobs.has(job.id);
+              const logs = jobLogs[job.id];
 
               return (
                 <Card key={job.id}>
                   <CardHeader>
                     <div className="flex justify-between items-start">
-                      <div>
+                      <div className="flex-1">
                         <CardTitle className="flex items-center gap-2">
                           {getStatusIcon(job.status)}
                           Job {job.id.slice(0, 8)}...
@@ -202,7 +317,26 @@ export default function BatchJobsPage() {
                         <p className="text-sm text-gray-600 mt-1">
                           {job.job_type} • Created {formatDate(job.created_at)}
                         </p>
+
+                        {/* Job Specifications */}
+                        {specs && (
+                          <div className="mt-3 space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <Settings className="w-4 h-4 text-gray-400" />
+                              <span className="font-medium">Specifications:</span>
+                            </div>
+                            <div className="text-sm text-gray-600 ml-6">
+                              <p>• Target age: {specs.targetAge}</p>
+                              <p>• Original breed: {specs.originalBreed}</p>
+                              <p>• Theme/Style: {specs.originalTheme} / {specs.originalStyle}</p>
+                              {specs.variations.map((variation, idx) => (
+                                <p key={idx}>• {variation}</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
+
                       <div className="flex items-center gap-2">
                         {(job.status === 'pending' || job.status === 'running') && (
                           <Button
@@ -231,6 +365,7 @@ export default function BatchJobsPage() {
                       </div>
                     </div>
                   </CardHeader>
+
                   <CardContent>
                     <div className="space-y-4">
                       {/* Progress Bar */}
@@ -271,6 +406,87 @@ export default function BatchJobsPage() {
                           )}
                         </div>
                       )}
+
+                      {/* Expandable Logs Section */}
+                      <Collapsible open={isExpanded} onOpenChange={() => toggleJobExpansion(job.id)}>
+                        <CollapsibleTrigger asChild>
+                          <Button variant="outline" size="sm" className="w-full">
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4 mr-2" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 mr-2" />
+                            )}
+                            <FileText className="w-4 h-4 mr-2" />
+                            {isExpanded ? 'Hide Logs' : 'Show Live Logs'}
+                            {logs && (
+                              <Badge variant="secondary" className="ml-2">
+                                {logs.logs.length} entries
+                              </Badge>
+                            )}
+                          </Button>
+                        </CollapsibleTrigger>
+
+                        <CollapsibleContent className="mt-4">
+                          <div className="border rounded-lg bg-slate-50 p-4 max-h-96 overflow-y-auto">
+                            {loadingLogs.has(job.id) ? (
+                              <div className="flex items-center justify-center py-8">
+                                <RefreshCw className="w-6 h-6 animate-spin text-gray-400 mr-2" />
+                                <span className="text-gray-500">Loading logs...</span>
+                              </div>
+                            ) : logs ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2 mb-4 text-sm">
+                                  <Zap className="w-4 h-4 text-blue-500" />
+                                  <span className="font-medium">Live Processing Logs</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {logs.summary.totalLogs} entries
+                                  </Badge>
+                                  <Badge variant="outline" className="text-xs">
+                                    Updated: {new Date(logs.summary.lastUpdate).toLocaleTimeString()}
+                                  </Badge>
+                                </div>
+
+                                {logs.logs.length === 0 ? (
+                                  <p className="text-gray-500 text-center py-4">No logs available yet</p>
+                                ) : (
+                                  <div className="font-mono text-xs space-y-1">
+                                    {logs.logs.map((logEntry, idx) => (
+                                      <div key={idx} className={`p-2 rounded border-l-2 ${
+                                        logEntry.level === 'success' ? 'border-l-green-400 bg-green-50' :
+                                        logEntry.level === 'error' ? 'border-l-red-400 bg-red-50' :
+                                        logEntry.level === 'warning' ? 'border-l-yellow-400 bg-yellow-50' :
+                                        'border-l-blue-400 bg-blue-50'
+                                      }`}>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-gray-500">
+                                            {new Date(logEntry.timestamp).toLocaleTimeString()}
+                                          </span>
+                                          <span className={getLevelColor(logEntry.level)}>
+                                            {getLevelIcon(logEntry.level)}
+                                          </span>
+                                          <span className="font-medium">{logEntry.type}</span>
+                                        </div>
+                                        <p className="mt-1 text-gray-700">{logEntry.message}</p>
+                                        {logEntry.details && (
+                                          <div className="mt-1 text-xs text-gray-600">
+                                            {Object.entries(logEntry.details).map(([key, value]) => (
+                                              <span key={key} className="mr-3">
+                                                <strong>{key}:</strong> {typeof value === 'object' ? JSON.stringify(value) : value}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-gray-500 text-center py-4">Click to load logs</p>
+                            )}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
                   </CardContent>
                 </Card>
