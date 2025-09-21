@@ -9,6 +9,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    console.log('🔍 Fetching logs for job ID:', params.id);
+
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
@@ -26,22 +28,80 @@ export async function GET(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    // Get all job items with detailed logging
+    // Get all job items (simplified query to avoid JOIN issues)
     const { data: items, error: itemsError } = await supabase
       .from('batch_job_items')
-      .select(`
-        *,
-        breeds:breed_id(id, name, slug),
-        coats:coat_id(id, name, slug, hex_color),
-        outfits:outfit_id(id, name, slug),
-        formats:format_id(id, name, slug)
-      `)
+      .select('*')
       .eq('job_id', jobId)
       .order('item_index');
 
     if (itemsError) {
       console.error('Error fetching job items:', itemsError);
-      return NextResponse.json({ error: 'Failed to fetch job items' }, { status: 500 });
+      return NextResponse.json({ error: `Failed to fetch job items: ${itemsError.message}` }, { status: 500 });
+    }
+
+    // Get additional metadata for items (with error handling)
+    const enrichedItems = [];
+    for (const item of (items || [])) {
+      const enrichedItem = { ...item };
+
+      // Try to get breed name
+      if (item.breed_id) {
+        try {
+          const { data: breed } = await supabase
+            .from('breeds')
+            .select('id, name, slug')
+            .eq('id', item.breed_id)
+            .single();
+          enrichedItem.breed = breed;
+        } catch (error) {
+          console.warn(`Could not fetch breed ${item.breed_id}:`, error);
+        }
+      }
+
+      // Try to get coat name
+      if (item.coat_id) {
+        try {
+          const { data: coat } = await supabase
+            .from('coats')
+            .select('id, name, slug, hex_color')
+            .eq('id', item.coat_id)
+            .single();
+          enrichedItem.coat = coat;
+        } catch (error) {
+          console.warn(`Could not fetch coat ${item.coat_id}:`, error);
+        }
+      }
+
+      // Try to get outfit name
+      if (item.outfit_id) {
+        try {
+          const { data: outfit } = await supabase
+            .from('outfits')
+            .select('id, name, slug')
+            .eq('id', item.outfit_id)
+            .single();
+          enrichedItem.outfit = outfit;
+        } catch (error) {
+          console.warn(`Could not fetch outfit ${item.outfit_id}:`, error);
+        }
+      }
+
+      // Try to get format name
+      if (item.format_id) {
+        try {
+          const { data: format } = await supabase
+            .from('formats')
+            .select('id, name, slug')
+            .eq('id', item.format_id)
+            .single();
+          enrichedItem.format = format;
+        } catch (error) {
+          console.warn(`Could not fetch format ${item.format_id}:`, error);
+        }
+      }
+
+      enrichedItems.push(enrichedItem);
     }
 
     // Process items into log entries
@@ -77,7 +137,7 @@ export async function GET(
     }
 
     // Add item logs
-    items?.forEach((item, index) => {
+    enrichedItems.forEach((item, index) => {
       const itemName = getItemDisplayName(item);
 
       // Item started
@@ -91,10 +151,10 @@ export async function GET(
             itemIndex: item.item_index,
             itemId: item.id,
             itemType: getItemType(item),
-            breed: item.breeds?.name,
-            coat: item.coats?.name,
-            outfit: item.outfits?.name,
-            format: item.formats?.name
+            breed: item.breed?.name,
+            coat: item.coat?.name,
+            outfit: item.outfit?.name,
+            format: item.format?.name
           }
         });
       }
@@ -167,7 +227,7 @@ export async function GET(
           successfulItems: job.successful_items,
           failedItems: job.failed_items,
           successRate: `${finalSuccessRate}%`,
-          averageItemDuration: items?.length > 0 ? `${Math.round(duration / items.length / 1000)}s` : 'N/A'
+          averageItemDuration: enrichedItems.length > 0 ? `${Math.round(duration / enrichedItems.length / 1000)}s` : 'N/A'
         }
       });
     }
@@ -177,7 +237,7 @@ export async function GET(
 
     return NextResponse.json({
       job,
-      items: items || [],
+      items: enrichedItems,
       logs: logEntries,
       summary: {
         totalLogs: logEntries.length,
@@ -188,20 +248,25 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Error fetching batch job logs:', error);
-    return NextResponse.json({ error: 'Failed to fetch logs' }, { status: 500 });
+    console.error('Error fetching batch job logs for job', jobId, ':', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({
+      error: 'Failed to fetch logs',
+      details: errorMessage,
+      jobId
+    }, { status: 500 });
   }
 }
 
 function getItemDisplayName(item: any): string {
-  if (item.breeds && item.coats) {
-    return `${item.breeds.name} with ${item.coats.name} coat`;
+  if (item.breed && item.coat) {
+    return `${item.breed.name} with ${item.coat.name} coat`;
   }
-  if (item.outfits) {
-    return `${item.outfits.name} outfit`;
+  if (item.outfit) {
+    return `${item.outfit.name} outfit`;
   }
-  if (item.formats) {
-    return `${item.formats.name} format`;
+  if (item.format) {
+    return `${item.format.name} format`;
   }
   return `Item ${item.item_index + 1}`;
 }
