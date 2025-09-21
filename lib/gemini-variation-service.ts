@@ -208,10 +208,14 @@ export class GeminiVariationService {
                   outfit,
                   breed: originalBreed, // Inherit original breed for outfit variations
                   coat: originalCoat, // Inherit original coat for outfit variations
+                  theme: currentTheme,
+                  style: currentStyle,
                   format: originalFormat, // Inherit original format for outfit variations
                   variation_type: 'outfit',
                   breed_id: originalBreed?.id || null,
                   coat_id: originalCoat?.id || null,
+                  theme_id: currentTheme?.id || null,
+                  style_id: currentStyle?.id || null,
                   outfit_id: outfit.id,
                   format_id: originalFormat?.id || null,
                   gemini_prompt: variationPrompt // Store Gemini prompt for reference
@@ -274,9 +278,13 @@ export class GeminiVariationService {
                   format,
                   breed: originalBreed, // Inherit original breed for format variations
                   coat: originalCoat, // Inherit original coat for format variations
+                  theme: currentTheme,
+                  style: currentStyle,
                   variation_type: 'format',
                   breed_id: originalBreed?.id || null,
                   coat_id: originalCoat?.id || null,
+                  theme_id: currentTheme?.id || null,
+                  style_id: currentStyle?.id || null,
                   format_id: format.id, // Use the new target format for format variations
                   gemini_prompt: variationPrompt // Store Gemini prompt for reference
                 }
@@ -459,10 +467,14 @@ export class GeminiVariationService {
               metadata: {
                 breed: targetBreed,
                 coat: validCoat,
+                theme: currentTheme,
+                style: currentStyle,
                 format: originalFormat, // Inherit original format for breed variations
                 variation_type: 'breed',
                 breed_id: targetBreed.id,
                 coat_id: validCoat.id,
+                theme_id: currentTheme?.id || null,
+                style_id: currentStyle?.id || null,
                 format_id: originalFormat?.id || null,
                 gemini_prompt: variationPrompt
               }

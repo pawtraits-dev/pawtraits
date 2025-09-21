@@ -2,13 +2,14 @@ import { createClient } from '@supabase/supabase-js';
 import { GeminiVariationService } from './gemini-variation-service';
 import { uploadImageBufferToCloudinary } from './cloudinary-server';
 import { ImageDescriptionGenerator } from './image-description-generator';
+import { AdaptiveBatchSpeedController } from './adaptive-batch-speed-controller';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-// Batch processing configuration
+// Legacy batch processing configuration (now managed by adaptive controller)
 const BATCH_CONFIG = {
-  DELAY_BETWEEN_ITEMS_MS: 1500, // Reduced from 3000ms to 1.5s
+  LEGACY_DELAY_BETWEEN_ITEMS_MS: 1500, // Fallback if adaptive controller fails
   RETRY_ATTEMPTS: 1,
   TIMEOUT_PER_ITEM_MS: 300000, // 5 minutes per item max
 };
@@ -17,6 +18,7 @@ export class BatchProcessingService {
   private supabase;
   private geminiService;
   private descriptionGenerator;
+  private speedController: AdaptiveBatchSpeedController;
 
   constructor() {
     this.supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -24,6 +26,13 @@ export class BatchProcessingService {
     });
     this.geminiService = new GeminiVariationService();
     this.descriptionGenerator = new ImageDescriptionGenerator();
+    this.speedController = new AdaptiveBatchSpeedController({
+      minDelayMs: 500,     // Minimum 0.5s between requests
+      maxDelayMs: 8000,    // Maximum 8s between requests
+      baseDelayMs: 1500,   // Start with 1.5s
+      successThreshold: 0.85, // Speed up when 85%+ success
+      errorThreshold: 0.15,   // Slow down when 15%+ errors
+    });
   }
 
   async processBatchJob(jobId: string): Promise<void> {
@@ -99,9 +108,11 @@ export class BatchProcessingService {
         return;
       }
 
-      console.log(`📊 Processing ${items.length} items sequentially`);
-      console.log(`⚙️  BATCH PARAMETERS: ${BATCH_CONFIG.DELAY_BETWEEN_ITEMS_MS}ms delay between items, ~60-120s per Gemini call`);
-      console.log(`⏱️  ESTIMATED TOTAL TIME: ${Math.round(items.length * 90 / 60)} minutes (${Math.round(items.length * 90)} seconds)`);
+      console.log(`📊 Processing ${items.length} items with adaptive speed control`);
+      this.speedController.reset(); // Reset for new job
+      const initialRecommendation = this.speedController.getSpeedRecommendation();
+      console.log(`⚙️  ADAPTIVE SPEED: Starting with ${initialRecommendation.delayMs}ms delay, parallelism: ${initialRecommendation.parallelism}`);
+      console.log(`⏱️  ESTIMATED TOTAL TIME: ${Math.round(items.length * 75 / 60)} minutes (adaptive - may improve during processing)`);
 
       // Process items one by one with progressive saving
       for (let i = 0; i < items.length; i++) {
@@ -122,6 +133,9 @@ export class BatchProcessingService {
         console.log(`\n🔄 ITEM ${i + 1}/${items.length}: Processing item ${item.id} at ${new Date().toISOString()}`);
         console.log(`📋 Item details: breed_id=${item.breed_id}, coat_id=${item.coat_id}, status=${item.status}`);
 
+        let success = false;
+        let errorType: string | undefined;
+
         try {
           await this.processItem(
             item,
@@ -135,30 +149,53 @@ export class BatchProcessingService {
             job.target_age
           );
 
+          success = true;
+          const itemTotalTime = Date.now() - itemOverallStartTime;
+
+          // Record success with speed controller
+          this.speedController.recordResult(true, itemTotalTime);
+
+          console.log(`✅ ITEM ${i + 1} COMPLETE: ${itemTotalTime}ms (${Math.round(itemTotalTime/1000)}s)`);
+
           // Update job progress after each successful item
           await this.updateJobProgress(jobId);
-          
-          const itemTotalTime = Date.now() - itemOverallStartTime;
-          console.log(`✅ ITEM ${i + 1} COMPLETE: ${itemTotalTime}ms (${Math.round(itemTotalTime/1000)}s)`);
-          
-          // Add delay between items to prevent rate limiting
-          if (i < items.length - 1) {
-            console.log(`⏳ Waiting ${BATCH_CONFIG.DELAY_BETWEEN_ITEMS_MS}ms before next item...`);
-            await new Promise(resolve => setTimeout(resolve, BATCH_CONFIG.DELAY_BETWEEN_ITEMS_MS));
-          }
 
         } catch (error) {
-          console.error(`Failed to process item ${item.id}:`, error);
+          success = false;
+          const itemTotalTime = Date.now() - itemOverallStartTime;
+          errorType = error instanceof Error ? error.message : 'unknown error';
+
+          // Record failure with speed controller
+          this.speedController.recordResult(false, itemTotalTime, errorType);
+
+          console.error(`❌ ITEM ${i + 1} FAILED: ${itemTotalTime}ms - ${errorType}`);
           // Continue with next item even if this one fails
           await this.updateJobProgress(jobId);
+        }
+
+        // Apply adaptive delay between items
+        if (i < items.length - 1) {
+          const speedRecommendation = this.speedController.getSpeedRecommendation();
+          console.log(`⚡ ADAPTIVE DELAY: ${speedRecommendation.delayMs}ms (${speedRecommendation.reasoning})`);
+          await new Promise(resolve => setTimeout(resolve, speedRecommendation.delayMs));
         }
       }
 
       // Mark job as completed
       await this.updateJobStatus(jobId, 'completed', { completed_at: new Date().toISOString() });
       const totalTime = Date.now() - overallStartTime;
+
+      // Log final performance metrics
+      const finalStatus = this.speedController.getStatus();
       console.log(`🏁 BATCH JOB COMPLETE: ${jobId}`);
       console.log(`⏱️  TOTAL PROCESSING TIME: ${totalTime}ms (${Math.round(totalTime/1000/60)}m ${Math.round((totalTime/1000) % 60)}s)`);
+      console.log(`📊 FINAL PERFORMANCE METRICS:`);
+      console.log(`   Success Rate: ${(finalStatus.metrics.successRate * 100).toFixed(1)}%`);
+      console.log(`   Average Response Time: ${Math.round(finalStatus.metrics.averageResponseTime/1000)}s`);
+      console.log(`   Error Rate: ${(finalStatus.metrics.errorRate * 100).toFixed(1)}%`);
+      console.log(`   Rate Limit Hits: ${finalStatus.metrics.rateLimitHits}`);
+      console.log(`   Final Delay: ${finalStatus.currentDelayMs}ms`);
+      console.log(`   Speed Controller Confidence: ${(finalStatus.recommendation.confidence * 100).toFixed(0)}%`);
 
     } catch (error) {
       console.error(`Batch job ${jobId} failed:`, error);

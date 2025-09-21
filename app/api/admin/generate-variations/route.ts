@@ -209,8 +209,8 @@ export async function POST(request: NextRequest) {
         
         // Add delay between items to prevent API rate limiting
         if (itemIndex < variationConfig.breedCoats.length - 1) {
-          console.log('⏳ Waiting 3 seconds before next item...');
-          await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay between items
+          console.log('⏳ Waiting 2 seconds before next item...');
+          await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay between items
         }
       }
       
