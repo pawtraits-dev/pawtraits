@@ -12,6 +12,7 @@ import { productDescriptionService } from '@/lib/product-utils';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
 import type { UserProfile } from '@/lib/user-types';
+import { extractDescriptionTitle } from '@/lib/utils';
 
 // 🏗️ CUSTOMER ORDERS VIEW COMPONENT
 // Following architectural patterns from docs/patterns/
@@ -309,7 +310,7 @@ export default function CustomerOrdersView({ userProfile }: CustomerOrdersViewPr
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-medium text-gray-900">{item.image_title}</h3>
+                          <h3 className="text-sm font-medium text-gray-900">{extractDescriptionTitle(item.image_title) || item.image_title}</h3>
                           <p className="text-sm font-medium text-purple-700">{getProductDescription(item.product_id)}</p>
                           <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                         </div>
