@@ -410,7 +410,26 @@ function BrowsePageContent() {
       );
     }
 
-    // Note: Search filtering is handled at the breed/theme level, not individual images
+    // Filter by color/coat search when in breed view
+    if (selectedBreedId && searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filteredImages = filteredImages.filter(img => {
+        // Search in description (which often contains color information)
+        const descriptionMatch = img.description?.toLowerCase().includes(searchLower);
+
+        // Search in coat color/name if available
+        const coatMatch = img.coat?.coat_name?.toLowerCase().includes(searchLower) ||
+                         img.coat?.color?.toLowerCase().includes(searchLower);
+
+        // Search in image tags if available
+        const tagsMatch = img.tags?.some(tag => tag.toLowerCase().includes(searchLower));
+
+        // Search in breed name as well
+        const breedMatch = img.breed_name?.toLowerCase().includes(searchLower);
+
+        return descriptionMatch || coatMatch || tagsMatch || breedMatch;
+      });
+    }
 
     return filteredImages;
   };
@@ -604,54 +623,60 @@ function BrowsePageContent() {
                 Available Portraits ({getFilteredImages().length})
               </h2>
 
-              {/* Theme-specific filtering controls */}
-              {selectedThemeId && (
+              {/* Breed and Theme-specific filtering controls */}
+              {(selectedBreedId || selectedThemeId) && (
                 <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
                   <div className="flex flex-col sm:flex-row gap-4">
-                    {/* Animal Type Filter */}
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Animal Type
-                      </label>
-                      <div className="flex gap-2">
-                        <Button
-                          variant={themeAnimalFilter === 'all' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setThemeAnimalFilter('all')}
-                        >
-                          All
-                        </Button>
-                        <Button
-                          variant={themeAnimalFilter === 'dogs' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setThemeAnimalFilter('dogs')}
-                        >
-                          <Dog className="w-4 h-4 mr-1" />
-                          Dogs
-                        </Button>
-                        <Button
-                          variant={themeAnimalFilter === 'cats' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setThemeAnimalFilter('cats')}
-                        >
-                          <Cat className="w-4 h-4 mr-1" />
-                          Cats
-                        </Button>
+                    {/* Theme-specific Animal Type Filter */}
+                    {selectedThemeId && (
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Animal Type
+                        </label>
+                        <div className="flex gap-2">
+                          <Button
+                            variant={themeAnimalFilter === 'all' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setThemeAnimalFilter('all')}
+                          >
+                            All
+                          </Button>
+                          <Button
+                            variant={themeAnimalFilter === 'dogs' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setThemeAnimalFilter('dogs')}
+                          >
+                            <Dog className="w-4 h-4 mr-1" />
+                            Dogs
+                          </Button>
+                          <Button
+                            variant={themeAnimalFilter === 'cats' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setThemeAnimalFilter('cats')}
+                          >
+                            <Cat className="w-4 h-4 mr-1" />
+                            Cats
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    {/* Breed Search */}
+                    {/* Breed/Color Search */}
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Search Breeds
+                        {selectedThemeId ? 'Search Breeds' : 'Search by Color or Coat'}
                       </label>
                       <div className="relative">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                         <Input
                           type="text"
-                          placeholder="Search for specific breeds..."
-                          value={themeBreedSearch}
-                          onChange={(e) => setThemeBreedSearch(e.target.value)}
+                          placeholder={
+                            selectedThemeId
+                              ? "Search for specific breeds..."
+                              : "Search by color (e.g., golden, black, white)..."
+                          }
+                          value={selectedThemeId ? themeBreedSearch : searchTerm}
+                          onChange={(e) => selectedThemeId ? setThemeBreedSearch(e.target.value) : setSearchTerm(e.target.value)}
                           className="pl-10"
                         />
                       </div>
@@ -663,10 +688,14 @@ function BrowsePageContent() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setThemeAnimalFilter('all');
-                          setThemeBreedSearch('');
+                          if (selectedThemeId) {
+                            setThemeAnimalFilter('all');
+                            setThemeBreedSearch('');
+                          } else {
+                            setSearchTerm('');
+                          }
                         }}
-                        disabled={themeAnimalFilter === 'all' && !themeBreedSearch}
+                        disabled={selectedThemeId ? (themeAnimalFilter === 'all' && !themeBreedSearch) : !searchTerm}
                       >
                         Clear Filters
                       </Button>

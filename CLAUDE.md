@@ -159,6 +159,51 @@ import { createClient } from '@supabase/supabase-js';          // ❌ WRONG in c
 
 ### Authentication Flow Patterns
 
+**🚨 CRITICAL: Authentication Consistency Rule**
+
+Each user type MUST use consistent authentication patterns across ALL their routes:
+
+**✅ Server-Side Authentication Pattern** (Pages that need SEO/immediate security):
+```typescript
+// Server Component (no 'use client')
+export default async function MyPage() {
+  const supabaseService = new SupabaseService();
+  const userProfile = await supabaseService.getCurrentUserProfile();
+
+  if (!userProfile) {
+    redirect('/auth/login');
+  }
+
+  // Render based on user type...
+}
+```
+
+**✅ Client-Side Authentication Pattern** (Interactive pages):
+```typescript
+// Client Component ('use client')
+export default function MyPage() {
+  return (
+    <UserAccessControl allowedUserTypes={['partner']}>
+      <MyPageContent />
+    </UserAccessControl>
+  );
+}
+
+function MyPageContent() {
+  const { userProfile } = useUserRouting();
+  // Render content...
+}
+```
+
+**❌ NEVER MIX THESE PATTERNS within the same user type routes!**
+
+**Why Consistency Matters:**
+- Mixed patterns create different auth failure behaviors
+- Server-side fails before rendering → immediate redirect
+- Client-side renders first → shows loading then auth check
+- Users experience confusing inconsistent behavior
+- Debugging becomes complex with different failure modes
+
 **✅ Frontend Authentication (All Routes)**
 ```typescript
 // ✅ CORRECT: Only use SupabaseService for auth checks
@@ -173,10 +218,10 @@ const { data: { user } } = await supabaseService.getClient().auth.getUser();
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const customerEmail = searchParams.get('email');
-  
+
   const supabaseService = new SupabaseService();
   const { data: { user } } = await supabaseService.getClient().auth.getUser();
-  
+
   if (!user?.email || user.email !== customerEmail) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -519,12 +564,20 @@ Use Stripe test mode with test API keys. Test cards:
 - [ ] Proper error handling and status codes
 - [ ] No bypass of the API layer architecture
 
+✅ **Authentication Consistency (CRITICAL):**
+- [ ] Consistent auth approach across all user-type routes
+- [ ] Either ALL server-side auth OR ALL client-side auth within user type
+- [ ] No mixed server/client auth patterns for same user type
+- [ ] Server-side pages use `getCurrentUserProfile()` + `redirect()`
+- [ ] Client-side pages use `useUserRouting()` + `<UserAccessControl>`
+
 **❌ RED FLAGS - If you see these, STOP and refactor:**
 - Direct `.from()` calls in React components
-- `createClient()` imports in frontend components  
+- `createClient()` imports in frontend components
 - Mixed admin/customer service usage
 - Database queries outside API routes/services
 - Authentication logic in frontend components
+- **Mixed server/client authentication within same user type routes**
 
 ## Important Implementation Notes
 

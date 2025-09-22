@@ -94,7 +94,24 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
         setIsGuest(!isAuthenticated);
 
         if (isAuthenticated) {
-          // Load from server via API
+          // Check if there are guest cart items to migrate
+          const stored = localStorage.getItem(GUEST_CART_STORAGE_KEY);
+          if (stored) {
+            try {
+              const guestItems = JSON.parse(stored);
+              if (Array.isArray(guestItems) && guestItems.length > 0) {
+                console.log(`🔄 Found ${guestItems.length} guest cart items, triggering migration...`);
+                await migrateGuestCartToServer();
+                return; // migrateGuestCartToServer already loads the server cart
+              }
+            } catch (parseError) {
+              console.error('Error parsing guest cart for migration:', parseError);
+              // Clear invalid guest cart data
+              localStorage.removeItem(GUEST_CART_STORAGE_KEY);
+            }
+          }
+
+          // No guest items to migrate, load server cart normally
           await loadServerCart();
         } else {
           // Load from localStorage

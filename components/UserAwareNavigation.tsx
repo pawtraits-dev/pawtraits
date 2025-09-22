@@ -115,7 +115,7 @@ export default function UserAwareNavigation({
 
   // Top permanent menu items
   const getTopMenuItems = () => [
-    { name: 'Dogs', href: '/browse', icon: Dog },
+    { name: 'Dogs', href: '/browse?type=dogs', icon: Dog },
     { name: 'Cats', href: '/browse?type=cats', icon: Cat },
     { name: 'Themes', href: '/browse?type=themes', icon: Palette }
   ]
@@ -126,7 +126,7 @@ export default function UserAwareNavigation({
   const handleSignOut = async () => {
     try {
       await supabaseService.signOut()
-      router.push('/auth/login')
+      router.push('/')
     } catch (error) {
       console.error('Sign out error:', error)
     }

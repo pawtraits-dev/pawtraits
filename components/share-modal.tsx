@@ -26,8 +26,17 @@ export default function ShareModal({ isOpen, onClose, image, onShare }: ShareMod
   const [copied, setCopied] = useState(false);
   
   // Generate share URL (you might want to create a dedicated share page)
-  const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/share/image/${image.id}`;
-  const shareText = `Check out this amazing AI pet portrait: "${image.prompt_text}"`;
+  const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/shop/${image.id}`;
+  // Create formatted share text with breed name and description
+  const getShareText = () => {
+    // Extract breed name from image data
+    const breedName = (image as any)?.breed_name || 'Pet';
+    const description = image.description || image.prompt_text || 'Amazing Pawtrait';
+
+    return `I love this ${breedName} Pawtrait: ${description}`;
+  };
+
+  const shareText = getShareText();
 
   const handleCopyLink = async () => {
     try {
