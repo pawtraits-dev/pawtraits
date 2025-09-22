@@ -130,7 +130,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     } finally {
       setLoading(false);
     }
-  }, [loadGuestCart]);
+  }, [loadGuestCart, migrateGuestCartToServer]);
 
   const loadServerCart = async () => {
     try {
