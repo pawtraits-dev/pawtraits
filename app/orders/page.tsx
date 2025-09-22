@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
-import { SupabaseService } from '@/lib/supabase';
+import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import CustomerOrdersView from '@/components/orders/CustomerOrdersView';
 import PartnerOrdersView from '@/components/orders/PartnerOrdersView';
 import AdminOrdersView from '@/components/orders/AdminOrdersView';
@@ -12,11 +13,28 @@ import AdminOrdersView from '@/components/orders/AdminOrdersView';
 export const dynamic = 'force-dynamic';
 
 export default async function OrdersPage() {
-  const supabaseService = new SupabaseService();
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
   try {
-    // Get authenticated user profile
-    const userProfile = await supabaseService.getCurrentUserProfile();
+    // Get authenticated user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      redirect('/auth/login');
+    }
+
+    // Get user profile using RPC
+    const { data: profileData, error: profileError } = await supabase
+      .rpc('get_user_profile', { user_uuid: user.id });
+
+    if (profileError || !profileData || (Array.isArray(profileData) && profileData.length === 0)) {
+      console.error('❌ ORDERS: Profile error:', profileError);
+      redirect('/auth/login');
+    }
+
+    // Handle both single object and array responses from RPC
+    const userProfile = Array.isArray(profileData) ? profileData[0] : profileData;
 
     if (!userProfile) {
       redirect('/auth/login');

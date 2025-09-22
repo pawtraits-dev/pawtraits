@@ -260,7 +260,7 @@ function OrderConfirmationContent() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-medium text-blue-900 mb-2">Track Your Order</h4>
                 <p className="text-sm text-blue-800 mb-3">You'll receive tracking information once your order ships.</p>
-                <Link href="/shop/orders">
+                <Link href="/orders">
                   <Button
                     variant="outline"
                     size="sm"
@@ -277,7 +277,7 @@ function OrderConfirmationContent() {
 
         {/* Action Buttons */}
         <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-          <Link href="/shop/orders">
+          <Link href="/orders">
             <Button className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3">View My Orders</Button>
           </Link>
           <Link href={continueShoppingRoute}>
