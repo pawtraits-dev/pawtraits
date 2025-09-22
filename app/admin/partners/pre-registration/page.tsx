@@ -349,8 +349,13 @@ export default function PreRegistrationManagementPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        {code.partner_name ? (
-                          <span className="text-sm font-medium">{code.partner_name}</span>
+                        {code.partner ? (
+                          <Link
+                            href={`/admin/partners/${code.partner.id}`}
+                            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {code.partner.business_name || `${code.partner.first_name} ${code.partner.last_name}`}
+                          </Link>
                         ) : (
                           <span className="text-sm text-gray-400">Not used</span>
                         )}

@@ -55,8 +55,8 @@ export default function PreRegistrationLandingPage() {
 
         // Handle redirect for used codes
         if (data.redirect === 'customer_signup') {
-          // Redirect to customer signup with partner referral
-          router.push(`/signup/user?partner=${data.partner_email}&code=${data.code}`);
+          // Redirect to dedicated partner referral signup page
+          router.push(`/r/partner/${data.code}`);
           return;
         }
 
