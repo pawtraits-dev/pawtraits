@@ -20,11 +20,24 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const campaign = searchParams.get('campaign');
 
-    // Get pre-registration codes with partner information
-    const { data, error } = await supabase.rpc('get_pre_registration_codes_with_partner', {
-      p_status_filter: status === 'all' ? null : status,
-      p_campaign_filter: campaign === 'all' ? null : campaign
-    });
+    // Get pre-registration codes (direct table query for now)
+    let query = supabase
+      .from('pre_registration_codes')
+      .select(`
+        *,
+        partner:partners(id, business_name, first_name, last_name)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (status && status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    if (campaign && campaign !== 'all') {
+      query = query.eq('marketing_campaign', campaign);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Failed to fetch pre-registration codes:', error);
@@ -61,13 +74,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Code is required' }, { status: 400 });
     }
 
-    // Create pre-registration code
-    const { data, error } = await supabase.rpc('create_pre_registration_code', {
-      p_code: code,
-      p_business_category: business_category || null,
-      p_marketing_campaign: marketing_campaign || null,
-      p_expiration_date: expiration_date || null
-    });
+    // Create pre-registration code (direct insert for now)
+    const { data, error } = await supabase
+      .from('pre_registration_codes')
+      .insert({
+        code: code,
+        business_category: business_category || null,
+        marketing_campaign: marketing_campaign || null,
+        expiration_date: expiration_date || null,
+        status: 'active',
+        scans_count: 0,
+        conversions_count: 0,
+        print_quantity: 1
+      })
+      .select()
+      .single();
 
     if (error) {
       console.error('Failed to create pre-registration code:', error);

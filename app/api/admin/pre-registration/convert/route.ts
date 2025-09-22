@@ -21,12 +21,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Code, partner ID, and email are required' }, { status: 400 });
     }
 
-    // Mark pre-registration code as used using database function
-    const { data, error } = await supabase.rpc('convert_pre_registration_code', {
-      p_code: code,
-      p_partner_id: partner_id,
-      p_partner_email: partner_email
-    });
+    // Mark pre-registration code as used (direct table update for now)
+    const { data: codeData, error: findError } = await supabase
+      .from('pre_registration_codes')
+      .select('id, status')
+      .eq('code', code)
+      .eq('status', 'active')
+      .single();
+
+    if (findError || !codeData) {
+      return NextResponse.json({ error: 'Code not found or already used' }, { status: 404 });
+    }
+
+    // Update the code to used status
+    const { data, error } = await supabase
+      .from('pre_registration_codes')
+      .update({
+        status: 'used',
+        partner_id: partner_id,
+        partner_email: partner_email,
+        conversions_count: 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', codeData.id)
+      .select('id')
+      .single();
 
     if (error) {
       console.error('Failed to convert pre-registration code:', error);
@@ -39,7 +58,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Pre-registration code converted successfully',
-      conversion_id: data?.[0]?.id || null
+      conversion_id: data?.id || null
     });
   } catch (error) {
     console.error('Pre-registration code conversion error:', error);

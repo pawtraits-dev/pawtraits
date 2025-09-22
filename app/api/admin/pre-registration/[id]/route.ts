@@ -25,21 +25,26 @@ export async function GET(
       return NextResponse.json({ error: 'Code ID is required' }, { status: 400 });
     }
 
-    // Get pre-registration code details with partner information
-    const { data, error } = await supabase.rpc('get_pre_registration_code_details', {
-      p_code_id: id
-    });
+    // Get pre-registration code details (direct query for now)
+    const { data, error } = await supabase
+      .from('pre_registration_codes')
+      .select(`
+        *,
+        partner:partners(id, business_name, first_name, last_name)
+      `)
+      .eq('id', id)
+      .single();
 
     if (error) {
       console.error('Failed to fetch pre-registration code details:', error);
       return NextResponse.json({ error: 'Failed to fetch code details' }, { status: 500 });
     }
 
-    if (!data || data.length === 0) {
+    if (!data) {
       return NextResponse.json({ error: 'Code not found' }, { status: 404 });
     }
 
-    return NextResponse.json(data[0]);
+    return NextResponse.json(data);
   } catch (error) {
     console.error('Pre-registration code details API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

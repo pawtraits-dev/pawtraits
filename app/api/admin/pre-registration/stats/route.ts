@@ -16,22 +16,32 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Get pre-registration stats
-    const { data, error } = await supabase.rpc('get_pre_registration_stats');
+    // Get pre-registration stats (manual calculation for now)
+    const { data: codes, error } = await supabase
+      .from('pre_registration_codes')
+      .select('status, scans_count, conversions_count');
 
     if (error) {
-      console.error('Failed to fetch pre-registration stats:', error);
+      console.error('Failed to fetch codes for stats:', error);
       return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 });
     }
 
-    // Return stats with proper formatting
-    const stats = data?.[0] || {
-      total_codes: 0,
-      active_codes: 0,
-      used_codes: 0,
-      expired_codes: 0,
-      total_scans: 0,
-      conversion_rate: 0
+    // Calculate stats manually
+    const total_codes = codes?.length || 0;
+    const active_codes = codes?.filter(c => c.status === 'active').length || 0;
+    const used_codes = codes?.filter(c => c.status === 'used').length || 0;
+    const expired_codes = codes?.filter(c => c.status === 'expired').length || 0;
+    const total_scans = codes?.reduce((sum, c) => sum + (c.scans_count || 0), 0) || 0;
+    const total_conversions = codes?.reduce((sum, c) => sum + (c.conversions_count || 0), 0) || 0;
+    const conversion_rate = total_scans > 0 ? total_conversions / total_scans : 0;
+
+    const stats = {
+      total_codes,
+      active_codes,
+      used_codes,
+      expired_codes,
+      total_scans,
+      conversion_rate
     };
 
     return NextResponse.json(stats);
