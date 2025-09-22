@@ -475,7 +475,7 @@ function UserQRSignupContent() {
           if (quantity) returnUrl.searchParams.set('quantity', quantity);
           router.push(returnUrl.toString());
         } else {
-          router.push('/customer');
+          router.push('/');
         }
       }, 2000);
       return () => clearTimeout(timer);

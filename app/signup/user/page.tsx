@@ -310,7 +310,7 @@ function UserSignupContent() {
   useEffect(() => {
     if (success) {
       const timer = setTimeout(() => {
-        router.push('/customer');
+        router.push('/');
       }, 2000);
       return () => clearTimeout(timer);
     }
