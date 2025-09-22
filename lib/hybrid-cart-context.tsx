@@ -65,18 +65,41 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
         if (Array.isArray(guestItems)) {
           const validatedItems = validateCartItems(guestItems);
           console.log(`Guest cart validation: ${guestItems.length} items → ${validatedItems.length} valid items`);
-          setItems(validatedItems);
+
+          // Merge with any existing items (in case items were added during loading)
+          setItems(currentItems => {
+            const existingItems = currentItems.filter(item => item.id.startsWith('guest_'));
+            const allItems = [...existingItems, ...validatedItems];
+
+            // Remove duplicates based on productId and imageId
+            const uniqueItems = allItems.reduce((acc: CartItem[], item) => {
+              const existing = acc.find(existing =>
+                existing.productId === item.productId && existing.imageId === item.imageId
+              );
+
+              if (existing) {
+                // Merge quantities
+                existing.quantity += item.quantity;
+                return acc;
+              } else {
+                return [...acc, item];
+              }
+            }, []);
+
+            console.log(`Merged cart: ${existingItems.length} existing + ${validatedItems.length} stored = ${uniqueItems.length} final items`);
+            return uniqueItems;
+          });
         } else {
-          console.log('Guest cart data is not an array, clearing items');
-          setItems([]);
+          console.log('Guest cart data is not an array, using existing items');
+          // Don't clear items, just keep what we have
         }
       } else {
-        console.log('No guest cart data found in localStorage');
-        setItems([]);
+        console.log('No guest cart data found in localStorage, keeping existing items');
+        // Don't clear items, just keep what we have
       }
     } catch (error) {
       console.error('Error loading guest cart:', error);
-      setItems([]);
+      // Don't clear items on error, just keep what we have
     }
   }, []);
 
@@ -248,6 +271,13 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
   };
 
   const addToCart = async (itemData: Omit<CartItem, 'id' | 'addedAt'>) => {
+    // If still loading, wait for initialization to complete
+    if (loading) {
+      console.log('Cart still loading, adding to guest cart directly');
+      addToGuestCart(itemData);
+      return;
+    }
+
     if (isGuest) {
       addToGuestCart(itemData);
     } else {
@@ -264,23 +294,28 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
       addedAt: new Date().toISOString(),
     };
 
-    const existingItemIndex = items.findIndex(
-      item => item.productId === itemData.productId && item.imageId === itemData.imageId
-    );
-
-    let newItems: CartItem[];
-    if (existingItemIndex >= 0) {
-      newItems = items.map((item, index) =>
-        index === existingItemIndex
-          ? { ...item, quantity: item.quantity + itemData.quantity }
-          : item
+    setItems(currentItems => {
+      const existingItemIndex = currentItems.findIndex(
+        item => item.productId === itemData.productId && item.imageId === itemData.imageId
       );
-    } else {
-      newItems = [...items, newItem];
-    }
 
-    setItems(newItems);
-    saveGuestCart(newItems);
+      let newItems: CartItem[];
+      if (existingItemIndex >= 0) {
+        newItems = currentItems.map((item, index) =>
+          index === existingItemIndex
+            ? { ...item, quantity: item.quantity + itemData.quantity }
+            : item
+        );
+      } else {
+        newItems = [...currentItems, newItem];
+      }
+
+      // Save to localStorage immediately
+      saveGuestCart(newItems);
+      console.log(`Guest cart updated: ${newItems.length} items, saved to localStorage`);
+
+      return newItems;
+    });
   };
 
   const addToServerCart = async (itemData: Omit<CartItem, 'id' | 'addedAt'>) => {
@@ -325,11 +360,13 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     }
 
     if (isGuest) {
-      const newItems = items.map(item =>
-        item.id === itemId ? { ...item, quantity } : item
-      );
-      setItems(newItems);
-      saveGuestCart(newItems);
+      setItems(currentItems => {
+        const newItems = currentItems.map(item =>
+          item.id === itemId ? { ...item, quantity } : item
+        );
+        saveGuestCart(newItems);
+        return newItems;
+      });
     } else {
       await updateServerCartQuantity(itemId, quantity);
     }
@@ -372,9 +409,11 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
 
   const removeFromCart = async (itemId: string) => {
     if (isGuest) {
-      const newItems = items.filter(item => item.id !== itemId);
-      setItems(newItems);
-      saveGuestCart(newItems);
+      setItems(currentItems => {
+        const newItems = currentItems.filter(item => item.id !== itemId);
+        saveGuestCart(newItems);
+        return newItems;
+      });
     } else {
       await removeFromServerCart(itemId);
     }
