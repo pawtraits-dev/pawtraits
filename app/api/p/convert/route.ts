@@ -17,8 +17,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { code, partner_id, partner_email } = body;
 
+    console.log('Conversion request received:', { code, partner_id, partner_email, body });
+
     if (!code || !partner_id || !partner_email) {
-      return NextResponse.json({ error: 'Code, partner ID, and email are required' }, { status: 400 });
+      console.error('Missing required fields for conversion:', { code, partner_id, partner_email });
+      return NextResponse.json({
+        error: 'Code, partner ID, and email are required',
+        received: { code, partner_id, partner_email }
+      }, { status: 400 });
     }
 
     // Mark pre-registration code as used (direct table update)
@@ -30,9 +36,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (findError || !codeData) {
-      console.error('Code not found or not active:', { code, findError });
-      return NextResponse.json({ error: 'Code not found or already used' }, { status: 404 });
+      console.error('Code not found or not active:', { code, findError, codeData });
+      return NextResponse.json({
+        error: 'Code not found or already used',
+        details: { code, findError: findError?.message, codeData }
+      }, { status: 404 });
     }
+
+    console.log('Found code to convert:', { codeId: codeData.id, code, status: codeData.status });
 
     // Update the code to used status
     const { data, error } = await supabase
@@ -40,7 +51,6 @@ export async function POST(request: NextRequest) {
       .update({
         status: 'used',
         partner_id: partner_id,
-        partner_email: partner_email,
         conversions_count: 1,
         updated_at: new Date().toISOString()
       })
@@ -49,8 +59,22 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Failed to convert pre-registration code:', error);
-      return NextResponse.json({ error: 'Failed to convert code' }, { status: 500 });
+      console.error('Failed to convert pre-registration code:', {
+        error: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        codeId: codeData.id,
+        updateData: {
+          status: 'used',
+          partner_id,
+          conversions_count: 1
+        }
+      });
+      return NextResponse.json({
+        error: 'Failed to convert code',
+        details: error.message
+      }, { status: 500 });
     }
 
     return NextResponse.json({

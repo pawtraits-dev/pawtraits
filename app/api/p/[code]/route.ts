@@ -44,10 +44,17 @@ export async function GET(
         return NextResponse.json({ error: 'Code has expired' }, { status: 410 });
       } else if (codeData.status === 'used') {
         // If code is used, redirect to customer signup with partner referral
+        // Get partner email by joining with partners table
+        const { data: partnerData } = await supabase
+          .from('partners')
+          .select('email')
+          .eq('id', codeData.partner_id)
+          .single();
+
         return NextResponse.json({
           redirect: 'customer_signup',
           partner_id: codeData.partner_id,
-          partner_email: codeData.partner_email,
+          partner_email: partnerData?.email,
           code: codeData.code
         }, { status: 200 });
       }
