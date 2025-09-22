@@ -221,7 +221,7 @@ function PartnerSignupForm() {
               country: formData.address.country || 'US'
             },
             is_active: true,
-            is_verified: false,
+            is_verified: true,
             onboarding_completed: false,
             notification_preferences: {
               email_commissions: true,
@@ -537,7 +537,7 @@ function PartnerSignupForm() {
                         onChange={(e) => handleInputChange('address.street', e.target.value)}
                         placeholder="Street Address"
                       />
-                      <div className="grid md:grid-cols-3 gap-3">
+                      <div className="grid md:grid-cols-4 gap-3">
                         <Input
                           value={formData.address.city}
                           onChange={(e) => handleInputChange('address.city', e.target.value)}
@@ -553,6 +553,22 @@ function PartnerSignupForm() {
                           onChange={(e) => handleInputChange('address.zip', e.target.value)}
                           placeholder="ZIP"
                         />
+                        <select
+                          value={formData.address.country}
+                          onChange={(e) => handleInputChange('address.country', e.target.value)}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <option value="US">United States</option>
+                          <option value="CA">Canada</option>
+                          <option value="GB">United Kingdom</option>
+                          <option value="AU">Australia</option>
+                          <option value="DE">Germany</option>
+                          <option value="FR">France</option>
+                          <option value="IT">Italy</option>
+                          <option value="ES">Spain</option>
+                          <option value="NL">Netherlands</option>
+                          <option value="OTHER">Other</option>
+                        </select>
                       </div>
                     </div>
                   </div>
