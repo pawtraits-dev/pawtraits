@@ -1015,7 +1015,7 @@ export class SupabaseService {
           p_phone: partnerData.phone,
           p_business_name: partnerData.business_name,
           p_business_type: partnerData.business_type,
-          p_business_address: partnerData.business_address,
+          p_business_address: JSON.stringify(partnerData.business_address),
           p_business_phone: partnerData.business_phone,
           p_business_website: partnerData.business_website
         });

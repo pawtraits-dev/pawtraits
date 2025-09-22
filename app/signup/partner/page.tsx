@@ -184,14 +184,14 @@ function PartnerSignupForm() {
             },
             body: JSON.stringify({ email: formData.email }),
           });
-          
+
           if (!confirmResponse.ok) {
             throw new Error(`Confirmation failed: ${confirmResponse.statusText}`);
           }
-          
+
           const confirmResult = await confirmResponse.json();
           console.log('Email confirmation result:', confirmResult);
-          
+
           // Update the user ID to the real one from the database
           if (confirmResult.userId) {
             realUserId = confirmResult.userId;
@@ -202,49 +202,42 @@ function PartnerSignupForm() {
           // Continue anyway - user might still be able to use the account
         }
 
-        // 3. Create partner profile using the user ID from auth result
+        // 3. Create partner profile using the API endpoint
         try {
-          const partnerData = {
-            email: formData.email,
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            phone: formData.phone || undefined,
-            business_name: formData.businessName,
-            business_type: formData.businessType as any,
-            business_phone: formData.businessPhone || undefined,
-            business_website: formData.businessWebsite || undefined,
-            business_address: {
-              street: formData.address.street || undefined,
-              city: formData.address.city || undefined,
-              state: formData.address.state || undefined,
-              zip: formData.address.zip || undefined,
-              country: formData.address.country || 'US'
+          console.log('Creating partner profile via API with user ID:', realUserId);
+          const partnerResponse = await fetch('/api/p/signup', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-            is_active: true,
-            is_verified: true,
-            onboarding_completed: false,
-            notification_preferences: {
-              email_commissions: true,
-              email_referrals: true,
-              sms_enabled: false
-            }
-          };
-          
-          // Pass the REAL user ID directly to avoid auth session timing issues
-          console.log('Creating partner with real user ID:', realUserId);
-          const partner = await supabaseService.createPartner(partnerData, realUserId);
-          
-          // 4. Create user profile with partner type
-          if (partner) {
-            console.log('Creating user profile for partner...');
-            await supabaseService.createUserProfile(realUserId, 'partner', {
-              first_name: formData.firstName,
-              last_name: formData.lastName,
+            body: JSON.stringify({
+              userId: realUserId,
               email: formData.email,
-              phone: formData.phone || undefined,
-              partner_id: partner.id
-            });
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+              phone: formData.phone || null,
+              businessName: formData.businessName,
+              businessType: formData.businessType,
+              businessPhone: formData.businessPhone || null,
+              businessWebsite: formData.businessWebsite || null,
+              businessAddress: {
+                street: formData.address.street || null,
+                city: formData.address.city || null,
+                state: formData.address.state || null,
+                zip: formData.address.zip || null,
+                country: formData.address.country || 'US'
+              }
+            })
+          });
+
+          if (!partnerResponse.ok) {
+            const partnerError = await partnerResponse.json();
+            throw new Error(partnerError.error || 'Failed to create partner profile');
           }
+
+          const partnerResult = await partnerResponse.json();
+          const partner = partnerResult.partner;
+          console.log('Partner created successfully:', partner);
 
           // Mark pre-registration code as used if partner signed up via QR code
           if (referralCode && partner) {
@@ -274,7 +267,7 @@ function PartnerSignupForm() {
 
           setSuccess(true);
         } catch (partnerError) {
-          console.error('Direct partner creation error:', partnerError);
+          console.error('Partner creation error:', partnerError);
           throw new Error(partnerError instanceof Error ? partnerError.message : 'Failed to create partner profile');
         }
       }
