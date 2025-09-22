@@ -42,6 +42,14 @@ export async function GET(
     if (codeData.status !== 'active') {
       if (codeData.status === 'expired') {
         return NextResponse.json({ error: 'Code has expired' }, { status: 410 });
+      } else if (codeData.status === 'used') {
+        // If code is used, redirect to customer signup with partner referral
+        return NextResponse.json({
+          redirect: 'customer_signup',
+          partner_id: codeData.partner_id,
+          partner_email: codeData.partner_email,
+          code: codeData.code
+        }, { status: 200 });
       }
       return NextResponse.json({ error: 'Code is not active' }, { status: 410 });
     }

@@ -52,6 +52,14 @@ export default function PreRegistrationLandingPage() {
 
       if (response.ok) {
         const data = await response.json();
+
+        // Handle redirect for used codes
+        if (data.redirect === 'customer_signup') {
+          // Redirect to customer signup with partner referral
+          router.push(`/signup/user?partner=${data.partner_email}&code=${data.code}`);
+          return;
+        }
+
         setCodeData(data);
         setScanRecorded(true);
 
