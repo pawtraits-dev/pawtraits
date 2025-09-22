@@ -1,9 +1,9 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from './supabase-client';
-import type { 
-  ImageCatalogCreate, 
-  ImageCatalogUpdate, 
+import type {
+  ImageCatalogCreate,
+  ImageCatalogUpdate,
   ImageCatalogWithDetails,
   Partner,
   PartnerCreate,
@@ -13,7 +13,18 @@ import type {
   ReferralUpdate,
   CommissionPayment,
   PartnerStats,
-  AnimalType
+  AnimalType,
+  // Extended referral system types
+  PreRegistrationCode,
+  PreRegistrationCodeCreate,
+  PreRegistrationCodeUpdate,
+  CustomerReferral,
+  CustomerReferralWithDetails,
+  CustomerReferralCreate,
+  CustomerCredits,
+  CustomerCreditTransaction,
+  CustomerReferralStats,
+  CreditApplicationResult
 } from './types';
 import type { UserProfile, UserType } from './user-types';
 import type { 
@@ -1436,5 +1447,415 @@ export class SupabaseService {
     }
 
     return directOrder;
+  }
+
+  // ===========================================
+  // EXTENDED REFERRAL SYSTEM METHODS
+  // ===========================================
+
+  // ===== PRE-REGISTRATION CODES =====
+
+  async createPreRegistrationCode(data: PreRegistrationCodeCreate): Promise<PreRegistrationCode | null> {
+    try {
+      const { data: result, error } = await this.supabase
+        .rpc('create_pre_registration_code', {
+          p_code: data.code,
+          p_business_category: data.business_category || null,
+          p_expiration_date: data.expiration_date || null,
+          p_marketing_campaign: data.marketing_campaign || null,
+          p_notes: data.notes || null,
+          p_print_quantity: data.print_quantity || 1,
+          p_admin_id: data.admin_id || null
+        });
+
+      if (error) throw error;
+
+      // Fetch the created record
+      const { data: codeRecord, error: fetchError } = await this.supabase
+        .from('pre_registration_codes')
+        .select('*')
+        .eq('id', result)
+        .single();
+
+      if (fetchError) throw fetchError;
+      return codeRecord;
+    } catch (error) {
+      console.error('Error creating pre-registration code:', error);
+      return null;
+    }
+  }
+
+  async getPreRegistrationCodes(filters?: {
+    status?: string;
+    campaign?: string;
+    business_category?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<PreRegistrationCode[]> {
+    try {
+      let query = this.supabase
+        .from('pre_registration_codes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
+      }
+
+      if (filters?.campaign) {
+        query = query.eq('marketing_campaign', filters.campaign);
+      }
+
+      if (filters?.business_category) {
+        query = query.eq('business_category', filters.business_category);
+      }
+
+      if (filters?.limit) {
+        const offset = filters.offset || 0;
+        query = query.range(offset, offset + filters.limit - 1);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching pre-registration codes:', error);
+      return [];
+    }
+  }
+
+  async getPreRegistrationCode(code: string): Promise<PreRegistrationCode | null> {
+    try {
+      const { data, error } = await this.supabase
+        .from('pre_registration_codes')
+        .select('*')
+        .eq('code', code)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching pre-registration code:', error);
+      return null;
+    }
+  }
+
+  async usePreRegistrationCode(code: string, partnerId: string): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase
+        .rpc('use_pre_registration_code', {
+          p_code: code,
+          p_partner_id: partnerId
+        });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error using pre-registration code:', error);
+      return false;
+    }
+  }
+
+  async trackPreRegistrationScan(code: string): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase
+        .rpc('track_pre_registration_scan', {
+          p_code: code
+        });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error tracking pre-registration scan:', error);
+      return false;
+    }
+  }
+
+  // ===== CUSTOMER REFERRALS =====
+
+  async createCustomerReferral(referrerCustomerId: string, refereeEmail: string): Promise<CustomerReferral | null> {
+    try {
+      const { data, error } = await this.supabase
+        .rpc('create_customer_referral', {
+          p_referrer_customer_id: referrerCustomerId,
+          p_referee_email: refereeEmail
+        });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const result = data[0];
+        // Fetch the complete referral record
+        const { data: referralData, error: fetchError } = await this.supabase
+          .from('customer_referrals')
+          .select('*')
+          .eq('id', result.referral_id)
+          .single();
+
+        if (fetchError) throw fetchError;
+        return referralData;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error creating customer referral:', error);
+      return null;
+    }
+  }
+
+  async getCustomerReferrals(customerId: string): Promise<CustomerReferralWithDetails[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('customer_referrals')
+        .select(`
+          *,
+          referrer_customer:customers!referrer_customer_id(first_name, last_name, email),
+          referee_customer:customers!referee_customer_id(first_name, last_name, email),
+          order:orders(total_amount, order_items(count))
+        `)
+        .eq('referrer_customer_id', customerId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map((item: any) => ({
+        ...item,
+        referrer_customer_name: item.referrer_customer
+          ? `${item.referrer_customer.first_name} ${item.referrer_customer.last_name}`.trim()
+          : '',
+        referrer_customer_email: item.referrer_customer?.email || '',
+        referee_customer_name: item.referee_customer
+          ? `${item.referee_customer.first_name} ${item.referee_customer.last_name}`.trim()
+          : null,
+        referee_customer_email: item.referee_customer?.email || null,
+        order_details: item.order ? {
+          total_amount: item.order.total_amount,
+          items_count: item.order.order_items?.length || 0
+        } : null
+      }));
+    } catch (error) {
+      console.error('Error fetching customer referrals:', error);
+      return [];
+    }
+  }
+
+  async getCustomerReferralByCode(code: string): Promise<CustomerReferralWithDetails | null> {
+    try {
+      const { data, error } = await this.supabase
+        .from('customer_referrals')
+        .select(`
+          *,
+          referrer_customer:customers!referrer_customer_id(first_name, last_name, email),
+          referee_customer:customers!referee_customer_id(first_name, last_name, email)
+        `)
+        .eq('referral_code', code)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        throw error;
+      }
+
+      return {
+        ...data,
+        referrer_customer_name: data.referrer_customer
+          ? `${data.referrer_customer.first_name} ${data.referrer_customer.last_name}`.trim()
+          : '',
+        referrer_customer_email: data.referrer_customer?.email || '',
+        referee_customer_name: data.referee_customer
+          ? `${data.referee_customer.first_name} ${data.referee_customer.last_name}`.trim()
+          : null,
+        referee_customer_email: data.referee_customer?.email || null
+      };
+    } catch (error) {
+      console.error('Error fetching customer referral by code:', error);
+      return null;
+    }
+  }
+
+  async trackCustomerReferralAccess(code: string): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase
+        .rpc('track_customer_referral_access', {
+          p_referral_code: code
+        });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error tracking customer referral access:', error);
+      return false;
+    }
+  }
+
+  async completeCustomerReferralSignup(code: string, refereeCustomerId: string): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase
+        .rpc('complete_customer_referral_signup', {
+          p_referral_code: code,
+          p_referee_customer_id: refereeCustomerId
+        });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error completing customer referral signup:', error);
+      return false;
+    }
+  }
+
+  // ===== CUSTOMER CREDITS =====
+
+  async getCustomerCredits(customerId: string): Promise<CustomerCredits | null> {
+    try {
+      // Initialize credits record if it doesn't exist
+      await this.supabase.rpc('initialize_customer_credits', {
+        p_customer_id: customerId
+      });
+
+      const { data, error } = await this.supabase
+        .from('customer_credits')
+        .select('*')
+        .eq('customer_id', customerId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching customer credits:', error);
+      return null;
+    }
+  }
+
+  async getCustomerCreditTransactions(customerId: string, limit = 50): Promise<CustomerCreditTransaction[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('customer_credit_transactions')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching customer credit transactions:', error);
+      return [];
+    }
+  }
+
+  async awardReferralCredit(referralCode: string, orderId: string, orderValue: number): Promise<{ credited_amount: number; referrer_customer_id: string } | null> {
+    try {
+      const { data, error } = await this.supabase
+        .rpc('award_referral_credit', {
+          p_referral_code: referralCode,
+          p_order_id: orderId,
+          p_order_value: orderValue
+        });
+
+      if (error) throw error;
+      return data?.[0] || null;
+    } catch (error) {
+      console.error('Error awarding referral credit:', error);
+      return null;
+    }
+  }
+
+  async applyCustomerCredits(customerId: string, orderValue: number, creditsToUse?: number): Promise<CreditApplicationResult | null> {
+    try {
+      const { data, error } = await this.supabase
+        .rpc('apply_customer_credits', {
+          p_customer_id: customerId,
+          p_order_value: orderValue,
+          p_credits_to_use: creditsToUse || null
+        });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const result = data[0];
+        return {
+          credits_applied: result.credits_applied,
+          remaining_balance: result.remaining_balance,
+          final_order_value: result.final_order_value
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error applying customer credits:', error);
+      return null;
+    }
+  }
+
+  // ===== UTILITY METHODS =====
+
+  async getCustomerReferralStats(customerId: string): Promise<CustomerReferralStats | null> {
+    try {
+      const { data, error } = await this.supabase
+        .rpc('get_customer_referral_stats', {
+          p_customer_id: customerId
+        });
+
+      if (error) throw error;
+      return data?.[0] || null;
+    } catch (error) {
+      console.error('Error fetching customer referral stats:', error);
+      return null;
+    }
+  }
+
+  async expireOldReferrals(): Promise<number> {
+    try {
+      const { data, error } = await this.supabase
+        .rpc('expire_old_referrals');
+
+      if (error) throw error;
+      return data || 0;
+    } catch (error) {
+      console.error('Error expiring old referrals:', error);
+      return 0;
+    }
+  }
+
+  // Generate personal referral code for customer
+  async generatePersonalReferralCode(customerId: string): Promise<string | null> {
+    try {
+      // Check if customer already has a personal referral code
+      const customer = await this.getCustomer(customerId);
+      if (customer?.personal_referral_code) {
+        return customer.personal_referral_code;
+      }
+
+      // Generate new code using database function
+      const { data, error } = await this.supabase
+        .rpc('generate_customer_referral_code', {
+          p_customer_id: customerId
+        });
+
+      if (error) throw error;
+
+      // Update customer with personal referral code
+      const { error: updateError } = await this.supabase
+        .from('customers')
+        .update({ personal_referral_code: data })
+        .eq('id', customerId);
+
+      if (updateError) throw updateError;
+
+      return data;
+    } catch (error) {
+      console.error('Error generating personal referral code:', error);
+      return null;
+    }
   }
 }

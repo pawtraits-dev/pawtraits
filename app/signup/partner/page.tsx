@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, Users, TrendingUp, DollarSign, QrCode, Mail, Phone, MapPin, Globe, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
@@ -40,7 +42,9 @@ interface FormData {
   };
 }
 
-export default function PartnerSignupPage() {
+// Component that handles search params and needs Suspense
+function PartnerSignupForm() {
+  const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>({
     email: '',
@@ -64,8 +68,31 @@ export default function PartnerSignupPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [referralCodeValid, setReferralCodeValid] = useState<boolean>(false);
 
   const supabaseService = new SupabaseService();
+
+  // Check for referral code from QR code scan
+  useEffect(() => {
+    const refCode = searchParams.get('ref');
+    if (refCode) {
+      setReferralCode(refCode);
+      // Optionally validate the referral code
+      validateReferralCode(refCode);
+    }
+  }, [searchParams]);
+
+  const validateReferralCode = async (code: string) => {
+    try {
+      const response = await fetch(`/api/p/${code}`);
+      if (response.ok) {
+        setReferralCodeValid(true);
+      }
+    } catch (error) {
+      console.error('Failed to validate referral code:', error);
+    }
+  };
 
   const handleInputChange = (field: string, value: string) => {
     if (field.includes('.')) {
@@ -218,7 +245,26 @@ export default function PartnerSignupPage() {
               partner_id: partner.id
             });
           }
-          
+
+          // Mark pre-registration code as used if partner signed up via QR code
+          if (referralCode && partner) {
+            try {
+              await fetch('/api/admin/pre-registration/convert', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  code: referralCode,
+                  partner_id: partner.id,
+                  partner_email: formData.email
+                })
+              });
+              console.log('Pre-registration code marked as used:', referralCode);
+            } catch (codeError) {
+              console.error('Failed to mark pre-registration code as used:', codeError);
+              // Don't fail the signup if this fails
+            }
+          }
+
           setSuccess(true);
         } catch (partnerError) {
           console.error('Direct partner creation error:', partnerError);
@@ -314,7 +360,21 @@ export default function PartnerSignupPage() {
                 }`}>2</div>
               </div>
             </CardHeader>
-            
+
+            {/* Pre-registration Code Indicator */}
+            {referralCode && (
+              <div className="px-6 pb-4">
+                <Alert className="border-green-200 bg-green-50">
+                  <QrCode className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-700">
+                    <strong>QR Code Registration:</strong> You&apos;re signing up via invitation code{' '}
+                    <span className="font-mono font-bold">{referralCode}</span>
+                    {referralCodeValid && <span className="text-green-600"> ✓ Verified</span>}
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+
             <CardContent className="space-y-6">
               {currentStep === 1 && (
                 <div className="space-y-4">
@@ -544,5 +604,14 @@ export default function PartnerSignupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Main export component with Suspense wrapper
+export default function PartnerSignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div></div>}>
+      <PartnerSignupForm />
+    </Suspense>
   );
 }

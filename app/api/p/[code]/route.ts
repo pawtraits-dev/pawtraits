@@ -1,0 +1,58 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { SupabaseService } from '@/lib/supabase';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { code: string } }
+) {
+  try {
+    const supabaseService = new SupabaseService();
+    const { code } = params;
+
+    if (!code) {
+      return NextResponse.json({ error: 'Code is required' }, { status: 400 });
+    }
+
+    // Get the pre-registration code
+    const { data: codeData, error } = await supabaseService.getClient()
+      .from('pre_registration_codes')
+      .select('*')
+      .eq('code', code)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Code not found' }, { status: 404 });
+      }
+      console.error('Failed to fetch pre-registration code:', error);
+      return NextResponse.json({ error: 'Failed to verify code' }, { status: 500 });
+    }
+
+    // Check if code is active
+    if (codeData.status !== 'active') {
+      if (codeData.status === 'expired') {
+        return NextResponse.json({ error: 'Code has expired' }, { status: 410 });
+      }
+      return NextResponse.json({ error: 'Code is not active' }, { status: 410 });
+    }
+
+    // Check if code has expired
+    if (codeData.expiration_date && new Date(codeData.expiration_date) < new Date()) {
+      return NextResponse.json({ error: 'Code has expired' }, { status: 410 });
+    }
+
+    // Increment scan count
+    await supabaseService.getClient()
+      .from('pre_registration_codes')
+      .update({
+        scans_count: codeData.scans_count + 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', codeData.id);
+
+    return NextResponse.json(codeData);
+  } catch (error) {
+    console.error('Pre-registration code verification error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

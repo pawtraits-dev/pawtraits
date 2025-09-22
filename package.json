@@ -59,6 +59,7 @@
     "eslint": "^8",
     "eslint-config-next": "15.4.5",
     "isomorphic-dompurify": "^2.26.0",
+    "jszip": "^3.10.1",
     "lodash": "^4.17.21",
     "lodash.isempty": "^4.4.0",
     "lodash.isobject": "^3.0.2",

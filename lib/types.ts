@@ -508,6 +508,211 @@ export interface ReferralWithPet extends Referral {
   pet_coat_hex_color?: string;
 }
 
+// ===========================================
+// EXTENDED REFERRAL SYSTEM TYPES
+// ===========================================
+
+// Pre-registration codes for partner acquisition
+export interface PreRegistrationCode {
+  id: string;
+  code: string;
+  status: 'active' | 'used' | 'expired' | 'deactivated';
+  business_category?: string;
+  expiration_date?: string;
+  marketing_campaign?: string;
+  notes?: string;
+  print_quantity: number;
+  qr_code_url?: string;
+  qr_code_data?: Record<string, any>;
+  partner_id?: string; // Set when code is used
+  admin_id?: string;
+  scans_count: number;
+  conversions_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PreRegistrationCodeWithPartner extends PreRegistrationCode {
+  partner_name?: string;
+  business_name?: string;
+}
+
+export type PreRegistrationCodeCreate = Omit<
+  PreRegistrationCode,
+  'id' | 'created_at' | 'updated_at' | 'scans_count' | 'conversions_count' | 'partner_id'
+>;
+
+export type PreRegistrationCodeUpdate = Partial<PreRegistrationCodeCreate>;
+
+// Customer referrals (customer-to-customer)
+export interface CustomerReferral {
+  id: string;
+  referrer_customer_id: string;
+  referee_customer_id?: string;
+  referral_code: string;
+  referee_email: string;
+  status: 'pending' | 'accessed' | 'signed_up' | 'purchased' | 'credited' | 'expired';
+  discount_amount?: number; // In cents
+  credit_amount?: number; // In cents
+  order_id?: string;
+  order_value?: number; // In cents
+  expires_at: string;
+  accessed_at?: string;
+  signed_up_at?: string;
+  purchased_at?: string;
+  credited_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomerReferralWithDetails extends CustomerReferral {
+  referrer_customer_name: string;
+  referrer_customer_email: string;
+  referee_customer_name?: string;
+  referee_customer_email?: string;
+  order_details?: {
+    total_amount: number;
+    items_count: number;
+  };
+}
+
+export type CustomerReferralCreate = Omit<
+  CustomerReferral,
+  'id' | 'created_at' | 'updated_at' | 'referral_code' | 'status'
+>;
+
+export type CustomerReferralUpdate = Partial<Pick<CustomerReferral, 'status' | 'referee_customer_id'>>;
+
+// Customer credits system
+export interface CustomerCredits {
+  id: string;
+  customer_id: string;
+  total_earned: number; // Total credits ever earned (in cents)
+  total_used: number; // Total credits ever used (in cents)
+  available_balance: number; // Current available balance (in cents)
+  pending_credits: number; // Credits pending order completion (in cents)
+  last_credit_earned_at?: string;
+  last_credit_used_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomerCreditTransaction {
+  id: string;
+  customer_id: string;
+  transaction_type: 'earned' | 'used' | 'expired' | 'refunded';
+  amount: number; // In cents
+  balance_after: number; // Balance after this transaction (in cents)
+  reference_type?: 'referral' | 'order' | 'adjustment';
+  reference_id?: string;
+  description?: string;
+  created_at: string;
+}
+
+// Customer referral statistics
+export interface CustomerReferralStats {
+  total_referrals: number;
+  successful_referrals: number;
+  pending_referrals: number;
+  total_credits_earned: number; // In cents
+  available_credits: number; // In cents
+  personal_referral_code?: string;
+}
+
+// Enhanced referral types with multi-tier support
+export type ExtendedReferralType = 'partner' | 'customer' | 'pre_registration';
+export type ReferrerType = 'partner' | 'customer';
+
+// Referral tracking and attribution
+export interface ReferralAttribution {
+  referral_id: string;
+  referral_type: ExtendedReferralType;
+  referrer_type: ReferrerType;
+  partner_id?: string;
+  customer_referrer_id?: string;
+  pre_registration_code_id?: string;
+  conversion_source: 'qr_scan' | 'email' | 'social' | 'direct_link';
+  accessed_from_qr: boolean;
+}
+
+// QR Code generation options for extended system
+export interface ExtendedQRCodeOptions {
+  type: 'partner' | 'customer' | 'pre_registration';
+  referral_code: string;
+  branding?: {
+    logo_url?: string;
+    primary_color?: string;
+    background_color?: string;
+  };
+  size?: 'small' | 'medium' | 'large' | 'print';
+  error_correction?: 'L' | 'M' | 'Q' | 'H';
+  format?: 'png' | 'svg' | 'pdf';
+}
+
+// Bulk QR code generation
+export interface BulkQRRequest {
+  codes: Array<{
+    code: string;
+    type: 'partner' | 'customer' | 'pre_registration';
+    campaign?: string;
+  }>;
+  options: ExtendedQRCodeOptions;
+  output_format: 'zip' | 'pdf' | 'individual';
+}
+
+// Credit application for checkout
+export interface CreditApplicationResult {
+  credits_applied: number; // In cents
+  remaining_balance: number; // In cents
+  final_order_value: number; // In cents
+  transaction_id?: string;
+}
+
+// Multi-tier commission calculation
+export interface MultiTierCommission {
+  tier: 'partner' | 'customer';
+  referrer_id: string;
+  referrer_type: ReferrerType;
+  commission_type: 'percentage' | 'credit';
+  commission_amount: number; // In cents or percentage
+  order_value: number; // In cents
+  calculated_amount: number; // Final amount in cents
+}
+
+// Referral funnel analytics
+export interface ReferralFunnelStats {
+  pre_registration: {
+    codes_created: number;
+    codes_scanned: number;
+    partners_converted: number;
+    conversion_rate: number;
+  };
+  partner_referrals: {
+    referrals_created: number;
+    customers_acquired: number;
+    total_commission_paid: number;
+    avg_order_value: number;
+  };
+  customer_referrals: {
+    referrals_sent: number;
+    friends_converted: number;
+    credits_awarded: number;
+    credits_redeemed: number;
+  };
+}
+
+// Print materials for QR codes
+export interface PrintMaterial {
+  id: string;
+  pre_registration_code_id: string;
+  material_type: 'counter_display' | 'window_decal' | 'business_card' | 'poster' | 'flyer';
+  format: 'pdf' | 'png' | 'svg';
+  size: string; // e.g., 'A4', '4x6', '8.5x11'
+  file_url: string;
+  print_quantity: number;
+  created_at: string;
+}
+
 // Form types
 export type CustomerCreate = Omit<Customer, 'id' | 'created_at' | 'updated_at'>;
 export type CustomerUpdate = Partial<CustomerCreate>;
