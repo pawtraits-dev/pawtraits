@@ -5,16 +5,16 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { 
-  Shield, 
-  BarChart3, 
-  Users, 
-  ShoppingBag, 
-  Image as ImageIcon, 
-  Palette, 
-  Tag, 
-  Settings, 
-  DollarSign, 
+import {
+  Shield,
+  BarChart3,
+  Users,
+  ShoppingBag,
+  Image as ImageIcon,
+  Palette,
+  Tag,
+  Settings,
+  DollarSign,
   Heart,
   Share2,
   FileImage,
@@ -30,7 +30,9 @@ import {
   PieChart,
   CreditCard,
   Target,
-  Globe
+  Globe,
+  QrCode,
+  UserPlus
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -79,7 +81,9 @@ const navigationSections = [
     items: [
       { name: 'Customers', href: '/admin/customers', icon: Users },
       { name: 'Partners', href: '/admin/partners', icon: Users },
-      { name: 'Referrals', href: '/admin/referrals', icon: Target },
+      { name: 'Pre-Registration Codes', href: '/admin/partners/pre-registration', icon: QrCode },
+      { name: 'Partner Referrals', href: '/admin/referrals', icon: Target },
+      { name: 'Customer Referrals', href: '/admin/customer-referrals', icon: UserPlus },
     ]
   },
   {

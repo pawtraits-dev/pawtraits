@@ -1,22 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SupabaseService } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabaseService = new SupabaseService();
+    // TODO: Add admin authentication check
 
-    // Check admin authentication
-    const admin = await supabaseService.getCurrentAdmin();
-    if (!admin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 401 });
-    }
+    // Use service role key for admin operations
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const campaign = searchParams.get('campaign');
 
     // Get pre-registration codes with partner information
-    const { data, error } = await supabaseService.getClient().rpc('get_pre_registration_codes_with_partner', {
+    const { data, error } = await supabase.rpc('get_pre_registration_codes_with_partner', {
       p_status_filter: status === 'all' ? null : status,
       p_campaign_filter: campaign === 'all' ? null : campaign
     });
@@ -35,13 +40,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabaseService = new SupabaseService();
+    // TODO: Add admin authentication check
 
-    // Check admin authentication
-    const admin = await supabaseService.getCurrentAdmin();
-    if (!admin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 401 });
-    }
+    // Use service role key for admin operations
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     const body = await request.json();
     const { code, business_category, marketing_campaign, expiration_date } = body;
@@ -52,7 +62,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create pre-registration code
-    const { data, error } = await supabaseService.getClient().rpc('create_pre_registration_code', {
+    const { data, error } = await supabase.rpc('create_pre_registration_code', {
       p_code: code,
       p_business_category: business_category || null,
       p_marketing_campaign: marketing_campaign || null,

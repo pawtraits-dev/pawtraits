@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SupabaseService } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabaseService = new SupabaseService();
+    // Use service role key for admin operations
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
     const body = await request.json();
     const { code, partner_id, partner_email } = body;
 
@@ -12,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Mark pre-registration code as used using database function
-    const { data, error } = await supabaseService.getClient().rpc('convert_pre_registration_code', {
+    const { data, error } = await supabase.rpc('convert_pre_registration_code', {
       p_code: code,
       p_partner_id: partner_id,
       p_partner_email: partner_email

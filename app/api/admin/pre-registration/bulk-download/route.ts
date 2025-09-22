@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SupabaseService } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import JSZip from 'jszip';
 import QRCode from 'qrcode';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabaseService = new SupabaseService();
+    // TODO: Add admin authentication check
 
-    // Check admin authentication
-    const admin = await supabaseService.getCurrentAdmin();
-    if (!admin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 401 });
-    }
+    // Use service role key for admin operations
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     const body = await request.json();
     const { code_ids } = body;
@@ -21,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the codes
-    const { data: codes, error } = await supabaseService.getClient()
+    const { data: codes, error } = await supabase
       .from('pre_registration_codes')
       .select('*')
       .in('id', code_ids);

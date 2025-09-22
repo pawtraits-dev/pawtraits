@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SupabaseService } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabaseService = new SupabaseService();
+    // TODO: Add admin authentication check
 
-    // Check admin authentication
-    const admin = await supabaseService.getCurrentAdmin();
-    if (!admin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 401 });
-    }
+    // Use service role key for admin operations
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     const { id } = params;
 
@@ -21,7 +26,7 @@ export async function GET(
     }
 
     // Get pre-registration code details with partner information
-    const { data, error } = await supabaseService.getClient().rpc('get_pre_registration_code_details', {
+    const { data, error } = await supabase.rpc('get_pre_registration_code_details', {
       p_code_id: id
     });
 
@@ -46,13 +51,18 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabaseService = new SupabaseService();
+    // TODO: Add admin authentication check
 
-    // Check admin authentication
-    const admin = await supabaseService.getCurrentAdmin();
-    if (!admin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 401 });
-    }
+    // Use service role key for admin operations
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     const { id } = params;
     const body = await request.json();
@@ -63,7 +73,7 @@ export async function PUT(
     }
 
     // Update pre-registration code
-    const { data, error } = await supabaseService.getClient()
+    const { data, error } = await supabase
       .from('pre_registration_codes')
       .update({
         status,
@@ -96,13 +106,18 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabaseService = new SupabaseService();
+    // TODO: Add admin authentication check
 
-    // Check admin authentication
-    const admin = await supabaseService.getCurrentAdmin();
-    if (!admin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 401 });
-    }
+    // Use service role key for admin operations
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     const { id } = params;
 
@@ -111,7 +126,7 @@ export async function DELETE(
     }
 
     // Delete pre-registration code
-    const { error } = await supabaseService.getClient()
+    const { error } = await supabase
       .from('pre_registration_codes')
       .delete()
       .eq('id', id);

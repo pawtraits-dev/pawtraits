@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SupabaseService } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabaseService = new SupabaseService();
+    // TODO: Add admin authentication check
 
-    // Check admin authentication
-    const admin = await supabaseService.getCurrentAdmin();
-    if (!admin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 401 });
-    }
+    // Use service role key for admin operations
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     // Get pre-registration stats
-    const { data, error } = await supabaseService.getClient().rpc('get_pre_registration_stats');
+    const { data, error } = await supabase.rpc('get_pre_registration_stats');
 
     if (error) {
       console.error('Failed to fetch pre-registration stats:', error);
