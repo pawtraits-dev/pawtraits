@@ -2,6 +2,137 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🚨 MANDATORY DEVELOPMENT PROCESS
+
+**CRITICAL**: This process MUST be followed for ALL development tasks. No exceptions.
+
+### Step 1: Requirements Understanding ✅
+Before starting ANY implementation:
+- [ ] Read and understand the complete user request
+- [ ] Ask clarifying questions if requirements are ambiguous
+- [ ] Identify all affected components, pages, and API routes
+- [ ] Determine scope and complexity of changes needed
+
+### Step 2: Implementation Planning 📋
+Before writing ANY code:
+- [ ] Document the planned approach in detail
+- [ ] Identify which files will be modified/created
+- [ ] Plan the data flow: Frontend → API → Database
+- [ ] Map out authentication and authorization requirements
+- [ ] Consider error handling and edge cases
+
+### Step 3: Architectural Compliance Validation ⚖️
+**MANDATORY CHECKPOINT** - Validate against established patterns:
+- [ ] **API-Only Data Access**: No direct database/RPC calls from pages/components
+- [ ] **Authentication Flow**: Use existing API endpoints (e.g., `/api/auth/check`)
+- [ ] **Data Layer Separation**: Frontend → API Routes → Database Services
+- [ ] **User Type Routing**: Follow established user-aware patterns
+- [ ] **Component Reuse**: Use existing components where possible
+- [ ] **Security Boundaries**: Proper authentication and authorization
+- [ ] **Error Handling**: Consistent error patterns across the application
+
+### Step 4: Implementation ⚙️
+Only after Steps 1-3 are complete:
+- [ ] Use TodoWrite tool to track implementation progress
+- [ ] Follow established code patterns and naming conventions
+- [ ] Implement error handling and loading states
+- [ ] Add appropriate logging for debugging
+- [ ] Write clean, readable code with minimal comments unless necessary
+
+### Step 5: Quality Assurance 🧪
+After implementation, ALWAYS:
+- [ ] Run `npm run build` to ensure no compilation errors
+- [ ] Run `npm run lint` to check code quality
+- [ ] Test the implementation manually if possible
+- [ ] Verify no architectural governance violations
+- [ ] Check that error handling works correctly
+
+### Step 6: Documentation & Commit 📝
+Before presenting work:
+- [ ] Update TodoWrite with completion status
+- [ ] Document any new patterns or deviations
+- [ ] Create clear commit messages with architectural context
+- [ ] Push changes only after successful build and lint
+
+## ❌ RED FLAGS - STOP IMMEDIATELY IF:
+- Planning to make direct database calls from components/pages
+- Creating new authentication patterns instead of using existing ones
+- Bypassing established API endpoints
+- Not following existing user-type routing patterns
+- Creating duplicate functionality that already exists
+
+## 🏗️ ARCHITECTURAL GOVERNANCE CHECKPOINTS
+
+Every implementation MUST pass these checks:
+
+**Data Access Pattern**:
+```
+✅ CORRECT: Component → API Endpoint → Database Service
+❌ WRONG:   Component → Direct Database/RPC Call
+```
+
+**Authentication Pattern**:
+```
+✅ CORRECT: Use /api/auth/check or existing endpoints
+❌ WRONG:   Direct Supabase auth calls from components
+```
+
+**User Type Routing**:
+```
+✅ CORRECT: Unified pages with user-type aware routing
+❌ WRONG:   Separate pages for each user type
+```
+
+## 📋 PROCESS EXAMPLE
+
+When receiving a request like "Fix the orders page authentication":
+
+**Step 1: Requirements**
+- User reports orders page redirecting to login when they're already authenticated
+- Need to investigate why server-side authentication is failing
+- Must maintain existing user-type aware routing
+
+**Step 2: Planning**
+```
+FILES TO INVESTIGATE:
+- app/orders/page.tsx (main page)
+- components/orders/* (view components)
+- app/api/auth/* (authentication endpoints)
+
+PLANNED APPROACH:
+- Check current authentication flow in orders page
+- Identify if using client-side vs server-side auth patterns
+- Verify if following API-only data access pattern
+- Plan fix using existing API endpoints
+```
+
+**Step 3: Architectural Validation**
+```
+COMPLIANCE CHECK:
+✅ Will use /api/auth/check endpoint (existing)
+✅ No direct database calls planned
+✅ Maintains server-side rendering pattern
+✅ Follows user-type aware routing
+❌ STOP: Currently planning direct RPC call - REVISE APPROACH
+```
+
+**Step 4-6: Implementation, QA, Commit**
+Only proceed after Step 3 passes all checks.
+
+## 🔒 ACCOUNTABILITY & ENFORCEMENT
+
+**FOR CLAUDE CODE:**
+- MUST state "Following mandatory development process" when starting work
+- MUST explicitly validate Steps 1-3 before implementation
+- MUST ask for approval if any architectural uncertainty exists
+- MUST use TodoWrite tool throughout process
+- NO EXCEPTIONS: Process violation = immediate work stoppage
+
+**FOR REVIEWER:**
+- Has authority to halt work if process not followed
+- Can request re-planning if architectural concerns exist
+- Expects explicit process validation before implementation proceeds
+
 ## Development Commands
 
 ```bash
