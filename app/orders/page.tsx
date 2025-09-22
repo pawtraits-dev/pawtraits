@@ -8,6 +8,9 @@ import AdminOrdersView from '@/components/orders/AdminOrdersView';
 // This page routes to appropriate orders view based on authenticated user type
 // Following our new architectural patterns from docs/patterns/
 
+// Force dynamic rendering - don't attempt to prerender this auth-required page
+export const dynamic = 'force-dynamic';
+
 export default async function OrdersPage() {
   // ✅ ARCHITECTURAL PATTERN: Server-side user type detection
   const supabaseService = new SupabaseService();
