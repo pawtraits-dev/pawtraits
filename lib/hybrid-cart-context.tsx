@@ -130,9 +130,9 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     } finally {
       setLoading(false);
     }
-  }, [loadGuestCart, migrateGuestCartToServer]);
+  }, [loadGuestCart, migrateGuestCartToServer, loadServerCart]);
 
-  const loadServerCart = async () => {
+  const loadServerCart = useCallback(async () => {
     try {
       const response = await fetch('/api/cart', {
         credentials: 'include'
@@ -159,7 +159,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
       console.error('Error loading server cart:', error);
       setItems([]);
     }
-  };
+  }, [setItems]);
 
   const validateCartItems = (items: any[]): CartItem[] => {
     return items.filter((item: any) => {
@@ -358,7 +358,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
-  const migrateGuestCartToServer = async () => {
+  const migrateGuestCartToServer = useCallback(async () => {
     try {
       const stored = localStorage.getItem(GUEST_CART_STORAGE_KEY);
       if (!stored) return;
@@ -389,7 +389,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     } catch (error) {
       console.error('Error during cart migration:', error);
     }
-  };
+  }, [loadServerCart, setIsGuest]);
 
   // Calculate totals
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
