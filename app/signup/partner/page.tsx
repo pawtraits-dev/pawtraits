@@ -249,7 +249,7 @@ function PartnerSignupForm() {
           // Mark pre-registration code as used if partner signed up via QR code
           if (referralCode && partner) {
             try {
-              await fetch('/api/admin/pre-registration/convert', {
+              const convertResponse = await fetch('/api/p/convert', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -258,7 +258,14 @@ function PartnerSignupForm() {
                   partner_email: formData.email
                 })
               });
-              console.log('Pre-registration code marked as used:', referralCode);
+
+              if (convertResponse.ok) {
+                const convertResult = await convertResponse.json();
+                console.log('Pre-registration code marked as used:', referralCode, convertResult);
+              } else {
+                const convertError = await convertResponse.json();
+                console.error('Failed to convert pre-registration code:', convertError);
+              }
             } catch (codeError) {
               console.error('Failed to mark pre-registration code as used:', codeError);
               // Don't fail the signup if this fails
