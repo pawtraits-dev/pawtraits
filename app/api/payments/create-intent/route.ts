@@ -42,6 +42,7 @@ interface CreatePaymentIntentRequest {
     };
   }>;
   referralCode?: string;
+  referralDiscount?: number; // Discount amount in pence
   // Shipping option data
   shippingOption?: {
     uid: string;
@@ -164,6 +165,12 @@ export async function POST(request: NextRequest) {
     // Add referral code if provided (customer orders only)
     if (body.referralCode && orderType === 'customer') {
       metadata.referralCode = body.referralCode;
+
+      // Add referral discount amount for order processing
+      if (body.referralDiscount && body.referralDiscount > 0) {
+        metadata.referralDiscount = body.referralDiscount.toString();
+        console.log(`🎯 Customer referral discount applied: ${body.referralDiscount} pence for code ${body.referralCode}`);
+      }
     }
 
     // Add partner-specific metadata

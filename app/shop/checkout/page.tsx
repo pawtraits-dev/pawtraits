@@ -109,19 +109,20 @@ function CheckoutPageContent() {
 
     setValidatingReferral(true)
     try {
+      const subtotalInPounds = totalPrice / 100; // Convert subtotal from pence to pounds
       const response = await fetch('/api/referrals/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           referralCode: referralCode,
           customerEmail: shippingData.email,
-          orderTotal: totalPrice / 100 // Convert to pounds
+          orderTotal: subtotalInPounds // Send subtotal (before shipping) in pounds
         })
       })
 
       const data = await response.json()
       setReferralValidation(data)
-      
+
       if (!data.valid) {
         setErrors(prev => ({ ...prev, referral: data.error }))
       } else {
@@ -271,8 +272,17 @@ function CheckoutPageContent() {
   // Create PaymentIntent when moving to payment step
   const createPaymentIntent = async () => {
     try {
-      const totalAmount = Math.round(total * 100); // Total including shipping in pence
+      const totalAmount = Math.round(total * 100); // Total including shipping, minus discount, in pence
       const customerName = `${shippingData.firstName} ${shippingData.lastName}`.trim();
+
+      console.log('💰 PaymentIntent calculation:', {
+        subtotal: subtotal,
+        shipping: shipping,
+        discount: discount,
+        total: total,
+        totalAmountPence: totalAmount,
+        referralValidation: referralValidation
+      });
 
       // Client-side validation
       if (totalAmount <= 0) {
@@ -307,7 +317,11 @@ function CheckoutPageContent() {
           printSpecs: item.printSpecs
         })),
         // Customer-specific metadata
-        referralCode: referralCode || undefined
+        referralCode: referralCode || undefined,
+        // Include referral validation data for webhook processing
+        referralDiscount: referralValidation?.valid && referralValidation?.discount?.eligible
+          ? Math.round(discount * 100) // discount amount in pence
+          : undefined
       };
 
       console.log('Creating Customer PaymentIntent with data:', {
