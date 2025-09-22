@@ -11,6 +11,8 @@ import { CheckCircle, Package, Mail, ArrowRight, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useUserRouting } from "@/hooks/use-user-routing"
 import UserInteractionsService from '@/lib/user-interactions'
+import Image from "next/image"
+import { extractDescriptionTitle } from '@/lib/utils'
 
 interface OrderItem {
   id: string
@@ -179,17 +181,33 @@ function OrderConfirmationContent() {
             </CardHeader>
             <CardContent className="space-y-4">
               {order.order_items.map((item) => (
-                <div key={item.id} className="border-b border-gray-200 pb-4 last:border-b-0 last:pb-0">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{item.image_title}</h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Custom Pet Portrait
-                      </p>
-                      {item.quantity > 1 && <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>}
+                <div key={item.id} className="flex items-start space-x-3 border-b border-gray-200 pb-4 last:border-b-0 last:pb-0">
+                  {/* Item thumbnail */}
+                  <div className="flex-shrink-0">
+                    <Image
+                      src={item.image_url || "/placeholder.svg"}
+                      alt={item.image_title}
+                      width={60}
+                      height={60}
+                      className="rounded-lg object-cover"
+                    />
+                  </div>
+
+                  {/* Item details */}
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-medium text-gray-900 truncate">
+                      {extractDescriptionTitle(item.image_title) || item.image_title}
+                    </h4>
+                    <div className="text-xs text-gray-600 mt-1 space-y-0.5">
+                      <p>Custom Pet Portrait</p>
+                      {item.quantity > 1 && <p>Quantity: {item.quantity}</p>}
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium">{formatPrice(item.total_price)}</p>
+                  </div>
+
+                  {/* Price */}
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-sm font-medium text-gray-900">
+                      {formatPrice(item.total_price)}
                     </div>
                   </div>
                 </div>
