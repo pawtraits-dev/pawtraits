@@ -12,68 +12,42 @@ import AdminOrdersView from '@/components/orders/AdminOrdersView';
 export const dynamic = 'force-dynamic';
 
 export default async function OrdersPage() {
-  // DEBUG: Detailed authentication debugging
-  console.log('🔍 ORDERS DEBUG: Starting authentication check...');
-
   const supabaseService = new SupabaseService();
 
-  // Debug step 1: Check if we can get a user at all
   try {
-    const { data: { user }, error: userError } = await supabaseService.getClient().auth.getUser();
-    console.log('🔍 ORDERS DEBUG - Raw user check:', {
-      user: user ? { id: user.id, email: user.email } : null,
-      userError: userError?.message
-    });
-
-    if (!user) {
-      console.log('🔍 ORDERS DEBUG: No user found, redirecting to login');
-      redirect('/auth/login');
-    }
-
-    // Debug step 2: Try to get user profile
+    // Get authenticated user profile
     const userProfile = await supabaseService.getCurrentUserProfile();
-    console.log('🔍 ORDERS DEBUG - User profile check:', {
-      userProfile: userProfile ? {
-        id: userProfile.id,
-        email: userProfile.email,
-        user_type: userProfile.user_type,
-        first_name: userProfile.first_name
-      } : null
-    });
 
     if (!userProfile) {
-      console.log('🔍 ORDERS DEBUG: User exists but no profile found, redirecting to login');
       redirect('/auth/login');
     }
 
-    console.log('🔍 ORDERS DEBUG: Authentication successful - User type:', userProfile.user_type, 'Email:', userProfile.email);
-
-    // Continue with normal flow
-    const profile = userProfile;
-
     // ✅ ARCHITECTURAL PATTERN: Route to appropriate component based on user type
-    switch (profile.user_type) {
+    switch (userProfile.user_type) {
       case 'customer':
-        return <CustomerOrdersView userProfile={profile} />;
+        return <CustomerOrdersView userProfile={userProfile} />;
 
       case 'partner':
-        return <PartnerOrdersView userProfile={profile} />;
+        return <PartnerOrdersView userProfile={userProfile} />;
 
       case 'admin':
-        return <AdminOrdersView userProfile={profile} />;
+        return <AdminOrdersView userProfile={userProfile} />;
 
       default:
-        console.error('❌ ORDERS DEBUG: Unknown user type:', profile.user_type);
+        console.error('❌ ORDERS: Unknown user type:', userProfile.user_type);
         redirect('/auth/login');
     }
 
   } catch (error) {
-    console.error('🔍 ORDERS DEBUG: Authentication error:', error);
+    console.error('❌ ORDERS: Authentication error:', error);
     redirect('/auth/login');
   }
 }
 
-// 📋 DEBUG INVESTIGATION:
-// - Check server console for detailed auth debugging logs
-// - Look for "🔍 ORDERS DEBUG" messages to see where auth is failing
-// - Compare with working pages to identify the pattern difference
+// 📋 ARCHITECTURAL COMPLIANCE CHECKLIST:
+// ✅ Server-side authentication and user type detection
+// ✅ Unified entry point for all user types accessing orders
+// ✅ Routes to appropriate user-type specific view components
+// ✅ Proper error handling and authentication redirects
+// ✅ No direct database access - delegates to view components
+// ✅ Follows established architectural patterns
