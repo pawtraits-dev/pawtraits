@@ -13,7 +13,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, ArrowLeft, ArrowRight, Heart, Upload, X } from 'lucide-react';
 import Link from 'next/link';
-import { getSupabaseClient } from '@/lib/supabase-client';
 import type { Breed, Coat } from '@/lib/types';
 
 interface FormData {
@@ -69,8 +68,6 @@ function UserSignupContent() {
   const [petPhotoPreview, setPetPhotoPreview] = useState<string | null>(null);
   const [referralData, setReferralData] = useState<any>(null);
 
-  // Create supabase client instance
-  const supabase = getSupabaseClient();
 
   useEffect(() => {
     loadBreedAndCoatData();
@@ -101,12 +98,18 @@ function UserSignupContent() {
 
   const loadBreedAndCoatData = async () => {
     try {
-      const [breedsData, coatsData] = await Promise.all([
-        supabase.from('breeds').select('*'),
-        supabase.from('coats').select('*')
+      // Use API endpoints instead of direct Supabase access
+      const [breedsResponse, coatsResponse] = await Promise.all([
+        fetch('/api/breeds'),
+        fetch('/api/coats')
       ]);
-      setBreeds(breedsData?.data?.filter((b: any) => b.is_active) || []);
-      setCoats(coatsData?.data?.filter((c: any) => c.is_active) || []);
+
+      if (breedsResponse.ok && coatsResponse.ok) {
+        const breedsData = await breedsResponse.json();
+        const coatsData = await coatsResponse.json();
+        setBreeds(breedsData?.filter((b: any) => b.is_active) || []);
+        setCoats(coatsData?.filter((c: any) => c.is_active) || []);
+      }
     } catch (error) {
       console.error('Error loading breed/coat data:', error);
     }
@@ -228,222 +231,71 @@ function UserSignupContent() {
     setLoading(true);
 
     try {
-      // 1. Create user account
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Create complete signup payload
+      const signupData = {
+        // User account data
         email: formData.email,
         password: formData.password,
-        options: {
-          data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName
-          }
-        }
-      });
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
 
-      if (authError) {
-        console.error('Supabase auth signup error:', authError);
-        console.error('Auth error details:', {
-          code: authError.code,
-          message: authError.message,
-          status: authError.status,
-          email: formData.email,
-          details: authError
-        });
-        throw authError;
+        // Pet data (optional)
+        petName: formData.petName,
+        breedId: formData.breedId,
+        coatId: formData.coatId,
+        age: formData.age,
+        gender: formData.gender,
+        weight: formData.weight,
+        personalityTraits: formData.personalityTraits,
+        specialNotes: formData.specialNotes,
+
+        // Referral data
+        referralCode: referralCode || null,
+
+        // Photo URL (will be set below if photo upload succeeds)
+        petPhotoUrl: null
       }
 
-      if (!authData.user) {
-        throw new Error('Failed to create user account');
-      }
-
-      // 2. Auto-confirm user email (for development)
-      try {
-        const confirmResponse = await fetch('/api/auth/confirm-user-by-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.email }),
-        });
-        
-        if (confirmResponse.ok) {
-          console.log('User email confirmed');
-        }
-      } catch (confirmError) {
-        console.warn('Email confirmation failed:', confirmError);
-      }
-
-      // 3. Upload pet photo if provided
+      // Upload pet photo first if provided
       let photoUrl = null;
       if (petPhoto) {
         try {
           const photoFormData = new FormData();
           photoFormData.append('file', petPhoto);
-          photoFormData.append('userId', authData.user.id);
-          
+          photoFormData.append('tempUpload', 'true'); // Mark as temp upload for signup
+
           const uploadResponse = await fetch('/api/upload/pet-photo', {
             method: 'POST',
             body: photoFormData
           });
-          
+
           if (uploadResponse.ok) {
             const uploadData = await uploadResponse.json();
             photoUrl = uploadData.url;
+            signupData.petPhotoUrl = photoUrl;
           }
         } catch (uploadError) {
           console.warn('Photo upload failed:', uploadError);
         }
       }
 
-      // 4. Create customer record
-      let customerId = null;
-      try {
-        const customerData = {
-          email: formData.email.toLowerCase().trim(),
-          first_name: formData.firstName.trim(),
-          last_name: formData.lastName.trim(),
-          user_id: authData.user.id,
-          is_registered: true,
-          referred_by_partner_id: null, // Will be set by referral tracking below
-          referral_code: referralCode || null,
-          referral_date: referralCode ? new Date().toISOString() : null
-        };
+      // Use comprehensive signup API endpoint
+      const response = await fetch('/api/auth/signup/customer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(signupData)
+      });
 
-        const { data: customer, error: customerError } = await supabase
-          .from('customers')
-          .insert(customerData)
-          .select()
-          .single();
-
-        if (customerError) {
-          console.error('Customer creation error:', customerError);
-          // Continue anyway - user account was created successfully
-        } else if (customer) {
-          customerId = customer.id;
-        }
-      } catch (customerError) {
-        console.warn('Customer record creation failed:', customerError);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Signup failed');
       }
 
-      // 4b. Create user profile with customer type using database function
-      try {
-        console.log('Creating user profile for customer using RPC function...', {
-          user_id: authData.user.id,
-          user_type: 'customer',
-          first_name: formData.firstName.trim(),
-          last_name: formData.lastName.trim(),
-          email: formData.email.toLowerCase().trim(),
-          customer_id: customerId
-        });
-        
-        const { data: profileData, error: profileError } = await supabase
-          .rpc('create_user_profile', {
-            p_user_id: authData.user.id,
-            p_user_type: 'customer',
-            p_first_name: formData.firstName.trim(),
-            p_last_name: formData.lastName.trim(),
-            p_email: formData.email.toLowerCase().trim(),
-            p_phone: formData.phone || null,
-            p_partner_id: null,
-            p_customer_id: customerId
-          });
-          
-        console.log('User profile creation result:', { profileData, profileError });
-        
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          throw profileError;
-        } else {
-          console.log('User profile created successfully:', profileData);
-        }
-      } catch (profileError) {
-        console.error('User profile creation failed:', profileError);
-        // Don't throw - let the signup continue even if profile creation fails
-      }
-
-      // 5. Create pet record (only if user provided pet details)
-      if (formData.petName.trim()) {
-        const petData = {
-          user_id: authData.user.id,
-          name: formData.petName,
-          breed_id: formData.breedId || null,
-          coat_id: formData.coatId || null,
-          age: formData.age ? parseInt(formData.age) : null,
-          gender: formData.gender,
-          weight: formData.weight ? parseFloat(formData.weight) : null,
-          primary_photo_url: photoUrl,
-          personality_traits: formData.personalityTraits,
-          special_notes: formData.specialNotes || null
-        };
-
-        const { error: petError } = await supabase
-          .rpc('create_user_pet', {
-            p_user_id: authData.user.id,
-            p_name: petData.name,
-            p_breed_id: petData.breed_id,
-            p_coat_id: petData.coat_id,
-            p_age: petData.age,
-            p_gender: petData.gender,
-            p_weight: petData.weight,
-            p_primary_photo_url: petData.primary_photo_url,
-            p_personality_traits: petData.personality_traits,
-            p_special_notes: petData.special_notes
-          });
-
-        if (petError) {
-          console.error('Pet creation error:', petError);
-          // Continue anyway - user account was created successfully
-        }
-      } else {
-        console.log('No pet name provided, skipping pet creation');
-      }
-
-      // 6. Update referral tracking if referral code provided
-      if (referralCode) {
-        try {
-          console.log('Updating referral tracking for code:', referralCode);
-          
-          // Mark referral as accepted using the enhanced database function
-          const { data: updatedReferral, error: acceptedError } = await supabase
-            .rpc('mark_referral_accepted_enhanced', {
-              p_referral_code: referralCode,
-              p_customer_email: formData.email.toLowerCase().trim(),
-              p_customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
-              p_customer_phone: formData.phone || null
-            });
-
-          if (acceptedError) {
-            console.error('Error marking referral as accepted:', acceptedError);
-          } else {
-            console.log('Referral marked as accepted:', updatedReferral);
-            
-            // Update customer record with partner reference if we got the referral data
-            if (updatedReferral?.partner_id) {
-              await supabase
-                .from('customers')
-                .update({ referred_by_partner_id: updatedReferral.partner_id })
-                .eq('user_id', authData.user.id);
-            }
-          }
-
-          // Track referral event
-          if (updatedReferral?.id) {
-            await fetch(`/api/referrals/${updatedReferral.id}/track`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                event_type: 'signup_complete',
-                user_id: authData.user.id,
-                event_data: {
-                  customer_email: formData.email,
-                  customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
-                  pet_name: formData.petName
-                }
-              })
-            });
-          }
-        } catch (referralError) {
-          console.warn('Referral tracking failed:', referralError);
-        }
-      }
+      const result = await response.json();
+      console.log('Signup successful:', result);
 
       setSuccess(true);
     } catch (error) {

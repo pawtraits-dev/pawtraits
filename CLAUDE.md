@@ -108,6 +108,61 @@ For payment processing to work properly:
 
 ## 🏗️ CRITICAL ARCHITECTURAL PATTERNS - MUST FOLLOW
 
+### Prerender Error Prevention (CRITICAL)
+
+**❌ Common Build-Breaking Pattern:**
+```typescript
+// ❌ NEVER: Direct Supabase client initialization in component body
+'use client'
+import { getSupabaseClient } from '@/lib/supabase-client'
+
+export default function MyComponent() {
+  const supabase = getSupabaseClient() // ❌ Causes "Cannot access 'y' before initialization"
+  // ...
+}
+```
+
+**✅ Correct Patterns:**
+```typescript
+// ✅ OPTION 1: Use API endpoints (PREFERRED)
+'use client'
+export default function MyComponent() {
+  const [data, setData] = useState(null)
+
+  useEffect(() => {
+    fetch('/api/my-endpoint')
+      .then(res => res.json())
+      .then(setData)
+  }, [])
+}
+
+// ✅ OPTION 2: Initialize in useEffect if absolutely needed
+'use client'
+export default function MyComponent() {
+  useEffect(() => {
+    const supabase = getSupabaseClient() // ✅ Safe inside useEffect
+    // Use supabase here...
+  }, [])
+}
+```
+
+**⚠️ Dependency Array Management:**
+Circular dependencies in React Hooks cause prerender failures:
+
+```typescript
+// ❌ WRONG: Circular dependencies
+const funcA = useCallback(() => funcB(), [funcB])
+const funcB = useCallback(() => funcA(), [funcA]) // ❌ Circular!
+
+// ✅ CORRECT: Break circular dependencies
+const funcA = useCallback(() => {
+  // Inline the logic instead of calling funcB
+}, [])
+const funcB = useCallback(() => {
+  // Inline the logic instead of calling funcA
+}, [])
+```
+
 ### Data Access Layer Architecture
 
 **✅ CORRECT PATTERNS - ALWAYS USE THESE:**
@@ -468,6 +523,21 @@ if (!profile || profile.user_type !== 'admin') {
 - Metadata-driven prompt construction using breed, theme, style combinations
 - Export functionality for batch generation workflows
 
+### Batch Processing System
+- **Adaptive Batch Speed Controller** (`lib/adaptive-batch-speed-controller.ts`): Dynamic rate limiting based on API performance
+- **Batch Job Management** (`/admin/batch-jobs`): Real-time monitoring with live logs
+- **Image Variation Generation** (`lib/gemini-variation-service.ts`): AI-powered breed, theme, and style variations
+- **Background Processing**: Long-running batch operations with status tracking
+- **Rate Limiting**: Intelligent speed adjustment to prevent API rate limiting
+
+### Advanced Features
+- **User Interaction Tracking**: Client-side analytics with offline support and server sync
+- **Hybrid Cart System**: Seamless guest-to-authenticated user cart migration
+- **QR Code Generation**: Partner referral QR codes with analytics tracking
+- **Multi-Country Pricing**: Dynamic pricing with automatic currency conversion
+- **Image Watermarking**: Automated watermark application for digital assets
+- **Share Functionality**: Social media sharing with platform-specific optimizations
+
 ## Stripe Payment Integration
 
 ### Setup and Configuration
@@ -579,6 +649,44 @@ Use Stripe test mode with test API keys. Test cards:
 - Authentication logic in frontend components
 - **Mixed server/client authentication within same user type routes**
 
+## 🐛 DEBUGGING & TROUBLESHOOTING
+
+### Build Failures
+
+**"Cannot access 'y' before initialization" Error:**
+- **Cause**: Direct Supabase client imports in component body or circular React Hook dependencies
+- **Solution**: Move Supabase initialization to useEffect or use API endpoints
+- **Prevention**: Always use API endpoints instead of direct database access in components
+
+**"ReferenceError" in Prerendering:**
+- **Cause**: Client-side only code running during static generation
+- **Solution**: Add `export const dynamic = 'force-dynamic'` to pages with client-side data fetching
+- **Prevention**: Follow server-side vs client-side rendering patterns consistently
+
+### Performance Issues
+
+**Slow Cart Operations:**
+- **Check**: Circular dependencies in `lib/hybrid-cart-context.tsx`
+- **Solution**: Inline API calls instead of calling other useCallback functions
+- **Prevention**: Keep dependency arrays minimal and break circular references
+
+**API Rate Limiting:**
+- **Check**: Batch processing speed in `lib/adaptive-batch-speed-controller.ts`
+- **Solution**: Adjust delayMs and parallelism parameters
+- **Monitor**: Use `/admin/batch-jobs` for real-time batch operation monitoring
+
+### Authentication Issues
+
+**Inconsistent Auth Behavior:**
+- **Cause**: Mixed server-side and client-side authentication within same user type
+- **Solution**: Use consistent auth pattern across all routes for each user type
+- **Debug**: Check UserProfile caching in sessionStorage
+
+**Redirect Loops:**
+- **Cause**: Server-side auth redirecting to client-side auth pages
+- **Solution**: Ensure auth failure redirects go to appropriate login pages for user type
+- **Prevention**: Use `useUserRouting()` consistently in client components
+
 ## Important Implementation Notes
 
 ### Legacy Peer Dependencies
@@ -671,3 +779,90 @@ When these tasks become priority:
 **Estimated Effort**: 2-3 weeks full-time development
 **Impact**: Improved consistency, better performance, enhanced maintainability
 **Risk**: Low - current admin system is stable and functional
+
+## 🚀 QUICK REFERENCE
+
+### Creating New API Endpoints
+
+**Customer API Pattern:**
+```typescript
+// /app/api/shop/[resource]/route.ts
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const customerEmail = searchParams.get('email');
+
+  const supabaseService = new SupabaseService();
+  const { data: { user } } = await supabaseService.getClient().auth.getUser();
+
+  if (!user?.email || user.email !== customerEmail) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // Your logic here...
+}
+```
+
+**Partner API Pattern:**
+```typescript
+// /app/api/partners/[resource]/route.ts
+export async function GET(request: NextRequest) {
+  const authorization = request.headers.get('authorization');
+  const token = authorization?.replace('Bearer ', '');
+
+  const supabaseService = new SupabaseService();
+  const { data: { user } } = await supabaseService.getClient().auth.getUser(token);
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // Your logic here...
+}
+```
+
+### Frontend Component Patterns
+
+**Client Component with Auth:**
+```typescript
+'use client'
+export default function MyPage() {
+  return (
+    <UserAccessControl allowedUserTypes={['customer']}>
+      <MyPageContent />
+    </UserAccessControl>
+  );
+}
+```
+
+**Server Component with Auth:**
+```typescript
+// No 'use client' - this is a Server Component
+export default async function MyPage() {
+  const supabaseService = new SupabaseService();
+  const userProfile = await supabaseService.getCurrentUserProfile();
+
+  if (!userProfile || userProfile.user_type !== 'customer') {
+    redirect('/auth/login');
+  }
+
+  return <MyPageContent userProfile={userProfile} />;
+}
+```
+
+### Database Operations
+
+**Simple Query:**
+```typescript
+const supabaseService = new SupabaseService();
+const { data, error } = await supabaseService.getClient()
+  .from('table_name')
+  .select('*')
+  .eq('id', id);
+```
+
+**Complex Query with RPC:**
+```typescript
+const { data, error } = await supabaseService.getClient()
+  .rpc('function_name', {
+    parameter1: value1,
+    parameter2: value2
+  });
+```

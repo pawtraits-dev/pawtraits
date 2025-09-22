@@ -101,8 +101,34 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
               const guestItems = JSON.parse(stored);
               if (Array.isArray(guestItems) && guestItems.length > 0) {
                 console.log(`🔄 Found ${guestItems.length} guest cart items, triggering migration...`);
-                await migrateGuestCartToServer();
-                return; // migrateGuestCartToServer already loads the server cart
+                // Direct migration call to avoid circular dependency
+                try {
+                  const response = await fetch('/api/cart/migrate', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ items: guestItems }),
+                  });
+
+                  if (response.ok) {
+                    localStorage.removeItem(GUEST_CART_STORAGE_KEY);
+                    setIsGuest(false);
+                    // Load server cart after migration
+                    const cartResponse = await fetch('/api/cart', {
+                      credentials: 'include'
+                    });
+                    if (cartResponse.ok) {
+                      const { items: serverItems } = await cartResponse.json();
+                      setItems(serverItems || []);
+                    }
+                  }
+                } catch (migrateError) {
+                  console.error('Error during cart migration:', migrateError);
+                  loadGuestCart(); // Fallback to guest cart
+                }
+                return;
               }
             } catch (parseError) {
               console.error('Error parsing guest cart for migration:', parseError);
@@ -112,7 +138,22 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
           }
 
           // No guest items to migrate, load server cart normally
-          await loadServerCart();
+          try {
+            const response = await fetch('/api/cart', {
+              credentials: 'include'
+            });
+
+            if (response.ok) {
+              const { items: serverItems } = await response.json();
+              setItems(serverItems || []);
+            } else {
+              console.error('Failed to load server cart');
+              setItems([]);
+            }
+          } catch (error) {
+            console.error('Error loading server cart:', error);
+            setItems([]);
+          }
         } else {
           // Load from localStorage
           loadGuestCart();
@@ -130,7 +171,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     } finally {
       setLoading(false);
     }
-  }, [loadGuestCart, migrateGuestCartToServer, loadServerCart]);
+  }, [loadGuestCart]);
 
   const loadServerCart = useCallback(async () => {
     try {
@@ -159,7 +200,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
       console.error('Error loading server cart:', error);
       setItems([]);
     }
-  }, [setItems]);
+  }, []);
 
   const validateCartItems = (items: any[]): CartItem[] => {
     return items.filter((item: any) => {
@@ -257,7 +298,20 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
         throw new Error(`Failed to add to cart: ${response.status}`);
       }
 
-      await loadServerCart();
+      // Reload server cart inline to avoid circular dependency
+      try {
+        const cartResponse = await fetch('/api/cart', {
+          credentials: 'include'
+        });
+
+        if (cartResponse.ok) {
+          const { items: serverItems } = await cartResponse.json();
+          setItems(serverItems || []);
+        }
+      } catch (error) {
+        console.error('Error loading server cart after add:', error);
+        setItems([]);
+      }
     } catch (error) {
       console.error('Error adding to server cart:', error);
       throw error;
@@ -296,7 +350,20 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
         throw new Error(`Failed to update cart: ${response.status}`);
       }
 
-      await loadServerCart();
+      // Reload server cart inline to avoid circular dependency
+      try {
+        const cartResponse = await fetch('/api/cart', {
+          credentials: 'include'
+        });
+
+        if (cartResponse.ok) {
+          const { items: serverItems } = await cartResponse.json();
+          setItems(serverItems || []);
+        }
+      } catch (error) {
+        console.error('Error loading server cart after update:', error);
+        setItems([]);
+      }
     } catch (error) {
       console.error('Error updating server cart:', error);
       throw error;
@@ -324,7 +391,20 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
         throw new Error(`Failed to remove from cart: ${response.status}`);
       }
 
-      await loadServerCart();
+      // Reload server cart inline to avoid circular dependency
+      try {
+        const cartResponse = await fetch('/api/cart', {
+          credentials: 'include'
+        });
+
+        if (cartResponse.ok) {
+          const { items: serverItems } = await cartResponse.json();
+          setItems(serverItems || []);
+        }
+      } catch (error) {
+        console.error('Error loading server cart after remove:', error);
+        setItems([]);
+      }
     } catch (error) {
       console.error('Error removing from server cart:', error);
       throw error;
@@ -383,13 +463,27 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
 
       localStorage.removeItem(GUEST_CART_STORAGE_KEY);
       setIsGuest(false);
-      await loadServerCart();
+
+      // Load server cart inline to avoid circular dependency
+      try {
+        const cartResponse = await fetch('/api/cart', {
+          credentials: 'include'
+        });
+
+        if (cartResponse.ok) {
+          const { items: serverItems } = await cartResponse.json();
+          setItems(serverItems || []);
+        }
+      } catch (error) {
+        console.error('Error loading server cart after migration:', error);
+        setItems([]);
+      }
 
       console.log('Guest cart migration completed');
     } catch (error) {
       console.error('Error during cart migration:', error);
     }
-  }, [loadServerCart, setIsGuest]);
+  }, []);
 
   // Calculate totals
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
