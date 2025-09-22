@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SupabaseService } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { code: string } }
 ) {
   try {
-    const supabaseService = new SupabaseService();
+    // Use service role key for public QR code access
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
     const { code } = params;
 
     if (!code) {
@@ -14,7 +24,7 @@ export async function GET(
     }
 
     // Get the pre-registration code
-    const { data: codeData, error } = await supabaseService.getClient()
+    const { data: codeData, error } = await supabase
       .from('pre_registration_codes')
       .select('*')
       .eq('code', code)
@@ -42,7 +52,7 @@ export async function GET(
     }
 
     // Increment scan count
-    await supabaseService.getClient()
+    await supabase
       .from('pre_registration_codes')
       .update({
         scans_count: codeData.scans_count + 1,
