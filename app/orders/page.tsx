@@ -1,22 +1,26 @@
-'use client';
-
+import { redirect } from 'next/navigation';
+import { SupabaseService } from '@/lib/supabase';
 import CustomerOrdersView from '@/components/orders/CustomerOrdersView';
 import PartnerOrdersView from '@/components/orders/PartnerOrdersView';
 import AdminOrdersView from '@/components/orders/AdminOrdersView';
-import { UserAccessControl } from '@/components/user-access-control';
-import { useUserRouting } from '@/hooks/use-user-routing';
 
 // 🏗️ USER-TYPE AWARE ORDERS PAGE
 // This page routes to appropriate orders view based on authenticated user type
 // Following our new architectural patterns from docs/patterns/
 
-function OrdersPageContent() {
-  const { userProfile } = useUserRouting();
+export default async function OrdersPage() {
+  // ✅ ARCHITECTURAL PATTERN: Server-side user type detection
+  const supabaseService = new SupabaseService();
+  const userProfile = await supabaseService.getCurrentUserProfile();
 
-  console.log('🔍 ORDERS PAGE: User type:', userProfile?.user_type, 'User:', userProfile?.email);
+  if (!userProfile) {
+    redirect('/auth/login');
+  }
+
+  console.log('🔍 ORDERS PAGE: User type:', userProfile.user_type, 'User:', userProfile.email);
 
   // ✅ ARCHITECTURAL PATTERN: Route to appropriate component based on user type
-  switch (userProfile?.user_type) {
+  switch (userProfile.user_type) {
     case 'customer':
       return <CustomerOrdersView userProfile={userProfile} />;
 
@@ -27,20 +31,9 @@ function OrdersPageContent() {
       return <AdminOrdersView userProfile={userProfile} />;
 
     default:
-      console.error('❌ ORDERS PAGE: Unknown user type:', userProfile?.user_type);
-      return null;
+      console.error('❌ ORDERS PAGE: Unknown user type:', userProfile.user_type);
+      redirect('/auth/login');
   }
-}
-
-export default function OrdersPage() {
-  return (
-    <UserAccessControl
-      allowedUserTypes={['admin', 'partner', 'customer']}
-      fallbackMessage="You need to be logged in to view orders."
-    >
-      <OrdersPageContent />
-    </UserAccessControl>
-  );
 }
 
 // 📋 ARCHITECTURAL COMPLIANCE CHECKLIST:
