@@ -23,7 +23,10 @@ import {
   Clock,
   ExternalLink,
   Eye,
-  UserCheck
+  UserCheck,
+  Share2,
+  Copy,
+  QrCode
 } from 'lucide-react';
 import type { Partner, Referral } from '@/lib/types';
 
@@ -94,6 +97,7 @@ export default function PartnerDetailPage() {
   const [partner, setPartner] = useState<Partner | null>(null);
   const [referrals, setReferrals] = useState<ReferralWithStatus[]>([]);
   const [commissionData, setCommissionData] = useState<CommissionData | null>(null);
+  const [partnerReferralCode, setPartnerReferralCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [referralsLoading, setReferralsLoading] = useState(true);
   const [commissionsLoading, setCommissionsLoading] = useState(true);
@@ -105,6 +109,12 @@ export default function PartnerDetailPage() {
       loadCommissionData();
     }
   }, [params.id]);
+
+  useEffect(() => {
+    if (partner) {
+      loadPartnerReferralCode();
+    }
+  }, [partner]);
 
   const loadPartnerDetails = async () => {
     try {
@@ -164,6 +174,36 @@ export default function PartnerDetailPage() {
       console.error('Error loading commission data:', error);
     } finally {
       setCommissionsLoading(false);
+    }
+  };
+
+  const loadPartnerReferralCode = async () => {
+    try {
+      // Generate a referral code for the partner based on business name or partner name
+      if (partner?.business_name) {
+        const prefix = partner.business_name.substring(0, 3).toUpperCase();
+        const suffix = partner.id.substring(0, 4).toUpperCase();
+        setPartnerReferralCode(`${prefix}${suffix}`);
+      } else if (partner?.first_name) {
+        const prefix = partner.first_name.substring(0, 3).toUpperCase();
+        const suffix = partner.id.substring(0, 4).toUpperCase();
+        setPartnerReferralCode(`${prefix}${suffix}`);
+      } else {
+        setPartnerReferralCode(partner?.id?.substring(0, 8).toUpperCase() || 'UNKNOWN');
+      }
+    } catch (error) {
+      console.error('Error generating partner referral code:', error);
+    }
+  };
+
+  const copyReferralCode = async () => {
+    if (partnerReferralCode) {
+      try {
+        await navigator.clipboard.writeText(partnerReferralCode);
+        // You could add a toast notification here
+      } catch (error) {
+        console.error('Failed to copy referral code:', error);
+      }
     }
   };
 
@@ -480,6 +520,64 @@ export default function PartnerDetailPage() {
                     <p className="text-gray-700">{partner.bio}</p>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Referral Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Share2 className="w-5 h-5 mr-2" />
+                  Referral Information
+                </CardTitle>
+                <CardDescription>
+                  Partner's main referral code for customer acquisition
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {partnerReferralCode && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <QrCode className="w-4 h-4 text-purple-600" />
+                        <p className="font-medium text-gray-900">Partner Referral Code</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={copyReferralCode}
+                        title="Copy referral code"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <div className="bg-white p-3 rounded border">
+                      <code className="text-lg font-mono font-bold text-purple-600">
+                        {partnerReferralCode}
+                      </code>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      This code can be used for direct customer referrals via /r/{partnerReferralCode}
+                    </p>
+                  </div>
+                )}
+
+                <div className="text-sm text-gray-600">
+                  <p className="mb-2 font-medium">Referral URL:</p>
+                  <div className="bg-gray-50 p-3 rounded border">
+                    <code className="text-sm break-all">
+                      {typeof window !== 'undefined'
+                        ? `${window.location.origin}/r/${partnerReferralCode || 'LOADING'}`
+                        : `https://yoursite.com/r/${partnerReferralCode || 'LOADING'}`
+                      }
+                    </code>
+                  </div>
+                </div>
+
+                <div className="text-sm text-gray-600">
+                  <p><strong>Usage:</strong> Share this code or URL with customers for direct referrals</p>
+                  <p><strong>Commission:</strong> {partner?.commission_rate ? `${(partner.commission_rate * 100).toFixed(0)}%` : '20%'} on first order, {partner?.lifetime_commission_rate ? `${(partner.lifetime_commission_rate * 100).toFixed(0)}%` : '5%'} lifetime</p>
+                </div>
               </CardContent>
             </Card>
 
