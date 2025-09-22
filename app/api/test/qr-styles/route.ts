@@ -72,9 +72,9 @@ export async function GET() {
               <div class="description">Partner branded version (currently same as standard)</div>
             </div>
             <div class="qr-item">
-              <h3>Logo QR (Heart Center)</h3>
-              <img src="${logoQR}" alt="Logo QR Code" width="200" height="200" />
-              <div class="description">QR code with purple heart logo in the center</div>
+              <h3>Paw Logo QR (Brand Center)</h3>
+              <img src="${logoQR}" alt="Paw Logo QR Code" width="200" height="200" />
+              <div class="description">QR code with Pawtraits paw logo in the center</div>
             </div>
           </div>
           <div style="text-align: center; margin-top: 40px; color: #666;">

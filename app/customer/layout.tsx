@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import CartIcon from '@/components/cart-icon';
-import { 
-  User, 
-  ShoppingBag, 
-  Image as ImageIcon, 
-  Heart, 
+import {
+  User,
+  ShoppingBag,
+  Image as ImageIcon,
+  Heart,
   Package,
   LogOut,
   Menu,
@@ -22,7 +22,8 @@ import {
   ShoppingCart,
   Sparkles,
   Search,
-  Grid3X3
+  Grid3X3,
+  Share2
 } from 'lucide-react';
 import Image from 'next/image';
 import { getSupabaseClient } from '@/lib/supabase-client';
@@ -46,6 +47,7 @@ const navigationItems = [
   { name: 'My Pets', href: '/customer/pets', icon: Heart },
   { name: 'My Orders', href: '/customer/orders', icon: Package },
   { name: 'Cart', href: '/shop/cart', icon: ShoppingCart },
+  { name: 'Share & Earn', href: '/customer/referrals', icon: Share2 },
   { name: 'My Account', href: '/customer/account', icon: User },
 ];
 

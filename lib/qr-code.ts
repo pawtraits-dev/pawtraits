@@ -80,16 +80,15 @@ export class QRCodeService {
       // Create the referral URL
       const referralUrl = `${baseUrl}/r/${referralCode}`;
 
-      // Generate QR code with Pawtraits branding
-      const qrBuffer = await this.generateQRCodeBuffer(referralUrl, {
-        errorCorrectionLevel: 'H', // High error correction for reliability
+      // Generate QR code with Pawtraits paw logo for upload
+      const qrDataURL = await this.generatePawtraitsQRCode(referralCode, baseUrl, {
         width: 512, // Higher resolution for printing
-        margin: 4,
-        color: {
-          dark: '#9333ea', // Pawtraits purple-600
-          light: '#00000000' // Transparent background
-        }
+        margin: 4
       });
+
+      // Convert data URL to buffer
+      const base64Data = qrDataURL.replace(/^data:image\/png;base64,/, '');
+      const qrBuffer = Buffer.from(base64Data, 'base64');
 
       // Create file object from buffer
       const qrFile = new File([qrBuffer], `qr-${referralCode}.png`, {
@@ -116,22 +115,16 @@ export class QRCodeService {
   }
 
   /**
-   * Generate QR code for immediate display (base64 data URL)
+   * Generate QR code for immediate display (base64 data URL) with paw logo
    */
   async generateReferralQRDataURL(
     referralCode: string,
     baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   ): Promise<string> {
-    const referralUrl = `${baseUrl}/r/${referralCode}`;
-
-    return this.generateQRCode(referralUrl, {
-      errorCorrectionLevel: 'H',
+    // Use the Pawtraits QR code with paw logo for all referral codes
+    return this.generatePawtraitsQRCode(referralCode, baseUrl, {
       width: 256,
-      margin: 3,
-      color: {
-        dark: '#9333ea', // Pawtraits purple-600
-        light: '#00000000' // Transparent background
-      }
+      margin: 3
     });
   }
 
@@ -149,29 +142,22 @@ export class QRCodeService {
   }
 
   /**
-   * Generate branded QR code with logo/styling for partner
+   * Generate branded QR code with paw logo for partner
    */
   async generateBrandedQRCode(
     referralCode: string,
     partnerName: string,
     baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   ): Promise<string> {
-    const referralUrl = `${baseUrl}/r/${referralCode}`;
-
-    // Generate branded QR code with consistent Pawtraits styling
-    return this.generateQRCode(referralUrl, {
-      errorCorrectionLevel: 'H',
+    // Use the Pawtraits QR code with paw logo for all partner codes
+    return this.generatePawtraitsQRCode(referralCode, baseUrl, {
       width: 400,
-      margin: 4,
-      color: {
-        dark: '#9333ea', // Pawtraits purple-600 (consistent with brand)
-        light: '#00000000' // Transparent background
-      }
+      margin: 4
     });
   }
 
   /**
-   * Generate QR code with Pawtraits logo in center
+   * Generate QR code with Pawtraits paw logo in center
    */
   async generatePawtraitsQRCode(
     referralCode: string,
@@ -180,10 +166,15 @@ export class QRCodeService {
   ): Promise<string> {
     const referralUrl = `${baseUrl}/r/${referralCode}`;
 
-    // Use the heart icon as our "logo" - you can replace this with actual logo URL
+    // Use the Pawtraits paw logo
     const logoUrl = 'data:image/svg+xml;base64,' + Buffer.from(`
-      <svg width="60" height="60" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" fill="#9333ea"/>
+      <svg fill="#9333ea" width="60" height="60" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <g>
+          <path d="M34.848,40.708c0-5.6-4.542-10.141-10.143-10.141c-5.601,0-10.141,4.541-10.141,10.141c0,5.604,4.539,10.143,10.141,10.143 C30.307,50.851,34.848,46.312,34.848,40.708z"/>
+          <path d="M75.293,32.548c-5.6,0-10.141,4.541-10.141,10.141c0,5.604,4.541,10.141,10.141,10.141c5.601,0,10.142-4.537,10.142-10.141 C85.435,37.089,80.895,32.548,75.293,32.548z"/>
+          <path d="M66.082,53.978c-0.705-0.869-1.703-1.875-2.849-2.93c-3.058-3.963-7.841-6.527-13.233-6.527 c-4.799,0-9.113,2.032-12.162,5.27c-1.732,1.507-3.272,2.978-4.252,4.188l-0.656,0.801c-3.06,3.731-6.869,8.373-6.841,16.25 c0.027,7.315,5.984,13.27,13.278,13.27c4.166,0,7.984-1.926,10.467-5.159c2.481,3.233,6.3,5.159,10.47,5.159 c7.291,0,13.247-5.954,13.275-13.27c0.028-7.877-3.782-12.519-6.841-16.25L66.082,53.978z"/>
+          <circle cx="50.703" cy="26.877" r="11.175"/>
+        </g>
       </svg>
     `).toString('base64');
 
