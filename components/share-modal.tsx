@@ -27,13 +27,25 @@ export default function ShareModal({ isOpen, onClose, image, onShare }: ShareMod
   
   // Generate share URL (you might want to create a dedicated share page)
   const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/shop/${image.id}`;
-  // Create formatted share text with breed name and description
+  // Create formatted share text with breed name and first line of description
   const getShareText = () => {
     // Extract breed name from image data
     const breedName = (image as any)?.breed_name || 'Pet';
-    const description = image.description || image.prompt_text || 'Amazing Pawtrait';
 
-    return `I love this ${breedName} Pawtrait: ${description}`;
+    // Get the first line of the description, removing any technical prompt details
+    let description = image.description || image.prompt_text || 'Amazing Pawtrait';
+
+    // Split by common delimiters and take the first meaningful part
+    const firstLine = description
+      .split(/[,\n]|--ar|\|\||A breed/)[0]  // Split on comma, newline, --ar, ||, or "A breed"
+      .trim()
+      .replace(/^(A |An |The )/i, '')  // Remove leading articles
+      .toLowerCase();
+
+    // Capitalize first letter and ensure it's not empty
+    const cleanDescription = firstLine.charAt(0).toUpperCase() + firstLine.slice(1) || 'Amazing Pawtrait';
+
+    return `I love this ${breedName} Pawtrait: ${cleanDescription}`;
   };
 
   const shareText = getShareText();

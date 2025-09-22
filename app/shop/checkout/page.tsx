@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, ArrowRight, CreditCard, Shield, Loader2, Truck } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { useHybridCart } from "@/lib/hybrid-cart-context"
 import { useRouter } from "next/navigation"
 import { useUserRouting } from "@/hooks/use-user-routing"
@@ -21,6 +22,7 @@ import { Elements } from '@stripe/react-stripe-js'
 import { getStripe } from '@/lib/stripe-client'
 import StripePaymentForm from '@/components/StripePaymentForm'
 import { checkoutValidation } from '@/lib/checkout-validation'
+import { extractDescriptionTitle } from '@/lib/utils'
 
 function CheckoutPageContent() {
   const [currentStep, setCurrentStep] = useState(1)
@@ -890,12 +892,39 @@ function CheckoutPageContent() {
                 <CardTitle>Order Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {orderSummary.items.map((item, index) => (
-                  <div key={index} className="flex justify-between text-sm">
-                    <span className="text-gray-600">
-                      {item.title} {item.quantity > 1 && `(×${item.quantity})`}
-                    </span>
-                    <span className="font-medium">£{(item.price * item.quantity).toFixed(2)}</span>
+                {items.map((item) => (
+                  <div key={item.id} className="flex items-start space-x-3">
+                    {/* Item thumbnail */}
+                    <div className="flex-shrink-0">
+                      <Image
+                        src={item.imageUrl || "/placeholder.svg"}
+                        alt={item.imageTitle}
+                        width={60}
+                        height={60}
+                        className="rounded-lg object-cover"
+                      />
+                    </div>
+
+                    {/* Item details */}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-medium text-gray-900 truncate">
+                        {extractDescriptionTitle(item.imageTitle) || item.imageTitle}
+                      </h4>
+                      <div className="text-xs text-gray-600 mt-1 space-y-0.5">
+                        <p>{item.product?.format?.name || 'Format'} {item.product?.medium?.name || 'Medium'}</p>
+                        <p>{item.product?.size_name || 'Size'} ({item.product?.width_cm || 0} x {item.product?.height_cm || 0}cm)</p>
+                      </div>
+                    </div>
+
+                    {/* Price and quantity */}
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-sm font-medium text-gray-900">
+                        £{(item.pricing.sale_price / 100).toFixed(2)}
+                      </div>
+                      {item.quantity > 1 && (
+                        <div className="text-xs text-gray-600">Qty: {item.quantity}</div>
+                      )}
+                    </div>
                   </div>
                 ))}
                 <Separator />
