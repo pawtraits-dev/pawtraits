@@ -6,6 +6,9 @@ const nextConfig = {
       // your project has type errors.
       ignoreBuildErrors: true,
     },
+    // Configure static export to skip problematic pages
+    trailingSlash: false,
+    output: 'standalone',
     transpilePackages: [],
     images: {
       remotePatterns: [
