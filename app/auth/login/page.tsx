@@ -109,7 +109,7 @@ function LoginPageContent() {
             redirectUrl = "/admin";
             break;
           case 'partner':
-            redirectUrl = "/partners";
+            redirectUrl = "/";
             break;
           case 'customer':
             redirectUrl = "/browse";
