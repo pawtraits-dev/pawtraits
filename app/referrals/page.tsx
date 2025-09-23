@@ -26,6 +26,8 @@ import {
 import Image from 'next/image';
 import { getSupabaseClient } from '@/lib/supabase-client';
 import { qrCodeService } from '@/lib/qr-code';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
+import { CountryProvider } from '@/lib/country-context';
 
 // Import the existing partner referrals component for reuse
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -365,7 +367,7 @@ function CustomerReferralsContent() {
   };
 
   const getReferralUrl = () => {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pawtraits.com';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pawtraits.pics';
     return `${baseUrl}/r/customer/${customerData?.personal_referral_code}`;
   };
 
@@ -797,13 +799,20 @@ export default function ReferralsPage() {
   }
 
   // Route to appropriate content based on user type
-  if (userProfile.user_type === 'partner') {
-    return <PartnerReferralsContent />;
-  } else if (userProfile.user_type === 'customer') {
-    return <CustomerReferralsContent />;
-  } else {
-    // Admin or other user types - redirect to appropriate page
-    router.push('/admin');
+  const content = userProfile.user_type === 'partner'
+    ? <PartnerReferralsContent />
+    : userProfile.user_type === 'customer'
+    ? <CustomerReferralsContent />
+    : (router.push('/admin'), null);
+
+  if (!content) {
     return null;
   }
+
+  return (
+    <CountryProvider>
+      <UserAwareNavigation userProfile={userProfile} />
+      {content}
+    </CountryProvider>
+  );
 }

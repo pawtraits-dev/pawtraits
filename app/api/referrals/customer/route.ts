@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
         id,
         first_name,
         last_name,
+        email,
         personal_referral_code,
         total_referrals,
         successful_referrals,
@@ -71,10 +72,10 @@ export async function GET(request: NextRequest) {
       customer.total_referrals = customer.total_referrals || 0;
       customer.successful_referrals = customer.successful_referrals || 0;
       customer.rewards_earned = customer.rewards_earned || 0;
+      customer.signup_discount_used = customer.signup_discount_used || 0;
     }
 
     // Get referral analytics from customer_referrals table (if it exists)
-    // For now, we'll create mock analytics data
     const analytics = {
       total_shares: customer?.total_referrals || 0,
       qr_scans: 0, // This would come from QR scan tracking

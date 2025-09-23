@@ -381,8 +381,8 @@ export default function CustomerReferralLandingPage() {
           <div className="mt-12 text-center text-sm text-gray-500">
             <p>
               Questions? Contact us at{' '}
-              <a href="mailto:support@pawtraits.com" className="text-purple-600 hover:underline">
-                support@pawtraits.com
+              <a href="mailto:support@pawtraits.pics" className="text-purple-600 hover:underline">
+                support@pawtraits.pics
               </a>
             </p>
           </div>
