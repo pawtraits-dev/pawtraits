@@ -105,6 +105,7 @@ export default function UserAwareNavigation({
       return [
         ...baseItems,
         { name: 'Orders', href: '/orders', icon: Package },
+        { name: 'Referrals', href: '/referrals', icon: Share2 },
         { name: 'Account', href: '/account', icon: User }
       ]
     }

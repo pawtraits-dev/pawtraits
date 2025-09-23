@@ -22,6 +22,8 @@ export async function GET(request: NextRequest) {
       .from('customers')
       .select(`
         id,
+        first_name,
+        last_name,
         personal_referral_code,
         total_referrals,
         successful_referrals,
@@ -37,6 +39,38 @@ export async function GET(request: NextRequest) {
         { error: 'Customer not found' },
         { status: 404 }
       );
+    }
+
+    // If customer doesn't have a referral code, generate one
+    if (!customer.personal_referral_code) {
+      console.log(`Generating referral code for customer: ${customerEmail}`);
+
+      // Generate unique referral code
+      const namePrefix = (customer.first_name?.charAt(0) || '') + (customer.last_name?.charAt(0) || '');
+      const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const referralCode = `${namePrefix}${randomSuffix}`.toUpperCase();
+
+      // Update customer with new referral code (only update fields that exist)
+      const { error: updateError } = await supabase
+        .from('customers')
+        .update({
+          personal_referral_code: referralCode
+        })
+        .eq('id', customer.id);
+
+      if (updateError) {
+        console.error('Error updating customer with referral code:', updateError);
+        return NextResponse.json(
+          { error: 'Failed to generate referral code' },
+          { status: 500 }
+        );
+      }
+
+      // Update the customer object with the new referral code
+      customer.personal_referral_code = referralCode;
+      customer.total_referrals = customer.total_referrals || 0;
+      customer.successful_referrals = customer.successful_referrals || 0;
+      customer.rewards_earned = customer.rewards_earned || 0;
     }
 
     // Get referral analytics from customer_referrals table (if it exists)
