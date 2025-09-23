@@ -85,7 +85,7 @@ export default function CustomerReferralLandingPage() {
 
   if (error) {
     return (
-      <>
+      <CountryProvider>
         <UserAwareNavigation />
         <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center p-4">
           <Card className="w-full max-w-md">
@@ -99,7 +99,7 @@ export default function CustomerReferralLandingPage() {
             </CardContent>
           </Card>
         </div>
-      </>
+      </CountryProvider>
     );
   }
 
