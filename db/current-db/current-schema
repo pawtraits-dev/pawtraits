@@ -1,6 +1,98 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.api_keys (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  key_name text NOT NULL CHECK (char_length(key_name) >= 1 AND char_length(key_name) <= 255),
+  key_hash text NOT NULL UNIQUE CHECK (char_length(key_hash) >= 10),
+  permissions ARRAY DEFAULT '{}'::text[],
+  is_active boolean DEFAULT true,
+  expires_at timestamp with time zone,
+  last_used_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  created_by uuid,
+  CONSTRAINT api_keys_pkey PRIMARY KEY (id),
+  CONSTRAINT api_keys_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT api_keys_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
+);
+CREATE TABLE public.audit_events (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  event_type text NOT NULL CHECK (event_type = ANY (ARRAY['AUTHENTICATION'::text, 'AUTHORIZATION'::text, 'DATA_ACCESS'::text, 'DATA_MODIFICATION'::text, 'DATA_DELETION'::text, 'SYSTEM_ACCESS'::text, 'SECURITY_INCIDENT'::text, 'PRIVACY_EVENT'::text, 'COMPLIANCE_EVENT'::text, 'ADMIN_ACTION'::text, 'API_ACCESS'::text, 'FILE_OPERATION'::text, 'PAYMENT_EVENT'::text])),
+  severity text NOT NULL CHECK (severity = ANY (ARRAY['LOW'::text, 'MEDIUM'::text, 'HIGH'::text, 'CRITICAL'::text])),
+  user_id uuid,
+  session_id text,
+  ip_address inet,
+  user_agent text,
+  resource text,
+  action text NOT NULL CHECK (char_length(action) >= 1 AND char_length(action) <= 255),
+  resource_id text,
+  event_details jsonb DEFAULT '{}'::jsonb CHECK (event_details IS NOT NULL),
+  outcome text NOT NULL CHECK (outcome = ANY (ARRAY['SUCCESS'::text, 'FAILURE'::text, 'PARTIAL'::text, 'BLOCKED'::text])),
+  risk_score integer CHECK (risk_score >= 0 AND risk_score <= 100),
+  compliance_flags ARRAY DEFAULT '{}'::text[],
+  timestamp timestamp with time zone NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT audit_events_pkey PRIMARY KEY (id),
+  CONSTRAINT audit_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.audit_rules (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  rule_name text NOT NULL UNIQUE CHECK (char_length(rule_name) >= 1 AND char_length(rule_name) <= 255),
+  event_type text NOT NULL,
+  conditions jsonb NOT NULL DEFAULT '[]'::jsonb,
+  actions jsonb NOT NULL DEFAULT '[]'::jsonb,
+  is_active boolean DEFAULT true,
+  priority integer DEFAULT 0 CHECK (priority >= 0 AND priority <= 1000),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  created_by uuid,
+  CONSTRAINT audit_rules_pkey PRIMARY KEY (id),
+  CONSTRAINT audit_rules_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
+);
+CREATE TABLE public.batch_job_items (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  job_id uuid NOT NULL,
+  item_index integer NOT NULL,
+  breed_id uuid,
+  coat_id uuid,
+  outfit_id uuid,
+  format_id uuid,
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'running'::text, 'completed'::text, 'failed'::text, 'skipped'::text])),
+  generated_image_id uuid,
+  error_message text,
+  gemini_duration_ms integer,
+  total_duration_ms integer,
+  retry_count integer DEFAULT 0,
+  started_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT batch_job_items_pkey PRIMARY KEY (id),
+  CONSTRAINT batch_job_items_generated_image_id_fkey FOREIGN KEY (generated_image_id) REFERENCES public.image_catalog(id),
+  CONSTRAINT batch_job_items_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.batch_jobs(id)
+);
+CREATE TABLE public.batch_jobs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  job_type text NOT NULL DEFAULT 'image_generation'::text,
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'running'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])),
+  original_image_id uuid,
+  config jsonb NOT NULL,
+  target_age text,
+  total_items integer NOT NULL DEFAULT 0,
+  completed_items integer NOT NULL DEFAULT 0,
+  successful_items integer NOT NULL DEFAULT 0,
+  failed_items integer NOT NULL DEFAULT 0,
+  started_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  estimated_completion_at timestamp with time zone,
+  generated_image_ids ARRAY DEFAULT '{}'::uuid[],
+  error_log ARRAY,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  created_by uuid,
+  CONSTRAINT batch_jobs_pkey PRIMARY KEY (id),
+  CONSTRAINT batch_jobs_original_image_id_fkey FOREIGN KEY (original_image_id) REFERENCES public.image_catalog(id)
+);
 CREATE TABLE public.breed_coats (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   breed_id uuid NOT NULL,
@@ -28,7 +120,65 @@ CREATE TABLE public.breeds (
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   animal_type text NOT NULL DEFAULT 'dog'::text CHECK (animal_type = ANY (ARRAY['dog'::text, 'cat'::text])),
+  hero_image_url text,
+  hero_image_alt text,
   CONSTRAINT breeds_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.carousel_content_selections (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  carousel_id uuid NOT NULL,
+  content_type character varying NOT NULL CHECK (content_type::text = ANY (ARRAY['theme'::character varying, 'dog_breed'::character varying, 'cat_breed'::character varying]::text[])),
+  content_id uuid NOT NULL,
+  sort_order integer DEFAULT 0,
+  is_active boolean DEFAULT true,
+  custom_title character varying,
+  custom_subtitle character varying,
+  custom_description text,
+  custom_cta_text character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  created_by uuid,
+  CONSTRAINT carousel_content_selections_pkey PRIMARY KEY (id),
+  CONSTRAINT carousel_content_selections_carousel_id_fkey FOREIGN KEY (carousel_id) REFERENCES public.carousels(id)
+);
+CREATE TABLE public.carousel_slides (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  carousel_id uuid NOT NULL,
+  image_url character varying NOT NULL,
+  image_alt text,
+  cloudinary_public_id character varying,
+  title character varying,
+  subtitle character varying,
+  description text,
+  cta_text character varying,
+  cta_url character varying,
+  cta_style character varying DEFAULT 'primary'::character varying CHECK (cta_style::text = ANY (ARRAY['primary'::character varying, 'secondary'::character varying, 'outline'::character varying]::text[])),
+  text_position character varying DEFAULT 'center'::character varying CHECK (text_position::text = ANY (ARRAY['center'::character varying, 'left'::character varying, 'right'::character varying, 'bottom-left'::character varying, 'bottom-center'::character varying, 'bottom-right'::character varying, 'top-left'::character varying, 'top-right'::character varying]::text[])),
+  text_color character varying DEFAULT 'white'::character varying CHECK (text_color::text = ANY (ARRAY['white'::character varying, 'black'::character varying, 'purple'::character varying, 'blue'::character varying]::text[])),
+  show_overlay boolean DEFAULT true,
+  overlay_opacity integer DEFAULT 40 CHECK (overlay_opacity >= 0 AND overlay_opacity <= 100),
+  sort_order integer DEFAULT 0,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  created_by uuid,
+  CONSTRAINT carousel_slides_pkey PRIMARY KEY (id),
+  CONSTRAINT carousel_slides_carousel_id_fkey FOREIGN KEY (carousel_id) REFERENCES public.carousels(id),
+  CONSTRAINT carousel_slides_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.user_profiles(id)
+);
+CREATE TABLE public.carousels (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name character varying NOT NULL,
+  page_type character varying NOT NULL CHECK (page_type::text = ANY (ARRAY['home'::character varying, 'dogs'::character varying, 'cats'::character varying, 'themes'::character varying]::text[])),
+  description text,
+  is_active boolean DEFAULT true,
+  auto_play_interval integer DEFAULT 6000,
+  show_thumbnails boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  created_by uuid,
+  CONSTRAINT carousels_pkey PRIMARY KEY (id),
+  CONSTRAINT carousels_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.user_profiles(id)
 );
 CREATE TABLE public.cart_items (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -45,8 +195,8 @@ CREATE TABLE public.cart_items (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT cart_items_pkey PRIMARY KEY (id),
-  CONSTRAINT cart_items_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id),
-  CONSTRAINT cart_items_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id)
+  CONSTRAINT cart_items_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id),
+  CONSTRAINT cart_items_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id)
 );
 CREATE TABLE public.client_orders (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -65,10 +215,14 @@ CREATE TABLE public.client_orders (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   customer_id uuid,
+  order_type text,
+  order_id uuid,
+  client_name text,
   CONSTRAINT client_orders_pkey PRIMARY KEY (id),
-  CONSTRAINT client_orders_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES public.commission_payments(id),
+  CONSTRAINT client_orders_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
   CONSTRAINT client_orders_referral_id_fkey FOREIGN KEY (referral_id) REFERENCES public.referrals(id),
   CONSTRAINT client_orders_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id),
+  CONSTRAINT client_orders_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES public.commission_payments(id),
   CONSTRAINT client_orders_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
 );
 CREATE TABLE public.coats (
@@ -84,6 +238,8 @@ CREATE TABLE public.coats (
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   animal_type text NOT NULL DEFAULT 'dog'::text CHECK (animal_type = ANY (ARRAY['dog'::text, 'cat'::text])),
+  hero_image_url text,
+  hero_image_alt text,
   CONSTRAINT coats_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.commission_payments (
@@ -117,6 +273,56 @@ CREATE TABLE public.countries (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT countries_pkey PRIMARY KEY (code)
 );
+CREATE TABLE public.customer_credit_transactions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  customer_id uuid NOT NULL,
+  transaction_type character varying NOT NULL CHECK (transaction_type::text = ANY (ARRAY['earned'::character varying, 'used'::character varying, 'expired'::character varying, 'refunded'::character varying]::text[])),
+  amount integer NOT NULL,
+  balance_after integer NOT NULL,
+  reference_type character varying,
+  reference_id uuid,
+  description text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT customer_credit_transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT customer_credit_transactions_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
+);
+CREATE TABLE public.customer_credits (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  customer_id uuid NOT NULL UNIQUE,
+  total_earned integer DEFAULT 0 CHECK (total_earned >= 0),
+  total_used integer DEFAULT 0 CHECK (total_used >= 0),
+  available_balance integer DEFAULT 0 CHECK (available_balance >= 0),
+  pending_credits integer DEFAULT 0,
+  last_credit_earned_at timestamp with time zone,
+  last_credit_used_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT customer_credits_pkey PRIMARY KEY (id),
+  CONSTRAINT customer_credits_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
+);
+CREATE TABLE public.customer_referrals (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  referrer_customer_id uuid NOT NULL,
+  referee_customer_id uuid,
+  referral_code character varying NOT NULL UNIQUE CHECK (referral_code::text ~ '^[A-Z0-9]{8,20}$'::text),
+  referee_email character varying,
+  status character varying DEFAULT 'pending'::character varying CHECK (status::text = ANY (ARRAY['pending'::character varying, 'accessed'::character varying, 'signed_up'::character varying, 'purchased'::character varying, 'credited'::character varying, 'expired'::character varying]::text[])),
+  discount_amount integer,
+  credit_amount integer,
+  order_id uuid,
+  order_value integer,
+  expires_at timestamp with time zone DEFAULT (now() + '90 days'::interval),
+  accessed_at timestamp with time zone,
+  signed_up_at timestamp with time zone,
+  purchased_at timestamp with time zone,
+  credited_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT customer_referrals_pkey PRIMARY KEY (id),
+  CONSTRAINT customer_referrals_referrer_customer_id_fkey FOREIGN KEY (referrer_customer_id) REFERENCES public.customers(id),
+  CONSTRAINT customer_referrals_referee_customer_id_fkey FOREIGN KEY (referee_customer_id) REFERENCES public.customers(id),
+  CONSTRAINT customer_referrals_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id)
+);
 CREATE TABLE public.customers (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   email text NOT NULL UNIQUE,
@@ -141,8 +347,27 @@ CREATE TABLE public.customers (
   customer_status text DEFAULT 'active'::text CHECK (customer_status = ANY (ARRAY['active'::text, 'inactive'::text, 'blocked'::text])),
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  personal_referral_code character varying UNIQUE,
+  total_credits_earned integer DEFAULT 0,
+  current_credit_balance integer DEFAULT 0,
   CONSTRAINT customers_pkey PRIMARY KEY (id),
   CONSTRAINT customers_referred_by_partner_id_fkey FOREIGN KEY (referred_by_partner_id) REFERENCES public.partners(id)
+);
+CREATE TABLE public.data_protection_events (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  event_type text NOT NULL CHECK (event_type = ANY (ARRAY['CONSENT_GIVEN'::text, 'CONSENT_WITHDRAWN'::text, 'DATA_EXPORT_REQUEST'::text, 'DATA_DELETION_REQUEST'::text, 'DATA_ANONYMIZATION'::text, 'DATA_BREACH_NOTIFICATION'::text, 'RIGHT_TO_RECTIFICATION'::text, 'RIGHT_TO_PORTABILITY'::text])),
+  data_categories ARRAY NOT NULL,
+  legal_basis text,
+  processed_at timestamp with time zone DEFAULT now(),
+  expires_at timestamp with time zone,
+  status text NOT NULL DEFAULT 'PENDING'::text CHECK (status = ANY (ARRAY['PENDING'::text, 'PROCESSING'::text, 'COMPLETED'::text, 'FAILED'::text])),
+  details jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  created_by uuid,
+  CONSTRAINT data_protection_events_pkey PRIMARY KEY (id),
+  CONSTRAINT data_protection_events_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id),
+  CONSTRAINT data_protection_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.format_theme_combinations (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -190,11 +415,11 @@ CREATE TABLE public.generated_prompts (
   is_approved boolean DEFAULT false,
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   CONSTRAINT generated_prompts_pkey PRIMARY KEY (id),
-  CONSTRAINT generated_prompts_theme_id_fkey FOREIGN KEY (theme_id) REFERENCES public.themes(id),
   CONSTRAINT generated_prompts_breed_id_fkey FOREIGN KEY (breed_id) REFERENCES public.breeds(id),
-  CONSTRAINT generated_prompts_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.prompt_templates(id),
+  CONSTRAINT generated_prompts_theme_id_fkey FOREIGN KEY (theme_id) REFERENCES public.themes(id),
   CONSTRAINT generated_prompts_style_id_fkey FOREIGN KEY (style_id) REFERENCES public.styles(id),
-  CONSTRAINT generated_prompts_format_id_fkey FOREIGN KEY (format_id) REFERENCES public.formats(id)
+  CONSTRAINT generated_prompts_format_id_fkey FOREIGN KEY (format_id) REFERENCES public.formats(id),
+  CONSTRAINT generated_prompts_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.prompt_templates(id)
 );
 CREATE TABLE public.image_catalog (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -233,11 +458,11 @@ CREATE TABLE public.image_catalog (
   migration_status text DEFAULT 'pending'::text,
   migrated_at timestamp with time zone,
   CONSTRAINT image_catalog_pkey PRIMARY KEY (id),
-  CONSTRAINT image_catalog_format_id_fkey FOREIGN KEY (format_id) REFERENCES public.formats(id),
   CONSTRAINT image_catalog_breed_id_fkey FOREIGN KEY (breed_id) REFERENCES public.breeds(id),
   CONSTRAINT image_catalog_theme_id_fkey FOREIGN KEY (theme_id) REFERENCES public.themes(id),
-  CONSTRAINT image_catalog_coat_id_fkey FOREIGN KEY (coat_id) REFERENCES public.coats(id),
-  CONSTRAINT image_catalog_style_id_fkey FOREIGN KEY (style_id) REFERENCES public.styles(id)
+  CONSTRAINT image_catalog_style_id_fkey FOREIGN KEY (style_id) REFERENCES public.styles(id),
+  CONSTRAINT image_catalog_format_id_fkey FOREIGN KEY (format_id) REFERENCES public.formats(id),
+  CONSTRAINT image_catalog_coat_id_fkey FOREIGN KEY (coat_id) REFERENCES public.coats(id)
 );
 CREATE TABLE public.interaction_analytics (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -287,12 +512,8 @@ CREATE TABLE public.order_items (
   order_id uuid NOT NULL,
   product_id text NOT NULL,
   image_id text NOT NULL,
-  image_url text NOT NULL,
   image_title text NOT NULL,
   quantity integer NOT NULL DEFAULT 1,
-  unit_price integer NOT NULL,
-  total_price integer NOT NULL,
-  product_metadata jsonb DEFAULT '{}'::jsonb,
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   captured_product_cost integer DEFAULT 0,
   captured_shipping_cost integer DEFAULT 0,
@@ -304,6 +525,12 @@ CREATE TABLE public.order_items (
   captured_gross_profit integer DEFAULT 0,
   cost_captured_at timestamp without time zone DEFAULT now(),
   pricing_snapshot_id uuid,
+  product_data jsonb DEFAULT '{}'::jsonb,
+  print_image_url text,
+  image_url text,
+  unit_price integer,
+  total_price integer,
+  original_price integer,
   CONSTRAINT order_items_pkey PRIMARY KEY (id),
   CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id)
 );
@@ -328,7 +555,19 @@ CREATE TABLE public.orders (
   metadata jsonb DEFAULT '{}'::jsonb,
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
-  CONSTRAINT orders_pkey PRIMARY KEY (id)
+  payment_intent_id text,
+  payment_status text DEFAULT 'pending'::text CHECK (payment_status = ANY (ARRAY['pending'::text, 'paid'::text, 'failed'::text, 'canceled'::text])),
+  gelato_order_id text,
+  gelato_status text CHECK (gelato_status IS NULL OR (gelato_status = ANY (ARRAY['pending'::text, 'processing'::text, 'shipped'::text, 'delivered'::text, 'error'::text]))),
+  error_message text,
+  placed_by_partner_id uuid,
+  client_email character varying,
+  client_name character varying,
+  order_type character varying DEFAULT 'customer'::character varying CHECK (order_type::text = ANY (ARRAY['customer'::character varying, 'partner'::character varying, 'partner_for_client'::character varying]::text[])),
+  shipping_address_line_1 character varying CHECK (shipping_address_line_1 IS NULL OR length(TRIM(BOTH FROM shipping_address_line_1)) > 0),
+  shipping_address_line_2 character varying,
+  CONSTRAINT orders_pkey PRIMARY KEY (id),
+  CONSTRAINT orders_placed_by_partner_id_fkey FOREIGN KEY (placed_by_partner_id) REFERENCES public.partners(id)
 );
 CREATE TABLE public.outfits (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -406,10 +645,10 @@ CREATE TABLE public.pets (
   updated_at timestamp with time zone DEFAULT now(),
   animal_type text NOT NULL DEFAULT 'dog'::text CHECK (animal_type = ANY (ARRAY['dog'::text, 'cat'::text])),
   CONSTRAINT pets_pkey PRIMARY KEY (id),
-  CONSTRAINT pets_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
-  CONSTRAINT pets_coat_id_fkey FOREIGN KEY (coat_id) REFERENCES public.coats(id),
+  CONSTRAINT pets_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT pets_breed_id_fkey FOREIGN KEY (breed_id) REFERENCES public.breeds(id),
-  CONSTRAINT pets_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+  CONSTRAINT pets_coat_id_fkey FOREIGN KEY (coat_id) REFERENCES public.coats(id),
+  CONSTRAINT pets_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
 );
 CREATE TABLE public.platform_analytics (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -422,6 +661,26 @@ CREATE TABLE public.platform_analytics (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT platform_analytics_pkey PRIMARY KEY (id),
   CONSTRAINT platform_analytics_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id)
+);
+CREATE TABLE public.pre_registration_codes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  code character varying NOT NULL UNIQUE CHECK (code::text ~ '^[A-Z0-9]{6,50}$'::text),
+  status character varying DEFAULT 'active'::character varying CHECK (status::text = ANY (ARRAY['active'::character varying, 'used'::character varying, 'expired'::character varying, 'deactivated'::character varying]::text[])),
+  business_category character varying,
+  expiration_date timestamp with time zone,
+  marketing_campaign character varying,
+  notes text,
+  print_quantity integer DEFAULT 1,
+  qr_code_url text,
+  qr_code_data jsonb,
+  partner_id uuid,
+  admin_id uuid,
+  scans_count integer DEFAULT 0,
+  conversions_count integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT pre_registration_codes_pkey PRIMARY KEY (id),
+  CONSTRAINT pre_registration_codes_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id)
 );
 CREATE TABLE public.product_pricing (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -452,9 +711,9 @@ CREATE TABLE public.product_pricing (
   created_by uuid,
   notes text,
   CONSTRAINT product_pricing_pkey PRIMARY KEY (id),
+  CONSTRAINT product_pricing_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id),
   CONSTRAINT product_pricing_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
-  CONSTRAINT product_pricing_country_code_fkey FOREIGN KEY (country_code) REFERENCES public.countries(code),
-  CONSTRAINT product_pricing_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
+  CONSTRAINT product_pricing_country_code_fkey FOREIGN KEY (country_code) REFERENCES public.countries(code)
 );
 CREATE TABLE public.products (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -478,8 +737,8 @@ CREATE TABLE public.products (
   height_inches numeric,
   gelato_sku text,
   CONSTRAINT products_pkey PRIMARY KEY (id),
-  CONSTRAINT products_format_id_fkey FOREIGN KEY (format_id) REFERENCES public.formats(id),
-  CONSTRAINT products_medium_id_fkey FOREIGN KEY (medium_id) REFERENCES public.media(id)
+  CONSTRAINT products_medium_id_fkey FOREIGN KEY (medium_id) REFERENCES public.media(id),
+  CONSTRAINT products_format_id_fkey FOREIGN KEY (format_id) REFERENCES public.formats(id)
 );
 CREATE TABLE public.prompt_templates (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -505,6 +764,17 @@ CREATE TABLE public.qr_code_tracking (
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
   CONSTRAINT qr_code_tracking_pkey PRIMARY KEY (id),
   CONSTRAINT qr_code_tracking_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id)
+);
+CREATE TABLE public.rate_limits (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  client_key text NOT NULL,
+  endpoint_pattern text NOT NULL,
+  request_count integer DEFAULT 0,
+  window_start timestamp with time zone NOT NULL,
+  blocked_until timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT rate_limits_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.referral_analytics (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -553,11 +823,18 @@ CREATE TABLE public.referrals (
   image_id uuid,
   client_first_name text,
   client_last_name text,
+  referrer_type character varying DEFAULT 'partner'::character varying CHECK (referrer_type::text = ANY (ARRAY['partner'::character varying, 'customer'::character varying]::text[])),
+  customer_referrer_id uuid,
+  pre_registration_code_id uuid,
+  accessed_from_qr boolean DEFAULT false,
+  conversion_source character varying,
   CONSTRAINT referrals_pkey PRIMARY KEY (id),
   CONSTRAINT referrals_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id),
   CONSTRAINT referrals_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id),
   CONSTRAINT referrals_pet_breed_id_fkey FOREIGN KEY (pet_breed_id) REFERENCES public.breeds(id),
-  CONSTRAINT referrals_pet_coat_id_fkey FOREIGN KEY (pet_coat_id) REFERENCES public.coats(id)
+  CONSTRAINT referrals_pet_coat_id_fkey FOREIGN KEY (pet_coat_id) REFERENCES public.coats(id),
+  CONSTRAINT referrals_customer_referrer_id_fkey FOREIGN KEY (customer_referrer_id) REFERENCES public.customers(id),
+  CONSTRAINT referrals_pre_registration_code_id_fkey FOREIGN KEY (pre_registration_code_id) REFERENCES public.pre_registration_codes(id)
 );
 CREATE TABLE public.share_events (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -643,6 +920,8 @@ CREATE TABLE public.themes (
   sort_order integer DEFAULT 0,
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  hero_image_url text,
+  hero_image_alt text,
   CONSTRAINT themes_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.user_interactions (
@@ -676,7 +955,7 @@ CREATE TABLE public.user_profiles (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT user_profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT user_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT user_profiles_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id),
-  CONSTRAINT user_profiles_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
-  CONSTRAINT user_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+  CONSTRAINT user_profiles_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
 );
