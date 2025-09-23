@@ -17,6 +17,7 @@ import {
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
+import { CountryProvider } from '@/lib/country-context';
 
 interface CustomerReferral {
   id: string;
@@ -52,8 +53,7 @@ export default function CustomerReferralLandingPage() {
         setReferralData(data.referral);
         setScanRecorded(true);
 
-        // Record referral access analytics
-        recordReferralAccess(data.referral.id);
+        // Access tracking is already handled in the verify API
       } else if (response.status === 404) {
         setError('This referral code is not valid or has been deactivated.');
       } else if (response.status === 410) {
@@ -69,26 +69,6 @@ export default function CustomerReferralLandingPage() {
     }
   };
 
-  const recordReferralAccess = async (referralId: string) => {
-    try {
-      await fetch('/api/customer-referrals/analytics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          referral_id: referralId,
-          event_type: 'access',
-          metadata: {
-            user_agent: navigator.userAgent,
-            timestamp: new Date().toISOString(),
-            referrer: document.referrer
-          }
-        })
-      });
-    } catch (error) {
-      // Don't fail the page load if analytics fails
-      console.error('Failed to record referral access analytics:', error);
-    }
-  };
 
   if (loading) {
     return (
@@ -124,7 +104,7 @@ export default function CustomerReferralLandingPage() {
   }
 
   return (
-    <>
+    <CountryProvider>
       <UserAwareNavigation />
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
         {/* Header */}
@@ -388,6 +368,6 @@ export default function CustomerReferralLandingPage() {
           </div>
         </div>
       </div>
-    </>
+    </CountryProvider>
   );
 }
