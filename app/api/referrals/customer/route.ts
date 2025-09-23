@@ -75,23 +75,44 @@ export async function GET(request: NextRequest) {
       customer.signup_discount_used = customer.signup_discount_used || 0;
     }
 
-    // Get referral analytics from customer_referrals table (if it exists)
+    // Get actual referral analytics from customer_referrals table
+    const { data: referralStats } = await supabase
+      .from('customer_referrals')
+      .select('status, credit_amount, order_value')
+      .eq('referrer_customer_id', customer.id);
+
+    const totalReferrals = referralStats?.length || 0;
+    const signedUpReferrals = referralStats?.filter(r => ['signed_up', 'purchased', 'credited'].includes(r.status)).length || 0;
+    const purchasedReferrals = referralStats?.filter(r => ['purchased', 'credited'].includes(r.status)).length || 0;
+    const totalRewards = referralStats?.reduce((sum, r) => sum + (r.credit_amount || 0), 0) || 0;
+
+    // Update customer table with current stats
+    await supabase
+      .from('customers')
+      .update({
+        total_referrals: totalReferrals,
+        successful_referrals: purchasedReferrals,
+        rewards_earned: totalRewards / 100, // Convert pence to pounds
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', customer.id);
+
     const analytics = {
-      total_shares: customer?.total_referrals || 0,
+      total_shares: totalReferrals,
       qr_scans: 0, // This would come from QR scan tracking
       link_clicks: 0, // This would come from link click tracking
-      signups: customer?.successful_referrals || 0,
-      successful_purchases: customer?.successful_referrals || 0,
-      total_rewards_earned: customer?.rewards_earned || 0
+      signups: signedUpReferrals,
+      successful_purchases: purchasedReferrals,
+      total_rewards_earned: totalRewards / 100 // Convert pence to pounds
     };
 
     return NextResponse.json({
       success: true,
       customer: {
         personal_referral_code: customer.personal_referral_code,
-        total_referrals: customer.total_referrals || 0,
-        successful_referrals: customer.successful_referrals || 0,
-        rewards_earned: customer.rewards_earned || 0,
+        total_referrals: totalReferrals,
+        successful_referrals: purchasedReferrals,
+        rewards_earned: totalRewards / 100, // Convert pence to pounds
         signup_discount_used: customer.signup_discount_used || 0
       },
       analytics

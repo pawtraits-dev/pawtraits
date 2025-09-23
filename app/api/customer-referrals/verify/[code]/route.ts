@@ -46,14 +46,47 @@ export async function GET(
       );
     }
 
-    // Record referral access (increment view count)
-    await supabase
-      .from('customers')
-      .update({
-        total_referrals: (customer.total_referrals || 0) + 1,
-        last_shared_at: new Date().toISOString()
-      })
-      .eq('id', customer.id);
+    // Check if this referral access has already been recorded
+    const { data: existingReferral } = await supabase
+      .from('customer_referrals')
+      .select('id, status')
+      .eq('referral_code', code.toUpperCase())
+      .single();
+
+    if (!existingReferral) {
+      // Create new referral tracking record with 'accessed' status
+      await supabase
+        .from('customer_referrals')
+        .insert({
+          referrer_customer_id: customer.id,
+          referral_code: code.toUpperCase(),
+          status: 'accessed',
+          accessed_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString() // 90 days from now
+        });
+
+      console.log('[CUSTOMER_REFERRAL] New referral access recorded for code:', code);
+    } else if (existingReferral.status === 'pending') {
+      // Update existing pending referral to accessed
+      await supabase
+        .from('customer_referrals')
+        .update({
+          status: 'accessed',
+          accessed_at: new Date().toISOString()
+        })
+        .eq('referral_code', code.toUpperCase());
+
+      console.log('[CUSTOMER_REFERRAL] Updated pending referral to accessed for code:', code);
+    }
+
+    // Get actual referral stats from customer_referrals table
+    const { data: referralStats } = await supabase
+      .from('customer_referrals')
+      .select('status')
+      .eq('referrer_customer_id', customer.id);
+
+    const totalReferrals = referralStats?.length || 0;
+    const successfulReferrals = referralStats?.filter(r => ['purchased', 'credited'].includes(r.status)).length || 0;
 
     return NextResponse.json({
       success: true,
@@ -63,8 +96,8 @@ export async function GET(
         customer_name: `${customer.first_name} ${customer.last_name}`,
         customer_email: customer.email,
         status: 'active', // Customer referrals are always active
-        total_referrals: (customer.total_referrals || 0) + 1, // Return updated count
-        successful_referrals: customer.successful_referrals || 0
+        total_referrals: totalReferrals,
+        successful_referrals: successfulReferrals
       }
     });
 

@@ -169,60 +169,90 @@ export async function POST(request: NextRequest) {
       console.log('No pet name provided, skipping pet creation')
     }
 
-    // 6. Update referral tracking if referral code provided
-    if (referralCode) {
+    // 6. Handle customer referral tracking if referral code provided
+    if (referralCode && customerId) {
       try {
-        console.log('Updating referral tracking for code:', referralCode)
+        console.log('Processing customer referral for code:', referralCode)
 
-        // Mark referral as accepted using the enhanced database function
-        const { data: updatedReferral, error: acceptedError } = await supabaseService.getClient()
-          .rpc('mark_referral_accepted_enhanced', {
-            p_referral_code: referralCode,
-            p_customer_email: email.toLowerCase().trim(),
-            p_customer_name: `${firstName} ${lastName}`.trim(),
-            p_customer_phone: phone || null
-          })
+        // Check if this is a customer referral code
+        const { data: referrerCustomer, error: referrerError } = await supabaseService.getClient()
+          .from('customers')
+          .select('id, first_name, last_name, email')
+          .eq('personal_referral_code', referralCode.toUpperCase())
+          .single();
 
-        if (acceptedError) {
-          console.error('Error marking referral as accepted:', acceptedError)
+        if (referrerCustomer && !referrerError) {
+          // This is a customer-to-customer referral
+          console.log('Found customer referrer:', referrerCustomer.email)
+
+          // Update existing customer_referrals record or create new one
+          const { data: existingReferral, error: findError } = await supabaseService.getClient()
+            .from('customer_referrals')
+            .select('id, status')
+            .eq('referral_code', referralCode.toUpperCase())
+            .single();
+
+          if (existingReferral) {
+            // Update existing referral to 'signed_up' status
+            const { error: updateError } = await supabaseService.getClient()
+              .from('customer_referrals')
+              .update({
+                referee_customer_id: customerId,
+                referee_email: email.toLowerCase().trim(),
+                status: 'signed_up',
+                signed_up_at: new Date().toISOString()
+              })
+              .eq('id', existingReferral.id);
+
+            if (updateError) {
+              console.error('Error updating customer referral:', updateError)
+            } else {
+              console.log('Customer referral updated to signed_up status')
+            }
+          } else {
+            // Create new customer referral record
+            const { error: insertError } = await supabaseService.getClient()
+              .from('customer_referrals')
+              .insert({
+                referrer_customer_id: referrerCustomer.id,
+                referee_customer_id: customerId,
+                referral_code: referralCode.toUpperCase(),
+                referee_email: email.toLowerCase().trim(),
+                status: 'signed_up',
+                signed_up_at: new Date().toISOString(),
+                expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+              });
+
+            if (insertError) {
+              console.error('Error creating customer referral:', insertError)
+            } else {
+              console.log('New customer referral created with signed_up status')
+            }
+          }
         } else {
-          console.log('Referral marked as accepted:', updatedReferral)
+          // Try partner referral system as fallback
+          console.log('Not a customer referral code, trying partner referral system')
 
-          // Update customer record with partner reference if we got the referral data
-          if (updatedReferral?.partner_id && customerId) {
+          const { data: updatedReferral, error: acceptedError } = await supabaseService.getClient()
+            .rpc('mark_referral_accepted_enhanced', {
+              p_referral_code: referralCode,
+              p_customer_email: email.toLowerCase().trim(),
+              p_customer_name: `${firstName} ${lastName}`.trim(),
+              p_customer_phone: phone || null
+            })
+
+          if (acceptedError) {
+            console.error('Error marking partner referral as accepted:', acceptedError)
+          } else if (updatedReferral?.partner_id && customerId) {
+            console.log('Partner referral marked as accepted')
             await supabaseService.getClient()
               .from('customers')
               .update({ referred_by_partner_id: updatedReferral.partner_id })
               .eq('id', customerId)
           }
         }
-
-        // Track referral event
-        if (updatedReferral?.id) {
-          try {
-            const trackResponse = await fetch(`${request.nextUrl.origin}/api/referrals/${updatedReferral.id}/track`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                event_type: 'signup_complete',
-                user_id: authData.user.id,
-                event_data: {
-                  customer_email: email.toLowerCase().trim(),
-                  customer_name: `${firstName} ${lastName}`.trim(),
-                  pet_name: petName || null
-                }
-              })
-            })
-
-            if (!trackResponse.ok) {
-              console.warn('Referral tracking API call failed')
-            }
-          } catch (trackError) {
-            console.warn('Referral event tracking failed:', trackError)
-          }
-        }
       } catch (referralError) {
-        console.warn('Referral tracking failed:', referralError)
+        console.warn('Referral processing failed:', referralError)
       }
     }
 

@@ -269,6 +269,9 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       await handlePartnerCommission(order, paymentIntent, metadata, placedByPartnerId, supabase);
     }
 
+    // Handle customer referral completion for all orders
+    await handleCustomerReferralCompletion(supabase, customerEmail, subtotalAmount, order.id);
+
     // Create Gelato order for fulfillment
     await createGelatoOrder(order, paymentIntent, supabase, metadata);
 
@@ -791,5 +794,69 @@ async function handlePartnerCommission(
 
   } catch (error) {
     console.error('Error handling partner commission:', error);
+  }
+}
+
+// Handle customer referral completion
+async function handleCustomerReferralCompletion(supabase: any, customerEmail: string, orderValue: number, orderId: string) {
+  try {
+    console.log('Checking for customer referrals to complete for:', customerEmail);
+
+    // Find any customer_referrals where this customer is the referee
+    const { data: customerReferrals, error: findError } = await supabase
+      .from('customer_referrals')
+      .select('id, referrer_customer_id, referral_code, status, credit_amount')
+      .eq('referee_email', customerEmail.toLowerCase())
+      .in('status', ['accessed', 'signed_up']);
+
+    if (findError) {
+      console.error('Error finding customer referrals:', findError);
+      return;
+    }
+
+    if (!customerReferrals || customerReferrals.length === 0) {
+      console.log('No pending customer referrals found for:', customerEmail);
+      return;
+    }
+
+    for (const referral of customerReferrals) {
+      console.log('Processing customer referral completion:', {
+        referralId: referral.id,
+        referralCode: referral.referral_code,
+        currentStatus: referral.status
+      });
+
+      // Calculate customer referral credit (example: 10% of order value)
+      const creditAmount = Math.round(orderValue * 0.10); // 10% as credit in pence
+
+      // Update referral to 'purchased' status
+      const { error: updateError } = await supabase
+        .from('customer_referrals')
+        .update({
+          status: 'purchased',
+          purchased_at: new Date().toISOString(),
+          order_id: orderId,
+          order_value: orderValue,
+          credit_amount: creditAmount
+        })
+        .eq('id', referral.id);
+
+      if (updateError) {
+        console.error('Error updating customer referral to purchased:', updateError);
+        continue;
+      }
+
+      console.log('✅ Customer referral completed:', {
+        referralCode: referral.referral_code,
+        creditAmount: creditAmount,
+        orderValue: orderValue
+      });
+
+      // TODO: Could add automatic crediting logic here in the future
+      // For now, we just mark it as purchased and track the credit amount
+    }
+
+  } catch (error) {
+    console.error('Error handling customer referral completion:', error);
   }
 }
