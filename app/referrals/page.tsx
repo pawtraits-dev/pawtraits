@@ -711,10 +711,11 @@ export default function ReferralsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     checkUserAccess();
-  }, []);
+  }, [router]);
 
   const checkUserAccess = async () => {
     try {
@@ -727,30 +728,70 @@ export default function ReferralsPage() {
         return;
       }
 
-      const { isAuthenticated, user, profile } = await authResponse.json();
+      const { isAuthenticated, user } = await authResponse.json();
 
-      if (!isAuthenticated || !user || !profile) {
+      if (!isAuthenticated || !user) {
+        console.log('❌ REFERRALS: User not authenticated, redirecting to login');
         router.push('/auth/login');
         return;
       }
 
-      setUserProfile(profile);
+      console.log('✅ REFERRALS: User authenticated:', {
+        user_type: user.user_type,
+        email: user.email
+      });
+
+      // Validate user type - referrals are available to customers and partners
+      if (!['customer', 'partner'].includes(user.user_type)) {
+        console.error('❌ REFERRALS: Invalid user type for referrals:', user.user_type);
+        if (user.user_type === 'admin') {
+          router.push('/admin');
+        } else {
+          router.push('/auth/login');
+        }
+        return;
+      }
+
+      setUserProfile(user);
     } catch (error) {
-      console.error('Error checking user access:', error);
+      console.error('❌ REFERRALS: API error:', error);
+      setError('Failed to load user profile');
       router.push('/auth/login');
     } finally {
       setLoading(false);
     }
   };
 
+  // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading referrals...</p>
+        </div>
       </div>
     );
   }
 
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => router.push('/auth/login')}
+            className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // No user profile loaded (shouldn't happen due to loading/error states above)
   if (!userProfile) {
     return null;
   }
