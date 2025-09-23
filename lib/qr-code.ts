@@ -74,7 +74,7 @@ export class QRCodeService {
    */
   async generateAndUploadReferralQR(
     referralCode: string,
-    baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || 'https://pawtraits.pics'
   ): Promise<{ success: boolean; qrCodeUrl?: string; error?: string }> {
     try {
       // Create the referral URL
@@ -119,7 +119,7 @@ export class QRCodeService {
    */
   async generateReferralQRDataURL(
     referralCode: string,
-    baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || 'https://pawtraits.pics'
   ): Promise<string> {
     // Use the Pawtraits QR code with paw logo for all referral codes
     return this.generatePawtraitsQRCode(referralCode, baseUrl, {
@@ -147,7 +147,7 @@ export class QRCodeService {
   async generateBrandedQRCode(
     referralCode: string,
     partnerName: string,
-    baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || 'https://pawtraits.pics'
   ): Promise<string> {
     // Use the Pawtraits QR code with paw logo for all partner codes
     return this.generatePawtraitsQRCode(referralCode, baseUrl, {
@@ -161,7 +161,7 @@ export class QRCodeService {
    */
   async generatePawtraitsQRCode(
     referralCode: string,
-    baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || 'https://pawtraits.pics',
     options: QRCodeOptions = {}
   ): Promise<string> {
     const referralUrl = `${baseUrl}/r/${referralCode}`;
