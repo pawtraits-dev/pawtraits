@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const supabase = createClient(supabaseUrl, serviceRoleKey, {
+const serviceRoleSupabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
@@ -22,17 +24,14 @@ export async function PUT(
 ) {
   const { itemId } = await params;
   try {
-    // Get user from Authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
+    // Get user from session cookies (consistent with main cart API)
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
-    const token = authHeader.substring(7);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     const { quantity } = await request.json();
@@ -44,11 +43,9 @@ export async function PUT(
       );
     }
 
-    const itemId = params.itemId;
-
     if (quantity === 0) {
       // Remove item if quantity is 0
-      const { error: deleteError } = await supabase
+      const { error: deleteError } = await serviceRoleSupabase
         .from('cart_items')
         .delete()
         .eq('id', itemId)
@@ -62,7 +59,7 @@ export async function PUT(
       return NextResponse.json({ success: true, deleted: true });
     } else {
       // Update quantity
-      const { data: updatedItem, error: updateError } = await supabase
+      const { data: updatedItem, error: updateError } = await serviceRoleSupabase
         .from('cart_items')
         .update({ 
           quantity: quantity,
@@ -97,23 +94,18 @@ export async function DELETE(
 ) {
   const { itemId } = await params;
   try {
-    // Get user from Authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
+    // Get user from session cookies (consistent with main cart API)
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
-    const token = authHeader.substring(7);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
-
-    const itemId = params.itemId;
 
     // Remove specific item
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await serviceRoleSupabase
       .from('cart_items')
       .delete()
       .eq('id', itemId)

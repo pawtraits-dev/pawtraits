@@ -19,25 +19,24 @@ export async function GET(
       return NextResponse.json({ error: 'Referral code is required' }, { status: 400 });
     }
 
-    // Get customer referral details
-    const { data: referral, error: referralError } = await supabase
-      .from('customer_referrals')
+    // Get customer with static referral code
+    const { data: customer, error: customerError } = await supabase
+      .from('customers')
       .select(`
         id,
-        referral_code,
-        customer_name,
-        customer_email,
-        status,
+        first_name,
+        last_name,
+        email,
+        personal_referral_code,
         total_referrals,
         successful_referrals,
         created_at
       `)
-      .eq('referral_code', code.toUpperCase())
-      .eq('status', 'active')
+      .eq('personal_referral_code', code.toUpperCase())
       .single();
 
-    if (referralError || !referral) {
-      console.log('[CUSTOMER_REFERRAL] Referral code not found:', code, 'Error:', referralError?.message);
+    if (customerError || !customer) {
+      console.log('[CUSTOMER_REFERRAL] Customer referral code not found:', code, 'Error:', customerError?.message);
       return NextResponse.json(
         {
           error: 'Referral code not found or inactive',
@@ -49,22 +48,23 @@ export async function GET(
 
     // Record referral access (increment view count)
     await supabase
-      .from('customer_referrals')
+      .from('customers')
       .update({
-        total_referrals: referral.total_referrals + 1,
-        last_accessed: new Date().toISOString()
+        total_referrals: (customer.total_referrals || 0) + 1,
+        last_shared_at: new Date().toISOString()
       })
-      .eq('id', referral.id);
+      .eq('id', customer.id);
 
     return NextResponse.json({
       success: true,
       referral: {
-        id: referral.id,
-        referral_code: referral.referral_code,
-        customer_name: referral.customer_name,
-        status: referral.status,
-        total_referrals: referral.total_referrals + 1, // Return updated count
-        successful_referrals: referral.successful_referrals
+        id: customer.id,
+        referral_code: customer.personal_referral_code,
+        customer_name: `${customer.first_name} ${customer.last_name}`,
+        customer_email: customer.email,
+        status: 'active', // Customer referrals are always active
+        total_referrals: (customer.total_referrals || 0) + 1, // Return updated count
+        successful_referrals: customer.successful_referrals || 0
       }
     });
 

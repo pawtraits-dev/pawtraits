@@ -47,7 +47,7 @@ const navigationItems = [
   { name: 'My Pets', href: '/customer/pets', icon: Heart },
   { name: 'My Orders', href: '/customer/orders', icon: Package },
   { name: 'Cart', href: '/shop/cart', icon: ShoppingCart },
-  { name: 'Share & Earn', href: '/customer/referrals', icon: Share2 },
+  { name: 'Share & Earn', href: '/referrals', icon: Share2 },
   { name: 'My Account', href: '/customer/account', icon: User },
 ];
 

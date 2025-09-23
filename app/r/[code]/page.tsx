@@ -54,20 +54,45 @@ export default function ReferralLandingPage() {
   const loadReferral = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/referrals/code/${code}`);
-      
+
+      // First try partner referrals
+      let response = await fetch(`/api/referrals/code/${code}`);
+
       if (response.ok) {
         const data = await response.json();
         setReferral(data);
-        
-        // Track page view
+
+        // Track page view for partner referrals
         await fetch(`/api/referrals/${data.id}/track`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ event_type: 'page_view' })
         });
       } else if (response.status === 404) {
-        setError('Referral code not found or expired');
+        // If partner referral not found, try customer referrals
+        const customerResponse = await fetch(`/api/customer-referrals/verify/${code}`);
+
+        if (customerResponse.ok) {
+          const customerData = await customerResponse.json();
+
+          // Convert customer data to referral format
+          setReferral({
+            id: customerData.referral.id,
+            referral_code: customerData.referral.referral_code,
+            client_name: customerData.referral.customer_name,
+            status: customerData.referral.status,
+            commission_rate: 0,
+            expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year from now
+            referral_type: 'customer',
+            partner: {
+              first_name: customerData.referral.customer_name.split(' ')[0] || 'Customer',
+              last_name: customerData.referral.customer_name.split(' ')[1] || 'Friend',
+              business_name: 'Pawtraits Customer'
+            }
+          });
+        } else {
+          setError('Referral code not found or expired');
+        }
       } else {
         setError('Failed to load referral');
       }
@@ -80,31 +105,50 @@ export default function ReferralLandingPage() {
 
   const handleClaimDiscount = async () => {
     if (!referral) return;
-    
+
     try {
-      // Track claim event
-      await fetch(`/api/referrals/${referral.id}/track`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_type: 'link_click' })
-      });
+      // Track claim event differently for customer vs partner referrals
+      if (referral.referral_type === 'customer') {
+        // Track customer referral click
+        await fetch(`/api/referrals/track`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            referral_code: referral.referral_code,
+            action: 'click',
+            platform: 'web'
+          })
+        });
+      } else {
+        // Track partner referral event
+        await fetch(`/api/referrals/${referral.id}/track`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event_type: 'link_click' })
+        });
+      }
 
       setClaimed(true);
-      
+
       // Redirect based on referral type
       setTimeout(() => {
-        if (referral.referral_type === 'image_share' && referral.image_id) {
-          // Method 2: Redirect to shop page for the specific image
+        if (referral.referral_type === 'customer') {
+          // Customer referral: Redirect to signup with customer code
+          window.location.href = `/signup/user?ref=${code}&discount=20&type=customer`;
+        } else if (referral.referral_type === 'image_share' && referral.image_id) {
+          // Partner Method 2: Redirect to shop page for the specific image
           window.location.href = `/shop/${referral.image_id}?ref=${code}&discount=20`;
         } else {
-          // Method 1: Traditional signup flow
+          // Partner Method 1: Traditional signup flow
           window.location.href = `/signup/user?ref=${code}&discount=20`;
         }
       }, 1500);
     } catch (err) {
       console.error('Failed to track claim:', err);
       // Still redirect even if tracking fails
-      if (referral.referral_type === 'image_share' && referral.image_id) {
+      if (referral.referral_type === 'customer') {
+        window.location.href = `/signup/user?ref=${code}&discount=20&type=customer`;
+      } else if (referral.referral_type === 'image_share' && referral.image_id) {
         window.location.href = `/shop/${referral.image_id}?ref=${code}&discount=20`;
       } else {
         window.location.href = `/signup/user?ref=${code}&discount=20`;
@@ -180,8 +224,10 @@ export default function ReferralLandingPage() {
             🎨 You've Been Invited!
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            {referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`} 
-            {' '}wants to treat you to a custom AI pet portrait
+            {referral.referral_type === 'customer'
+              ? `${referral.partner.first_name} ${referral.partner.last_name} wants to share something special with you - get 20% off your first AI pet portrait!`
+              : `${referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`} wants to treat you to a custom AI pet portrait`
+            }
           </p>
         </div>
 
