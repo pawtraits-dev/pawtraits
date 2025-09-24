@@ -7,14 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  ArrowLeft, 
-  User, 
-  Building, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar, 
+import {
+  ArrowLeft,
+  User,
+  Building,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
   DollarSign,
   Users,
   TrendingUp,
@@ -26,7 +26,11 @@ import {
   UserCheck,
   Share2,
   Copy,
-  QrCode
+  QrCode,
+  Upload,
+  Trash2,
+  Loader2,
+  Image
 } from 'lucide-react';
 import type { Partner, Referral } from '@/lib/types';
 
@@ -101,6 +105,8 @@ export default function PartnerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [referralsLoading, setReferralsLoading] = useState(true);
   const [commissionsLoading, setCommissionsLoading] = useState(true);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUploadSuccess, setLogoUploadSuccess] = useState(false);
 
   useEffect(() => {
     if (params.id) {
@@ -204,6 +210,75 @@ export default function PartnerDetailPage() {
       } catch (error) {
         console.error('Failed to copy referral code:', error);
       }
+    }
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !partner) return;
+
+    try {
+      setIsUploadingLogo(true);
+      console.log('🔄 Admin uploading partner logo via API');
+
+      const formData = new FormData();
+      formData.append('logo', file);
+
+      const response = await fetch(`/api/admin/partners/${partner.id}/logo`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload logo');
+      }
+
+      const result = await response.json();
+
+      // Update local partner state with new logo URL
+      setPartner(prev => prev ? { ...prev, logo_url: result.logo_url } : null);
+
+      setLogoUploadSuccess(true);
+      setTimeout(() => setLogoUploadSuccess(false), 2000);
+
+    } catch (error) {
+      console.error('Error uploading partner logo:', error);
+      // TODO: Show error toast notification
+    } finally {
+      setIsUploadingLogo(false);
+      // Clear the file input
+      event.target.value = '';
+    }
+  };
+
+  const handleLogoDelete = async () => {
+    if (!partner) return;
+
+    try {
+      setIsUploadingLogo(true);
+      console.log('🗑️ Admin deleting partner logo via API');
+
+      const response = await fetch(`/api/admin/partners/${partner.id}/logo`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete logo');
+      }
+
+      // Update local partner state to remove logo URL
+      setPartner(prev => prev ? { ...prev, logo_url: null } : null);
+
+      setLogoUploadSuccess(true);
+      setTimeout(() => setLogoUploadSuccess(false), 2000);
+
+    } catch (error) {
+      console.error('Error deleting partner logo:', error);
+      // TODO: Show error toast notification
+    } finally {
+      setIsUploadingLogo(false);
     }
   };
 
@@ -520,6 +595,80 @@ export default function PartnerDetailPage() {
                     <p className="text-gray-700">{partner.bio}</p>
                   </div>
                 )}
+
+                {/* Business Logo Management */}
+                <div>
+                  <p className="font-medium mb-3 flex items-center">
+                    <Image className="w-4 h-4 mr-2" />
+                    Business Logo
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-center justify-center">
+                      {partner.logo_url ? (
+                        <img
+                          src={partner.logo_url}
+                          alt="Business Logo"
+                          className="w-full h-full object-contain rounded-lg"
+                        />
+                      ) : (
+                        <Upload className="w-6 h-6 text-gray-400" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <input
+                          type="file"
+                          id="admin-logo-upload"
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          onChange={handleLogoUpload}
+                          className="hidden"
+                        />
+                        <label htmlFor="admin-logo-upload">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="cursor-pointer"
+                            asChild
+                          >
+                            <span>
+                              {isUploadingLogo ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Uploading...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-4 h-4 mr-2" />
+                                  {partner.logo_url ? 'Change Logo' : 'Upload Logo'}
+                                </>
+                              )}
+                            </span>
+                          </Button>
+                        </label>
+                        {partner.logo_url && !isUploadingLogo && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleLogoDelete}
+                            className="text-red-600 border-red-300 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Remove
+                          </Button>
+                        )}
+                        {logoUploadSuccess && (
+                          <span className="text-sm text-green-600 flex items-center">
+                            <Check className="w-4 h-4 mr-1" />
+                            Updated!
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Upload logo for display on referral invitations. JPEG, PNG, WebP. Max 5MB.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
