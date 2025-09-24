@@ -16,7 +16,9 @@ import {
   Building,
   TrendingUp,
   Users,
-  Scan
+  Scan,
+  Copy,
+  CheckCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { PreRegistrationCode, PreRegistrationCodeWithPartner } from '@/lib/types';
@@ -37,6 +39,7 @@ export default function PreRegistrationManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [campaignFilter, setCampaignFilter] = useState<string>('all');
+  const [copiedCodes, setCopiedCodes] = useState<Set<string>>(new Set());
 
   // Get unique campaigns for filter
   const campaigns = Array.from(new Set(codes.map(code => code.marketing_campaign).filter(Boolean)));
@@ -122,6 +125,23 @@ export default function PreRegistrationManagementPage() {
       case 'expired': return 'bg-gray-100 text-gray-800';
       case 'deactivated': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const handleCopyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCodes(prev => new Set(prev).add(code));
+      // Clear the copied state after 2 seconds
+      setTimeout(() => {
+        setCopiedCodes(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(code);
+          return newSet;
+        });
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to copy code:', error);
     }
   };
 
@@ -317,7 +337,24 @@ export default function PreRegistrationManagementPage() {
                   {filteredCodes.map((code) => (
                     <tr key={code.id} className="border-b hover:bg-gray-50">
                       <td className="py-3 px-4">
-                        <div className="font-mono font-medium">{code.code}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="font-mono font-bold text-lg bg-gray-100 px-3 py-1 rounded border">
+                            {code.code}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleCopyCode(code.code)}
+                            className="h-8 w-8 p-0"
+                            title="Copy code"
+                          >
+                            {copiedCodes.has(code.code) ? (
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
                       </td>
                       <td className="py-3 px-4">
                         <Badge className={getStatusColor(code.status)}>

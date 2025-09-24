@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Plus,
   ArrowLeft,
@@ -25,6 +26,8 @@ interface CreateFormData {
   business_category: string;
   marketing_campaign: string;
   expiration_date: string;
+  bulk_generation: boolean;
+  quantity: number;
 }
 
 export default function CreatePreRegistrationCodePage() {
@@ -33,7 +36,9 @@ export default function CreatePreRegistrationCodePage() {
     code: '',
     business_category: '',
     marketing_campaign: '',
-    expiration_date: ''
+    expiration_date: '',
+    bulk_generation: false,
+    quantity: 10
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +53,21 @@ export default function CreatePreRegistrationCodePage() {
     setFormData(prev => ({ ...prev, code: result }));
   };
 
+  const generateBulkCodes = (quantity: number) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const codes = [];
+
+    for (let i = 0; i < quantity; i++) {
+      let code = '';
+      for (let j = 0; j < 8; j++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      codes.push(code);
+    }
+
+    return codes;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -55,42 +75,77 @@ export default function CreatePreRegistrationCodePage() {
     setSuccess(false);
 
     try {
-      const response = await fetch('/api/admin/pre-registration/codes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          expiration_date: formData.expiration_date || null
-        })
-      });
+      if (formData.bulk_generation) {
+        // Generate multiple codes
+        const codes = generateBulkCodes(formData.quantity);
+        const responses = [];
 
-      if (response.ok) {
+        for (const code of codes) {
+          const response = await fetch('/api/admin/pre-registration/codes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code,
+              business_category: formData.business_category || null,
+              marketing_campaign: formData.marketing_campaign || null,
+              expiration_date: formData.expiration_date || null
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Failed to create code ${code}: ${errorData.error}`);
+          }
+
+          responses.push(await response.json());
+        }
+
         setSuccess(true);
-        // Reset form
-        setFormData({
-          code: '',
-          business_category: '',
-          marketing_campaign: '',
-          expiration_date: ''
+        setError(`Successfully created ${codes.length} codes!`);
+      } else {
+        // Single code creation
+        const response = await fetch('/api/admin/pre-registration/codes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            expiration_date: formData.expiration_date || null
+          })
         });
 
-        // Redirect after a brief delay to show success message
-        setTimeout(() => {
-          router.push('/admin/partners/pre-registration');
-        }, 2000);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to create code');
+        if (response.ok) {
+          setSuccess(true);
+          setError('Code created successfully!');
+        } else {
+          const errorData = await response.json();
+          setError(errorData.error || 'Failed to create code');
+        }
       }
+
+      // Reset form
+      setFormData({
+        code: '',
+        business_category: '',
+        marketing_campaign: '',
+        expiration_date: '',
+        bulk_generation: false,
+        quantity: 10
+      });
+
+      // Redirect after a delay to show success message
+      setTimeout(() => {
+        router.push('/admin/partners/pre-registration');
+      }, 3000);
+
     } catch (error) {
-      console.error('Error creating pre-registration code:', error);
-      setError('Failed to create code');
+      console.error('Error creating pre-registration code(s):', error);
+      setError(error instanceof Error ? error.message : 'Failed to create code(s)');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (field: keyof CreateFormData, value: string) => {
+  const handleInputChange = (field: keyof CreateFormData, value: string | boolean | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -117,7 +172,10 @@ export default function CreatePreRegistrationCodePage() {
         <Alert className="border-green-200 bg-green-50">
           <CheckCircle2 className="h-4 w-4 text-green-600" />
           <AlertDescription className="text-green-700">
-            Pre-registration code created successfully! Redirecting to codes list...
+            {formData.bulk_generation ?
+              `${formData.quantity} pre-registration codes created successfully! Redirecting to codes list...` :
+              'Pre-registration code created successfully! Redirecting to codes list...'
+            }
           </AlertDescription>
         </Alert>
       )}
@@ -139,35 +197,75 @@ export default function CreatePreRegistrationCodePage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Code Field */}
+                {/* Bulk Generation Toggle */}
                 <div className="space-y-2">
-                  <Label htmlFor="code" className="flex items-center gap-2">
-                    <QrCode className="w-4 h-4" />
-                    Code
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="code"
-                      value={formData.code}
-                      onChange={(e) => handleInputChange('code', e.target.value.toUpperCase())}
-                      placeholder="Enter unique code (e.g., ABC12345)"
-                      required
-                      maxLength={50}
-                      className="font-mono"
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="bulk_generation"
+                      checked={formData.bulk_generation}
+                      onCheckedChange={(checked) => handleInputChange('bulk_generation', checked as boolean)}
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={generateRandomCode}
-                      className="whitespace-nowrap"
-                    >
-                      Generate Random
-                    </Button>
+                    <Label htmlFor="bulk_generation" className="flex items-center gap-2">
+                      <Plus className="w-4 h-4" />
+                      Bulk Generation
+                    </Label>
                   </div>
                   <p className="text-sm text-gray-500">
-                    Unique identifier for this pre-registration code (6-50 characters, letters and numbers only)
+                    Generate multiple codes with the same settings
                   </p>
                 </div>
+
+                {/* Quantity Field (only shown for bulk generation) */}
+                {formData.bulk_generation && (
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity">Number of Codes to Generate</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={formData.quantity}
+                      onChange={(e) => handleInputChange('quantity', parseInt(e.target.value) || 10)}
+                      placeholder="10"
+                      required
+                    />
+                    <p className="text-sm text-gray-500">
+                      How many codes to generate (1-100)
+                    </p>
+                  </div>
+                )}
+
+                {/* Code Field (only shown for single generation) */}
+                {!formData.bulk_generation && (
+                  <div className="space-y-2">
+                    <Label htmlFor="code" className="flex items-center gap-2">
+                      <QrCode className="w-4 h-4" />
+                      Code
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="code"
+                        value={formData.code}
+                        onChange={(e) => handleInputChange('code', e.target.value.toUpperCase())}
+                        placeholder="Enter unique code (e.g., ABC12345)"
+                        required
+                        maxLength={50}
+                        className="font-mono"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={generateRandomCode}
+                        className="whitespace-nowrap"
+                      >
+                        Generate Random
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      Unique identifier for this pre-registration code (6-50 characters, letters and numbers only)
+                    </p>
+                  </div>
+                )}
 
                 {/* Business Category */}
                 <div className="space-y-2">
@@ -227,11 +325,14 @@ export default function CreatePreRegistrationCodePage() {
                 <div className="flex gap-3 pt-4">
                   <Button
                     type="submit"
-                    disabled={loading || !formData.code.trim()}
+                    disabled={loading || (!formData.bulk_generation && !formData.code.trim())}
                     className="flex-1"
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    {loading ? 'Creating...' : 'Create Code'}
+                    {loading ?
+                      (formData.bulk_generation ? 'Creating Codes...' : 'Creating...') :
+                      (formData.bulk_generation ? `Create ${formData.quantity} Codes` : 'Create Code')
+                    }
                   </Button>
                   <Button
                     type="button"
@@ -255,22 +356,32 @@ export default function CreatePreRegistrationCodePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
+                <h4 className="font-medium text-gray-900">Single vs Bulk Generation:</h4>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  <li>• <strong>Single:</strong> Create one code with custom or random ID</li>
+                  <li>• <strong>Bulk:</strong> Generate up to 100 codes at once</li>
+                  <li>• All codes in bulk share same settings</li>
+                  <li>• QR codes generated automatically</li>
+                </ul>
+              </div>
+
+              <div className="space-y-2">
                 <h4 className="font-medium text-gray-900">After Creating:</h4>
                 <ul className="text-sm text-gray-600 space-y-1">
-                  <li>• QR code will be automatically generated</li>
                   <li>• Download individual or bulk QR codes</li>
                   <li>• Print and distribute to target partners</li>
                   <li>• Track scans and conversions</li>
+                  <li>• Monitor campaign performance</li>
                 </ul>
               </div>
 
               <div className="space-y-2">
                 <h4 className="font-medium text-gray-900">Best Practices:</h4>
                 <ul className="text-sm text-gray-600 space-y-1">
+                  <li>• Use bulk generation for campaigns</li>
                   <li>• Use descriptive campaign names</li>
                   <li>• Group codes by business type</li>
                   <li>• Set expiration dates for campaigns</li>
-                  <li>• Monitor performance regularly</li>
                 </ul>
               </div>
 
