@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User, CreditCard, Bell, Shield, Eye, EyeOff, Save, Loader2, Check } from 'lucide-react';
+import { User, CreditCard, Bell, Shield, Eye, EyeOff, Save, Loader2, Check, Upload, Trash2 } from 'lucide-react';
 import type { UserProfile } from '@/lib/user-types';
 import { getUserDisplayName } from '@/lib/user-types';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
@@ -30,6 +30,8 @@ export default function PartnerAccountView({ userProfile }: PartnerAccountViewPr
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   // Profile form state - initialized from userProfile prop
   const [profileData, setProfileData] = useState({
@@ -109,6 +111,9 @@ export default function PartnerAccountView({ userProfile }: PartnerAccountViewPr
           zipCode: partnerData.business_address?.zip || '',
           bio: partnerData.bio || '',
         });
+
+        // Update logo URL
+        setLogoUrl(partnerData.logo_url || null);
 
         // Update payment data
         setPaymentData(prev => ({
@@ -314,6 +319,72 @@ export default function PartnerAccountView({ userProfile }: PartnerAccountViewPr
     setNotifications(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingLogo(true);
+      console.log('🏗️ PARTNER ACCOUNT: Uploading logo via API');
+
+      const formData = new FormData();
+      formData.append('logo', file);
+
+      const response = await fetch('/api/partners/logo', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload logo');
+      }
+
+      const result = await response.json();
+      setLogoUrl(result.logo_url);
+
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 2000);
+
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      // TODO: Show error message to user
+    } finally {
+      setIsUploadingLogo(false);
+      // Clear the file input
+      event.target.value = '';
+    }
+  };
+
+  const handleLogoDelete = async () => {
+    try {
+      setIsUploadingLogo(true);
+      console.log('🏗️ PARTNER ACCOUNT: Deleting logo via API');
+
+      const response = await fetch('/api/partners/logo', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete logo');
+      }
+
+      setLogoUrl(null);
+
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 2000);
+
+    } catch (error) {
+      console.error('Error deleting logo:', error);
+      // TODO: Show error message to user
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
   if (isDataLoading) {
     return (
       <CountryProvider>
@@ -376,18 +447,70 @@ export default function PartnerAccountView({ userProfile }: PartnerAccountViewPr
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="flex items-center gap-6 mb-6">
-                    <Avatar className="w-16 h-16">
-                      <AvatarImage src="/placeholder-avatar.png" />
-                      <AvatarFallback className="text-lg bg-green-100 text-green-700">
-                        {getUserDisplayName(userProfile).split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <Button variant="outline" size="sm" className="border-green-300 text-green-700 hover:bg-green-50">
-                        Change Photo
-                      </Button>
-                      <p className="text-sm text-gray-600 mt-1">JPG, GIF or PNG. 1MB max.</p>
+                  {/* Business Logo Section */}
+                  <div className="space-y-4 mb-6">
+                    <h3 className="text-lg font-medium text-green-900">Business Logo</h3>
+                    <div className="flex items-center gap-6">
+                      <div className="w-24 h-24 rounded-lg border-2 border-dashed border-green-200 bg-green-50 flex items-center justify-center">
+                        {logoUrl ? (
+                          <img
+                            src={logoUrl}
+                            alt="Business Logo"
+                            className="w-full h-full object-contain rounded-lg"
+                          />
+                        ) : (
+                          <Upload className="w-8 h-8 text-green-400" />
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <input
+                            type="file"
+                            id="logo-upload"
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={handleLogoUpload}
+                            className="hidden"
+                          />
+                          <label htmlFor="logo-upload">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-green-300 text-green-700 hover:bg-green-50"
+                              asChild
+                            >
+                              <span className="cursor-pointer">
+                                {isUploadingLogo ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Uploading...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Upload className="w-4 h-4 mr-2" />
+                                    {logoUrl ? 'Change Logo' : 'Upload Logo'}
+                                  </>
+                                )}
+                              </span>
+                            </Button>
+                          </label>
+                          {logoUrl && !isUploadingLogo && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleLogoDelete}
+                              className="border-red-300 text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          Upload your business logo to display on referral invitations.
+                          <br />
+                          JPEG, PNG, or WebP. Maximum 5MB. Optimal size: 400x400px.
+                        </p>
+                      </div>
                     </div>
                   </div>
 

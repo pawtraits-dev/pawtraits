@@ -19,6 +19,14 @@ import {
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+interface Partner {
+  id: string;
+  business_name?: string;
+  first_name: string;
+  last_name: string;
+  logo_url?: string;
+}
+
 interface PreRegistrationCode {
   id: string;
   code: string;
@@ -29,6 +37,7 @@ interface PreRegistrationCode {
   conversions_count: number;
   created_at: string;
   expiration_date?: string;
+  partner?: Partner;
 }
 
 export default function PreRegistrationLandingPage() {
@@ -146,12 +155,30 @@ export default function PreRegistrationLandingPage() {
                 <p className="text-sm text-gray-600">Partner Registration</p>
               </div>
             </div>
-            {scanRecorded && (
-              <div className="flex items-center gap-2 text-green-600">
-                <CheckCircle2 className="w-5 h-5" />
-                <span className="text-sm font-medium">QR Code Verified</span>
-              </div>
-            )}
+            <div className="flex items-center gap-4">
+              {/* Partner Logo */}
+              {codeData?.partner?.logo_url && (
+                <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border">
+                  <img
+                    src={codeData.partner.logo_url}
+                    alt={`${codeData.partner.business_name || `${codeData.partner.first_name} ${codeData.partner.last_name}`} Logo`}
+                    className="w-8 h-8 object-contain rounded"
+                  />
+                  <div className="text-sm">
+                    <p className="font-medium text-gray-900">
+                      {codeData.partner.business_name || `${codeData.partner.first_name} ${codeData.partner.last_name}`}
+                    </p>
+                    <p className="text-gray-500">Referring Partner</p>
+                  </div>
+                </div>
+              )}
+              {scanRecorded && (
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span className="text-sm font-medium">QR Code Verified</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -160,15 +187,40 @@ export default function PreRegistrationLandingPage() {
         {/* Welcome Section */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <QrCode className="w-16 h-16 text-purple-600" />
+            {codeData?.partner?.logo_url ? (
+              <div className="w-20 h-20 p-2 bg-white border border-purple-200 rounded-2xl shadow-sm">
+                <img
+                  src={codeData.partner.logo_url}
+                  alt="Partner Logo"
+                  className="w-full h-full object-contain rounded-xl"
+                />
+              </div>
+            ) : (
+              <QrCode className="w-16 h-16 text-purple-600" />
+            )}
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome to Pawtraits Partner Program!
-          </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            You&apos;ve scanned a special partner invitation QR code. Join our network of pet care professionals
-            and start earning commissions by referring customers to beautiful AI-generated pet portraits.
-          </p>
+
+          {codeData?.partner ? (
+            <>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                You&apos;re Invited by {codeData.partner.business_name || `${codeData.partner.first_name} ${codeData.partner.last_name}`}!
+              </h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                {codeData.partner.business_name || `${codeData.partner.first_name} ${codeData.partner.last_name}`} has invited you to join the Pawtraits Partner Program.
+                Join our network of pet care professionals and start earning commissions by referring customers to beautiful AI-generated pet portraits.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                Welcome to Pawtraits Partner Program!
+              </h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                You&apos;ve scanned a special partner invitation QR code. Join our network of pet care professionals
+                and start earning commissions by referring customers to beautiful AI-generated pet portraits.
+              </p>
+            </>
+          )}
         </div>
 
         {/* Code Information */}

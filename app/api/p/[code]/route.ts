@@ -23,10 +23,19 @@ export async function GET(
       return NextResponse.json({ error: 'Code is required' }, { status: 400 });
     }
 
-    // Get the pre-registration code
+    // Get the pre-registration code with partner information
     const { data: codeData, error } = await supabase
       .from('pre_registration_codes')
-      .select('*')
+      .select(`
+        *,
+        partner:partners(
+          id,
+          business_name,
+          first_name,
+          last_name,
+          logo_url
+        )
+      `)
       .eq('code', code)
       .single();
 

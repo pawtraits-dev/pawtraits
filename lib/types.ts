@@ -237,6 +237,7 @@ export interface Partner {
   business_website?: string;
   bio?: string;
   avatar_url?: string;
+  logo_url?: string;
   is_active: boolean;
   is_verified: boolean;
   onboarding_completed: boolean;
