@@ -49,9 +49,13 @@ export async function GET(
     // Check if this referral access has already been recorded
     const { data: existingReferral } = await supabase
       .from('customer_referrals')
-      .select('id, status')
+      .select('id, status, qr_scans_count')
       .eq('referral_code', code.toUpperCase())
       .single();
+
+    // Track QR scan - increment scan count
+    const currentScans = (existingReferral?.qr_scans_count || 0);
+    const newScanCount = currentScans + 1;
 
     if (!existingReferral) {
       // Create new referral tracking record with 'accessed' status
@@ -62,21 +66,29 @@ export async function GET(
           referral_code: code.toUpperCase(),
           status: 'accessed',
           accessed_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString() // 90 days from now
+          expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days from now
+          qr_scans_count: 1 // First scan
         });
 
       console.log('[CUSTOMER_REFERRAL] New referral access recorded for code:', code);
-    } else if (existingReferral.status === 'pending') {
-      // Update existing pending referral to accessed
+    } else {
+      // Update existing referral with new scan count
+      const updateData: any = {
+        qr_scans_count: newScanCount
+      };
+
+      // If status is pending, also update to accessed
+      if (existingReferral.status === 'pending') {
+        updateData.status = 'accessed';
+        updateData.accessed_at = new Date().toISOString();
+      }
+
       await supabase
         .from('customer_referrals')
-        .update({
-          status: 'accessed',
-          accessed_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('referral_code', code.toUpperCase());
 
-      console.log('[CUSTOMER_REFERRAL] Updated pending referral to accessed for code:', code);
+      console.log('[CUSTOMER_REFERRAL] Updated referral scan count to', newScanCount, 'for code:', code);
     }
 
     // Get actual referral stats from customer_referrals table

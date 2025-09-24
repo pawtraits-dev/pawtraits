@@ -78,13 +78,14 @@ export async function GET(request: NextRequest) {
     // Get actual referral analytics from customer_referrals table
     const { data: referralStats } = await supabase
       .from('customer_referrals')
-      .select('status, credit_amount, order_value')
+      .select('status, credit_amount, order_value, qr_scans_count')
       .eq('referrer_customer_id', customer.id);
 
     const totalReferrals = referralStats?.length || 0;
     const signedUpReferrals = referralStats?.filter(r => ['signed_up', 'purchased', 'credited'].includes(r.status)).length || 0;
     const purchasedReferrals = referralStats?.filter(r => ['purchased', 'credited'].includes(r.status)).length || 0;
     const totalRewards = referralStats?.reduce((sum, r) => sum + (r.credit_amount || 0), 0) || 0;
+    const totalQRScans = referralStats?.reduce((sum, r) => sum + (r.qr_scans_count || 0), 0) || 0;
 
     // Update customer table with current stats
     await supabase
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest) {
 
     const analytics = {
       total_shares: totalReferrals,
-      qr_scans: 0, // This would come from QR scan tracking
+      qr_scans: totalQRScans, // Now actually counting QR scans
       link_clicks: 0, // This would come from link click tracking
       signups: signedUpReferrals,
       successful_purchases: purchasedReferrals,
