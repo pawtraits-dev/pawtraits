@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,6 +22,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get carousel content with full details
+    const supabaseAdmin = getSupabaseAdmin();
     const { data: content, error } = await supabaseAdmin
       .from('carousel_content_with_details')
       .select('*')
@@ -58,6 +61,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
     const body = await request.json();
     const { carousel_id, selected_themes, selected_dog_breeds, selected_cat_breeds } = body;
 
@@ -153,6 +157,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
     const body = await request.json();
     const { selections } = body; // Array of {id, sort_order, is_active}
 
