@@ -70,23 +70,37 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Create user profile
-    const { error: profileError } = await supabase
+    // Create user profile - this is critical for authentication to work
+    const { data: userProfile, error: profileError } = await supabase
       .from('user_profiles')
       .insert({
-        id: userId,
+        user_id: userId,  // Fixed: was using 'id' instead of 'user_id'
         user_type: 'partner',
         first_name: firstName,
         last_name: lastName,
         email: email,
         phone: phone || null,
-        partner_id: partner.id
-      });
+        partner_id: partner.id,
+        status: 'active'
+      })
+      .select()
+      .single();
 
     if (profileError) {
       console.error('Failed to create user profile:', profileError);
-      // Don't fail the entire request if profile creation fails
+
+      // Clean up the partner record if user profile creation fails
+      await supabase
+        .from('partners')
+        .delete()
+        .eq('id', userId);
+
+      return NextResponse.json({
+        error: 'Failed to create user profile - signup incomplete'
+      }, { status: 500 });
     }
+
+    console.log('✅ Created user profile for partner:', userProfile.id);
 
     return NextResponse.json({
       success: true,
