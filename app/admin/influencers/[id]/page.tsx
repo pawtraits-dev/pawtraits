@@ -191,6 +191,10 @@ export default function AdminInfluencerDetailPage() {
     is_active: true,
   });
 
+  // Auto-fetch state
+  const [autoFetching, setAutoFetching] = useState(false);
+  const [autoFetchResult, setAutoFetchResult] = useState<string | null>(null);
+
   // Form state for adding referral code
   const [codeFormData, setCodeFormData] = useState({
     code: '',
@@ -554,6 +558,61 @@ export default function AdminInfluencerDetailPage() {
     });
   };
 
+  const autoFetchSocialData = async () => {
+    if (!channelFormData.platform || !channelFormData.username) {
+      setAutoFetchResult('Please select a platform and enter a username first');
+      return;
+    }
+
+    setAutoFetching(true);
+    setAutoFetchResult(null);
+
+    try {
+      const response = await fetch('/api/social-media/fetch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platform: channelFormData.platform,
+          username: channelFormData.username,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch social media data');
+      }
+
+      if (data.error) {
+        setAutoFetchResult(`Error: ${data.error}`);
+        return;
+      }
+
+      // Update form with fetched data
+      setChannelFormData(prev => ({
+        ...prev,
+        profile_url: data.profile_url || prev.profile_url,
+        follower_count: data.follower_count || prev.follower_count,
+        engagement_rate: data.engagement_rate || prev.engagement_rate,
+        verified: data.verified !== null ? data.verified : prev.verified,
+      }));
+
+      const successMessage = [];
+      if (data.follower_count) successMessage.push(`${data.follower_count.toLocaleString()} followers`);
+      if (data.post_count) successMessage.push(`${data.post_count.toLocaleString()} posts`);
+      if (data.verified) successMessage.push('verified account');
+
+      setAutoFetchResult(`✓ Fetched: ${successMessage.length > 0 ? successMessage.join(', ') : 'Profile validated'}`);
+    } catch (error) {
+      console.error('Error auto-fetching social data:', error);
+      setAutoFetchResult(`Error: ${error instanceof Error ? error.message : 'Failed to fetch data'}`);
+    } finally {
+      setAutoFetching(false);
+    }
+  };
+
   const getPlatformIcon = (platform: string) => {
     const Icon = platformIcons[platform.toLowerCase()];
     return Icon || ExternalLink;
@@ -658,7 +717,7 @@ export default function AdminInfluencerDetailPage() {
               <div className="ml-4">
                 <p className="text-sm text-gray-600">Conversion Rate</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {(influencer.stats.referrals.conversion_rate * 100).toFixed(1)}%
+                  {((influencer.stats?.referrals?.conversion_rate || 0) * 100).toFixed(1)}%
                 </p>
               </div>
             </div>
@@ -672,7 +731,7 @@ export default function AdminInfluencerDetailPage() {
               <div className="ml-4">
                 <p className="text-sm text-gray-600">Commission Earned</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  ${influencer.stats.financial.total_commission_earned.toFixed(2)}
+                  ${(influencer.stats?.financial?.total_commission_earned || 0).toFixed(2)}
                 </p>
               </div>
             </div>
@@ -744,19 +803,19 @@ export default function AdminInfluencerDetailPage() {
               <CardContent className="space-y-3">
                 <div className="flex justify-between">
                   <span>Total Revenue Generated:</span>
-                  <span className="font-medium">${influencer.stats.financial.total_revenue.toFixed(2)}</span>
+                  <span className="font-medium">${(influencer.stats?.financial?.total_revenue || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Total Commission:</span>
-                  <span className="font-medium">${influencer.stats.financial.total_commission_earned.toFixed(2)}</span>
+                  <span className="font-medium">${(influencer.stats?.financial?.total_commission_earned || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Commission Paid:</span>
-                  <span className="font-medium text-green-600">${influencer.stats.financial.commission_paid.toFixed(2)}</span>
+                  <span className="font-medium text-green-600">${(influencer.stats?.financial?.commission_paid || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Commission Pending:</span>
-                  <span className="font-medium text-yellow-600">${influencer.stats.financial.commission_pending.toFixed(2)}</span>
+                  <span className="font-medium text-yellow-600">${(influencer.stats?.financial?.commission_pending || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t">
                   <span>Commission Rate:</span>
@@ -965,11 +1024,11 @@ export default function AdminInfluencerDetailPage() {
 
                         <div className="flex items-center space-x-6">
                           <div className="text-center">
-                            <p className="text-lg font-semibold">{channel.follower_count.toLocaleString()}</p>
+                            <p className="text-lg font-semibold">{(channel.follower_count || 0).toLocaleString()}</p>
                             <p className="text-sm text-gray-600">followers</p>
                           </div>
                           <div className="text-center">
-                            <p className="text-lg font-semibold">{channel.engagement_rate.toFixed(1)}%</p>
+                            <p className="text-lg font-semibold">{(channel.engagement_rate || 0).toFixed(1)}%</p>
                             <p className="text-sm text-gray-600">engagement</p>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -1100,11 +1159,11 @@ export default function AdminInfluencerDetailPage() {
                           <p className="text-sm text-gray-500">Conversions</p>
                         </div>
                         <div className="p-3 bg-white rounded-md border">
-                          <p className="text-lg font-semibold text-gray-900">${code.total_revenue.toFixed(2)}</p>
+                          <p className="text-lg font-semibold text-gray-900">${(code.total_revenue || 0).toFixed(2)}</p>
                           <p className="text-sm text-gray-500">Revenue</p>
                         </div>
                         <div className="p-3 bg-white rounded-md border bg-green-50">
-                          <p className="text-lg font-semibold text-green-600">${code.total_commission.toFixed(2)}</p>
+                          <p className="text-lg font-semibold text-green-600">${(code.total_commission || 0).toFixed(2)}</p>
                           <p className="text-sm text-gray-500">Commission</p>
                         </div>
                       </div>
@@ -1144,9 +1203,9 @@ export default function AdminInfluencerDetailPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium">${referral.order_value.toFixed(2)}</p>
+                        <p className="font-medium">${(referral.order_value || 0).toFixed(2)}</p>
                         <p className="text-sm text-green-600">
-                          ${referral.commission_amount.toFixed(2)} commission
+                          ${(referral.commission_amount || 0).toFixed(2)} commission
                         </p>
                       </div>
                     </div>
@@ -1173,7 +1232,10 @@ export default function AdminInfluencerDetailPage() {
               <select
                 id="platform"
                 value={channelFormData.platform}
-                onChange={(e) => setChannelFormData({ ...channelFormData, platform: e.target.value })}
+                onChange={(e) => {
+                  setChannelFormData({ ...channelFormData, platform: e.target.value });
+                  setAutoFetchResult(null); // Clear previous result when platform changes
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select a platform</option>
@@ -1189,12 +1251,41 @@ export default function AdminInfluencerDetailPage() {
 
             <div>
               <Label htmlFor="channel_username">Username *</Label>
-              <Input
-                id="channel_username"
-                value={channelFormData.username}
-                onChange={(e) => setChannelFormData({ ...channelFormData, username: e.target.value })}
-                placeholder="@username"
-              />
+              <div className="flex space-x-2">
+                <Input
+                  id="channel_username"
+                  value={channelFormData.username}
+                  onChange={(e) => {
+                    setChannelFormData({ ...channelFormData, username: e.target.value });
+                    setAutoFetchResult(null); // Clear previous result when username changes
+                  }}
+                  placeholder="@username"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={autoFetchSocialData}
+                  disabled={autoFetching || !channelFormData.platform || !channelFormData.username}
+                  className="whitespace-nowrap"
+                >
+                  {autoFetching ? (
+                    <>
+                      <div className="w-4 h-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 mr-2"></div>
+                      Fetching...
+                    </>
+                  ) : (
+                    <>🔍 Auto-Fetch</>
+                  )}
+                </Button>
+              </div>
+              {autoFetchResult && (
+                <p className={`text-xs mt-1 ${
+                  autoFetchResult.startsWith('✓') ? 'text-green-600' : autoFetchResult.startsWith('Error') ? 'text-red-600' : 'text-yellow-600'
+                }`}>
+                  {autoFetchResult}
+                </p>
+              )}
             </div>
 
             <div>
@@ -1204,7 +1295,11 @@ export default function AdminInfluencerDetailPage() {
                 value={channelFormData.profile_url}
                 onChange={(e) => setChannelFormData({ ...channelFormData, profile_url: e.target.value })}
                 placeholder="https://platform.com/username"
+                className={channelFormData.profile_url && !channelFormData.profile_url.startsWith('http') ? 'border-yellow-500' : ''}
               />
+              {channelFormData.profile_url && !channelFormData.profile_url.startsWith('http') && (
+                <p className="text-xs text-yellow-600 mt-1">URL should start with https://</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
