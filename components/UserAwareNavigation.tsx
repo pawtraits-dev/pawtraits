@@ -63,15 +63,17 @@ export default function UserAwareNavigation({
   const userType = userProfile?.user_type || 'customer'
   const isPartner = userType === 'partner'
   const isAdmin = userType === 'admin'
+  const isInfluencer = userType === 'influencer'
 
   // Theme colors based on user type
   const theme = {
-    primary: isPartner ? 'text-green-600' : isAdmin ? 'text-blue-600' : 'text-purple-600',
-    primaryHover: isPartner ? 'hover:text-green-700' : isAdmin ? 'hover:text-blue-700' : 'hover:text-purple-700',
-    primaryBg: isPartner ? 'bg-green-600' : isAdmin ? 'bg-blue-600' : 'bg-purple-600',
-    primaryBgHover: isPartner ? 'hover:bg-green-700' : isAdmin ? 'hover:bg-blue-700' : 'hover:bg-purple-700',
-    accent: isPartner ? 'bg-green-50 border-green-200' : isAdmin ? 'bg-blue-50 border-blue-200' : 'bg-purple-50 border-purple-200',
-    logo: isPartner ? '/assets/logos/paw-svgrepo-200x200-green.svg' :
+    primary: isInfluencer ? 'text-yellow-600' : isPartner ? 'text-green-600' : isAdmin ? 'text-blue-600' : 'text-purple-600',
+    primaryHover: isInfluencer ? 'hover:text-yellow-700' : isPartner ? 'hover:text-green-700' : isAdmin ? 'hover:text-blue-700' : 'hover:text-purple-700',
+    primaryBg: isInfluencer ? 'bg-yellow-600' : isPartner ? 'bg-green-600' : isAdmin ? 'bg-blue-600' : 'bg-purple-600',
+    primaryBgHover: isInfluencer ? 'hover:bg-yellow-700' : isPartner ? 'hover:bg-green-700' : isAdmin ? 'hover:bg-blue-700' : 'hover:bg-purple-700',
+    accent: isInfluencer ? 'bg-yellow-50 border-yellow-200' : isPartner ? 'bg-green-50 border-green-200' : isAdmin ? 'bg-blue-50 border-blue-200' : 'bg-purple-50 border-purple-200',
+    logo: isInfluencer ? '/assets/logos/paw-svgrepo-200x200-gold.svg' :
+          isPartner ? '/assets/logos/paw-svgrepo-200x200-green.svg' :
           isAdmin ? '/assets/logos/paw-svgrepo-200x200-blue.svg' :
           '/assets/logos/paw-svgrepo-200x200-purple.svg'
   }
@@ -95,6 +97,15 @@ export default function UserAwareNavigation({
         ...baseItems,
         { name: 'Orders', href: '/orders', icon: Package },
         { name: 'Commissions', href: '/commissions', icon: DollarSign },
+        { name: 'Referrals', href: '/referrals', icon: Share2 },
+        { name: 'Account', href: '/account', icon: User }
+      ]
+    }
+
+    if (isInfluencer) {
+      return [
+        ...baseItems,
+        { name: 'Orders', href: '/orders', icon: Package },
         { name: 'Referrals', href: '/referrals', icon: Share2 },
         { name: 'Account', href: '/account', icon: User }
       ]
@@ -172,6 +183,11 @@ export default function UserAwareNavigation({
             {isPartner && (
               <span className="ml-2 px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
                 Partner
+              </span>
+            )}
+            {isInfluencer && (
+              <span className="ml-2 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
+                Influencer
               </span>
             )}
             {isAdmin && (
@@ -266,6 +282,11 @@ export default function UserAwareNavigation({
               {isPartner && (
                 <span className="ml-2 px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
                   Partner
+                </span>
+              )}
+              {isInfluencer && (
+                <span className="ml-2 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
+                  Influencer
                 </span>
               )}
             </button>

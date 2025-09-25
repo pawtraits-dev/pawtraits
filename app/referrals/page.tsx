@@ -38,7 +38,7 @@ import type { Referral } from "@/lib/types";
 
 interface UserProfile {
   id: string;
-  user_type: 'customer' | 'partner' | 'admin';
+  user_type: 'customer' | 'partner' | 'influencer' | 'admin';
   first_name: string;
   last_name: string;
   email: string;
@@ -60,6 +60,363 @@ interface ReferralAnalytics {
   signups: number;
   successful_purchases: number;
   total_rewards_earned: number;
+}
+
+// Influencer referrals component
+function InfluencerReferralsContent() {
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState("All Statuses")
+  const [sortBy, setSortBy] = useState("date")
+
+  const [referrals, setReferrals] = useState<any[]>([])
+  const [influencerData, setInfluencerData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  const supabase = getSupabaseClient()
+
+  useEffect(() => {
+    fetchInfluencerData()
+  }, [])
+
+  const fetchInfluencerData = async () => {
+    try {
+      setLoading(true)
+
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      // For now, use placeholder data since we need to implement the API
+      console.log('🌟 INFLUENCER REFERRALS: Would fetch from /api/influencers/referrals');
+
+      // Placeholder data structure
+      const mockInfluencerData = {
+        stats: {
+          total_codes: 2,
+          active_codes: 2,
+          total_usage: 15,
+          total_conversions: 8,
+          conversion_rate: 0.533,
+          total_revenue: 450.00,
+          total_commission: 45.00,
+          commission_pending: 25.00,
+          commission_paid: 20.00
+        },
+        referral_codes: [
+          {
+            id: '1',
+            code: 'PETLOVER20',
+            description: 'General promotion',
+            usage_count: 10,
+            conversion_count: 6,
+            total_revenue: 300.00,
+            total_commission: 30.00,
+            is_active: true
+          },
+          {
+            id: '2',
+            code: 'DOGMOM',
+            description: 'Dog-focused content',
+            usage_count: 5,
+            conversion_count: 2,
+            total_revenue: 150.00,
+            total_commission: 15.00,
+            is_active: true
+          }
+        ],
+        recent_referrals: [
+          {
+            id: '1',
+            customer_email: 'customer1@example.com',
+            status: 'purchased',
+            order_value: 75.00,
+            commission_amount: 7.50,
+            source_platform: 'instagram',
+            created_at: new Date().toISOString()
+          },
+          {
+            id: '2',
+            customer_email: 'customer2@example.com',
+            status: 'pending',
+            order_value: 0,
+            commission_amount: 0,
+            source_platform: 'tiktok',
+            created_at: new Date().toISOString()
+          }
+        ]
+      };
+
+      setInfluencerData(mockInfluencerData);
+      setReferrals(mockInfluencerData.recent_referrals);
+
+    } catch (error) {
+      console.error('Error fetching influencer data:', error)
+      setError(error instanceof Error ? error.message : 'An error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'purchased':
+      case 'credited':
+        return 'bg-green-100 text-green-800'
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'accessed':
+        return 'bg-blue-100 text-blue-800'
+      case 'expired':
+        return 'bg-red-100 text-red-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-amber-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-amber-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={fetchInfluencerData} className="bg-yellow-600 hover:bg-yellow-700">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-amber-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Influencer Referrals ✨</h1>
+          <p className="mt-2 text-gray-600">
+            Manage your referral codes and track your commission earnings
+          </p>
+        </div>
+
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <QrCode className="w-8 h-8 text-yellow-600" />
+                <div className="ml-4">
+                  <p className="text-sm text-gray-600">Active Codes</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {influencerData?.stats?.active_codes || 0}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <TrendingUp className="w-8 h-8 text-yellow-600" />
+                <div className="ml-4">
+                  <p className="text-sm text-gray-600">Conversion Rate</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {((influencerData?.stats?.conversion_rate || 0) * 100).toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <Gift className="w-8 h-8 text-yellow-600" />
+                <div className="ml-4">
+                  <p className="text-sm text-gray-600">Total Revenue</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    ${(influencerData?.stats?.total_revenue || 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <Gift className="w-8 h-8 text-yellow-600" />
+                <div className="ml-4">
+                  <p className="text-sm text-gray-600">Pending Commission</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    ${(influencerData?.stats?.commission_pending || 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content */}
+        <Tabs defaultValue="codes" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="codes">Referral Codes</TabsTrigger>
+            <TabsTrigger value="referrals">Recent Referrals</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="codes" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Your Referral Codes</CardTitle>
+                <CardDescription>
+                  Create and manage your influencer referral codes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {influencerData?.referral_codes?.map((code: any) => (
+                    <div key={code.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <code className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-sm font-mono">
+                            {code.code}
+                          </code>
+                          <Badge className={code.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                            {code.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">{code.description}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">
+                          {code.conversion_count}/{code.usage_count} conversions
+                        </p>
+                        <p className="text-lg font-bold text-yellow-600">
+                          ${code.total_commission.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  <Button className="w-full bg-yellow-600 hover:bg-yellow-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create New Code
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="referrals" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Referrals</CardTitle>
+                <CardDescription>
+                  Track your recent referral activity and earnings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Platform</TableHead>
+                      <TableHead>Order Value</TableHead>
+                      <TableHead>Commission</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {referrals.map((referral: any) => (
+                      <TableRow key={referral.id}>
+                        <TableCell>{referral.customer_email}</TableCell>
+                        <TableCell>
+                          <Badge className={getStatusBadgeColor(referral.status)}>
+                            {referral.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="capitalize">{referral.source_platform || '-'}</TableCell>
+                        <TableCell>${referral.order_value.toFixed(2)}</TableCell>
+                        <TableCell>${referral.commission_amount.toFixed(2)}</TableCell>
+                        <TableCell>{new Date(referral.created_at).toLocaleDateString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Performance Analytics</CardTitle>
+                <CardDescription>
+                  Detailed insights into your referral performance
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Usage Statistics</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Total Usage:</span>
+                        <span className="font-medium">{influencerData?.stats?.total_usage || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total Conversions:</span>
+                        <span className="font-medium">{influencerData?.stats?.total_conversions || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Conversion Rate:</span>
+                        <span className="font-medium">
+                          {((influencerData?.stats?.conversion_rate || 0) * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Financial Summary</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Total Revenue Generated:</span>
+                        <span className="font-medium">${(influencerData?.stats?.total_revenue || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total Commission:</span>
+                        <span className="font-medium">${(influencerData?.stats?.total_commission || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Commission Paid:</span>
+                        <span className="font-medium text-green-600">${(influencerData?.stats?.commission_paid || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Commission Pending:</span>
+                        <span className="font-medium text-yellow-600">${(influencerData?.stats?.commission_pending || 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
 }
 
 // Partner referrals component (existing logic)
@@ -801,6 +1158,8 @@ export default function ReferralsPage() {
   // Route to appropriate content based on user type
   const content = userProfile.user_type === 'partner'
     ? <PartnerReferralsContent />
+    : userProfile.user_type === 'influencer'
+    ? <InfluencerReferralsContent />
     : userProfile.user_type === 'customer'
     ? <CustomerReferralsContent />
     : (router.push('/admin'), null);

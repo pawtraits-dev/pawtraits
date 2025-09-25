@@ -258,6 +258,147 @@ export interface Partner {
   updated_at: string;
 }
 
+// ===========================
+// INFLUENCER SYSTEM TYPES
+// ===========================
+
+export interface Influencer {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  username?: string; // Social media handle
+  bio?: string;
+  avatar_url?: string;
+  phone?: string;
+  is_active: boolean;
+  is_verified: boolean;
+  commission_rate: number; // Default 10% lifetime commission
+  payment_method?: 'paypal' | 'bank_transfer';
+  payment_details?: Record<string, any>;
+  notification_preferences: {
+    email_commissions: boolean;
+    email_referrals: boolean;
+  };
+  // Admin approval fields
+  approval_status: 'pending' | 'approved' | 'rejected' | 'suspended';
+  approved_by?: string;
+  approved_at?: string;
+  rejection_reason?: string;
+  last_login_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InfluencerSocialChannel {
+  id: string;
+  influencer_id: string;
+  platform: 'instagram' | 'tiktok' | 'youtube' | 'twitter' | 'facebook' | 'linkedin' | 'pinterest';
+  username: string;
+  profile_url?: string;
+  follower_count?: number;
+  engagement_rate?: number; // Percentage as decimal (e.g., 0.035 for 3.5%)
+  verified: boolean;
+  is_primary: boolean; // One primary channel per influencer
+  is_active: boolean;
+  last_updated: string;
+  created_at: string;
+}
+
+export interface InfluencerReferralCode {
+  id: string;
+  influencer_id: string;
+  code: string;
+  qr_code_url?: string;
+  description?: string; // What this code is for
+  usage_count: number;
+  conversion_count: number;
+  total_revenue: number; // In cents
+  total_commission: number; // In cents
+  is_active: boolean;
+  expires_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InfluencerReferral {
+  id: string;
+  influencer_id: string;
+  referral_code_id: string;
+  customer_id?: string;
+  customer_email?: string;
+  status: 'pending' | 'accessed' | 'signed_up' | 'purchased' | 'credited' | 'expired';
+  order_id?: string;
+  order_value?: number; // In cents
+  commission_amount?: number; // In cents
+  commission_paid: boolean;
+  source_platform?: string; // Which social platform the referral came from
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  accessed_at?: string;
+  signed_up_at?: string;
+  purchased_at?: string;
+  credited_at?: string;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Extended interfaces for admin views
+export interface InfluencerWithStats extends Influencer {
+  total_referrals: number;
+  successful_referrals: number;
+  pending_referrals: number;
+  total_commission_earned: number; // In cents
+  total_revenue_generated: number; // In cents
+  conversion_rate: number; // Percentage as decimal
+  primary_social_channel?: InfluencerSocialChannel;
+  social_channels_count: number;
+  active_codes_count: number;
+}
+
+export interface InfluencerStats {
+  influencer_id: string;
+  first_name: string;
+  last_name: string;
+  username?: string;
+  total_referrals: number;
+  successful_referrals: number;
+  pending_referrals: number;
+  expired_referrals: number;
+  total_commission_earned: number; // In cents
+  total_revenue_generated: number; // In cents
+  avg_order_value: number; // In cents
+  conversion_rate: number; // Percentage as decimal
+  total_social_reach?: number; // Sum of follower counts
+  primary_platform?: string;
+}
+
+export interface AdminInfluencerOverview {
+  total_influencers: number;
+  active_influencers: number;
+  pending_approval: number;
+  total_commission_paid: number; // In cents
+  total_revenue_generated: number; // In cents
+  avg_commission_rate: number;
+  top_performers: InfluencerStats[];
+  recent_signups: Influencer[];
+}
+
+// Form types for influencer management
+export type InfluencerCreate = Omit<Influencer, 'id' | 'created_at' | 'updated_at' | 'approval_status' | 'approved_by' | 'approved_at'>;
+export type InfluencerUpdate = Partial<InfluencerCreate>;
+
+export type SocialChannelCreate = Omit<InfluencerSocialChannel, 'id' | 'created_at' | 'last_updated'>;
+export type SocialChannelUpdate = Partial<SocialChannelCreate>;
+
+export type InfluencerReferralCodeCreate = Omit<InfluencerReferralCode, 'id' | 'created_at' | 'updated_at' | 'usage_count' | 'conversion_count' | 'total_revenue' | 'total_commission'>;
+
+// Extended referral types to include influencers
+export type ExtendedReferralType = 'partner' | 'customer' | 'influencer' | 'pre_registration';
+export type ExtendedReferrerType = 'partner' | 'customer' | 'influencer';
+
 export interface Referral {
   id: string;
   partner_id: string;
@@ -620,9 +761,8 @@ export interface CustomerReferralStats {
   personal_referral_code?: string;
 }
 
-// Enhanced referral types with multi-tier support
-export type ExtendedReferralType = 'partner' | 'customer' | 'pre_registration';
-export type ReferrerType = 'partner' | 'customer';
+// Enhanced referral types with multi-tier support (updated to include influencers)
+export type ReferrerType = 'partner' | 'customer' | 'influencer';
 
 // Referral tracking and attribution
 export interface ReferralAttribution {
@@ -631,6 +771,7 @@ export interface ReferralAttribution {
   referrer_type: ReferrerType;
   partner_id?: string;
   customer_referrer_id?: string;
+  influencer_id?: string;
   pre_registration_code_id?: string;
   conversion_source: 'qr_scan' | 'email' | 'social' | 'direct_link';
   accessed_from_qr: boolean;
@@ -638,7 +779,7 @@ export interface ReferralAttribution {
 
 // QR Code generation options for extended system
 export interface ExtendedQRCodeOptions {
-  type: 'partner' | 'customer' | 'pre_registration';
+  type: 'partner' | 'customer' | 'influencer' | 'pre_registration';
   referral_code: string;
   branding?: {
     logo_url?: string;
@@ -654,7 +795,7 @@ export interface ExtendedQRCodeOptions {
 export interface BulkQRRequest {
   codes: Array<{
     code: string;
-    type: 'partner' | 'customer' | 'pre_registration';
+    type: 'partner' | 'customer' | 'influencer' | 'pre_registration';
     campaign?: string;
   }>;
   options: ExtendedQRCodeOptions;

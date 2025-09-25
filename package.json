@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:influencers": "npx tsx scripts/run-influencer-tests.ts",
+    "test:db": "npx tsx scripts/test-influencer-db.ts",
+    "test:api": "npx tsx scripts/test-influencer-system.ts",
+    "test:workflows": "npx tsx scripts/test-influencer-workflows.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",

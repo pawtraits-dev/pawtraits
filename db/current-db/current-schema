@@ -318,6 +318,7 @@ CREATE TABLE public.customer_referrals (
   credited_at timestamp with time zone,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  qr_scans_count integer NOT NULL DEFAULT 0,
   CONSTRAINT customer_referrals_pkey PRIMARY KEY (id),
   CONSTRAINT customer_referrals_referrer_customer_id_fkey FOREIGN KEY (referrer_customer_id) REFERENCES public.customers(id),
   CONSTRAINT customer_referrals_referee_customer_id_fkey FOREIGN KEY (referee_customer_id) REFERENCES public.customers(id),
@@ -350,6 +351,10 @@ CREATE TABLE public.customers (
   personal_referral_code character varying UNIQUE,
   total_credits_earned integer DEFAULT 0,
   current_credit_balance integer DEFAULT 0,
+  total_referrals integer DEFAULT 0,
+  successful_referrals integer DEFAULT 0,
+  rewards_earned numeric DEFAULT 0.00,
+  signup_discount_used integer DEFAULT 0,
   CONSTRAINT customers_pkey PRIMARY KEY (id),
   CONSTRAINT customers_referred_by_partner_id_fkey FOREIGN KEY (referred_by_partner_id) REFERENCES public.partners(id)
 );
@@ -613,6 +618,7 @@ CREATE TABLE public.partners (
   last_login_at timestamp with time zone,
   commission_rate numeric DEFAULT 20.00,
   lifetime_commission_rate numeric DEFAULT 5.00,
+  logo_url text,
   CONSTRAINT partners_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.pet_photos (

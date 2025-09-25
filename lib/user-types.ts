@@ -1,4 +1,4 @@
-export type UserType = 'admin' | 'partner' | 'customer';
+export type UserType = 'admin' | 'partner' | 'customer' | 'influencer';
 
 export interface UserProfile {
   id: string;
@@ -13,6 +13,7 @@ export interface UserProfile {
   permissions?: string[];
   partner_id?: string;
   customer_id?: string;
+  influencer_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -22,18 +23,25 @@ export interface UserPermissions {
   canManageUsers?: boolean;
   canManagePartners?: boolean;
   canManageCustomers?: boolean;
+  canManageInfluencers?: boolean;
   canViewAnalytics?: boolean;
   canManageContent?: boolean;
-  
+
   // Partner permissions
   canCreateReferrals?: boolean;
   canViewReferralStats?: boolean;
   canManageProfile?: boolean;
-  
+
   // Customer permissions
   canCreateOrders?: boolean;
   canViewOrderHistory?: boolean;
   canManagePets?: boolean;
+
+  // Influencer permissions
+  canCreateInfluencerReferrals?: boolean;
+  canViewInfluencerStats?: boolean;
+  canManageSocialChannels?: boolean;
+  canGenerateQRCodes?: boolean;
 }
 
 export const DEFAULT_PERMISSIONS: Record<UserType, UserPermissions> = {
@@ -41,6 +49,7 @@ export const DEFAULT_PERMISSIONS: Record<UserType, UserPermissions> = {
     canManageUsers: true,
     canManagePartners: true,
     canManageCustomers: true,
+    canManageInfluencers: true,
     canViewAnalytics: true,
     canManageContent: true,
   },
@@ -53,6 +62,13 @@ export const DEFAULT_PERMISSIONS: Record<UserType, UserPermissions> = {
     canCreateOrders: true,
     canViewOrderHistory: true,
     canManagePets: true,
+  },
+  influencer: {
+    canCreateInfluencerReferrals: true,
+    canViewInfluencerStats: true,
+    canManageSocialChannels: true,
+    canGenerateQRCodes: true,
+    canManageProfile: true,
   },
 };
 
@@ -82,6 +98,8 @@ export function getUserTypeDisplayName(userType: UserType): string {
       return 'Partner';
     case 'customer':
       return 'Customer';
+    case 'influencer':
+      return 'Influencer';
     default:
       return 'User';
   }

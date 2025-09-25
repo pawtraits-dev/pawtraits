@@ -81,6 +81,7 @@ const navigationSections = [
     items: [
       { name: 'Customers', href: '/admin/customers', icon: Users },
       { name: 'Partners', href: '/admin/partners', icon: Users },
+      { name: 'Influencers', href: '/admin/influencers', icon: Heart },
       { name: 'Pre-Registration Codes', href: '/admin/partners/pre-registration', icon: QrCode },
       { name: 'Partner Referrals', href: '/admin/referrals', icon: Target },
       { name: 'Customer Referrals', href: '/admin/customer-referrals', icon: UserPlus },

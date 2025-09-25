@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import CustomerAccountView from '@/components/account/CustomerAccountView';
 import PartnerAccountView from '@/components/account/PartnerAccountView';
+import InfluencerAccountView from '@/components/account/InfluencerAccountView';
 import AdminAccountView from '@/components/account/AdminAccountView';
 
 // 🏗️ CLIENT-SIDE USER-TYPE AWARE ACCOUNT PAGE
@@ -43,7 +44,7 @@ export default function AccountPage() {
         });
 
         // Validate user type
-        if (!['customer', 'partner', 'admin'].includes(profile.user_type)) {
+        if (!['customer', 'partner', 'influencer', 'admin'].includes(profile.user_type)) {
           console.error('❌ ACCOUNT: Unknown user type:', profile.user_type);
           router.push('/auth/login');
           return;
@@ -103,6 +104,9 @@ export default function AccountPage() {
 
     case 'partner':
       return <PartnerAccountView userProfile={userProfile} />;
+
+    case 'influencer':
+      return <InfluencerAccountView userProfile={userProfile} />;
 
     case 'admin':
       return <AdminAccountView userProfile={userProfile} />;
