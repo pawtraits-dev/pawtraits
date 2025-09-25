@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "validate:schema": "npx tsx scripts/validate-schema.ts",
     "test:influencers": "npx tsx scripts/run-influencer-tests.ts",
     "test:db": "npx tsx scripts/test-influencer-db.ts",
     "test:api": "npx tsx scripts/test-influencer-system.ts",

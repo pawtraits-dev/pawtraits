@@ -13,8 +13,12 @@ Before starting ANY implementation:
 - [ ] Identify all affected components, pages, and API routes
 - [ ] Determine scope and complexity of changes needed
 
-### Step 2: Implementation Planning 📋
+### Step 2: Schema Validation & Implementation Planning 📋
+**🚨 CRITICAL**: Schema validation prevents false assumptions about database structure.
 Before writing ANY code:
+- [ ] **VALIDATE DATABASE SCHEMA**: Run `npm run validate:schema` to generate current schema documentation
+- [ ] **REVIEW SCHEMA REFERENCE**: Check `docs/database-schema-reference.md` for actual table structure
+- [ ] **NO ASSUMPTIONS**: Use actual column names and types from schema documentation
 - [ ] Document the planned approach in detail
 - [ ] Identify which files will be modified/created
 - [ ] Plan the data flow: Frontend → API → Database
@@ -60,6 +64,8 @@ Before presenting work:
 - Bypassing established API endpoints
 - Not following existing user-type routing patterns
 - Creating duplicate functionality that already exists
+- **Writing tests without validating database schema first**
+- **Making assumptions about column names or table structure**
 
 ## 🏗️ ARCHITECTURAL GOVERNANCE CHECKPOINTS
 
@@ -81,6 +87,12 @@ Every implementation MUST pass these checks:
 ```
 ✅ CORRECT: Unified pages with user-type aware routing
 ❌ WRONG:   Separate pages for each user type
+```
+
+**Database Schema Validation**:
+```
+✅ CORRECT: Run npm run validate:schema → Check docs/database-schema-reference.md → Use actual column names
+❌ WRONG:   Assume database structure → Write tests based on assumptions → Debug schema mismatches
 ```
 
 ## 📋 PROCESS EXAMPLE
@@ -119,6 +131,58 @@ COMPLIANCE CHECK:
 **Step 4-6: Implementation, QA, Commit**
 Only proceed after Step 3 passes all checks.
 
+## 🔍 DATABASE SCHEMA VALIDATION SYSTEM
+
+### Problem Solved
+Previously, tests failed because they were written based on assumptions about database structure rather than actual schema. For example:
+- **Assumption**: Tests expected `user_id` column in influencers table
+- **Reality**: Influencers table uses standalone structure without `user_id`
+- **Result**: Time wasted debugging test failures instead of real functionality
+
+### Solution: Schema-First Development
+**New Command**: `npm run validate:schema`
+
+**What it does**:
+1. **Connects to actual database** and reads current schema
+2. **Generates documentation** at `docs/database-schema-reference.md`
+3. **Validates expected vs actual** column names and types
+4. **Prevents false assumptions** by providing source of truth
+
+### When to Run Schema Validation
+**MANDATORY** in these situations:
+- [ ] Before writing tests for new database features
+- [ ] After any database migrations
+- [ ] When onboarding new developers
+- [ ] Before implementing features that touch the database
+- [ ] As part of CI/CD pipeline (recommended)
+
+### Example Workflow
+```bash
+# 1. Validate current schema
+npm run validate:schema
+
+# 2. Check generated documentation
+cat docs/database-schema-reference.md
+
+# 3. Write tests using ACTUAL column names
+const testInfluencer = {
+  first_name: 'John',        // ✅ Actual column name
+  last_name: 'Doe',          // ✅ From schema doc
+  email: 'john@example.com', // ✅ Verified exists
+  // user_id: 'abc123',      // ❌ This column doesn't exist
+};
+
+# 4. No more schema assumption failures!
+npm run test:influencers
+```
+
+### Benefits
+- **Eliminates debugging time** wasted on schema mismatches
+- **Provides single source of truth** for database structure
+- **Catches breaking changes** early in development process
+- **Improves developer onboarding** with actual schema docs
+- **Enables confident test writing** with verified column names
+
 ## 🔒 ACCOUNTABILITY & ENFORCEMENT
 
 **FOR CLAUDE CODE:**
@@ -153,6 +217,9 @@ npm run type-check
 
 # Install dependencies (required for React 19 compatibility)
 npm install --legacy-peer-deps
+
+# Database schema validation (prevents false assumptions)
+npm run validate:schema                 # Generate current schema documentation
 
 # Utility testing scripts (run with tsx from scripts/ directory)
 tsx scripts/test-cloudinary.ts          # Test Cloudinary integration
