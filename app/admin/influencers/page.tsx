@@ -116,12 +116,10 @@ export default function AdminInfluencersPage() {
   const [newInfluencerData, setNewInfluencerData] = useState({
     first_name: '',
     last_name: '',
-    email: '',
-    username: '',
     bio: '',
-    phone: '',
+    custom_referral_code: '',
     commission_rate: 10.0,
-    approval_status: 'pending' as 'pending' | 'approved' | 'rejected' | 'suspended',
+    approval_status: 'approved' as 'pending' | 'approved' | 'rejected' | 'suspended',
     is_active: true,
     is_verified: false,
   });
@@ -336,12 +334,10 @@ export default function AdminInfluencersPage() {
         setNewInfluencerData({
           first_name: '',
           last_name: '',
-          email: '',
-          username: '',
           bio: '',
-          phone: '',
+          custom_referral_code: '',
           commission_rate: 10.0,
-          approval_status: 'pending',
+          approval_status: 'approved',
           is_active: true,
           is_verified: false,
         });
@@ -800,7 +796,7 @@ export default function AdminInfluencersPage() {
           <DialogHeader>
             <DialogTitle>Add New Influencer</DialogTitle>
             <DialogDescription>
-              Create a new influencer profile. Admin-created influencers are automatically approved.
+              Create a new influencer profile with a custom referral code for easy sharing.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -826,35 +822,37 @@ export default function AdminInfluencersPage() {
             </div>
 
             <div>
-              <Label htmlFor="email">Email *</Label>
+              <Label htmlFor="custom_referral_code">Referral Code *</Label>
               <Input
-                id="email"
-                type="email"
-                value={newInfluencerData.email}
-                onChange={(e) => setNewInfluencerData({ ...newInfluencerData, email: e.target.value })}
-                placeholder="john@example.com"
+                id="custom_referral_code"
+                value={newInfluencerData.custom_referral_code}
+                onChange={(e) => setNewInfluencerData({ ...newInfluencerData, custom_referral_code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') })}
+                placeholder="SARAH2024"
+                className={`uppercase ${
+                  newInfluencerData.custom_referral_code && (newInfluencerData.custom_referral_code.length < 4 || !/^[A-Z0-9]+$/.test(newInfluencerData.custom_referral_code))
+                    ? 'border-red-500'
+                    : newInfluencerData.custom_referral_code.length >= 4 && /^[A-Z0-9]+$/.test(newInfluencerData.custom_referral_code)
+                    ? 'border-green-500'
+                    : ''
+                }`}
+                maxLength={20}
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  value={newInfluencerData.username}
-                  onChange={(e) => setNewInfluencerData({ ...newInfluencerData, username: e.target.value })}
-                  placeholder="johndoe"
-                />
-              </div>
-              <div>
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  value={newInfluencerData.phone}
-                  onChange={(e) => setNewInfluencerData({ ...newInfluencerData, phone: e.target.value })}
-                  placeholder="+1 (555) 123-4567"
-                />
-              </div>
+              <p className={`text-xs mt-1 ${
+                newInfluencerData.custom_referral_code && (newInfluencerData.custom_referral_code.length < 4 || !/^[A-Z0-9]+$/.test(newInfluencerData.custom_referral_code))
+                  ? 'text-red-500'
+                  : newInfluencerData.custom_referral_code.length >= 4 && /^[A-Z0-9]+$/.test(newInfluencerData.custom_referral_code)
+                  ? 'text-green-500'
+                  : 'text-gray-500'
+              }`}>
+                {newInfluencerData.custom_referral_code && newInfluencerData.custom_referral_code.length < 4
+                  ? `Need ${4 - newInfluencerData.custom_referral_code.length} more characters`
+                  : newInfluencerData.custom_referral_code && !/^[A-Z0-9]+$/.test(newInfluencerData.custom_referral_code)
+                  ? 'Only letters and numbers allowed'
+                  : newInfluencerData.custom_referral_code.length >= 4 && /^[A-Z0-9]+$/.test(newInfluencerData.custom_referral_code)
+                  ? 'Valid referral code ✓'
+                  : 'Minimum 4 characters. Letters and numbers only. Will be used as their referral code for followers.'
+                }
+              </p>
             </div>
 
             <div>
@@ -906,7 +904,7 @@ export default function AdminInfluencersPage() {
               </Button>
               <Button
                 onClick={addNewInfluencer}
-                disabled={addingInfluencer || !newInfluencerData.first_name || !newInfluencerData.last_name || !newInfluencerData.email}
+                disabled={addingInfluencer || !newInfluencerData.first_name || !newInfluencerData.last_name || !newInfluencerData.custom_referral_code || newInfluencerData.custom_referral_code.length < 4 || !/^[A-Z0-9]+$/.test(newInfluencerData.custom_referral_code)}
                 className="bg-yellow-600 hover:bg-yellow-700"
               >
                 {addingInfluencer ? (

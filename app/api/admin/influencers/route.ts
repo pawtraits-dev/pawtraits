@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import type { Influencer, InfluencerCreate, AdminInfluencerOverview } from '@/lib/types';
+import type { Influencer, AdminInfluencerOverview } from '@/lib/types';
+
+interface InfluencerCreateRequest {
+  first_name: string;
+  last_name: string;
+  bio?: string;
+  custom_referral_code: string;
+  commission_rate?: number;
+  approval_status?: 'pending' | 'approved' | 'rejected' | 'suspended';
+  is_active?: boolean;
+  is_verified?: boolean;
+  avatar_url?: string;
+  payment_method?: string;
+  payment_details?: any;
+  notification_preferences?: {
+    email_commissions?: boolean;
+    email_referrals?: boolean;
+  };
+}
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -130,64 +148,48 @@ export async function POST(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    const body = await request.json() as InfluencerCreate;
+    const body = await request.json() as InfluencerCreateRequest;
 
     // Validate required fields
-    if (!body.email || !body.first_name || !body.last_name) {
+    if (!body.first_name || !body.last_name || !body.custom_referral_code) {
       return NextResponse.json(
-        { error: 'Missing required fields: email, first_name, last_name' },
+        { error: 'Missing required fields: first_name, last_name, custom_referral_code' },
         { status: 400 }
       );
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(body.email)) {
+    // Validate referral code format
+    const referralCodeRegex = /^[A-Z0-9]{4,20}$/;
+    if (!referralCodeRegex.test(body.custom_referral_code)) {
       return NextResponse.json(
-        { error: 'Invalid email format' },
+        { error: 'Referral code must be 4-20 characters, letters and numbers only' },
         { status: 400 }
       );
     }
 
-    // Check if email already exists
-    const { data: existingInfluencer } = await supabase
-      .from('influencers')
+    // Check if referral code already exists in influencer_referral_codes table
+    const { data: existingCode } = await supabase
+      .from('influencer_referral_codes')
       .select('id')
-      .eq('email', body.email.toLowerCase().trim())
+      .eq('code', body.custom_referral_code.toUpperCase().trim())
       .single();
 
-    if (existingInfluencer) {
+    if (existingCode) {
       return NextResponse.json(
-        { error: 'An influencer with this email already exists' },
+        { error: 'This referral code is already taken. Please choose a different one.' },
         { status: 409 }
       );
     }
 
-    // Check if username is unique (if provided)
-    if (body.username) {
-      const { data: existingUsername } = await supabase
-        .from('influencers')
-        .select('id')
-        .eq('username', body.username.toLowerCase().trim())
-        .single();
-
-      if (existingUsername) {
-        return NextResponse.json(
-          { error: 'This username is already taken' },
-          { status: 409 }
-        );
-      }
-    }
-
     // Prepare influencer data
     const influencerData = {
-      email: body.email.toLowerCase().trim(),
+      email: `${body.custom_referral_code.toLowerCase()}@temp.pawtraits.pics`, // Temporary email until they complete setup
       first_name: body.first_name.trim(),
       last_name: body.last_name.trim(),
-      username: body.username?.toLowerCase().trim() || null,
+      username: body.custom_referral_code.toLowerCase(),
       bio: body.bio?.trim() || null,
       avatar_url: body.avatar_url || null,
-      phone: body.phone?.trim() || null,
+      phone: null,
       commission_rate: body.commission_rate || 10.00,
       payment_method: body.payment_method || null,
       payment_details: body.payment_details || null,
@@ -212,15 +214,15 @@ export async function POST(request: NextRequest) {
       throw createError;
     }
 
-    // Create setup/onboarding referral code for the influencer
-    const setupCode = `${newInfluencer.first_name.substring(0, 3).toUpperCase()}${newInfluencer.last_name.substring(0, 3).toUpperCase()}${newInfluencer.id.substring(0, 6).toUpperCase()}`;
+    // Create custom referral code for the influencer
+    const customCode = body.custom_referral_code.toUpperCase().trim();
 
     const { data: setupCodeData, error: codeError } = await supabase
       .from('influencer_referral_codes')
       .insert({
         influencer_id: newInfluencer.id,
-        code: setupCode,
-        description: 'Account setup and onboarding code',
+        code: customCode,
+        description: 'Custom referral code for follower acquisition',
         is_active: true,
         usage_count: 0,
         conversion_count: 0,
@@ -231,16 +233,18 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (codeError) {
-      console.warn('Failed to create setup code for influencer:', codeError);
-      // Don't fail the entire operation, just log the warning
-    } else {
-      console.log('Created setup code for influencer:', setupCode);
+      console.error('Failed to create referral code for influencer:', codeError);
+      // This is critical, so we should fail the operation
+      return NextResponse.json(
+        { error: 'Failed to create referral code. Please try again.' },
+        { status: 500 }
+      );
     }
 
-    console.log('Successfully created influencer:', newInfluencer.id);
+    console.log('Successfully created influencer with custom referral code:', newInfluencer.id, customCode);
     return NextResponse.json({
       ...newInfluencer,
-      setup_code: setupCode
+      setup_code: customCode
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating influencer:', error);
