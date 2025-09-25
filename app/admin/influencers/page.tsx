@@ -5,6 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Link from 'next/link';
 import {
   Search,
@@ -86,6 +90,8 @@ export default function AdminInfluencersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [platformFilter, setPlatformFilter] = useState('all');
+  const [showAddInfluencerModal, setShowAddInfluencerModal] = useState(false);
+  const [addingInfluencer, setAddingInfluencer] = useState(false);
 
   // Stats for overview cards
   const [overviewStats, setOverviewStats] = useState({
@@ -95,6 +101,20 @@ export default function AdminInfluencersPage() {
     total_commission_paid: 0,
     total_social_reach: 0,
     avg_conversion_rate: 0
+  });
+
+  // Form state for adding new influencer
+  const [newInfluencerData, setNewInfluencerData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    username: '',
+    bio: '',
+    phone: '',
+    commission_rate: 10.0,
+    approval_status: 'pending' as 'pending' | 'approved' | 'rejected' | 'suspended',
+    is_active: true,
+    is_verified: false,
   });
 
   useEffect(() => {
@@ -289,6 +309,43 @@ export default function AdminInfluencersPage() {
     }
   };
 
+  const addNewInfluencer = async () => {
+    try {
+      setAddingInfluencer(true);
+      const response = await fetch('/api/admin/influencers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newInfluencerData)
+      });
+
+      if (response.ok) {
+        await loadInfluencers(); // Reload data
+        setShowAddInfluencerModal(false);
+        setNewInfluencerData({
+          first_name: '',
+          last_name: '',
+          email: '',
+          username: '',
+          bio: '',
+          phone: '',
+          commission_rate: 10.0,
+          approval_status: 'pending',
+          is_active: true,
+          is_verified: false,
+        });
+        alert('Influencer created successfully');
+      } else {
+        const errorData = await response.json();
+        alert(`Error: ${errorData.error || 'Failed to create influencer'}`);
+      }
+    } catch (error) {
+      console.error('Error creating influencer:', error);
+      alert('Error creating influencer');
+    } finally {
+      setAddingInfluencer(false);
+    }
+  };
+
   const getPlatformIcon = (platform?: string) => {
     if (!platform) return Heart;
     const Icon = platformIcons[platform.toLowerCase()];
@@ -313,7 +370,10 @@ export default function AdminInfluencersPage() {
             Manage influencer partnerships, track performance, and approve new applications
           </p>
         </div>
-        <Button className="bg-yellow-600 hover:bg-yellow-700">
+        <Button
+          className="bg-yellow-600 hover:bg-yellow-700"
+          onClick={() => setShowAddInfluencerModal(true)}
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add Influencer
         </Button>
@@ -578,6 +638,138 @@ export default function AdminInfluencersPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Influencer Modal */}
+      <Dialog open={showAddInfluencerModal} onOpenChange={setShowAddInfluencerModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add New Influencer</DialogTitle>
+            <DialogDescription>
+              Create a new influencer profile. Admin-created influencers are automatically approved.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="first_name">First Name *</Label>
+                <Input
+                  id="first_name"
+                  value={newInfluencerData.first_name}
+                  onChange={(e) => setNewInfluencerData({ ...newInfluencerData, first_name: e.target.value })}
+                  placeholder="John"
+                />
+              </div>
+              <div>
+                <Label htmlFor="last_name">Last Name *</Label>
+                <Input
+                  id="last_name"
+                  value={newInfluencerData.last_name}
+                  onChange={(e) => setNewInfluencerData({ ...newInfluencerData, last_name: e.target.value })}
+                  placeholder="Doe"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="email">Email *</Label>
+              <Input
+                id="email"
+                type="email"
+                value={newInfluencerData.email}
+                onChange={(e) => setNewInfluencerData({ ...newInfluencerData, email: e.target.value })}
+                placeholder="john@example.com"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  value={newInfluencerData.username}
+                  onChange={(e) => setNewInfluencerData({ ...newInfluencerData, username: e.target.value })}
+                  placeholder="johndoe"
+                />
+              </div>
+              <div>
+                <Label htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  value={newInfluencerData.phone}
+                  onChange={(e) => setNewInfluencerData({ ...newInfluencerData, phone: e.target.value })}
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea
+                id="bio"
+                value={newInfluencerData.bio}
+                onChange={(e) => setNewInfluencerData({ ...newInfluencerData, bio: e.target.value })}
+                placeholder="Tell us about this influencer..."
+                rows={3}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="commission_rate">Commission Rate (%)</Label>
+              <Input
+                id="commission_rate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={newInfluencerData.commission_rate}
+                onChange={(e) => setNewInfluencerData({ ...newInfluencerData, commission_rate: parseFloat(e.target.value) || 0 })}
+              />
+            </div>
+
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="is_active"
+                  checked={newInfluencerData.is_active}
+                  onCheckedChange={(checked) => setNewInfluencerData({ ...newInfluencerData, is_active: checked })}
+                />
+                <Label htmlFor="is_active">Active</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="is_verified"
+                  checked={newInfluencerData.is_verified}
+                  onCheckedChange={(checked) => setNewInfluencerData({ ...newInfluencerData, is_verified: checked })}
+                />
+                <Label htmlFor="is_verified">Verified</Label>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" onClick={() => setShowAddInfluencerModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={addNewInfluencer}
+                disabled={addingInfluencer || !newInfluencerData.first_name || !newInfluencerData.last_name || !newInfluencerData.email}
+                className="bg-yellow-600 hover:bg-yellow-700"
+              >
+                {addingInfluencer ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Influencer
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

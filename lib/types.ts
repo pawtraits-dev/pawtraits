@@ -388,7 +388,7 @@ export interface AdminInfluencerOverview {
 
 // Form types for influencer management
 export type InfluencerCreate = Omit<Influencer, 'id' | 'created_at' | 'updated_at' | 'approval_status' | 'approved_by' | 'approved_at'>;
-export type InfluencerUpdate = Partial<InfluencerCreate>;
+export type InfluencerUpdate = Partial<InfluencerCreate> & { approval_status?: 'pending' | 'approved' | 'rejected' | 'suspended' };
 
 export type SocialChannelCreate = Omit<InfluencerSocialChannel, 'id' | 'created_at' | 'last_updated'>;
 export type SocialChannelUpdate = Partial<SocialChannelCreate>;

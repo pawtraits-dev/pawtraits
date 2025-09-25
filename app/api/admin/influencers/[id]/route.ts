@@ -258,6 +258,9 @@ export async function PUT(
     if (body.is_active !== undefined) updateData.is_active = body.is_active;
     if (body.is_verified !== undefined) updateData.is_verified = body.is_verified;
 
+    // Handle approval status
+    if (body.approval_status !== undefined) updateData.approval_status = body.approval_status;
+
     // Handle notification preferences
     if (body.notification_preferences) {
       updateData.notification_preferences = {

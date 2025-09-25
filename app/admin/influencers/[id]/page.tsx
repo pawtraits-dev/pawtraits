@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
   ArrowLeft,
   Save,
@@ -152,6 +153,10 @@ export default function AdminInfluencerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [showAddChannelModal, setShowAddChannelModal] = useState(false);
+  const [addingChannel, setAddingChannel] = useState(false);
+  const [showAddCodeModal, setShowAddCodeModal] = useState(false);
+  const [addingCode, setAddingCode] = useState(false);
 
   // Form state for editing
   const [formData, setFormData] = useState({
@@ -165,6 +170,26 @@ export default function AdminInfluencerDetailPage() {
     approval_status: 'pending',
     is_active: true,
     is_verified: false,
+  });
+
+  // Form state for adding social channel
+  const [channelFormData, setChannelFormData] = useState({
+    platform: '',
+    username: '',
+    profile_url: '',
+    follower_count: 0,
+    engagement_rate: 0,
+    verified: false,
+    is_primary: false,
+    is_active: true,
+  });
+
+  // Form state for adding referral code
+  const [codeFormData, setCodeFormData] = useState({
+    code: '',
+    description: '',
+    expires_at: '',
+    is_active: true,
   });
 
   useEffect(() => {
@@ -399,6 +424,77 @@ export default function AdminInfluencerDetailPage() {
       }
     } catch (error) {
       console.error('Error updating status:', error);
+    }
+  };
+
+  const addSocialChannel = async () => {
+    try {
+      setAddingChannel(true);
+      const response = await fetch(`/api/admin/influencers/${influencerId}/social`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(channelFormData)
+      });
+
+      if (response.ok) {
+        await loadInfluencerDetail(); // Reload data
+        setShowAddChannelModal(false);
+        setChannelFormData({
+          platform: '',
+          username: '',
+          profile_url: '',
+          follower_count: 0,
+          engagement_rate: 0,
+          verified: false,
+          is_primary: false,
+          is_active: true,
+        });
+        alert('Social channel added successfully');
+      } else {
+        const errorData = await response.json();
+        alert(`Error: ${errorData.error || 'Failed to add social channel'}`);
+      }
+    } catch (error) {
+      console.error('Error adding social channel:', error);
+      alert('Error adding social channel');
+    } finally {
+      setAddingChannel(false);
+    }
+  };
+
+  const addReferralCode = async () => {
+    try {
+      setAddingCode(true);
+      const response = await fetch(`/api/admin/influencers/${influencerId}/codes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: codeFormData.code,
+          description: codeFormData.description || null,
+          expires_at: codeFormData.expires_at || null,
+          is_active: codeFormData.is_active,
+        })
+      });
+
+      if (response.ok) {
+        await loadInfluencerDetail(); // Reload data
+        setShowAddCodeModal(false);
+        setCodeFormData({
+          code: '',
+          description: '',
+          expires_at: '',
+          is_active: true,
+        });
+        alert('Referral code created successfully');
+      } else {
+        const errorData = await response.json();
+        alert(`Error: ${errorData.error || 'Failed to create referral code'}`);
+      }
+    } catch (error) {
+      console.error('Error creating referral code:', error);
+      alert('Error creating referral code');
+    } finally {
+      setAddingCode(false);
     }
   };
 
@@ -765,7 +861,11 @@ export default function AdminInfluencerDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 Social Media Channels
-                <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700">
+                <Button
+                  size="sm"
+                  className="bg-yellow-600 hover:bg-yellow-700"
+                  onClick={() => setShowAddChannelModal(true)}
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Channel
                 </Button>
@@ -840,7 +940,11 @@ export default function AdminInfluencerDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 Referral Codes
-                <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700">
+                <Button
+                  size="sm"
+                  className="bg-yellow-600 hover:bg-yellow-700"
+                  onClick={() => setShowAddCodeModal(true)}
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Create Code
                 </Button>
@@ -940,6 +1044,210 @@ export default function AdminInfluencerDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Add Social Channel Modal */}
+      <Dialog open={showAddChannelModal} onOpenChange={setShowAddChannelModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add Social Channel</DialogTitle>
+            <DialogDescription>
+              Add a new social media channel for this influencer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="platform">Platform *</Label>
+              <select
+                id="platform"
+                value={channelFormData.platform}
+                onChange={(e) => setChannelFormData({ ...channelFormData, platform: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a platform</option>
+                <option value="instagram">Instagram</option>
+                <option value="tiktok">TikTok</option>
+                <option value="youtube">YouTube</option>
+                <option value="twitter">Twitter</option>
+                <option value="facebook">Facebook</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="pinterest">Pinterest</option>
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="channel_username">Username *</Label>
+              <Input
+                id="channel_username"
+                value={channelFormData.username}
+                onChange={(e) => setChannelFormData({ ...channelFormData, username: e.target.value })}
+                placeholder="@username"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="profile_url">Profile URL</Label>
+              <Input
+                id="profile_url"
+                value={channelFormData.profile_url}
+                onChange={(e) => setChannelFormData({ ...channelFormData, profile_url: e.target.value })}
+                placeholder="https://platform.com/username"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="follower_count">Followers</Label>
+                <Input
+                  id="follower_count"
+                  type="number"
+                  min="0"
+                  value={channelFormData.follower_count}
+                  onChange={(e) => setChannelFormData({ ...channelFormData, follower_count: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="engagement_rate">Engagement Rate (%)</Label>
+                <Input
+                  id="engagement_rate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={channelFormData.engagement_rate}
+                  onChange={(e) => setChannelFormData({ ...channelFormData, engagement_rate: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="verified"
+                  checked={channelFormData.verified}
+                  onCheckedChange={(checked) => setChannelFormData({ ...channelFormData, verified: checked })}
+                />
+                <Label htmlFor="verified">Verified</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="is_primary"
+                  checked={channelFormData.is_primary}
+                  onCheckedChange={(checked) => setChannelFormData({ ...channelFormData, is_primary: checked })}
+                />
+                <Label htmlFor="is_primary">Primary</Label>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" onClick={() => setShowAddChannelModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={addSocialChannel}
+                disabled={addingChannel || !channelFormData.platform || !channelFormData.username}
+                className="bg-yellow-600 hover:bg-yellow-700"
+              >
+                {addingChannel ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Channel
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Referral Code Modal */}
+      <Dialog open={showAddCodeModal} onOpenChange={setShowAddCodeModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create Referral Code</DialogTitle>
+            <DialogDescription>
+              Create a new referral code for this influencer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="referral_code">Referral Code *</Label>
+              <Input
+                id="referral_code"
+                value={codeFormData.code}
+                onChange={(e) => setCodeFormData({ ...codeFormData, code: e.target.value.toUpperCase() })}
+                placeholder="INFLUENCER10"
+                className="uppercase"
+                style={{ textTransform: 'uppercase' }}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Minimum 6 alphanumeric characters (automatically converted to uppercase)
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="code_description">Description</Label>
+              <Textarea
+                id="code_description"
+                value={codeFormData.description}
+                onChange={(e) => setCodeFormData({ ...codeFormData, description: e.target.value })}
+                placeholder="Describe this code or campaign..."
+                rows={2}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="expires_at">Expiration Date (Optional)</Label>
+              <Input
+                id="expires_at"
+                type="date"
+                value={codeFormData.expires_at}
+                onChange={(e) => setCodeFormData({ ...codeFormData, expires_at: e.target.value })}
+                min={new Date().toISOString().split('T')[0]}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Leave blank for no expiration
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="code_active"
+                checked={codeFormData.is_active}
+                onCheckedChange={(checked) => setCodeFormData({ ...codeFormData, is_active: checked })}
+              />
+              <Label htmlFor="code_active">Active</Label>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" onClick={() => setShowAddCodeModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={addReferralCode}
+                disabled={addingCode || !codeFormData.code || codeFormData.code.length < 6}
+                className="bg-yellow-600 hover:bg-yellow-700"
+              >
+                {addingCode ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Code
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
