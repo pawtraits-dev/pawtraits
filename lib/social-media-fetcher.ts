@@ -38,6 +38,18 @@ export class SocialMediaFetcher {
       }
     } catch (error) {
       console.error(`Error fetching ${platform} data for ${username}:`, error);
+      let errorMessage = 'Failed to fetch data';
+
+      if (error instanceof Error) {
+        if (platform.toLowerCase() === 'instagram') {
+          errorMessage = 'Instagram limits automated data access. Account exists but follower data not available - please enter manually.';
+        } else if (platform.toLowerCase() === 'twitter') {
+          errorMessage = 'Twitter/X restricts automated access. Account validation may not work - please enter data manually.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
       return {
         platform,
         username: cleanUsername,
@@ -49,7 +61,7 @@ export class SocialMediaFetcher {
         profile_url: this.getProfileUrl(platform, cleanUsername),
         avatar_url: null,
         bio: null,
-        error: error instanceof Error ? error.message : 'Failed to fetch data'
+        error: errorMessage
       };
     }
   }
@@ -61,6 +73,11 @@ export class SocialMediaFetcher {
       const response = await fetch(url, {
         headers: {
           'User-Agent': this.USER_AGENT,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
         },
       });
 
@@ -73,37 +90,165 @@ export class SocialMediaFetcher {
 
       const html = await response.text();
 
-      // Extract JSON data from Instagram's page
-      const jsonMatch = html.match(/<script type="application\/ld\+json"[^>]*>([^<]+)<\/script>/);
-      let data: any = null;
+      // Instagram has implemented strong anti-bot measures
+      // The follower data is now loaded dynamically via AJAX after page load
 
-      if (jsonMatch) {
-        try {
-          data = JSON.parse(jsonMatch[1]);
-        } catch (e) {
-          // Fallback to regex extraction if JSON parsing fails
+      let follower_count = null;
+      let following_count = null;
+      let post_count = null;
+      let verified = false;
+      let avatar_url = null;
+      let bio = null;
+
+      // Try multiple patterns for follower count
+      const followerPatterns = [
+        /"edge_followed_by":\s*{\s*"count":\s*(\d+)/,
+        /"followers":\s*(\d+)/,
+        /followers":\s*(\d+)/,
+        /,"c":\s*(\d+),"t":"followers"/,
+      ];
+
+      for (const pattern of followerPatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          follower_count = parseInt(match[1], 10);
+          console.log(`Found follower count with pattern ${pattern.source}:`, follower_count);
+          break;
         }
       }
 
-      // Fallback: Extract data using regex patterns
-      const followerMatch = html.match(/"edge_followed_by":{"count":(\d+)}/);
-      const followingMatch = html.match(/"edge_follow":{"count":(\d+)}/);
-      const postMatch = html.match(/"edge_owner_to_timeline_media":{"count":(\d+)}/);
-      const verifiedMatch = html.match(/"is_verified":true/);
-      const avatarMatch = html.match(/"profile_pic_url_hd":"([^"]+)"/);
-      const bioMatch = html.match(/"biography":"([^"]+)"/);
+      // Try multiple patterns for following count
+      const followingPatterns = [
+        /"edge_follow":\s*{\s*"count":\s*(\d+)/,
+        /"following":\s*(\d+)/,
+        /following":\s*(\d+)/,
+        /,"c":\s*(\d+),"t":"following"/,
+      ];
+
+      for (const pattern of followingPatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          following_count = parseInt(match[1], 10);
+          break;
+        }
+      }
+
+      // Try multiple patterns for post count
+      const postPatterns = [
+        /"edge_owner_to_timeline_media":\s*{\s*"count":\s*(\d+)/,
+        /"posts":\s*(\d+)/,
+        /posts":\s*(\d+)/,
+        /,"c":\s*(\d+),"t":"posts"/,
+      ];
+
+      for (const pattern of postPatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          post_count = parseInt(match[1], 10);
+          break;
+        }
+      }
+
+      // Check for verification
+      const verifiedPatterns = [
+        /"is_verified":\s*true/,
+        /"verified":\s*true/,
+        /verified":\s*true/,
+      ];
+
+      for (const pattern of verifiedPatterns) {
+        if (html.match(pattern)) {
+          verified = true;
+          break;
+        }
+      }
+
+      // Try to extract profile picture
+      const avatarPatterns = [
+        /"profile_pic_url_hd":\s*"([^"]+)"/,
+        /"profile_pic_url":\s*"([^"]+)"/,
+        /profile_pic_url":\s*"([^"]+)"/,
+      ];
+
+      for (const pattern of avatarPatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          avatar_url = match[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/');
+          break;
+        }
+      }
+
+      // Try to extract bio
+      const bioPatterns = [
+        /"biography":\s*"([^"]+)"/,
+        /biography":\s*"([^"]+)"/,
+      ];
+
+      for (const pattern of bioPatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          bio = match[1].replace(/\\n/g, '\n').replace(/\\u[\da-f]{4}/gi, '').replace(/\\\//g, '/');
+          break;
+        }
+      }
+
+      // If we didn't get follower count, try to extract from meta tags or structured data
+      if (!follower_count) {
+        const metaPatterns = [
+          /<meta[^>]*content="[^"]*(\d{1,3}(?:,\d{3})*(?:\.\d+)?[KMB]?)\s*followers"/i,
+          /<script[^>]*type="application\/ld\+json"[^>]*>([^<]+)<\/script>/
+        ];
+
+        for (const pattern of metaPatterns) {
+          const match = html.match(pattern);
+          if (match) {
+            if (pattern.source.includes('ld+json')) {
+              try {
+                const jsonData = JSON.parse(match[1]);
+                // Instagram structured data might contain follower information
+                console.log('Instagram structured data:', jsonData);
+              } catch (e) {
+                // Ignore JSON parse errors
+              }
+            } else {
+              // Parse follower count from meta description
+              const followerStr = match[1];
+              if (followerStr.includes('K')) {
+                follower_count = Math.round(parseFloat(followerStr.replace('K', '').replace(',', '')) * 1000);
+              } else if (followerStr.includes('M')) {
+                follower_count = Math.round(parseFloat(followerStr.replace('M', '').replace(',', '')) * 1000000);
+              } else if (followerStr.includes('B')) {
+                follower_count = Math.round(parseFloat(followerStr.replace('B', '').replace(',', '')) * 1000000000);
+              } else {
+                follower_count = parseInt(followerStr.replace(/,/g, ''), 10);
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      console.log('Instagram extraction results:', {
+        follower_count,
+        following_count,
+        post_count,
+        verified,
+        has_avatar: !!avatar_url,
+        has_bio: !!bio
+      });
 
       return {
         platform: 'instagram',
         username,
-        follower_count: followerMatch ? parseInt(followerMatch[1], 10) : null,
-        following_count: followingMatch ? parseInt(followingMatch[1], 10) : null,
-        post_count: postMatch ? parseInt(postMatch[1], 10) : null,
+        follower_count,
+        following_count,
+        post_count,
         engagement_rate: null, // Would need additional API calls to calculate
-        verified: !!verifiedMatch,
+        verified,
         profile_url: url,
-        avatar_url: avatarMatch ? avatarMatch[1].replace(/\\u0026/g, '&') : null,
-        bio: bioMatch ? bioMatch[1].replace(/\\n/g, '\n').replace(/\\u[\da-f]{4}/gi, '') : null,
+        avatar_url,
+        bio,
+        error: follower_count === null ? 'Instagram data extraction limited due to anti-bot measures. Please enter follower count manually.' : undefined
       };
     } catch (error) {
       throw error;

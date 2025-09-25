@@ -195,6 +195,12 @@ export default function AdminInfluencerDetailPage() {
   const [autoFetching, setAutoFetching] = useState(false);
   const [autoFetchResult, setAutoFetchResult] = useState<string | null>(null);
 
+  // Edit/Delete social channel state
+  const [showEditChannelModal, setShowEditChannelModal] = useState(false);
+  const [editingChannel, setEditingChannel] = useState<any>(null);
+  const [updatingChannel, setUpdatingChannel] = useState(false);
+  const [deletingChannel, setDeletingChannel] = useState<string | null>(null);
+
   // Form state for adding referral code
   const [codeFormData, setCodeFormData] = useState({
     code: '',
@@ -610,6 +616,91 @@ export default function AdminInfluencerDetailPage() {
       setAutoFetchResult(`Error: ${error instanceof Error ? error.message : 'Failed to fetch data'}`);
     } finally {
       setAutoFetching(false);
+    }
+  };
+
+  const startEditChannel = (channel: any) => {
+    setEditingChannel(channel);
+    setChannelFormData({
+      platform: channel.platform,
+      username: channel.username,
+      profile_url: channel.profile_url || '',
+      follower_count: channel.follower_count || 0,
+      engagement_rate: channel.engagement_rate || 0,
+      verified: channel.verified || false,
+      is_primary: channel.is_primary || false,
+      is_active: channel.is_active !== false,
+    });
+    setShowEditChannelModal(true);
+  };
+
+  const updateSocialChannel = async () => {
+    if (!editingChannel) return;
+
+    setUpdatingChannel(true);
+    try {
+      const response = await fetch(`/api/admin/influencers/${params.id}/channels/${editingChannel.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...channelFormData,
+          follower_count: parseInt(channelFormData.follower_count?.toString() || '0') || 0,
+          engagement_rate: parseFloat(channelFormData.engagement_rate?.toString() || '0') || 0,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to update social channel: ${error}`);
+      }
+
+      // Reload influencer data
+      await loadInfluencerData();
+      setShowEditChannelModal(false);
+      setEditingChannel(null);
+      setChannelFormData({
+        platform: '',
+        username: '',
+        profile_url: '',
+        follower_count: 0,
+        engagement_rate: 0,
+        verified: false,
+        is_primary: false,
+        is_active: true,
+      });
+    } catch (error) {
+      console.error('Error updating social channel:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update social channel');
+    } finally {
+      setUpdatingChannel(false);
+    }
+  };
+
+  const deleteSocialChannel = async (channelId: string) => {
+    if (!confirm('Are you sure you want to delete this social channel?')) {
+      return;
+    }
+
+    setDeletingChannel(channelId);
+    try {
+      const response = await fetch(`/api/admin/influencers/${params.id}/channels/${channelId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to delete social channel: ${error}`);
+      }
+
+      // Reload influencer data
+      await loadInfluencerData();
+    } catch (error) {
+      console.error('Error deleting social channel:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete social channel');
+    } finally {
+      setDeletingChannel(null);
     }
   };
 
@@ -1032,11 +1123,27 @@ export default function AdminInfluencerDetailPage() {
                             <p className="text-sm text-gray-600">engagement</p>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <Button variant="outline" size="sm">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => startEditChannel(channel)}
+                              title="Edit social channel"
+                            >
                               <Edit className="w-4 h-4" />
                             </Button>
-                            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                              <Trash2 className="w-4 h-4" />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => deleteSocialChannel(channel.id)}
+                              disabled={deletingChannel === channel.id}
+                              title="Delete social channel"
+                            >
+                              {deletingChannel === channel.id ? (
+                                <div className="w-4 h-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent"></div>
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
                             </Button>
                           </div>
                         </div>
@@ -1365,6 +1472,166 @@ export default function AdminInfluencerDetailPage() {
                     <Plus className="w-4 h-4 mr-2" />
                     Add Channel
                   </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Social Channel Modal */}
+      <Dialog open={showEditChannelModal} onOpenChange={setShowEditChannelModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Social Channel</DialogTitle>
+            <DialogDescription>
+              Update the social media channel information.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="edit_platform">Platform *</Label>
+              <select
+                id="edit_platform"
+                value={channelFormData.platform}
+                onChange={(e) => {
+                  setChannelFormData({ ...channelFormData, platform: e.target.value });
+                  setAutoFetchResult(null);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a platform</option>
+                <option value="instagram">Instagram</option>
+                <option value="tiktok">TikTok</option>
+                <option value="youtube">YouTube</option>
+                <option value="twitter">Twitter</option>
+                <option value="facebook">Facebook</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="pinterest">Pinterest</option>
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="edit_channel_username">Username *</Label>
+              <div className="flex space-x-2">
+                <Input
+                  id="edit_channel_username"
+                  value={channelFormData.username}
+                  onChange={(e) => {
+                    setChannelFormData({ ...channelFormData, username: e.target.value });
+                    setAutoFetchResult(null);
+                  }}
+                  placeholder="@username"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={autoFetchSocialData}
+                  disabled={autoFetching || !channelFormData.platform || !channelFormData.username}
+                  className="whitespace-nowrap"
+                >
+                  {autoFetching ? (
+                    <>
+                      <div className="w-4 h-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 mr-2"></div>
+                      Fetching...
+                    </>
+                  ) : (
+                    <>🔍 Auto-Fetch</>
+                  )}
+                </Button>
+              </div>
+              {autoFetchResult && (
+                <p className={`text-xs mt-1 ${
+                  autoFetchResult.startsWith('✓') ? 'text-green-600' : autoFetchResult.startsWith('Error') ? 'text-red-600' : 'text-yellow-600'
+                }`}>
+                  {autoFetchResult}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="edit_profile_url">Profile URL</Label>
+              <Input
+                id="edit_profile_url"
+                value={channelFormData.profile_url}
+                onChange={(e) => setChannelFormData({ ...channelFormData, profile_url: e.target.value })}
+                placeholder="https://platform.com/username"
+                className={channelFormData.profile_url && !channelFormData.profile_url.startsWith('http') ? 'border-yellow-500' : ''}
+              />
+              {channelFormData.profile_url && !channelFormData.profile_url.startsWith('http') && (
+                <p className="text-xs text-yellow-600 mt-1">URL should start with https://</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit_follower_count">Followers</Label>
+                <Input
+                  id="edit_follower_count"
+                  type="number"
+                  min="0"
+                  value={channelFormData.follower_count}
+                  onChange={(e) => setChannelFormData({ ...channelFormData, follower_count: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit_engagement_rate">Engagement Rate (%)</Label>
+                <Input
+                  id="edit_engagement_rate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={channelFormData.engagement_rate}
+                  onChange={(e) => setChannelFormData({ ...channelFormData, engagement_rate: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="edit_verified"
+                  checked={channelFormData.verified}
+                  onCheckedChange={(checked) => setChannelFormData({ ...channelFormData, verified: checked })}
+                />
+                <Label htmlFor="edit_verified">Verified</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="edit_is_primary"
+                  checked={channelFormData.is_primary}
+                  onCheckedChange={(checked) => setChannelFormData({ ...channelFormData, is_primary: checked })}
+                />
+                <Label htmlFor="edit_is_primary">Primary</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="edit_is_active"
+                  checked={channelFormData.is_active}
+                  onCheckedChange={(checked) => setChannelFormData({ ...channelFormData, is_active: checked })}
+                />
+                <Label htmlFor="edit_is_active">Active</Label>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" onClick={() => setShowEditChannelModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={updateSocialChannel}
+                disabled={updatingChannel || !channelFormData.platform || !channelFormData.username}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {updatingChannel ? (
+                  <>
+                    <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></div>
+                    Updating...
+                  </>
+                ) : (
+                  'Update Channel'
                 )}
               </Button>
             </div>
