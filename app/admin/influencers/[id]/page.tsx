@@ -34,9 +34,13 @@ import {
   Calendar,
   Mail,
   Phone,
-  Globe
+  Globe,
+  Copy,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import Link from 'next/link';
+import { qrCodeService } from '@/lib/qr-code';
 
 interface InfluencerDetail {
   id: string;
@@ -157,6 +161,9 @@ export default function AdminInfluencerDetailPage() {
   const [addingChannel, setAddingChannel] = useState(false);
   const [showAddCodeModal, setShowAddCodeModal] = useState(false);
   const [addingCode, setAddingCode] = useState(false);
+  const [qrCodes, setQrCodes] = useState<{ [key: string]: string }>({}); // Store QR codes by referral code ID
+  const [showQrCode, setShowQrCode] = useState<{ [key: string]: boolean }>({}); // Track which QR codes are visible
+  const [generatingQr, setGeneratingQr] = useState<{ [key: string]: boolean }>({}); // Track QR generation loading state
 
   // Form state for editing
   const [formData, setFormData] = useState({
@@ -496,6 +503,55 @@ export default function AdminInfluencerDetailPage() {
     } finally {
       setAddingCode(false);
     }
+  };
+
+  // QR code functions
+  const generateQRCode = async (codeId: string, referralCode: string) => {
+    try {
+      setGeneratingQr(prev => ({ ...prev, [codeId]: true }));
+
+      // Generate QR code data URL
+      const qrDataURL = await qrCodeService.generateReferralQRDataURL(referralCode);
+
+      setQrCodes(prev => ({ ...prev, [codeId]: qrDataURL }));
+      setShowQrCode(prev => ({ ...prev, [codeId]: true }));
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      alert('Failed to generate QR code');
+    } finally {
+      setGeneratingQr(prev => ({ ...prev, [codeId]: false }));
+    }
+  };
+
+  const toggleQRCode = async (codeId: string, referralCode: string) => {
+    if (showQrCode[codeId]) {
+      // Hide QR code
+      setShowQrCode(prev => ({ ...prev, [codeId]: false }));
+    } else {
+      // Show QR code - generate if not exists
+      if (!qrCodes[codeId]) {
+        await generateQRCode(codeId, referralCode);
+      } else {
+        setShowQrCode(prev => ({ ...prev, [codeId]: true }));
+      }
+    }
+  };
+
+  const copyReferralURL = (referralCode: string) => {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pawtraits.pics';
+    const referralUrl = `${baseUrl}/r/${referralCode}`;
+
+    navigator.clipboard.writeText(referralUrl).then(() => {
+      // Show temporary success message
+      const originalTitle = document.title;
+      document.title = '✓ URL Copied!';
+      setTimeout(() => {
+        document.title = originalTitle;
+      }, 2000);
+    }).catch(err => {
+      console.error('Failed to copy URL:', err);
+      alert('Failed to copy URL to clipboard');
+    });
   };
 
   const getPlatformIcon = (platform: string) => {
@@ -954,50 +1010,107 @@ export default function AdminInfluencerDetailPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {influencer.referral_codes.map((code) => (
-                  <div key={code.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <code className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-sm font-mono">
-                            {code.code}
-                          </code>
-                          <Badge className={code.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                            {code.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
+              <div className="space-y-6">
+                {influencer.referral_codes.map((code) => {
+                  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pawtraits.pics';
+                  const referralUrl = `${baseUrl}/r/${code.code}`;
+
+                  return (
+                    <div key={code.id} className="border rounded-lg p-6 bg-gradient-to-r from-yellow-50 to-amber-50">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <code className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-md text-lg font-mono font-bold">
+                              {code.code}
+                            </code>
+                            <Badge className={code.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                              {code.is_active ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </div>
+                          {code.description && (
+                            <p className="text-sm text-gray-700 mb-2">{code.description}</p>
+                          )}
+                          <p className="text-xs text-gray-500">
+                            Created {new Date(code.created_at).toLocaleDateString()}
+                          </p>
                         </div>
-                        {code.description && (
-                          <p className="text-sm text-gray-600 mt-1">{code.description}</p>
-                        )}
-                        <p className="text-xs text-gray-500 mt-1">
-                          Created {new Date(code.created_at).toLocaleDateString()}
-                        </p>
+
+                        {/* QR Code and Actions */}
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyReferralURL(code.code)}
+                            className="flex items-center space-x-1"
+                          >
+                            <Copy className="w-4 h-4" />
+                            <span>Copy URL</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleQRCode(code.id, code.code)}
+                            disabled={generatingQr[code.id]}
+                            className="flex items-center space-x-1"
+                          >
+                            {generatingQr[code.id] ? (
+                              <div className="w-4 h-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
+                            ) : showQrCode[code.id] ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                            <span>{showQrCode[code.id] ? 'Hide QR' : 'Show QR'}</span>
+                          </Button>
+                        </div>
                       </div>
 
-                      <div className="text-right">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <p className="font-medium">{code.usage_count}</p>
-                            <p className="text-gray-500">uses</p>
+                      {/* Referral URL Display */}
+                      <div className="mb-4">
+                        <Label className="text-xs text-gray-600">Referral URL:</Label>
+                        <div className="mt-1 p-2 bg-white border rounded-md font-mono text-sm text-gray-700 break-all">
+                          {referralUrl}
+                        </div>
+                      </div>
+
+                      {/* QR Code Display */}
+                      {showQrCode[code.id] && qrCodes[code.id] && (
+                        <div className="mb-4 text-center">
+                          <div className="inline-block p-4 bg-white rounded-lg shadow-sm border">
+                            <img
+                              src={qrCodes[code.id]}
+                              alt={`QR Code for ${code.code}`}
+                              className="w-48 h-48 mx-auto"
+                            />
+                            <p className="text-xs text-gray-500 mt-2">
+                              Scan to access referral link
+                            </p>
                           </div>
-                          <div>
-                            <p className="font-medium">{code.conversion_count}</p>
-                            <p className="text-gray-500">conversions</p>
-                          </div>
-                          <div>
-                            <p className="font-medium">${code.total_revenue.toFixed(2)}</p>
-                            <p className="text-gray-500">revenue</p>
-                          </div>
-                          <div>
-                            <p className="font-medium text-green-600">${code.total_commission.toFixed(2)}</p>
-                            <p className="text-gray-500">commission</p>
-                          </div>
+                        </div>
+                      )}
+
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-4 gap-4 text-center">
+                        <div className="p-3 bg-white rounded-md border">
+                          <p className="text-lg font-semibold text-gray-900">{code.usage_count}</p>
+                          <p className="text-sm text-gray-500">Uses</p>
+                        </div>
+                        <div className="p-3 bg-white rounded-md border">
+                          <p className="text-lg font-semibold text-gray-900">{code.conversion_count}</p>
+                          <p className="text-sm text-gray-500">Conversions</p>
+                        </div>
+                        <div className="p-3 bg-white rounded-md border">
+                          <p className="text-lg font-semibold text-gray-900">${code.total_revenue.toFixed(2)}</p>
+                          <p className="text-sm text-gray-500">Revenue</p>
+                        </div>
+                        <div className="p-3 bg-white rounded-md border bg-green-50">
+                          <p className="text-lg font-semibold text-green-600">${code.total_commission.toFixed(2)}</p>
+                          <p className="text-sm text-gray-500">Commission</p>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -1181,11 +1294,30 @@ export default function AdminInfluencerDetailPage() {
                 value={codeFormData.code}
                 onChange={(e) => setCodeFormData({ ...codeFormData, code: e.target.value.toUpperCase() })}
                 placeholder="INFLUENCER10"
-                className="uppercase"
+                className={`uppercase ${
+                  codeFormData.code && (codeFormData.code.length < 6 || !/^[A-Za-z0-9]+$/.test(codeFormData.code))
+                    ? 'border-red-500'
+                    : codeFormData.code.length >= 6 && /^[A-Za-z0-9]+$/.test(codeFormData.code)
+                    ? 'border-green-500'
+                    : ''
+                }`}
                 style={{ textTransform: 'uppercase' }}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Minimum 6 alphanumeric characters (automatically converted to uppercase)
+              <p className={`text-xs mt-1 ${
+                codeFormData.code && (codeFormData.code.length < 6 || !/^[A-Za-z0-9]+$/.test(codeFormData.code))
+                  ? 'text-red-500'
+                  : codeFormData.code.length >= 6 && /^[A-Za-z0-9]+$/.test(codeFormData.code)
+                  ? 'text-green-500'
+                  : 'text-gray-500'
+              }`}>
+                {codeFormData.code && codeFormData.code.length < 6
+                  ? `Need ${6 - codeFormData.code.length} more characters`
+                  : codeFormData.code && !/^[A-Za-z0-9]+$/.test(codeFormData.code)
+                  ? 'Only letters and numbers allowed - no spaces, dashes, or special characters'
+                  : codeFormData.code.length >= 6 && /^[A-Za-z0-9]+$/.test(codeFormData.code)
+                  ? 'Valid referral code ✓'
+                  : 'Minimum 6 characters. Letters and numbers only - no spaces, dashes, or special characters. (Automatically converted to uppercase)'
+                }
               </p>
             </div>
 
@@ -1229,7 +1361,7 @@ export default function AdminInfluencerDetailPage() {
               </Button>
               <Button
                 onClick={addReferralCode}
-                disabled={addingCode || !codeFormData.code || codeFormData.code.length < 6}
+                disabled={addingCode || !codeFormData.code || codeFormData.code.length < 6 || !/^[A-Za-z0-9]+$/.test(codeFormData.code)}
                 className="bg-yellow-600 hover:bg-yellow-700"
               >
                 {addingCode ? (

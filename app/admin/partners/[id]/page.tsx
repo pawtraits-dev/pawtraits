@@ -30,9 +30,11 @@ import {
   Upload,
   Trash2,
   Loader2,
-  Image
+  Image,
+  EyeOff
 } from 'lucide-react';
 import type { Partner, Referral } from '@/lib/types';
+import { qrCodeService } from '@/lib/qr-code';
 
 interface ReferralWithStatus extends Referral {
   client_signup_status?: 'completed' | 'pending' | 'expired';
@@ -107,6 +109,9 @@ export default function PartnerDetailPage() {
   const [commissionsLoading, setCommissionsLoading] = useState(true);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [logoUploadSuccess, setLogoUploadSuccess] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [showQrCode, setShowQrCode] = useState(false);
+  const [generatingQr, setGeneratingQr] = useState(false);
 
   useEffect(() => {
     if (params.id) {
@@ -211,6 +216,52 @@ export default function PartnerDetailPage() {
         console.error('Failed to copy referral code:', error);
       }
     }
+  };
+
+  const generateQRCode = async () => {
+    if (!partnerReferralCode) return;
+
+    try {
+      setGeneratingQr(true);
+      const qrDataURL = await qrCodeService.generateReferralQRDataURL(partnerReferralCode);
+      setQrCodeDataUrl(qrDataURL);
+      setShowQrCode(true);
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      alert('Failed to generate QR code');
+    } finally {
+      setGeneratingQr(false);
+    }
+  };
+
+  const toggleQRCode = async () => {
+    if (showQrCode) {
+      setShowQrCode(false);
+    } else {
+      if (!qrCodeDataUrl) {
+        await generateQRCode();
+      } else {
+        setShowQrCode(true);
+      }
+    }
+  };
+
+  const copyReferralURL = () => {
+    if (!partnerReferralCode) return;
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pawtraits.pics';
+    const referralUrl = `${baseUrl}/r/${partnerReferralCode}`;
+
+    navigator.clipboard.writeText(referralUrl).then(() => {
+      const originalTitle = document.title;
+      document.title = '✓ URL Copied!';
+      setTimeout(() => {
+        document.title = originalTitle;
+      }, 2000);
+    }).catch(err => {
+      console.error('Failed to copy URL:', err);
+      alert('Failed to copy URL to clipboard');
+    });
   };
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -683,50 +734,97 @@ export default function PartnerDetailPage() {
                   Partner's main referral code for customer acquisition
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 {partnerReferralCode && (
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <QrCode className="w-4 h-4 text-purple-600" />
-                        <p className="font-medium text-gray-900">Partner Referral Code</p>
+                  <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-lg border">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <QrCode className="w-5 h-5 text-purple-600" />
+                          <p className="font-semibold text-gray-900">Partner Referral Code</p>
+                        </div>
+                        <div className="bg-white p-3 rounded-md border shadow-sm">
+                          <code className="text-xl font-mono font-bold text-purple-600">
+                            {partnerReferralCode}
+                          </code>
+                        </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={copyReferralCode}
-                        title="Copy referral code"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center space-x-2 ml-4">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={copyReferralCode}
+                          title="Copy referral code"
+                          className="flex items-center space-x-1"
+                        >
+                          <Copy className="w-4 h-4" />
+                          <span>Copy Code</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={copyReferralURL}
+                          title="Copy referral URL"
+                          className="flex items-center space-x-1"
+                        >
+                          <Copy className="w-4 h-4" />
+                          <span>Copy URL</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={toggleQRCode}
+                          disabled={generatingQr}
+                          className="flex items-center space-x-1"
+                        >
+                          {generatingQr ? (
+                            <div className="w-4 h-4 animate-spin rounded-full border-2 border-gray-300 border-t-purple-600"></div>
+                          ) : showQrCode ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                          <span>{showQrCode ? 'Hide QR' : 'Show QR'}</span>
+                        </Button>
+                      </div>
                     </div>
-                    <div className="bg-white p-3 rounded border">
-                      <code className="text-lg font-mono font-bold text-purple-600">
-                        {partnerReferralCode}
-                      </code>
+
+                    {/* Referral URL Display */}
+                    <div className="mb-4">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Referral URL:</p>
+                      <div className="bg-white p-3 rounded-md border font-mono text-sm text-gray-700 break-all">
+                        {typeof window !== 'undefined'
+                          ? `${window.location.origin}/r/${partnerReferralCode}`
+                          : `https://pawtraits.pics/r/${partnerReferralCode}`
+                        }
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      This code can be used for direct customer referrals via /r/{partnerReferralCode}
-                    </p>
+
+                    {/* QR Code Display */}
+                    {showQrCode && qrCodeDataUrl && (
+                      <div className="text-center">
+                        <div className="inline-block p-4 bg-white rounded-lg shadow-sm border">
+                          <img
+                            src={qrCodeDataUrl}
+                            alt={`QR Code for ${partnerReferralCode}`}
+                            className="w-48 h-48 mx-auto"
+                          />
+                          <p className="text-xs text-gray-500 mt-2">
+                            Scan to access referral link
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Usage Information */}
+                    <div className="mt-4 pt-4 border-t border-gray-200 text-sm text-gray-600">
+                      <p className="mb-2"><strong>Usage:</strong> Share this code or URL with customers for direct referrals</p>
+                      <p><strong>Commission:</strong> {partner?.commission_rate ? `${(partner.commission_rate * 100).toFixed(0)}%` : '20%'} on first order, {partner?.lifetime_commission_rate ? `${(partner.lifetime_commission_rate * 100).toFixed(0)}%` : '5%'} lifetime</p>
+                    </div>
                   </div>
                 )}
-
-                <div className="text-sm text-gray-600">
-                  <p className="mb-2 font-medium">Referral URL:</p>
-                  <div className="bg-gray-50 p-3 rounded border">
-                    <code className="text-sm break-all">
-                      {typeof window !== 'undefined'
-                        ? `${window.location.origin}/r/${partnerReferralCode || 'LOADING'}`
-                        : `https://yoursite.com/r/${partnerReferralCode || 'LOADING'}`
-                      }
-                    </code>
-                  </div>
-                </div>
-
-                <div className="text-sm text-gray-600">
-                  <p><strong>Usage:</strong> Share this code or URL with customers for direct referrals</p>
-                  <p><strong>Commission:</strong> {partner?.commission_rate ? `${(partner.commission_rate * 100).toFixed(0)}%` : '20%'} on first order, {partner?.lifetime_commission_rate ? `${(partner.lifetime_commission_rate * 100).toFixed(0)}%` : '5%'} lifetime</p>
-                </div>
               </CardContent>
             </Card>
 

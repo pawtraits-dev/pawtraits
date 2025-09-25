@@ -73,6 +73,14 @@ export async function GET(request: NextRequest) {
       const successfulReferrals = codes.reduce((sum: number, code: any) => sum + (code.conversion_count || 0), 0);
       const totalCommissionEarned = codes.reduce((sum: number, code: any) => sum + (code.total_commission || 0), 0);
 
+      // Find setup/onboarding code (description contains 'setup' or 'onboarding')
+      const setupCode = codes.find((code: any) =>
+        code.description && (
+          code.description.toLowerCase().includes('setup') ||
+          code.description.toLowerCase().includes('onboarding')
+        )
+      );
+
       // Calculate social media stats
       const socialChannels = influencer.influencer_social_channels || [];
       const totalSocialReach = socialChannels
@@ -96,7 +104,8 @@ export async function GET(request: NextRequest) {
         active_codes_count: codes.filter((code: any) => code.is_active).length,
         total_social_reach: totalSocialReach,
         primary_platform: primaryChannel?.platform || null,
-        primary_social_channel: primaryChannel || null
+        primary_social_channel: primaryChannel || null,
+        setup_code: setupCode?.code || null
       };
     }) || [];
 
@@ -203,8 +212,36 @@ export async function POST(request: NextRequest) {
       throw createError;
     }
 
+    // Create setup/onboarding referral code for the influencer
+    const setupCode = `${newInfluencer.first_name.substring(0, 3).toUpperCase()}${newInfluencer.last_name.substring(0, 3).toUpperCase()}${newInfluencer.id.substring(0, 6).toUpperCase()}`;
+
+    const { data: setupCodeData, error: codeError } = await supabase
+      .from('influencer_referral_codes')
+      .insert({
+        influencer_id: newInfluencer.id,
+        code: setupCode,
+        description: 'Account setup and onboarding code',
+        is_active: true,
+        usage_count: 0,
+        conversion_count: 0,
+        total_revenue: 0,
+        total_commission: 0
+      })
+      .select()
+      .single();
+
+    if (codeError) {
+      console.warn('Failed to create setup code for influencer:', codeError);
+      // Don't fail the entire operation, just log the warning
+    } else {
+      console.log('Created setup code for influencer:', setupCode);
+    }
+
     console.log('Successfully created influencer:', newInfluencer.id);
-    return NextResponse.json(newInfluencer, { status: 201 });
+    return NextResponse.json({
+      ...newInfluencer,
+      setup_code: setupCode
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating influencer:', error);
 

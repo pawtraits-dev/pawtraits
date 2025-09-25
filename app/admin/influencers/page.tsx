@@ -29,7 +29,9 @@ import {
   Facebook,
   Youtube,
   QrCode,
-  Plus
+  Plus,
+  Copy,
+  CheckCircle
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -37,6 +39,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { QRCodeService } from '@/lib/qr-code';
 
 interface AdminInfluencerOverview {
   id: string;
@@ -67,6 +70,7 @@ interface AdminInfluencerOverview {
     follower_count: number;
     verified: boolean;
   };
+  setup_code?: string;
 }
 
 const approvalStatusColors = {
@@ -92,6 +96,11 @@ export default function AdminInfluencersPage() {
   const [platformFilter, setPlatformFilter] = useState('all');
   const [showAddInfluencerModal, setShowAddInfluencerModal] = useState(false);
   const [addingInfluencer, setAddingInfluencer] = useState(false);
+
+  // QR code state management
+  const [copiedCodes, setCopiedCodes] = useState<Set<string>>(new Set());
+  const [qrCodes, setQrCodes] = useState<Map<string, string>>(new Map());
+  const [generatingQr, setGeneratingQr] = useState<Set<string>>(new Set());
 
   // Stats for overview cards
   const [overviewStats, setOverviewStats] = useState({
@@ -165,7 +174,8 @@ export default function AdminInfluencersPage() {
               username: 'emmapetlover',
               follower_count: 65000,
               verified: true
-            }
+            },
+            setup_code: 'EMMJOH123456'
           },
           {
             id: '2',
@@ -193,7 +203,8 @@ export default function AdminInfluencersPage() {
               username: 'MarcusCatTips',
               follower_count: 28000,
               verified: false
-            }
+            },
+            setup_code: 'MARCHE789012'
           },
           {
             id: '3',
@@ -221,7 +232,8 @@ export default function AdminInfluencersPage() {
               username: 'sarahpaws',
               follower_count: 12000,
               verified: false
-            }
+            },
+            setup_code: 'SARWIL345678'
           }
         ];
 
@@ -350,6 +362,91 @@ export default function AdminInfluencersPage() {
     if (!platform) return Heart;
     const Icon = platformIcons[platform.toLowerCase()];
     return Icon || Heart;
+  };
+
+  const generateQRCode = async (code: string) => {
+    if (qrCodes.has(code) || generatingQr.has(code)) return;
+
+    try {
+      setGeneratingQr(prev => new Set(prev).add(code));
+      const qrCodeService = new QRCodeService();
+
+      const qrUrl = `${window.location.origin}/p/${code}`;
+
+      // Create the paw logo SVG (rotated to fix upside-down issue)
+      const logoUrl = 'data:image/svg+xml;base64,' + btoa(`
+        <svg fill="#9333ea" width="60" height="60" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <g transform="rotate(180 50 50)">
+            <path d="M34.848,40.708c0-5.6-4.542-10.141-10.143-10.141c-5.601,0-10.141,4.541-10.141,10.141c0,5.604,4.539,10.143,10.141,10.143 C30.307,50.851,34.848,46.312,34.848,40.708z"/>
+            <path d="M75.293,32.548c-5.6,0-10.141,4.541-10.141,10.141c0,5.604,4.541,10.141,10.141,10.141c5.601,0,10.142-4.537,10.142-10.141 C85.435,37.089,80.895,32.548,75.293,32.548z"/>
+            <path d="M66.082,53.978c-0.705-0.869-1.703-1.875-2.849-2.93c-3.058-3.963-7.841-6.527-13.233-6.527 c-4.799,0-9.113,2.032-12.162,5.27c-1.732,1.507-3.272,2.978-4.252,4.188l-0.656,0.801c-3.06,3.731-6.869,8.373-6.841,16.25 c0.027,7.315,5.984,13.27,13.278,13.27c4.166,0,7.984-1.926,10.467-5.159c2.481,3.233,6.3,5.159,10.47,5.159 c7.291,0,13.247-5.954,13.275-13.27c0.028-7.877-3.782-12.519-6.841-16.25L66.082,53.978z"/>
+            <circle cx="50.703" cy="26.877" r="11.175"/>
+          </g>
+        </svg>
+      `);
+
+      // Generate branded QR code with Pawtraits logo and purple theme
+      const qrCodeDataUrl = await qrCodeService.generateQRCodeWithLogo(qrUrl, logoUrl, {
+        width: 128,
+        margin: 4,
+        errorCorrectionLevel: 'H',
+        color: {
+          dark: '#9333ea', // Pawtraits purple-600
+          light: '#00000000' // Transparent background
+        }
+      });
+
+      setQrCodes(prev => new Map(prev).set(code, qrCodeDataUrl));
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+    } finally {
+      setGeneratingQr(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(code);
+        return newSet;
+      });
+    }
+  };
+
+  const handleCopyQRCode = async (code: string, qrDataUrl: string) => {
+    try {
+      // Convert data URL to blob
+      const response = await fetch(qrDataUrl);
+      const blob = await response.blob();
+
+      // Copy to clipboard using the Clipboard API
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [blob.type]: blob
+        })
+      ]);
+
+      setCopiedCodes(prev => new Set(prev).add(code));
+      // Clear the copied state after 2 seconds
+      setTimeout(() => {
+        setCopiedCodes(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(code);
+          return newSet;
+        });
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to copy QR code:', error);
+      // Fallback: try to copy the text code instead
+      try {
+        await navigator.clipboard.writeText(code);
+        setCopiedCodes(prev => new Set(prev).add(code));
+        setTimeout(() => {
+          setCopiedCodes(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(code);
+            return newSet;
+          });
+        }, 2000);
+      } catch (textError) {
+        console.error('Failed to copy text code as fallback:', textError);
+      }
+    }
   };
 
   if (loading) {
@@ -564,6 +661,64 @@ export default function AdminInfluencersPage() {
                     </div>
 
                     <div className="flex items-center space-x-4">
+                      {/* QR Code Section */}
+                      {influencer.setup_code && (
+                        <div className="flex items-center gap-2">
+                          {qrCodes.has(influencer.setup_code) ? (
+                            <>
+                              <img
+                                src={qrCodes.get(influencer.setup_code)!}
+                                alt={`Setup QR Code for ${influencer.first_name} ${influencer.last_name}`}
+                                className="w-12 h-12 border rounded"
+                                style={{ imageRendering: 'pixelated' }}
+                              />
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleCopyQRCode(influencer.setup_code!, qrCodes.get(influencer.setup_code!)!)}
+                                className="h-8 px-2 text-xs"
+                                title="Copy setup QR code"
+                              >
+                                {copiedCodes.has(influencer.setup_code) ? (
+                                  <>
+                                    <CheckCircle className="w-3 h-3 text-green-600 mr-1" />
+                                    Copied!
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3 h-3 mr-1" />
+                                    Copy QR
+                                  </>
+                                )}
+                              </Button>
+                            </>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <div className="w-12 h-12 border rounded bg-gray-100 flex items-center justify-center">
+                                {generatingQr.has(influencer.setup_code) ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => generateQRCode(influencer.setup_code!)}
+                                    className="h-full w-full p-0 hover:bg-purple-50"
+                                    title="Generate setup QR code"
+                                  >
+                                    <QrCode className="w-4 h-4 text-gray-400" />
+                                  </Button>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                <span className="font-mono">{influencer.setup_code}</span>
+                                <br />
+                                <span className="text-gray-400">Setup Code</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Status Badge */}
                       <Badge className={approvalStatusColors[influencer.approval_status]}>
                         {influencer.approval_status}

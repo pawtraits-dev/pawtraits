@@ -128,9 +128,16 @@ export async function POST(
     }
 
     // Validate code format (minimum 6 characters, alphanumeric)
-    if (body.code.length < 6 || !/^[A-Za-z0-9]+$/.test(body.code)) {
+    if (body.code.length < 6) {
       return NextResponse.json(
-        { error: 'Code must be at least 6 alphanumeric characters' },
+        { error: 'Code must be at least 6 characters long' },
+        { status: 400 }
+      );
+    }
+
+    if (!/^[A-Za-z0-9]+$/.test(body.code)) {
+      return NextResponse.json(
+        { error: 'Code must contain only letters and numbers (no spaces, dashes, or special characters)' },
         { status: 400 }
       );
     }
