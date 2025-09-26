@@ -1160,16 +1160,8 @@ export default function AdminInfluencerDetailPage() {
         <TabsContent value="codes" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+              <CardTitle>
                 Referral Codes
-                <Button
-                  size="sm"
-                  className="bg-yellow-600 hover:bg-yellow-700"
-                  onClick={() => setShowAddCodeModal(true)}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Code
-                </Button>
               </CardTitle>
               <CardDescription>
                 Manage referral codes and track performance

@@ -28,10 +28,45 @@ export async function GET(
       .single();
 
     if (error || !data) {
-      return NextResponse.json(
-        { error: 'Referral not found' },
-        { status: 404 }
-      );
+      // If partner referral not found, try influencer referral codes using proper service method
+      try {
+        const influencerData = await supabaseService.getInfluencerReferralCodeByCode(referralCode);
+
+        if (!influencerData) {
+          return NextResponse.json(
+            { error: 'Referral not found' },
+            { status: 404 }
+          );
+        }
+
+        const { code: influencerCode, influencer } = influencerData;
+
+        // Format influencer referral response
+        const influencerResponse = {
+          id: influencerCode.id,
+          referral_code: influencerCode.code,
+          client_name: 'Influencer Referral',
+          status: 'active',
+          commission_rate: influencer.commission_rate || 10,
+          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year from now
+          referral_type: 'influencer',
+          partner: {
+            first_name: influencer.first_name,
+            last_name: influencer.last_name,
+            business_name: `@${influencer.username}${influencer.is_verified ? ' ✓' : ''}`,
+            business_type: 'influencer',
+            avatar_url: influencer.avatar_url
+          }
+        };
+
+        return NextResponse.json(influencerResponse);
+      } catch (influencerError) {
+        console.error('Error fetching influencer referral code:', influencerError);
+        return NextResponse.json(
+          { error: 'Referral not found' },
+          { status: 404 }
+        );
+      }
     }
 
     // Check if expired

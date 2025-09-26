@@ -135,6 +135,9 @@ export default function ReferralLandingPage() {
         if (referral.referral_type === 'customer') {
           // Customer referral: Redirect to signup with customer code
           window.location.href = `/signup/user?ref=${code}&discount=20&type=customer`;
+        } else if (referral.referral_type === 'influencer') {
+          // Influencer referral: Redirect to signup with influencer code
+          window.location.href = `/signup/user?ref=${code}&discount=20&type=influencer`;
         } else if (referral.referral_type === 'image_share' && referral.image_id) {
           // Partner Method 2: Redirect to shop page for the specific image
           window.location.href = `/shop/${referral.image_id}?ref=${code}&discount=20`;
@@ -148,6 +151,8 @@ export default function ReferralLandingPage() {
       // Still redirect even if tracking fails
       if (referral.referral_type === 'customer') {
         window.location.href = `/signup/user?ref=${code}&discount=20&type=customer`;
+      } else if (referral.referral_type === 'influencer') {
+        window.location.href = `/signup/user?ref=${code}&discount=20&type=influencer`;
       } else if (referral.referral_type === 'image_share' && referral.image_id) {
         window.location.href = `/shop/${referral.image_id}?ref=${code}&discount=20`;
       } else {
@@ -226,6 +231,8 @@ export default function ReferralLandingPage() {
           <p className="text-xl text-gray-600 mb-8">
             {referral.referral_type === 'customer'
               ? `${referral.partner.first_name} ${referral.partner.last_name} wants to share something special with you - get 20% off your first AI pet portrait!`
+              : referral.referral_type === 'influencer'
+              ? `${referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`} is sharing their favorite pet portrait service with you!`
               : `${referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`} wants to treat you to a custom AI pet portrait`
             }
           </p>

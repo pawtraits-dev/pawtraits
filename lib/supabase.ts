@@ -24,7 +24,10 @@ import type {
   CustomerCredits,
   CustomerCreditTransaction,
   CustomerReferralStats,
-  CreditApplicationResult
+  CreditApplicationResult,
+  // Influencer types
+  Influencer,
+  InfluencerReferralCode
 } from './types';
 import type { UserProfile, UserType } from './user-types';
 import type { 
@@ -1230,6 +1233,53 @@ export class SupabaseService {
           email_opens: this.supabase.rpc('increment_email_opens', { referral_id: referralId })
         })
         .eq('id', referralId);
+    }
+  }
+
+  // Influencer Referral Code Methods - Public access for referral lookups
+  async getInfluencerReferralCodeByCode(code: string): Promise<{ code: InfluencerReferralCode; influencer: Influencer } | null> {
+    try {
+      // For public referral code lookups, we need to use service role to bypass RLS
+      // This is appropriate as referral codes are meant to be publicly accessible
+      const serviceRoleClient = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      );
+
+      const { data, error } = await serviceRoleClient
+        .from('influencer_referral_codes')
+        .select(`
+          *,
+          influencers (
+            id,
+            first_name,
+            last_name,
+            username,
+            bio,
+            avatar_url,
+            is_verified,
+            commission_rate
+          )
+        `)
+        .eq('code', code.toUpperCase())
+        .eq('is_active', true)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        throw error;
+      }
+
+      if (!data || !data.influencers) return null;
+
+      return {
+        code: data,
+        influencer: data.influencers as Influencer
+      };
+    } catch (error) {
+      console.error('Error fetching influencer referral code:', error);
+      throw error;
     }
   }
 
