@@ -147,9 +147,7 @@ export default function PreRegistrationLandingPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2L13.09 8.26L20 9L13.09 9.74L12 16L10.91 9.74L4 9L10.91 8.26L12 2Z" />
-                </svg>
+                <img src="/assets/logos/paw-svgrepo-200x200-green.svg" alt="Pawtraits Logo" className="w-6 h-6" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Pawtraits</h1>
