@@ -12,7 +12,6 @@ import {
   TrendingUp,
   ArrowRight,
   AlertCircle,
-  Heart,
   Star,
   Gift
 } from 'lucide-react';
@@ -112,10 +111,10 @@ export default function PreRegistrationLandingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Verifying QR code...</p>
           </CardContent>
         </Card>
@@ -125,7 +124,7 @@ export default function PreRegistrationLandingPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
@@ -141,14 +140,16 @@ export default function PreRegistrationLandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
-                <Heart className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2L13.09 8.26L20 9L13.09 9.74L12 16L10.91 9.74L4 9L10.91 8.26L12 2Z" />
+                </svg>
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Pawtraits</h1>
@@ -188,7 +189,7 @@ export default function PreRegistrationLandingPage() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             {codeData?.partner?.logo_url ? (
-              <div className="w-20 h-20 p-2 bg-white border border-purple-200 rounded-2xl shadow-sm">
+              <div className="w-20 h-20 p-2 bg-white border border-green-200 rounded-2xl shadow-sm">
                 <img
                   src={codeData.partner.logo_url}
                   alt="Partner Logo"
@@ -196,7 +197,7 @@ export default function PreRegistrationLandingPage() {
                 />
               </div>
             ) : (
-              <QrCode className="w-16 h-16 text-purple-600" />
+              <QrCode className="w-16 h-16 text-green-600" />
             )}
           </div>
 
@@ -207,7 +208,7 @@ export default function PreRegistrationLandingPage() {
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
                 {codeData.partner.business_name || `${codeData.partner.first_name} ${codeData.partner.last_name}`} has invited you to join the Pawtraits Partner Program.
-                Join our network of pet care professionals and start earning commissions by referring customers to beautiful AI-generated pet portraits.
+                
               </p>
             </>
           ) : (
@@ -216,8 +217,8 @@ export default function PreRegistrationLandingPage() {
                 Welcome to Pawtraits Partner Program!
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                You&apos;ve scanned a special partner invitation QR code. Join our network of pet care professionals
-                and start earning commissions by referring customers to beautiful AI-generated pet portraits.
+                You&apos;ve scanned a special partner invitation QR code. Join our network of pet care professionals, and start earning referral bonuses and commissions.
+                
               </p>
             </>
           )}
@@ -230,22 +231,17 @@ export default function PreRegistrationLandingPage() {
               <CardContent className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
                   <div>
-                    <QrCode className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+                    <QrCode className="w-8 h-8 text-green-600 mx-auto mb-2" />
                     <p className="text-sm text-gray-600">Invitation Code</p>
                     <p className="font-mono font-bold text-lg">{codeData.code}</p>
                   </div>
                   {codeData.business_category && (
                     <div>
                       <Building className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">Target Category</p>
+                      <p className="text-sm text-gray-600">Partner Type</p>
                       <p className="font-medium capitalize">{codeData.business_category}</p>
                     </div>
                   )}
-                  <div>
-                    <Users className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600">Others Joined</p>
-                    <p className="font-bold text-lg text-green-600">{codeData.conversions_count}</p>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -265,37 +261,37 @@ export default function PreRegistrationLandingPage() {
               <CardContent className="space-y-6">
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-sm font-bold text-purple-600">1</span>
+                    <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-sm font-bold text-green-600">1</span>
                     </div>
                     <div>
                       <h4 className="font-medium text-gray-900">Register as a Partner</h4>
                       <p className="text-sm text-gray-600">
-                        Complete your partner application with business details and verification
+                        Complete your partner application with your business details 
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-sm font-bold text-purple-600">2</span>
+                    <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-sm font-bold text-green-600">2</span>
                     </div>
                     <div>
                       <h4 className="font-medium text-gray-900">Get Approved</h4>
                       <p className="text-sm text-gray-600">
-                        Our team reviews your application and approves qualified partners
+                        Share your referral code with your customers giving them an introductory 10% discount
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-sm font-bold text-purple-600">3</span>
+                    <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-sm font-bold text-green-600">3</span>
                     </div>
                     <div>
                       <h4 className="font-medium text-gray-900">Start Earning</h4>
                       <p className="text-sm text-gray-600">
-                        Refer customers and earn 20% commission on first orders, 5% on subsequent orders
+                        Earn 10% commission on referred customer orders - for life
                       </p>
                     </div>
                   </div>
@@ -328,7 +324,7 @@ export default function PreRegistrationLandingPage() {
                       <span className="font-medium">High Commissions</span>
                     </div>
                     <p className="text-sm text-gray-600 pl-7">
-                      Earn 20% on first orders and 5% on repeat purchases from your referrals
+                      Earn 10% commission on referred customer orders
                     </p>
                   </div>
 
@@ -338,7 +334,7 @@ export default function PreRegistrationLandingPage() {
                       <span className="font-medium">Customer Delight</span>
                     </div>
                     <p className="text-sm text-gray-600 pl-7">
-                      Offer your customers beautiful AI-generated portraits of their beloved pets
+                      Customers love Patraits, and receive a 10% discount by using your uniqie code
                     </p>
                   </div>
 
@@ -348,19 +344,11 @@ export default function PreRegistrationLandingPage() {
                       <span className="font-medium">Business Integration</span>
                     </div>
                     <p className="text-sm text-gray-600 pl-7">
-                      Easy to integrate with your existing pet care services
+                      Natural fit with your existing products and services
                     </p>
                   </div>
 
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Gift className="w-5 h-5 text-purple-500" />
-                      <span className="font-medium">Marketing Support</span>
-                    </div>
-                    <p className="text-sm text-gray-600 pl-7">
-                      We provide marketing materials and QR codes to help you promote
-                    </p>
-                  </div>
+                  
                 </div>
               </CardContent>
             </Card>
@@ -375,17 +363,12 @@ export default function PreRegistrationLandingPage() {
               <CardContent className="space-y-4">
                 <div className="p-4 bg-green-50 rounded-lg">
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600">20%</p>
-                    <p className="text-sm text-green-700">First Order Commission</p>
+                    <p className="text-2xl font-bold text-green-600">10%</p>
+                    <p className="text-sm text-green-700">Commission</p>
                   </div>
                 </div>
 
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-blue-600">5%</p>
-                    <p className="text-sm text-blue-700">Repeat Order Commission</p>
-                  </div>
-                </div>
+
 
                 <div className="text-xs text-gray-500 text-center">
                   Commission calculated on order total (excluding shipping)
@@ -393,39 +376,6 @@ export default function PreRegistrationLandingPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Perfect for:</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    <span>Pet groomers</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    <span>Veterinary clinics</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    <span>Pet stores</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    <span>Dog trainers</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    <span>Pet photographers</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    <span>Pet boarding services</span>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
 
             <Card>
               <CardHeader>
@@ -446,8 +396,8 @@ export default function PreRegistrationLandingPage() {
         <div className="mt-12 text-center text-sm text-gray-500">
           <p>
             Questions? Contact us at{' '}
-            <a href="mailto:partners@pawtraits.com" className="text-purple-600 hover:underline">
-              partners@pawtraits.com
+            <a href="mailto:partners@pawtraits.pics" className="text-green-600 hover:underline">
+              partners@pawtraits.pics
             </a>
           </p>
         </div>
