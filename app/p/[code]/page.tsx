@@ -330,7 +330,7 @@ export default function PreRegistrationLandingPage() {
 
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <Heart className="w-5 h-5 text-red-500" />
+                      <Star className="w-5 h-5 text-red-500" />
                       <span className="font-medium">Customer Delight</span>
                     </div>
                     <p className="text-sm text-gray-600 pl-7">
