@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SupabaseService } from '@/lib/supabase';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
 
 // ✅ ARCHITECTURAL PATTERN: Partner profile API endpoint
 // Following established patterns for API-only data access
@@ -17,13 +18,21 @@ export async function GET(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    const supabaseService = new SupabaseService();
+    // ✅ ARCHITECTURAL PATTERN: Use route handler client for API routes (not component client)
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
-    // ✅ ARCHITECTURAL PATTERN: Get authenticated user (still use regular client for auth)
-    const { data: { user }, error: authError } = await supabaseService.getClient().auth.getUser();
+    // ✅ ARCHITECTURAL PATTERN: Get authenticated user with proper API route client
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    console.log('🔍 PARTNERS PROFILE API: Auth debug info:');
+    console.log('  - Auth error:', authError?.message);
+    console.log('  - User found:', !!user);
+    console.log('  - User email:', user?.email);
+    console.log('  - User ID:', user?.id);
 
     if (authError || !user) {
-      console.log('❌ PARTNERS PROFILE API: Authentication failed');
+      console.log('❌ PARTNERS PROFILE API: Authentication failed - missing user or auth error');
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -101,10 +110,12 @@ export async function PUT(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    const supabaseService = new SupabaseService();
+    // ✅ ARCHITECTURAL PATTERN: Use route handler client for API routes (not component client)
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
-    // ✅ ARCHITECTURAL PATTERN: Get authenticated user (still use regular client for auth)
-    const { data: { user }, error: authError } = await supabaseService.getClient().auth.getUser();
+    // ✅ ARCHITECTURAL PATTERN: Get authenticated user with proper API route client
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
       console.log('❌ PARTNERS PROFILE API: Authentication failed');
