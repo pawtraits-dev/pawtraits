@@ -13,8 +13,7 @@ import {
   ArrowRight,
   AlertCircle,
   Heart,
-  Camera,
-  Sparkles
+  Camera
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -29,31 +28,31 @@ interface Partner {
   avatar_url?: string;
 }
 
-interface ReferralCode {
+interface UnifiedReferral {
   id: string;
-  referral_code: string;
-  client_first_name?: string;
-  client_last_name?: string;
-  client_email?: string;
-  pet_name?: string;
-  commission_rate: number;
+  code: string;
+  type: string;
+  status: string;
   expires_at: string;
-  partner: Partner;
-  image?: {
+  commission_rate: number;
+  discount_rate: number;
+  referral_type: 'PARTNER' | 'CUSTOMER' | 'INFLUENCER' | 'ORGANIC';
+  referrer: {
     id: string;
-    filename: string;
-    description: string;
-    public_url: string;
-    breed_name: string;
-    theme_name: string;
-    style_name: string;
+    type: 'partner' | 'customer' | 'influencer';
+    name: string;
+    avatar_url?: string;
+    business_name?: string;
+    username?: string;
+    is_verified?: boolean;
   };
+  partner?: Partner; // Legacy compatibility
 }
 
 export default function CustomerInvitationPage() {
   const params = useParams();
   const router = useRouter();
-  const [referralData, setReferralData] = useState<ReferralCode | null>(null);
+  const [referralData, setReferralData] = useState<UnifiedReferral | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scanRecorded, setScanRecorded] = useState(false);
@@ -67,7 +66,7 @@ export default function CustomerInvitationPage() {
   const fetchReferralData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/referrals/code/${params.code}`);
+      const response = await fetch(`/api/referrals/verify/${params.code}`);
 
       if (response.ok) {
         const data = await response.json();
@@ -118,42 +117,29 @@ export default function CustomerInvitationPage() {
     );
   }
 
-  const getPartnerName = () => {
-    if (!referralData?.partner) return 'Our Partner';
-    return referralData.partner.business_name ||
-           `${referralData.partner.first_name} ${referralData.partner.last_name}`;
+  const getReferrerName = () => {
+    if (!referralData?.referrer) return 'Our Partner';
+    return referralData.referrer.business_name || referralData.referrer.name;
   };
 
-  const getPartnerLogo = () => {
-    if (referralData?.partner?.logo_url) {
+  const getReferrerLogo = () => {
+    if (referralData?.referrer?.avatar_url) {
       return (
         <div className="w-20 h-20 p-2 bg-white border border-purple-200 rounded-2xl shadow-sm">
           <Image
-            src={referralData.partner.logo_url}
-            alt="Partner Logo"
+            src={referralData.referrer.avatar_url}
+            alt="Referrer Logo"
             width={80}
             height={80}
             className="w-full h-full object-contain rounded-xl"
           />
         </div>
       );
-    } else if (referralData?.partner?.avatar_url) {
-      return (
-        <Image
-          src={referralData.partner.avatar_url}
-          alt="Partner Avatar"
-          width={80}
-          height={80}
-          className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-sm"
-        />
-      );
     } else {
       return (
         <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center border-4 border-white shadow-sm">
           <span className="text-purple-600 text-2xl font-bold">
-            {referralData?.partner ?
-              `${referralData.partner.first_name[0]}${referralData.partner.last_name[0]}` :
-              'P'}
+            {referralData?.referrer ? referralData.referrer.name.charAt(0).toUpperCase() : 'R'}
           </span>
         </div>
       );
@@ -176,37 +162,29 @@ export default function CustomerInvitationPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              {/* Partner Logo */}
-              {referralData?.partner && (
+              {/* Referrer Logo */}
+              {referralData?.referrer && (
                 <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border">
-                  {referralData.partner.logo_url ? (
+                  {referralData.referrer.avatar_url ? (
                     <Image
-                      src={referralData.partner.logo_url}
-                      alt={`${getPartnerName()} Logo`}
+                      src={referralData.referrer.avatar_url}
+                      alt={`${getReferrerName()} Logo`}
                       width={32}
                       height={32}
                       className="w-8 h-8 object-contain rounded"
                     />
-                  ) : referralData.partner.avatar_url ? (
-                    <Image
-                      src={referralData.partner.avatar_url}
-                      alt={`${getPartnerName()} Avatar`}
-                      width={32}
-                      height={32}
-                      className="w-8 h-8 object-cover rounded-full"
-                    />
                   ) : (
                     <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
                       <span className="text-xs font-bold text-purple-600">
-                        {referralData.partner.first_name[0]}{referralData.partner.last_name[0]}
+                        {referralData.referrer.name.charAt(0).toUpperCase()}
                       </span>
                     </div>
                   )}
                   <div className="text-sm">
                     <p className="font-medium text-gray-900">
-                      {getPartnerName()}
+                      {getReferrerName()}
                     </p>
-                    <p className="text-gray-500">Referring Partner</p>
+                    <p className="text-gray-500">Referring {referralData.referrer.type}</p>
                   </div>
                 </div>
               )}
@@ -225,14 +203,14 @@ export default function CustomerInvitationPage() {
         {/* Welcome Section */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            {getPartnerLogo()}
+            {getReferrerLogo()}
           </div>
 
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            You&apos;re Invited by {getPartnerName()}!
+            You&apos;re Invited by {getReferrerName()}!
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            {getPartnerName()} has referred you to Pawtraits. Create stunning AI-generated portraits of your beloved pets with professional quality and get <span className="font-semibold text-purple-600">10% off your first order</span>!
+            {getReferrerName()} has referred you to Pawtraits. Create stunning AI-generated portraits of your beloved pets with professional quality and get <span className="font-semibold text-purple-600">{referralData?.discount_rate}% off your first order</span>!
           </p>
         </div>
 
@@ -244,18 +222,18 @@ export default function CustomerInvitationPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
                   <div>
                     <QrCode className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600">Referral Code</p>
-                    <p className="font-mono font-bold text-lg">{referralData.referral_code}</p>
+                    <p className="text-sm text-gray-600">Invitation Code</p>
+                    <p className="font-mono font-bold text-lg">{referralData.code}</p>
                   </div>
                   <div>
                     <Gift className="w-8 h-8 text-green-600 mx-auto mb-2" />
                     <p className="text-sm text-gray-600">Your Discount</p>
-                    <p className="font-bold text-lg text-green-600">10% OFF</p>
+                    <p className="font-bold text-lg text-green-600">{referralData.discount_rate}% OFF</p>
                   </div>
                   <div>
                     <Building className="w-8 h-8 text-blue-600 mx-auto mb-2" />
                     <p className="text-sm text-gray-600">Referred By</p>
-                    <p className="font-medium">{getPartnerName()}</p>
+                    <p className="font-medium">{getReferrerName()}</p>
                   </div>
                 </div>
               </CardContent>
@@ -263,43 +241,6 @@ export default function CustomerInvitationPage() {
           </div>
         )}
 
-        {/* Featured Image Preview */}
-        {referralData?.image && (
-          <div className="mb-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-yellow-500" />
-                  Featured Portrait Style
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                  <div className="relative">
-                    <Image
-                      src={referralData.image.public_url}
-                      alt={referralData.image.description}
-                      width={400}
-                      height={400}
-                      className="w-full h-64 object-cover rounded-lg shadow-md"
-                    />
-                  </div>
-                  <div className="space-y-4">
-                    <h3 className="text-xl font-bold text-gray-900">
-                      {referralData.image.breed_name} in {referralData.image.theme_name}
-                    </h3>
-                    <p className="text-gray-600">
-                      Style: {referralData.image.style_name}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {referralData.image.description}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Action */}
@@ -351,14 +292,14 @@ export default function CustomerInvitationPage() {
                 </div>
 
                 <div className="pt-4">
-                  <Link href={`/signup/user?ref_partner_id=${referralData?.partner.id}&ref_code=${referralData?.referral_code}`}>
+                  <Link href={`/signup/user?ref_partner_id=${referralData?.referrer?.id}&ref_code=${referralData?.code}`}>
                     <Button size="lg" className="w-full bg-purple-600 hover:bg-purple-700">
                       <ArrowRight className="w-5 h-5 mr-2" />
-                      Start Creating - Get 10% Off
+                      Start Creating - Get {referralData?.discount_rate}% Off
                     </Button>
                   </Link>
                   <p className="text-xs text-gray-500 text-center mt-2">
-                    Your 10% discount will be automatically applied with referral code {referralData?.referral_code}
+                    Your {referralData?.discount_rate}% discount will be automatically applied with referral code {referralData?.code}
                   </p>
                 </div>
               </CardContent>
@@ -424,7 +365,7 @@ export default function CustomerInvitationPage() {
               <CardContent className="space-y-4">
                 <div className="p-4 bg-green-50 rounded-lg">
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600">10%</p>
+                    <p className="text-2xl font-bold text-green-600">{referralData?.discount_rate}%</p>
                     <p className="text-sm text-green-700">OFF First Order</p>
                   </div>
                 </div>
