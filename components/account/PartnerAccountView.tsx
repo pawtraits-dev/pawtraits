@@ -41,6 +41,7 @@ export default function PartnerAccountView({ userProfile }: PartnerAccountViewPr
     phone: userProfile.phone || '',
     businessName: '',
     businessType: '',
+    businessWebsite: '',
     address: '',
     city: '',
     state: '',
@@ -105,6 +106,7 @@ export default function PartnerAccountView({ userProfile }: PartnerAccountViewPr
           phone: partnerData.phone || userProfile.phone || '',
           businessName: partnerData.business_name || '',
           businessType: partnerData.business_type || '',
+          businessWebsite: partnerData.business_website || '',
           address: partnerData.business_address?.street || '',
           city: partnerData.business_address?.city || '',
           state: partnerData.business_address?.state || '',
@@ -164,6 +166,7 @@ export default function PartnerAccountView({ userProfile }: PartnerAccountViewPr
           phone: profileData.phone || undefined,
           business_name: profileData.businessName || undefined,
           business_type: profileData.businessType || undefined,
+          business_website: profileData.businessWebsite || undefined,
           business_address: {
             street: profileData.address || undefined,
             city: profileData.city || undefined,
@@ -599,6 +602,16 @@ export default function PartnerAccountView({ userProfile }: PartnerAccountViewPr
                           </SelectContent>
                         </Select>
                       </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="businessWebsite">Business Website</Label>
+                      <Input
+                        id="businessWebsite"
+                        type="url"
+                        value={profileData.businessWebsite}
+                        onChange={(e) => handleProfileChange('businessWebsite', e.target.value)}
+                        placeholder="https://your-business-website.com"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="address">Business Address</Label>
