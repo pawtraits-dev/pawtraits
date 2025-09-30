@@ -66,6 +66,7 @@ Before presenting work:
 - Creating duplicate functionality that already exists
 - **Writing tests without validating database schema first**
 - **Making assumptions about column names or table structure**
+- **Using SupabaseService.getCurrentPartner/getCurrentCustomer in API routes** (causes RLS infinite recursion)
 
 ## 🏗️ ARCHITECTURAL GOVERNANCE CHECKPOINTS
 
@@ -536,6 +537,75 @@ const supabase = createClient(url, key);
 const { data } = await supabase.from('table').select();
 ```
 
+### Service Role Client Pattern for API Routes
+
+**🚨 CRITICAL: RLS Infinite Recursion Prevention**
+
+When implementing API endpoints that need to query user data (user_profiles, partners, customers), **ALWAYS use service role client** for database operations to bypass RLS policy conflicts.
+
+**✅ CORRECT API Route Pattern:**
+```typescript
+// /app/api/partners/profile/route.ts
+import { createClient } from '@supabase/supabase-js';
+
+export async function GET(request: NextRequest) {
+  // ✅ Use service role client for database operations
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  });
+
+  const supabaseService = new SupabaseService();
+
+  // ✅ Still use regular client for authentication
+  const { data: { user }, error: authError } =
+    await supabaseService.getClient().auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
+  // ✅ Use service role client for database queries
+  const { data: userProfile } = await supabaseAdmin
+    .from('user_profiles')
+    .select('*')
+    .eq('email', user.email)
+    .single();
+
+  // ... rest of logic
+}
+```
+
+**❌ WRONG Pattern - Causes RLS Infinite Recursion:**
+```typescript
+// ❌ This will fail with "infinite recursion detected in policy"
+export async function GET(request: NextRequest) {
+  const supabaseService = new SupabaseService();
+
+  // ❌ This calls getCurrentUserProfile() which triggers RLS recursion
+  const partner = await supabaseService.getCurrentPartner();
+}
+```
+
+**Why This Pattern is Required:**
+- **RLS Policies**: Row Level Security policies on `user_profiles` can create circular dependencies
+- **Authentication vs Authorization**: Auth check uses regular client, data access uses service role
+- **Security Maintained**: Authentication still enforced, but database queries bypass problematic RLS
+- **Performance**: Avoids complex RLS policy evaluation that can cause recursion
+
+**When to Use Service Role Client:**
+- ✅ **API routes** that query user-related tables (`user_profiles`, `partners`, `customers`)
+- ✅ **Cross-table joins** that involve user data
+- ✅ **Complex queries** that might trigger RLS policy conflicts
+- ✅ **Admin operations** that need to bypass user-scoped RLS
+
+**When NOT to Use:**
+- ❌ **Frontend components** (never use service role key in frontend)
+- ❌ **Simple queries** that don't involve user profile lookups
+- ❌ **Public endpoints** that don't require authentication
+
 ### User Type System
 The application supports three distinct user types with separate authentication flows:
 - **Admin**: Full system access via `/admin/*` routes
@@ -846,6 +916,7 @@ Use Stripe test mode with test API keys. Test cards:
 - Database queries outside API routes/services
 - Authentication logic in frontend components
 - **Mixed server/client authentication within same user type routes**
+- **SupabaseService.getCurrentPartner/getCurrentCustomer calls in API routes** (use service role client instead)
 
 ## 🐛 DEBUGGING & TROUBLESHOOTING
 
