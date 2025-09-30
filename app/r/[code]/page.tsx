@@ -25,6 +25,7 @@ interface ReferralData {
     business_name?: string;
     business_type?: string;
     avatar_url?: string;
+    logo_url?: string;
   };
   image?: {
     id: string;
@@ -226,14 +227,14 @@ export default function ReferralLandingPage() {
             <Heart className="w-10 h-10 text-purple-600" />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            🎨 You've Been Invited!
+            🎨 Special Invitation from Your Groomer!
           </h1>
           <p className="text-xl text-gray-600 mb-8">
             {referral.referral_type === 'customer'
-              ? `${referral.partner.first_name} ${referral.partner.last_name} wants to share something special with you - get 20% off your first AI pet portrait!`
+              ? `${referral.partner.first_name} ${referral.partner.last_name} wants to share something special with you - create a stunning AI pet portrait with 20% off!`
               : referral.referral_type === 'influencer'
-              ? `${referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`} is sharing their favorite pet portrait service with you!`
-              : `${referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`} wants to treat you to a custom AI pet portrait`
+              ? `${referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`} recommends this amazing pet portrait service - get 20% off your first order!`
+              : `${referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`} has something special for you - a custom AI pet portrait with exclusive savings!`
             }
           </p>
         </div>
@@ -281,7 +282,7 @@ export default function ReferralLandingPage() {
                     <Gift className="w-8 h-8 text-purple-600" />
                   </div>
                   <h2 className="text-3xl font-bold text-purple-900 mb-2">20% OFF</h2>
-                  <p className="text-lg text-purple-700 mb-6">This Portrait Style</p>
+                  <p className="text-lg text-purple-700 mb-6">This Beautiful Portrait Style</p>
                   
                   {isExpired ? (
                     <div className="space-y-4">
@@ -295,12 +296,12 @@ export default function ReferralLandingPage() {
                       <Badge variant="secondary" className="text-sm px-4 py-2">
                         {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left
                       </Badge>
-                      <Button 
+                      <Button
                         onClick={handleClaimDiscount}
-                        size="lg" 
+                        size="lg"
                         className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                       >
-                        Get This Style 🎉
+                        Create My Portrait 🎉
                       </Button>
                     </div>
                   )}
@@ -311,7 +312,17 @@ export default function ReferralLandingPage() {
               <Card>
                 <CardContent className="p-8">
                   <div className="flex items-center space-x-4 mb-6">
-                    {referral.partner.avatar_url ? (
+                    {referral.partner.logo_url ? (
+                      <div className="w-16 h-16 bg-white rounded-lg border shadow-sm flex items-center justify-center p-2">
+                        <Image
+                          src={referral.partner.logo_url}
+                          alt={referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`}
+                          width={64}
+                          height={64}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    ) : referral.partner.avatar_url ? (
                       <Image
                         src={referral.partner.avatar_url}
                         alt={referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`}
@@ -336,24 +347,24 @@ export default function ReferralLandingPage() {
                     </div>
                   </div>
                   
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-2">What You Get:</h4>
+                  <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">What You'll Receive:</h4>
                     <ul className="space-y-2 text-sm text-gray-600">
                       <li className="flex items-center space-x-2">
                         <Star className="w-4 h-4 text-yellow-500" />
-                        <span>Professional AI-generated pet portrait</span>
+                        <span>Stunning AI-generated pet portrait in your chosen style</span>
                       </li>
                       <li className="flex items-center space-x-2">
                         <Star className="w-4 h-4 text-yellow-500" />
-                        <span>Multiple artistic styles to choose from</span>
+                        <span>Multiple artistic styles and themes available</span>
                       </li>
                       <li className="flex items-center space-x-2">
                         <Star className="w-4 h-4 text-yellow-500" />
-                        <span>High-resolution files for printing</span>
+                        <span>High-resolution digital files perfect for printing</span>
                       </li>
                       <li className="flex items-center space-x-2">
                         <Star className="w-4 h-4 text-yellow-500" />
-                        <span>Perfect for gifts and keepsakes</span>
+                        <span>Beautiful keepsakes and gifts for pet lovers</span>
                       </li>
                     </ul>
                   </div>
@@ -371,7 +382,7 @@ export default function ReferralLandingPage() {
                   <Gift className="w-8 h-8 text-purple-600" />
                 </div>
                 <h2 className="text-3xl font-bold text-purple-900 mb-2">20% OFF</h2>
-                <p className="text-lg text-purple-700 mb-6">Your First Custom Pet Portrait</p>
+                <p className="text-lg text-purple-700 mb-6">Your First Beautiful Pet Portrait</p>
                 
                 {isExpired ? (
                   <div className="space-y-4">
@@ -385,12 +396,12 @@ export default function ReferralLandingPage() {
                     <Badge variant="secondary" className="text-sm px-4 py-2">
                       {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left
                     </Badge>
-                    <Button 
+                    <Button
                       onClick={handleClaimDiscount}
-                      size="lg" 
+                      size="lg"
                       className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                     >
-                      Claim My 20% Discount 🎉
+                      Start My Portrait 🎉
                     </Button>
                   </div>
                 )}
@@ -401,7 +412,17 @@ export default function ReferralLandingPage() {
             <Card>
               <CardContent className="p-8">
                 <div className="flex items-center space-x-4 mb-6">
-                  {referral.partner.avatar_url ? (
+                  {referral.partner.logo_url ? (
+                    <div className="w-16 h-16 bg-white rounded-lg border shadow-sm flex items-center justify-center p-2">
+                      <Image
+                        src={referral.partner.logo_url}
+                        alt={referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`}
+                        width={64}
+                        height={64}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : referral.partner.avatar_url ? (
                     <Image
                       src={referral.partner.avatar_url}
                       alt={referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`}
@@ -426,24 +447,24 @@ export default function ReferralLandingPage() {
                   </div>
                 </div>
                 
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">What You Get:</h4>
+                <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-900 mb-2">What You'll Receive:</h4>
                   <ul className="space-y-2 text-sm text-gray-600">
                     <li className="flex items-center space-x-2">
                       <Star className="w-4 h-4 text-yellow-500" />
-                      <span>Professional AI-generated pet portrait</span>
+                      <span>Stunning AI-generated pet portrait in your chosen style</span>
                     </li>
                     <li className="flex items-center space-x-2">
                       <Star className="w-4 h-4 text-yellow-500" />
-                      <span>Multiple artistic styles to choose from</span>
+                      <span>Multiple artistic styles and themes available</span>
                     </li>
                     <li className="flex items-center space-x-2">
                       <Star className="w-4 h-4 text-yellow-500" />
-                      <span>High-resolution files for printing</span>
+                      <span>High-resolution digital files perfect for printing</span>
                     </li>
                     <li className="flex items-center space-x-2">
                       <Star className="w-4 h-4 text-yellow-500" />
-                      <span>Perfect for gifts and keepsakes</span>
+                      <span>Beautiful keepsakes and gifts for pet lovers</span>
                     </li>
                   </ul>
                 </div>
@@ -474,7 +495,7 @@ export default function ReferralLandingPage() {
 
         {/* Footer */}
         <div className="text-center text-gray-500 text-sm">
-          <p>Questions? Contact {referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`} directly.</p>
+          <p>Questions about your portrait? Contact {referral.partner.business_name || `${referral.partner.first_name} ${referral.partner.last_name}`} directly.</p>
           <p className="mt-2">
             <Link href="/" className="hover:text-gray-700 underline">
               Learn more about Pawtraits

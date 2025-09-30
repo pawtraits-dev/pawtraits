@@ -62,8 +62,12 @@ export default function PreRegistrationLandingPage() {
         const data = await response.json();
 
         // Handle redirect for used codes
-        if (data.redirect === 'customer_signup') {
-          // Redirect to dedicated partner referral signup page
+        if (data.redirect === 'customer_referral') {
+          // Redirect to main referral landing page with the generated referral code
+          router.push(`/r/${data.referral_code}`);
+          return;
+        } else if (data.redirect === 'customer_signup') {
+          // Fallback for old format
           router.push(`/r/partner/${data.code}`);
           return;
         }

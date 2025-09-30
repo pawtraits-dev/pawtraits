@@ -21,7 +21,8 @@ export async function GET(
           last_name,
           business_name,
           business_type,
-          avatar_url
+          avatar_url,
+          logo_url
         )
       `)
       .eq('referral_code', referralCode)
