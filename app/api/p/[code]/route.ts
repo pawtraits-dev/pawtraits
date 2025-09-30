@@ -61,7 +61,7 @@ export async function GET(
           .single();
 
         return NextResponse.json({
-          redirect: 'customer_signup',
+          redirect: 'customer_invitation',
           partner_id: codeData.partner_id,
           partner_email: partnerData?.email,
           code: codeData.code
