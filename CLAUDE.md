@@ -67,6 +67,7 @@ Before presenting work:
 - **Writing tests without validating database schema first**
 - **Making assumptions about column names or table structure**
 - **Using SupabaseService.getCurrentPartner/getCurrentCustomer in API routes** (causes RLS infinite recursion)
+- **Using SupabaseService or createClientComponentClient() in API routes** (causes auth failures)
 
 ## 🏗️ ARCHITECTURAL GOVERNANCE CHECKPOINTS
 
@@ -537,7 +538,49 @@ const supabase = createClient(url, key);
 const { data } = await supabase.from('table').select();
 ```
 
-### Service Role Client Pattern for API Routes
+### API Route Client Patterns - CRITICAL FOR AUTHENTICATION
+
+**🚨 CRITICAL: Proper Client Types for API Routes**
+
+API routes MUST use different Supabase clients than frontend components. Using the wrong client type causes authentication failures.
+
+**✅ CORRECT: Use createRouteHandlerClient for Authentication in API Routes**
+```typescript
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+
+export async function GET(request: NextRequest) {
+  // ✅ CORRECT: Route handler client reads cookies properly in API routes
+  const cookieStore = await cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+  // ✅ Authentication works correctly
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  // ✅ Use service role client for database operations to bypass RLS
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  });
+}
+```
+
+**❌ WRONG: Never Use SupabaseService or Client Component Clients in API Routes**
+```typescript
+// ❌ This will fail with "Auth session missing!"
+import { SupabaseService } from '@/lib/supabase';
+
+export async function GET(request: NextRequest) {
+  const supabaseService = new SupabaseService(); // ❌ Uses createClientComponentClient()
+  const { data: { user } } = await supabaseService.getClient().auth.getUser(); // ❌ FAILS
+}
+```
+
+**Why This Matters:**
+- **createClientComponentClient()**: Designed for browser/React components, cannot read server cookies
+- **createRouteHandlerClient()**: Designed for API routes, properly reads cookies from request headers
+- **Service Role Client**: Bypasses RLS for database operations
+
+### Service Role Client Pattern for Database Operations
 
 **🚨 CRITICAL: RLS Infinite Recursion Prevention**
 
@@ -917,6 +960,7 @@ Use Stripe test mode with test API keys. Test cards:
 - Authentication logic in frontend components
 - **Mixed server/client authentication within same user type routes**
 - **SupabaseService.getCurrentPartner/getCurrentCustomer calls in API routes** (use service role client instead)
+- **SupabaseService or createClientComponentClient() in API routes** (causes "Auth session missing!" errors)
 
 ## 🐛 DEBUGGING & TROUBLESHOOTING
 
@@ -945,6 +989,12 @@ Use Stripe test mode with test API keys. Test cards:
 - **Monitor**: Use `/admin/batch-jobs` for real-time batch operation monitoring
 
 ### Authentication Issues
+
+**"Auth session missing!" in API Routes:**
+- **Cause**: Using SupabaseService or createClientComponentClient() in API routes
+- **Solution**: Use createRouteHandlerClient() with cookies for API route authentication
+- **Example**: `/api/partners/profile` was using SupabaseService (client component client) instead of route handler client
+- **Fix**: Replace with `createRouteHandlerClient({ cookies: () => cookieStore })`
 
 **Inconsistent Auth Behavior:**
 - **Cause**: Mixed server-side and client-side authentication within same user type
