@@ -527,7 +527,7 @@ export class SupabaseService {
           .select('*')
           .eq('id', profile.partner_id)
           .single();
-        
+
         if (error) throw error;
         return partner;
       }
