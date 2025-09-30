@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
-import { SupabaseService } from '@/lib/supabase';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
 
 // Configure Cloudinary
 if (!cloudinary.config().cloud_name) {
@@ -13,22 +15,73 @@ if (!cloudinary.config().cloud_name) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabaseService = new SupabaseService();
-    const { data: { user } } = await supabaseService.getClient().auth.getUser();
+    console.log('🏗️ PARTNERS LOGO API: POST request received');
 
-    if (!user) {
+    // Use service role client for database operations (bypass RLS issues)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // ✅ ARCHITECTURAL PATTERN: Use route handler client for API routes (not component client)
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+    // ✅ ARCHITECTURAL PATTERN: Get authenticated user with proper API route client
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    console.log('🔍 PARTNERS LOGO API: Auth debug info:');
+    console.log('  - Auth error:', authError?.message);
+    console.log('  - User found:', !!user);
+    console.log('  - User email:', user?.email);
+    console.log('  - User ID:', user?.id);
+
+    if (authError || !user) {
+      console.log('❌ PARTNERS LOGO API: Authentication failed - missing user or auth error');
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       );
     }
 
-    // Get partner profile to verify user is a partner
-    const partner = await supabaseService.getCurrentPartner();
-    if (!partner) {
+    // ✅ ARCHITECTURAL PATTERN: Get partner data directly from database using service role
+    // First get user profile by email to find partner_id
+    const { data: userProfile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('*')
+      .eq('email', user.email)
+      .single();
+
+    console.log('🔍 PARTNERS LOGO API: Debug info:');
+    console.log('  - User email:', user.email);
+    console.log('  - User profile found:', !!userProfile);
+    console.log('  - Partner ID from profile:', userProfile?.partner_id);
+
+    if (profileError || !userProfile?.partner_id) {
+      console.log('❌ PARTNERS LOGO API: User profile or partner_id not found:', profileError?.message);
       return NextResponse.json(
-        { error: 'Partner profile required' },
-        { status: 403 }
+        { error: 'Partner profile not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get partner data using the partner_id
+    const { data: partner, error: partnerError } = await supabaseAdmin
+      .from('partners')
+      .select('*')
+      .eq('id', userProfile.partner_id)
+      .single();
+
+    console.log('🔍 PARTNERS LOGO API: Partner lookup result:');
+    console.log('  - Partner found:', !!partner);
+
+    if (partnerError || !partner) {
+      console.log('❌ PARTNERS LOGO API: Partner record not found:', partnerError?.message);
+      return NextResponse.json(
+        { error: 'Partner profile not found' },
+        { status: 404 }
       );
     }
 
@@ -86,11 +139,13 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Update partner record with logo URL
-    const { data: updatedPartner, error: updateError } = await supabaseService
-      .getClient()
+    // Update partner record with logo URL using service role client
+    const { data: updatedPartner, error: updateError } = await supabaseAdmin
       .from('partners')
-      .update({ logo_url: result.secure_url })
+      .update({
+        logo_url: result.secure_url,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', partner.id)
       .select()
       .single();
@@ -125,22 +180,59 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabaseService = new SupabaseService();
-    const { data: { user } } = await supabaseService.getClient().auth.getUser();
+    console.log('🏗️ PARTNERS LOGO API: DELETE request received');
 
-    if (!user) {
+    // Use service role client for database operations (bypass RLS issues)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // ✅ ARCHITECTURAL PATTERN: Use route handler client for API routes (not component client)
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+    // ✅ ARCHITECTURAL PATTERN: Get authenticated user with proper API route client
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.log('❌ PARTNERS LOGO API: Authentication failed for DELETE');
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       );
     }
 
-    // Get partner profile to verify user is a partner
-    const partner = await supabaseService.getCurrentPartner();
-    if (!partner) {
+    // ✅ ARCHITECTURAL PATTERN: Get partner data directly from database using service role
+    // First get user profile by email to find partner_id
+    const { data: userProfile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('*')
+      .eq('email', user.email)
+      .single();
+
+    if (profileError || !userProfile?.partner_id) {
+      console.log('❌ PARTNERS LOGO API: User profile or partner_id not found for DELETE:', profileError?.message);
       return NextResponse.json(
-        { error: 'Partner profile required' },
-        { status: 403 }
+        { error: 'Partner profile not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get partner data using the partner_id
+    const { data: partner, error: partnerError } = await supabaseAdmin
+      .from('partners')
+      .select('*')
+      .eq('id', userProfile.partner_id)
+      .single();
+
+    if (partnerError || !partner) {
+      console.log('❌ PARTNERS LOGO API: Partner record not found for DELETE:', partnerError?.message);
+      return NextResponse.json(
+        { error: 'Partner profile not found' },
+        { status: 404 }
       );
     }
 
@@ -165,11 +257,13 @@ export async function DELETE(request: NextRequest) {
       // Continue with database update even if Cloudinary deletion fails
     }
 
-    // Remove logo URL from partner record
-    const { data: updatedPartner, error: updateError } = await supabaseService
-      .getClient()
+    // Remove logo URL from partner record using service role client
+    const { data: updatedPartner, error: updateError } = await supabaseAdmin
       .from('partners')
-      .update({ logo_url: null })
+      .update({
+        logo_url: null,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', partner.id)
       .select()
       .single();

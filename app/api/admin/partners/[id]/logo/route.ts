@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
 
 // Configure Cloudinary
 if (!cloudinary.config().cloud_name) {
@@ -16,7 +19,57 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    // TODO: Add admin authentication check
+    console.log('🏗️ ADMIN PARTNERS LOGO API: POST request received');
+
+    // ✅ ARCHITECTURAL PATTERN: Add admin authentication check
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // ✅ ARCHITECTURAL PATTERN: Use route handler client for API routes
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+    // ✅ ARCHITECTURAL PATTERN: Get authenticated user with proper API route client
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    console.log('🔍 ADMIN PARTNERS LOGO API: Auth debug info:');
+    console.log('  - Auth error:', authError?.message);
+    console.log('  - User found:', !!user);
+    console.log('  - User email:', user?.email);
+    console.log('  - User ID:', user?.id);
+
+    if (authError || !user) {
+      console.log('❌ ADMIN PARTNERS LOGO API: Authentication failed - missing user or auth error');
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // ✅ ARCHITECTURAL PATTERN: Check admin user type using service role client
+    const { data: userProfile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('*')
+      .eq('email', user.email)
+      .single();
+
+    console.log('🔍 ADMIN PARTNERS LOGO API: Admin check:');
+    console.log('  - User email:', user.email);
+    console.log('  - User profile found:', !!userProfile);
+    console.log('  - User type:', userProfile?.user_type);
+
+    if (profileError || !userProfile || userProfile.user_type !== 'admin') {
+      console.log('❌ ADMIN PARTNERS LOGO API: Admin access denied:', profileError?.message || 'Not an admin user');
+      return NextResponse.json(
+        { error: 'Admin access required' },
+        { status: 403 }
+      );
+    }
+
     const adminService = new AdminSupabaseService();
 
     const partnerId = params.id;
@@ -120,7 +173,46 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    // TODO: Add admin authentication check
+    console.log('🏗️ ADMIN PARTNERS LOGO API: DELETE request received');
+
+    // ✅ ARCHITECTURAL PATTERN: Add admin authentication check
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // ✅ ARCHITECTURAL PATTERN: Use route handler client for API routes
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+    // ✅ ARCHITECTURAL PATTERN: Get authenticated user with proper API route client
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.log('❌ ADMIN PARTNERS LOGO API: Authentication failed for DELETE');
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // ✅ ARCHITECTURAL PATTERN: Check admin user type using service role client
+    const { data: userProfile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('*')
+      .eq('email', user.email)
+      .single();
+
+    if (profileError || !userProfile || userProfile.user_type !== 'admin') {
+      console.log('❌ ADMIN PARTNERS LOGO API: Admin access denied for DELETE:', profileError?.message || 'Not an admin user');
+      return NextResponse.json(
+        { error: 'Admin access required' },
+        { status: 403 }
+      );
+    }
+
     const adminService = new AdminSupabaseService();
 
     const partnerId = params.id;
