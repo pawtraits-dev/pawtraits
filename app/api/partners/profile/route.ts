@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // ✅ ARCHITECTURAL PATTERN: Get current partner data
+    // ✅ ARCHITECTURAL PATTERN: Get partner data via service method
     const partner = await supabaseService.getCurrentPartner();
 
     if (!partner) {
@@ -65,7 +65,17 @@ export async function PUT(request: NextRequest) {
     const updateData = await request.json();
     console.log('📝 PARTNERS PROFILE API: Update data received:', updateData);
 
-    // ✅ ARCHITECTURAL PATTERN: Update partner via service method
+    // ✅ ARCHITECTURAL PATTERN: Get current partner and update via direct query
+    const currentPartner = await supabaseService.getCurrentPartner();
+    if (!currentPartner) {
+      console.error('❌ PARTNERS PROFILE API: Partner not found for update');
+      return NextResponse.json(
+        { error: 'Partner profile not found' },
+        { status: 404 }
+      );
+    }
+
+    // Update partner record directly
     const { data: updatedPartner, error: updateError } = await supabaseService.getClient()
       .from('partners')
       .update({
@@ -79,7 +89,7 @@ export async function PUT(request: NextRequest) {
         bio: updateData.bio,
         updated_at: new Date().toISOString()
       })
-      .eq('email', user.email)
+      .eq('id', currentPartner.id)
       .select()
       .single();
 
@@ -90,17 +100,6 @@ export async function PUT(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    // Also update user_profiles table for consistency
-    await supabaseService.getClient()
-      .from('user_profiles')
-      .update({
-        first_name: updateData.first_name,
-        last_name: updateData.last_name,
-        phone: updateData.phone,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', user.id);
 
     console.log('✅ PARTNERS PROFILE API: Partner profile updated successfully');
     return NextResponse.json(updatedPartner);
