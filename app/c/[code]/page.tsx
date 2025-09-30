@@ -338,7 +338,7 @@ export default function CustomerInvitationPage() {
                       <span className="font-medium">Special Discount</span>
                     </div>
                     <p className="text-sm text-gray-600 pl-7">
-                      10% off your first order thanks to {getPartnerName()}
+                      {referralData?.discount_rate}% off your first order thanks to {getReferrerName()}
                     </p>
                   </div>
 
