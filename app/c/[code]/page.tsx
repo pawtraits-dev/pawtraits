@@ -20,6 +20,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
+import { CountryProvider } from '@/lib/country-context';
 
 interface Partner {
   id: string;
@@ -51,7 +52,7 @@ interface UnifiedReferral {
   partner?: Partner; // Legacy compatibility
 }
 
-export default function CustomerInvitationPage() {
+function CustomerInvitationPageContent() {
   const params = useParams();
   const router = useRouter();
   const [referralData, setReferralData] = useState<UnifiedReferral | null>(null);
@@ -416,5 +417,13 @@ export default function CustomerInvitationPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function CustomerInvitationPage() {
+  return (
+    <CountryProvider>
+      <CustomerInvitationPageContent />
+    </CountryProvider>
   );
 }
