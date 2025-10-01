@@ -41,6 +41,11 @@ interface Referral {
   partner_email: string;
   is_expired: boolean;
   days_until_expiry: number;
+  // New simplified referral system fields
+  referral_type?: 'PARTNER' | 'CUSTOMER' | 'INFLUENCER' | 'ORGANIC';
+  referrer_id?: string;
+  discount_applied?: number;
+  order_value?: number;
 }
 
 const statusColors = {
@@ -65,6 +70,7 @@ export default function AdminReferralsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [referralTypeFilter, setReferralTypeFilter] = useState('all');
 
   useEffect(() => {
     loadReferrals();
@@ -72,7 +78,7 @@ export default function AdminReferralsPage() {
 
   useEffect(() => {
     filterReferrals();
-  }, [referrals, searchTerm, statusFilter]);
+  }, [referrals, searchTerm, statusFilter, referralTypeFilter]);
 
   const loadReferrals = async () => {
     try {
@@ -80,7 +86,7 @@ export default function AdminReferralsPage() {
       const response = await fetch('/api/admin/referrals');
       if (response.ok) {
         const data = await response.json();
-        setReferrals(data);
+        setReferrals(data.referrals || data); // Handle both new and legacy response formats
       }
     } catch (error) {
       console.error('Error loading referrals:', error);
@@ -105,6 +111,10 @@ export default function AdminReferralsPage() {
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter(referral => referral.status === statusFilter);
+    }
+
+    if (referralTypeFilter !== 'all') {
+      filtered = filtered.filter(referral => referral.referral_type === referralTypeFilter);
     }
 
     setFilteredReferrals(filtered);

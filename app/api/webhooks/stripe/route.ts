@@ -800,63 +800,72 @@ async function handlePartnerCommission(
 // Handle customer referral completion
 async function handleCustomerReferralCompletion(supabase: any, customerEmail: string, orderValue: number, orderId: string) {
   try {
-    console.log('Checking for customer referrals to complete for:', customerEmail);
+    console.log('🎯 Processing referral completion using simplified system for:', customerEmail);
 
-    // Find any customer_referrals where this customer is the referee
-    const { data: customerReferrals, error: findError } = await supabase
-      .from('customer_referrals')
-      .select('id, referrer_customer_id, referral_code, status, credit_amount')
-      .eq('referee_email', customerEmail.toLowerCase())
-      .in('status', ['accessed', 'signed_up']);
+    // Find customer with referral data using simplified system
+    const { data: customer, error: customerError } = await supabase
+      .from('customers')
+      .select(`
+        id,
+        email,
+        referral_type,
+        referrer_id,
+        referral_code_used,
+        referral_discount_applied,
+        referral_commission_rate,
+        referral_order_id
+      `)
+      .eq('email', customerEmail.toLowerCase())
+      .single();
 
-    if (findError) {
-      console.error('Error finding customer referrals:', findError);
+    if (customerError || !customer) {
+      console.log('⚠️ Customer not found for referral completion:', customerEmail);
       return;
     }
 
-    if (!customerReferrals || customerReferrals.length === 0) {
-      console.log('No pending customer referrals found for:', customerEmail);
+    // Only process if customer has referral data and this is their first order
+    if (!customer.referral_type || customer.referral_type === 'ORGANIC' || customer.referral_order_id) {
+      console.log('ℹ️ Customer has no referral or already has completed referral order');
       return;
     }
 
-    for (const referral of customerReferrals) {
-      console.log('Processing customer referral completion:', {
-        referralId: referral.id,
-        referralCode: referral.referral_code,
-        currentStatus: referral.status
-      });
+    console.log('✅ Processing referral completion:', {
+      customerId: customer.id,
+      referralType: customer.referral_type,
+      referralCode: customer.referral_code_used,
+      discountApplied: customer.referral_discount_applied,
+      commissionRate: customer.referral_commission_rate
+    });
 
-      // Calculate customer referral credit (example: 10% of order value)
-      const creditAmount = Math.round(orderValue * 0.10); // 10% as credit in pence
+    // Update customer record to mark referral as completed
+    const { error: updateError } = await supabase
+      .from('customers')
+      .update({
+        referral_order_id: orderId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', customer.id);
 
-      // Update referral to 'purchased' status
-      const { error: updateError } = await supabase
-        .from('customer_referrals')
-        .update({
-          status: 'purchased',
-          purchased_at: new Date().toISOString(),
-          order_id: orderId,
-          order_value: orderValue,
-          credit_amount: creditAmount
-        })
-        .eq('id', referral.id);
-
-      if (updateError) {
-        console.error('Error updating customer referral to purchased:', updateError);
-        continue;
-      }
-
-      console.log('✅ Customer referral completed:', {
-        referralCode: referral.referral_code,
-        creditAmount: creditAmount,
-        orderValue: orderValue
-      });
-
-      // TODO: Could add automatic crediting logic here in the future
-      // For now, we just mark it as purchased and track the credit amount
+    if (updateError) {
+      console.error('❌ Error updating customer referral completion:', updateError);
+      return;
     }
+
+    // Handle commission/rewards based on referral type
+    if (customer.referral_type === 'PARTNER' && customer.referrer_id && customer.referral_commission_rate > 0) {
+      console.log('🎯 Processing partner commission from referral');
+      // For now, just log - full commission system update is next task
+    } else if (customer.referral_type === 'CUSTOMER' && customer.referrer_id) {
+      console.log('🎯 Processing customer referral credit');
+      // For now, just log - full credit system update is next task
+    } else if (customer.referral_type === 'INFLUENCER' && customer.referrer_id && customer.referral_commission_rate > 0) {
+      console.log('🎯 Processing influencer commission from referral');
+      // For now, just log - full commission system update is next task
+    }
+
+    console.log('🎉 Simplified referral completion processed successfully');
 
   } catch (error) {
-    console.error('Error handling customer referral completion:', error);
+    console.error('💥 Error handling simplified referral completion:', error);
   }
 }

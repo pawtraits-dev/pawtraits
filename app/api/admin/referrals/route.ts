@@ -8,73 +8,152 @@ export async function GET(request: NextRequest) {
   try {
     // TODO: Add admin authentication check
     
-    console.log('Admin referrals API: Fetching all referrals...');
+    console.log('Admin referrals API: Fetching referrals using simplified system...');
     
     // Create service role client to bypass RLS
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
     
-    // Get all referrals with partner and commission information
-    const { data: referrals, error } = await supabase
-      .from('referrals')
+    // Get all customers with referral data using simplified system
+    const { data: customers, error } = await supabase
+      .from('customers')
       .select(`
-        *,
-        partners (
+        id,
+        email,
+        first_name,
+        last_name,
+        referral_type,
+        referrer_id,
+        referral_code_used,
+        referral_discount_applied,
+        referral_commission_rate,
+        referral_applied_at,
+        referral_order_id,
+        created_at,
+        referrer:user_profiles!referrer_id (
           id,
           first_name,
           last_name,
-          business_name,
-          email
+          email,
+          user_type,
+          partner_id,
+          customer_id,
+          partner:partners (
+            id,
+            business_name
+          ),
+          customer:customers (
+            id,
+            first_name,
+            last_name
+          )
         ),
-        client_orders (
-          order_value,
-          commission_amount,
-          commission_paid,
-          order_status,
-          created_at
+        referred_order:orders!referral_order_id (
+          id,
+          order_number,
+          total_amount,
+          currency,
+          created_at,
+          status
         )
       `)
-      .order('created_at', { ascending: false });
+      .not('referral_type', 'eq', 'ORGANIC')
+      .not('referral_type', 'is', null)
+      .order('referral_applied_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching referrals:', error);
+      console.error('Error fetching simplified referrals:', error);
       throw error;
     }
 
-    // Process referrals to include commission data from client_orders
-    const processedReferrals = referrals?.map((referral: any) => {
-      // Calculate commission statistics from client_orders
-      const orders = referral.client_orders || [];
-      const orderCount = orders.length;
-      const totalOrderValue = orders.reduce((sum: number, order: any) => sum + (parseFloat(order.order_value) || 0), 0);
-      const totalCommissionAmount = orders.reduce((sum: number, order: any) => sum + (parseFloat(order.commission_amount) || 0), 0);
-      const commissionPaid = orders.some((order: any) => order.commission_paid);
-      
+    // Process customers to format as referral records
+    const processedReferrals = customers?.map((customer: any) => {
+      const referrer = customer.referrer;
+      let referrerName = 'Unknown Referrer';
+      let referrerBusiness = 'N/A';
+      let referrerEmail = 'N/A';
+
+      if (referrer) {
+        if (customer.referral_type === 'PARTNER' && referrer.partner) {
+          referrerName = referrer.partner.business_name || `${referrer.first_name} ${referrer.last_name}`.trim();
+          referrerBusiness = referrer.partner.business_name || 'N/A';
+          referrerEmail = referrer.email || 'N/A';
+        } else if (customer.referral_type === 'CUSTOMER' && referrer.customer) {
+          referrerName = `${referrer.customer.first_name} ${referrer.customer.last_name}`.trim();
+          referrerBusiness = 'Customer Referral';
+          referrerEmail = referrer.email || 'N/A';
+        } else if (customer.referral_type === 'INFLUENCER') {
+          referrerName = `${referrer.first_name} ${referrer.last_name}`.trim();
+          referrerBusiness = 'Influencer';
+          referrerEmail = referrer.email || 'N/A';
+        }
+      }
+
+      // Determine status based on referral completion
+      let status = 'pending';
+      if (customer.referred_order) {
+        status = 'purchased';
+      } else if (customer.referral_applied_at) {
+        status = 'viewed';
+      }
+
       return {
-        ...referral,
-        // Remove the nested client_orders array 
-        client_orders: undefined,
-        // Add calculated commission data
-        order_count: orderCount,
-        order_value: totalOrderValue,
-        total_order_value: totalOrderValue,
-        commission_amount: totalCommissionAmount > 0 ? totalCommissionAmount / 100 : (referral.commission_amount ? referral.commission_amount / 100 : null),
-        commission_paid: commissionPaid,
-        // Partner information
-        partner_name: referral.partners ? 
-          `${referral.partners.first_name} ${referral.partners.last_name}`.trim() : 
-          'Unknown Partner',
-        partner_business: referral.partners?.business_name || 'N/A',
-        partner_email: referral.partners?.email || 'N/A',
-        // Expiry calculations
-        is_expired: referral.expires_at ? new Date(referral.expires_at) < new Date() : false,
-        days_until_expiry: referral.expires_at ? Math.ceil((new Date(referral.expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0
+        id: customer.id,
+        referral_code: customer.referral_code_used || 'N/A',
+        client_name: `${customer.first_name} ${customer.last_name}`.trim(),
+        client_email: customer.email,
+        client_phone: null, // Not stored in simplified system
+        status: status,
+        commission_amount: customer.referred_order ?
+          (customer.referred_order.total_amount * (customer.referral_commission_rate || 0) / 100 / 100) : null, // Convert from pence to pounds
+        commission_rate: customer.referral_commission_rate || 0,
+        commission_paid: false, // TODO: Implement commission payment tracking
+        qr_scans: 0, // Not tracked in simplified system
+        email_opens: 0, // Not tracked in simplified system
+        expires_at: null, // No expiry in simplified system
+        created_at: customer.created_at,
+        purchased_at: customer.referred_order?.created_at || null,
+        last_viewed_at: customer.referral_applied_at,
+        partner_name: referrerName,
+        partner_business: referrerBusiness,
+        partner_email: referrerEmail,
+        is_expired: false, // No expiry in simplified system
+        days_until_expiry: 0,
+        // Additional fields for simplified system
+        referral_type: customer.referral_type,
+        referrer_id: customer.referrer_id,
+        discount_applied: customer.referral_discount_applied ? customer.referral_discount_applied / 100 : 0, // Convert pence to pounds
+        order_value: customer.referred_order?.total_amount ? customer.referred_order.total_amount / 100 : 0 // Convert pence to pounds
       };
     }) || [];
 
+    // Calculate summary analytics for admin dashboard
+    const summaryAnalytics = {
+      total_referrals: processedReferrals.length,
+      by_type: {
+        PARTNER: processedReferrals.filter(r => r.referral_type === 'PARTNER').length,
+        CUSTOMER: processedReferrals.filter(r => r.referral_type === 'CUSTOMER').length,
+        INFLUENCER: processedReferrals.filter(r => r.referral_type === 'INFLUENCER').length,
+      },
+      by_status: {
+        pending: processedReferrals.filter(r => r.status === 'pending').length,
+        viewed: processedReferrals.filter(r => r.status === 'viewed').length,
+        purchased: processedReferrals.filter(r => r.status === 'purchased').length,
+      },
+      total_commission: processedReferrals.reduce((sum, r) => sum + (r.commission_amount || 0), 0),
+      total_order_value: processedReferrals.reduce((sum, r) => sum + (r.order_value || 0), 0),
+      conversion_rate: processedReferrals.length > 0
+        ? (processedReferrals.filter(r => r.status === 'purchased').length / processedReferrals.length * 100)
+        : 0
+    };
+
     console.log('Admin referrals API: Found', processedReferrals.length, 'referrals');
-    return NextResponse.json(processedReferrals);
+
+    return NextResponse.json({
+      referrals: processedReferrals,
+      analytics: summaryAnalytics
+    });
   } catch (error) {
     console.error('Error fetching referrals for admin:', error);
     return NextResponse.json(
