@@ -61,7 +61,7 @@ export async function GET(
         };
         referralType = 'PARTNER';
         referrerInfo = {
-          id: data.partner.user_profiles.id, // Link to user_profiles
+          id: data.partner.user_profiles?.[0]?.id, // Link to user_profiles (first element of array)
           type: 'partner',
           name: data.partner.business_name || `${data.partner.first_name} ${data.partner.last_name}`,
           avatar_url: data.partner.logo_url || data.partner.avatar_url,
@@ -103,7 +103,7 @@ export async function GET(
         };
         referralType = 'PARTNER';
         referrerInfo = {
-          id: data.partners.user_profiles.id,
+          id: data.partners.user_profiles?.[0]?.id || data.partners.user_profiles?.id,
           type: 'partner',
           name: data.partners.business_name || `${data.partners.first_name} ${data.partners.last_name}`,
           avatar_url: data.partners.logo_url || data.partners.avatar_url,
@@ -143,7 +143,7 @@ export async function GET(
         };
         referralType = 'CUSTOMER';
         referrerInfo = {
-          id: data.customers.user_profiles.id,
+          id: data.customers.user_profiles?.[0]?.id || data.customers.user_profiles?.id,
           type: 'customer',
           name: `${data.customers.first_name} ${data.customers.last_name}`,
           avatar_url: null,
@@ -186,7 +186,7 @@ export async function GET(
         };
         referralType = 'INFLUENCER';
         referrerInfo = {
-          id: data.influencers.user_profiles.id,
+          id: data.influencers.user_profiles?.[0]?.id || data.influencers.user_profiles?.id,
           type: 'influencer',
           name: `@${data.influencers.username}${data.influencers.is_verified ? ' ✓' : ''}`,
           avatar_url: data.influencers.avatar_url,

@@ -177,7 +177,7 @@ function CustomerInvitationPageContent() {
 
             {/* Main CTA */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link href={`/signup/user?ref_partner_id=${referralData?.referrer?.id}&ref_code=${referralData?.code}`}>
+              <Link href={`/signup/user?ref=${referralData?.code}`}>
                 <Button
                   size="lg"
                   className="bg-white text-purple-600 hover:bg-gray-100 shadow-lg text-lg px-8 py-4"
@@ -362,7 +362,7 @@ function CustomerInvitationPageContent() {
             Join thousands of happy pet parents and get {referralData?.discount_rate}% off your first order
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link href={`/signup/user?ref_partner_id=${referralData?.referrer?.id}&ref_code=${referralData?.code}`}>
+            <Link href={`/signup/user?ref=${referralData?.code}`}>
               <Button
                 size="lg"
                 className="bg-white text-purple-600 hover:bg-gray-100 shadow-lg text-lg px-8 py-4"

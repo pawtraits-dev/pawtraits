@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
         referral_code: referralCode || null,
         referral_date: referralCode ? new Date().toISOString() : null,
         // Simplified referral tracking fields
-        referral_type: referralCode ? null : 'ORGANIC', // Will be set by unified API if referral code provided
+        referral_type: 'ORGANIC', // Default to ORGANIC, will be updated if referral is valid
         referrer_id: null,
         referral_code_used: referralCode ? referralCode.toUpperCase() : null,
         referral_applied_at: referralCode ? new Date().toISOString() : null
