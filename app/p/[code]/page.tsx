@@ -13,10 +13,14 @@ import {
   ArrowRight,
   AlertCircle,
   Star,
-  Gift
+  Gift,
+  Sparkles,
+  HandHeart
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
 
 interface Partner {
   id: string;
@@ -39,7 +43,7 @@ interface PreRegistrationCode {
   partner?: Partner;
 }
 
-export default function PreRegistrationLandingPage() {
+function PreRegistrationLandingPageContent() {
   const params = useParams();
   const router = useRouter();
   const [codeData, setCodeData] = useState<PreRegistrationCode | null>(null);
@@ -111,295 +115,359 @@ export default function PreRegistrationLandingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Verifying QR code...</p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+        <UserAwareNavigation />
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-8 text-center">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Invalid QR Code</h2>
-            <p className="text-gray-600 mb-6">{error}</p>
-            <Link href="/">
-              <Button>Go to Home Page</Button>
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+        <UserAwareNavigation />
+        <div className="flex items-center justify-center min-h-[60vh] p-4">
+          <Card className="w-full max-w-md shadow-lg">
+            <CardContent className="p-8 text-center">
+              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Invalid QR Code</h2>
+              <p className="text-gray-600 mb-6">{error}</p>
+              <Link href="/">
+                <Button className="bg-purple-600 hover:bg-purple-700">Go to Home Page</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
-                <img src="/assets/logos/paw-svgrepo-200x200-green.svg" alt="Pawtraits Logo" className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Pawtraits</h1>
-                <p className="text-sm text-gray-600">Partner Registration</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              {/* Partner Logo */}
-              {codeData?.partner?.logo_url && (
-                <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border">
-                  <img
-                    src={codeData.partner.logo_url}
-                    alt={`${codeData.partner.business_name || `${codeData.partner.first_name} ${codeData.partner.last_name}`} Logo`}
-                    className="w-8 h-8 object-contain rounded"
-                  />
-                  <div className="text-sm">
-                    <p className="font-medium text-gray-900">
-                      {codeData.partner.business_name || `${codeData.partner.first_name} ${codeData.partner.last_name}`}
-                    </p>
-                    <p className="text-gray-500">Referring Partner</p>
-                  </div>
-                </div>
-              )}
-              {scanRecorded && (
-                <div className="flex items-center gap-2 text-green-600">
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span className="text-sm font-medium">QR Code Verified</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+  const getPartnerName = () => {
+    if (!codeData?.partner) return 'Our Partner Network';
+    return codeData.partner.business_name || `${codeData.partner.first_name} ${codeData.partner.last_name}`;
+  };
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Welcome Section */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            {codeData?.partner?.logo_url ? (
-              <div className="w-20 h-20 p-2 bg-white border border-green-200 rounded-2xl shadow-sm">
-                <img
-                  src={codeData.partner.logo_url}
-                  alt="Partner Logo"
-                  className="w-full h-full object-contain rounded-xl"
-                />
+  const getPartnerLogo = () => {
+    if (codeData?.partner?.logo_url) {
+      return (
+        <div className="w-20 h-20 p-2 bg-white border border-purple-200 rounded-2xl shadow-sm">
+          <Image
+            src={codeData.partner.logo_url}
+            alt="Partner Logo"
+            width={80}
+            height={80}
+            className="w-full h-full object-contain rounded-xl"
+          />
+        </div>
+      );
+    } else {
+      return (
+        <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center border-4 border-white shadow-sm">
+          <HandHeart className="w-12 h-12 text-purple-600" />
+        </div>
+      );
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+      {/* Navigation */}
+      <UserAwareNavigation />
+
+      {/* Hero Section */}
+      <section className="py-16 bg-gradient-to-r from-purple-600 to-blue-600 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-black bg-opacity-10"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            {/* Partner Logo */}
+            <div className="flex items-center justify-center mb-6">
+              {getPartnerLogo()}
+            </div>
+
+            <h1 className="text-4xl lg:text-6xl font-bold mb-6 font-[family-name:var(--font-life-savers)]">
+              {codeData?.partner ? `You're Invited by ${getPartnerName()}!` : 'Join Pawtraits Partner Network!'}
+            </h1>
+            <p className="text-xl lg:text-2xl mb-8 max-w-3xl mx-auto opacity-90">
+              {codeData?.partner ?
+                `${getPartnerName()} has invited you to join the Pawtraits Partner Program. Start earning commissions and help pet parents create beautiful AI portraits.` :
+                "You've scanned a special partner invitation QR code. Join our network of pet care professionals and start earning referral bonuses and commissions."
+              }
+            </p>
+
+            {/* Main CTA */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link href={`/signup/partner?ref=${codeData?.code}`}>
+                <Button
+                  size="lg"
+                  className="bg-white text-purple-600 hover:bg-gray-100 shadow-lg text-lg px-8 py-4"
+                >
+                  <Sparkles className="w-6 h-6 mr-2" />
+                  Join as Partner Now
+                </Button>
+              </Link>
+            </div>
+
+            {/* QR verification badge */}
+            {scanRecorded && (
+              <div className="flex items-center justify-center gap-2 mt-6 text-green-200">
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="text-sm font-medium">QR Code Verified</span>
               </div>
-            ) : (
-              <QrCode className="w-16 h-16 text-green-600" />
             )}
           </div>
-
-          {codeData?.partner ? (
-            <>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                You&apos;re Invited by {codeData.partner.business_name || `${codeData.partner.first_name} ${codeData.partner.last_name}`}!
-              </h2>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                {codeData.partner.business_name || `${codeData.partner.first_name} ${codeData.partner.last_name}`} has invited you to join the Pawtraits Partner Program.
-                
-              </p>
-            </>
-          ) : (
-            <>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                Welcome to Pawtraits Partner Program!
-              </h2>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                You&apos;ve scanned a special partner invitation QR code. Join our network of pet care professionals, and start earning referral bonuses and commissions.
-                
-              </p>
-            </>
-          )}
         </div>
+      </section>
 
-        {/* Code Information */}
-        {codeData && (
-          <div className="mb-8">
-            <Card>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-                  <div>
-                    <QrCode className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600">Invitation Code</p>
-                    <p className="font-mono font-bold text-lg">{codeData.code}</p>
+      {/* Partner Information Card */}
+      {codeData && (
+        <section className="py-12 bg-white">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Card className="shadow-lg border-0">
+              <CardContent className="p-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+                  <div className="space-y-3">
+                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto">
+                      <QrCode className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <p className="text-sm font-medium text-gray-600">Invitation Code</p>
+                    <p className="font-mono font-bold text-xl text-purple-600">{codeData.code}</p>
                   </div>
                   {codeData.business_category && (
-                    <div>
-                      <Building className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">Partner Type</p>
-                      <p className="font-medium capitalize">{codeData.business_category}</p>
+                    <div className="space-y-3">
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+                        <Building className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <p className="text-sm font-medium text-gray-600">Partner Type</p>
+                      <p className="font-bold text-lg text-gray-900 capitalize">{codeData.business_category}</p>
+                    </div>
+                  )}
+                  {codeData?.partner && (
+                    <div className="space-y-3">
+                      <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                        {codeData.partner.logo_url ? (
+                          <Image
+                            src={codeData.partner.logo_url}
+                            alt={getPartnerName()}
+                            width={32}
+                            height={32}
+                            className="w-8 h-8 object-contain rounded-full"
+                          />
+                        ) : (
+                          <HandHeart className="w-6 h-6 text-green-600" />
+                        )}
+                      </div>
+                      <p className="text-sm font-medium text-gray-600">Referring Partner</p>
+                      <p className="font-bold text-lg text-gray-900">{getPartnerName()}</p>
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
           </div>
-        )}
+        </section>
+      )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Action */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Star className="w-5 h-5 text-yellow-500" />
-                  Join the Pawtraits Partner Network
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-sm font-bold text-green-600">1</span>
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900">Register as a Partner</h4>
-                      <p className="text-sm text-gray-600">
-                        Complete your partner application with your business details 
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-sm font-bold text-green-600">2</span>
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900">Get Approved</h4>
-                      <p className="text-sm text-gray-600">
-                        Share your referral code with your customers giving them an introductory 10% discount
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-sm font-bold text-green-600">3</span>
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900">Start Earning</h4>
-                      <p className="text-sm text-gray-600">
-                        Earn 10% commission on referred customer orders - for life
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4">
-                  <Link href={`/signup/partner?ref=${codeData?.code}`}>
-                    <Button size="lg" className="w-full">
-                      <ArrowRight className="w-5 h-5 mr-2" />
-                      Join as Partner Now
-                    </Button>
-                  </Link>
-                  <p className="text-xs text-gray-500 text-center mt-2">
-                    This will link your registration to invitation code {codeData?.code}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Business Benefits */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Why Partner with Pawtraits?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5 text-green-500" />
-                      <span className="font-medium">High Commissions</span>
-                    </div>
-                    <p className="text-sm text-gray-600 pl-7">
-                      Earn 10% commission on referred customer orders
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Star className="w-5 h-5 text-red-500" />
-                      <span className="font-medium">Customer Delight</span>
-                    </div>
-                    <p className="text-sm text-gray-600 pl-7">
-                      Customers love Patraits, and receive a 10% discount by using your uniqie code
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Building className="w-5 h-5 text-blue-500" />
-                      <span className="font-medium">Business Integration</span>
-                    </div>
-                    <p className="text-sm text-gray-600 pl-7">
-                      Natural fit with your existing products and services
-                    </p>
-                  </div>
-
-                  
-                </div>
-              </CardContent>
-            </Card>
+      {/* How It Works Section */}
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
+              Join the Pawtraits Partner Network
+            </h2>
+            <p className="text-xl text-gray-600">
+              Become part of our growing network of pet care professionals in just three steps
+            </p>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Commission Structure</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600">10%</p>
-                    <p className="text-sm text-green-700">Commission</p>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Step 1 */}
+            <Card className="text-center bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <CardContent className="p-8">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-2xl font-bold text-purple-600">1</span>
                 </div>
-
-
-
-                <div className="text-xs text-gray-500 text-center">
-                  Commission calculated on order total (excluding shipping)
-                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Register as a Partner</h3>
+                <p className="text-gray-600">
+                  Complete your partner application with your business details and get approved to start referring customers.
+                </p>
               </CardContent>
             </Card>
 
+            {/* Step 2 */}
+            <Card className="text-center bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <CardContent className="p-8">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-2xl font-bold text-purple-600">2</span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Share Your Code</h3>
+                <p className="text-gray-600">
+                  Share your unique referral code with customers, giving them a 10% discount on their first order.
+                </p>
+              </CardContent>
+            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Already have an account?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Link href="/auth/login">
-                  <Button variant="outline" className="w-full">
-                    Sign In
-                  </Button>
-                </Link>
+            {/* Step 3 */}
+            <Card className="text-center bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <CardContent className="p-8">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-2xl font-bold text-purple-600">3</span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Start Earning</h3>
+                <p className="text-gray-600">
+                  Earn 10% commission on all referred customer orders - for life. Track your earnings in your partner dashboard.
+                </p>
               </CardContent>
             </Card>
           </div>
         </div>
+      </section>
 
-        {/* Footer */}
-        <div className="mt-12 text-center text-sm text-gray-500">
-          <p>
-            Questions? Contact us at{' '}
-            <a href="mailto:partners@pawtraits.pics" className="text-green-600 hover:underline">
-              partners@pawtraits.pics
-            </a>
+      {/* Benefits Section */}
+      <section className="py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
+              Why Partner with Pawtraits?
+            </h2>
+            <p className="text-xl text-gray-600">
+              Join the growing network of successful pet care professionals
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {/* Benefit 1 */}
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <TrendingUp className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">High Commissions</h3>
+              <p className="text-gray-600">Earn 10% commission on all referred customer orders with no caps or limits.</p>
+            </div>
+
+            {/* Benefit 2 */}
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Star className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Customer Delight</h3>
+              <p className="text-gray-600">Customers love Pawtraits and get a 10% discount with your unique referral code.</p>
+            </div>
+
+            {/* Benefit 3 */}
+            <div className="text-center">
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Building className="w-8 h-8 text-purple-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Perfect Integration</h3>
+              <p className="text-gray-600">AI pet portraits are a natural fit with your existing pet care products and services.</p>
+            </div>
+
+            {/* Benefit 4 */}
+            <div className="text-center">
+              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <HandHeart className="w-8 h-8 text-yellow-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Lifetime Earnings</h3>
+              <p className="text-gray-600">Once you refer a customer, you earn commission on all their future orders forever.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Commission Section */}
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-4xl font-bold text-gray-900 mb-6 font-[family-name:var(--font-life-savers)]">
+            Generous Commission Structure
+          </h2>
+          <Card className="shadow-lg border-0 bg-white">
+            <CardContent className="p-8">
+              <div className="bg-purple-50 rounded-lg p-8 mb-6">
+                <div className="text-center">
+                  <p className="text-6xl font-bold text-purple-600 mb-2">10%</p>
+                  <p className="text-xl text-purple-700 font-medium">Commission on Every Order</p>
+                </div>
+              </div>
+              <p className="text-gray-600">
+                Commission calculated on order total (excluding shipping) • Paid monthly • No minimum thresholds
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* Final CTA Section */}
+      <section className="py-16 bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-4xl font-bold mb-6 font-[family-name:var(--font-life-savers)]">
+            Ready to Join Our Partner Network?
+          </h2>
+          <p className="text-xl mb-8 opacity-90">
+            Start earning commissions by helping pet parents create beautiful AI portraits
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Link href={`/signup/partner?ref=${codeData?.code}`}>
+              <Button
+                size="lg"
+                className="bg-white text-purple-600 hover:bg-gray-100 shadow-lg text-lg px-8 py-4"
+              >
+                <ArrowRight className="w-6 h-6 mr-2" />
+                Join as Partner Now
+              </Button>
+            </Link>
+            <Link href="/auth/login">
+              <Button
+                variant="outline"
+                size="lg"
+                className="border-white text-white hover:bg-white hover:text-purple-600 text-lg px-8 py-4"
+              >
+                Already Have an Account?
+              </Button>
+            </Link>
+          </div>
+          <p className="text-sm mt-4 opacity-75">
+            Registration will be linked to invitation code {codeData?.code}
           </p>
         </div>
-      </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <div className="flex items-center justify-center space-x-2 mb-4">
+              <Image
+                src="/assets/logos/paw-svgrepo-200x200-purple.svg"
+                alt="Pawtraits Logo"
+                width={24}
+                height={24}
+                className="w-6 h-6"
+              />
+              <span className="text-xl font-bold font-[family-name:var(--font-life-savers)]">Pawtraits</span>
+            </div>
+            <p className="text-gray-400 mb-4">Partner Program</p>
+            <p className="text-sm text-gray-500">
+              Questions? Contact us at{' '}
+              <a href="mailto:partners@pawtraits.pics" className="text-purple-400 hover:underline">
+                partners@pawtraits.pics
+              </a>
+            </p>
+            <div className="mt-8 pt-8 border-t border-gray-800 text-center">
+              <p className="text-gray-400">
+                © 2024 Pawtraits. All rights reserved.
+              </p>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
+  );
+}
+
+export default function PreRegistrationLandingPage() {
+  return (
+    <PreRegistrationLandingPageContent />
   );
 }
