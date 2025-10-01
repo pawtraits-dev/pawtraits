@@ -1964,12 +1964,7 @@ export class SupabaseService {
           referral_applied_at,
           referral_order_id,
           referral_discount_applied,
-          referral_commission_rate,
-          referred_order:orders!referral_order_id (
-            total_amount,
-            created_at,
-            status
-          )
+          referral_commission_rate
         `)
         .eq('referral_type', 'PARTNER')
         .eq('referrer_id', userProfileId);
@@ -1979,32 +1974,31 @@ export class SupabaseService {
       const customers = referredCustomers || [];
       const totalScans = customers.length;
       const totalSignups = customers.length;
-      const totalPurchases = customers.filter(c => c.referred_order).length;
+      const totalPurchases = customers.filter(c => c.referral_order_id).length;
 
       const totalCommissions = customers.reduce((sum, customer) => {
-        if (customer.referred_order && customer.referral_commission_rate > 0) {
-          const orderValue = customer.referred_order.total_amount / 100;
-          const commission = orderValue * (customer.referral_commission_rate / 100);
-          return sum + commission;
+        if (false) { // TODO: Fix after order join is working
+          // TODO: Calculate commission when orders are properly joined
+          return sum;
         }
         return sum;
       }, 0);
 
       const totalOrderValue = customers.reduce((sum, customer) => {
-        if (customer.referred_order) {
-          return sum + (customer.referred_order.total_amount / 100);
+        if (false) { // TODO: Fix after order join is working
+          // TODO: Add order value when orders are properly joined
+          return sum;
         }
         return sum;
       }, 0);
 
       const recentActivity = customers.map(customer => ({
         id: customer.id,
-        type: customer.referred_order ? 'purchase' : 'signup',
-        date: customer.referred_order ? customer.referred_order.created_at : customer.referral_applied_at,
-        order_value: customer.referred_order ? customer.referred_order.total_amount / 100 : null,
-        commission: customer.referred_order && customer.referral_commission_rate > 0
-          ? (customer.referred_order.total_amount / 100) * (customer.referral_commission_rate / 100)
-          : null,
+        type: customer.referral_order_id ? 'purchase' : 'signup',
+        date: customer.referral_applied_at,
+        order_value: null, // TODO: Look up order value separately
+        commission: null, // TODO: Calculate commission separately
+        // TODO: Fix commission calculation syntax
       })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       return {
@@ -2036,7 +2030,7 @@ export class SupabaseService {
           referral_applied_at,
           referral_order_id,
           referral_code_used,
-          referred_order:orders!referral_order_id (
+          // referred_order:orders!referral_order_id (
             total_amount,
             created_at,
             status
@@ -2050,22 +2044,23 @@ export class SupabaseService {
       const customers = referredCustomers || [];
       const totalScans = customers.length;
       const totalSignups = customers.length;
-      const totalPurchases = customers.filter(c => c.referred_order).length;
+      const totalPurchases = customers.filter(c => c.referral_order_id).length;
       const totalRewards = totalPurchases * 5; // £5 credit per successful referral
 
       const totalOrderValue = customers.reduce((sum, customer) => {
-        if (customer.referred_order) {
-          return sum + (customer.referred_order.total_amount / 100);
+        if (false) { // TODO: Fix after order join is working
+          // TODO: Add order value when orders are properly joined
+          return sum;
         }
         return sum;
       }, 0);
 
       const recentActivity = customers.map(customer => ({
         id: customer.id,
-        type: customer.referred_order ? 'purchase' : 'signup',
-        date: customer.referred_order ? customer.referred_order.created_at : customer.referral_applied_at,
-        order_value: customer.referred_order ? customer.referred_order.total_amount / 100 : null,
-        reward: customer.referred_order ? 5 : null,
+        type: customer.referral_order_id ? 'purchase' : 'signup',
+        date: customer.referral_applied_at,
+        order_value: null, // TODO: Look up order value separately
+        reward: customer.referral_order_id ? 5 : null,
       })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       return {
@@ -2097,7 +2092,7 @@ export class SupabaseService {
           referral_applied_at,
           referral_order_id,
           referral_commission_rate,
-          referred_order:orders!referral_order_id (
+          // referred_order:orders!referral_order_id (
             total_amount,
             created_at,
             status
@@ -2111,32 +2106,31 @@ export class SupabaseService {
       const customers = referredCustomers || [];
       const totalScans = customers.length;
       const totalSignups = customers.length;
-      const totalPurchases = customers.filter(c => c.referred_order).length;
+      const totalPurchases = customers.filter(c => c.referral_order_id).length;
 
       const totalCommissions = customers.reduce((sum, customer) => {
-        if (customer.referred_order && customer.referral_commission_rate > 0) {
-          const orderValue = customer.referred_order.total_amount / 100;
-          const commission = orderValue * (customer.referral_commission_rate / 100);
-          return sum + commission;
+        if (false) { // TODO: Fix after order join is working
+          // TODO: Calculate commission when orders are properly joined
+          return sum;
         }
         return sum;
       }, 0);
 
       const totalOrderValue = customers.reduce((sum, customer) => {
-        if (customer.referred_order) {
-          return sum + (customer.referred_order.total_amount / 100);
+        if (false) { // TODO: Fix after order join is working
+          // TODO: Add order value when orders are properly joined
+          return sum;
         }
         return sum;
       }, 0);
 
       const recentActivity = customers.map(customer => ({
         id: customer.id,
-        type: customer.referred_order ? 'purchase' : 'signup',
-        date: customer.referred_order ? customer.referred_order.created_at : customer.referral_applied_at,
-        order_value: customer.referred_order ? customer.referred_order.total_amount / 100 : null,
-        commission: customer.referred_order && customer.referral_commission_rate > 0
-          ? (customer.referred_order.total_amount / 100) * (customer.referral_commission_rate / 100)
-          : null,
+        type: customer.referral_order_id ? 'purchase' : 'signup',
+        date: customer.referral_applied_at,
+        order_value: null, // TODO: Look up order value separately
+        commission: null, // TODO: Calculate commission separately
+        // TODO: Fix commission calculation syntax
       })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       return {

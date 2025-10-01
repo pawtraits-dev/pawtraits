@@ -13,8 +13,20 @@ export async function GET(
 
     const supabaseService = new SupabaseService();
 
+    // Get user profile ID for this partner
+    const { data: userProfile } = await supabaseService.getClient()
+      .from('user_profiles')
+      .select('id')
+      .eq('partner_id', id)
+      .single();
+
+    if (!userProfile) {
+      console.log('Admin referrals API: No user profile found for partner', id);
+      return NextResponse.json([]);
+    }
+
     // Get partner referral analytics using proper service method
-    const analytics = await supabaseService.getPartnerReferralAnalytics(id);
+    const analytics = await supabaseService.getPartnerReferralAnalytics(userProfile.id);
 
     if (!analytics) {
       return NextResponse.json([]);

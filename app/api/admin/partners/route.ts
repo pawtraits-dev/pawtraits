@@ -28,8 +28,15 @@ export async function GET(request: NextRequest) {
       !p.email?.includes('@admin') && // Basic admin email pattern check
       !p.email?.includes('admin@')
     )) {
-      // Get referral analytics for this partner
-      const analytics = await supabaseService.getPartnerReferralAnalytics(partner.id);
+      // Get user profile ID for this partner
+      const { data: userProfile } = await supabaseService.getClient()
+        .from('user_profiles')
+        .select('id')
+        .eq('partner_id', partner.id)
+        .single();
+
+      // Get referral analytics for this partner using user profile ID
+      const analytics = userProfile ? await supabaseService.getPartnerReferralAnalytics(userProfile.id) : null;
 
       const totalReferrals = analytics?.summary?.total_scans || 0;
       const successfulReferrals = analytics?.summary?.total_purchases || 0;
