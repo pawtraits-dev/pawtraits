@@ -113,93 +113,36 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     const shippingCost = parseInt(metadata.shippingCost || '0');
     const subtotalAmount = paymentIntent.amount - shippingCost;
 
-    // Get partner ID if this is a partner order
-    let partnerUserProfile = null;
-    let placedByPartnerId = null;
-    
-    if (orderType.startsWith('partner')) {
-      const partnerEmail = metadata.partnerEmail || metadata.placedByEmail;
-      console.log('Webhook: Looking for partner ID for order type:', orderType, {
-        partnerEmail: metadata.partnerEmail,
-        placedByEmail: metadata.placedByEmail,
-        resolvedEmail: partnerEmail
+    // Check if this is a partner order (user placing order is a partner)
+    let orderingUserProfile = null;
+
+    // Get the user profile for the customer placing the order
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('id, email, user_type, partner_id, customer_id')
+      .eq('email', customerEmail)
+      .single();
+
+    if (!profileError && userProfile) {
+      orderingUserProfile = userProfile;
+      console.log('Webhook: Found user profile:', {
+        id: userProfile.id,
+        email: userProfile.email,
+        user_type: userProfile.user_type,
+        partner_id: userProfile.partner_id,
+        customer_id: userProfile.customer_id
       });
-      
-      if (partnerEmail) {
-        // Get partner user profile and partner record
-        console.log('Webhook: Looking up user_profiles for email:', partnerEmail);
-        const { data: partnerProfile, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('id, email, user_type')
-          .eq('email', partnerEmail)
-          .eq('user_type', 'partner')
-          .single();
-
-        console.log('Webhook: User profile lookup result:', { 
-          partnerProfile, 
-          profileError: profileError?.message,
-          profileErrorCode: profileError?.code 
-        });
-
-        if (!profileError && partnerProfile) {
-          partnerUserProfile = partnerProfile;
-          
-          // Get the partner record using the partner_id from user_profiles
-          console.log('Webhook: Looking up partners table for partner_id from user_profiles');
-          const { data: partnerIdResult, error: partnerIdError } = await supabase
-            .from('user_profiles')
-            .select('partner_id')
-            .eq('id', partnerProfile.id)
-            .single();
-
-          if (!partnerIdError && partnerIdResult?.partner_id) {
-            console.log('Webhook: Looking up partners table for partner_id:', partnerIdResult.partner_id);
-            const { data: partnerRecord, error: partnerError } = await supabase
-              .from('partners')
-              .select('id, email')
-              .eq('id', partnerIdResult.partner_id)
-              .single();
-
-            console.log('Webhook: Partner record lookup result:', { 
-              partnerRecord, 
-              partnerError: partnerError?.message,
-              partnerErrorCode: partnerError?.code 
-            });
-
-            if (!partnerError && partnerRecord) {
-              placedByPartnerId = partnerRecord.id;
-              console.log('Webhook: Successfully found partner:', { 
-                userProfileId: partnerProfile.id,
-                partnerIdFromProfile: partnerIdResult.partner_id,
-                partnerRecordId: partnerRecord.id,
-                finalPartnerId: placedByPartnerId 
-              });
-            } else {
-              console.log('Webhook: Partner record lookup failed - partner_id exists in user_profiles but no matching partners table record');
-            }
-          } else {
-            console.log('Webhook: Partner ID lookup failed - user_profiles record has no partner_id or lookup failed:', partnerIdError?.message);
-          }
-        } else {
-          console.log('Webhook: Partner profile lookup failed - no user_profiles record found for this email with user_type=partner');
-        }
-      } else {
-        console.log('Webhook: No partner email found in metadata for partner order');
-      }
+    } else {
+      console.log('Webhook: No user profile found for customer email:', customerEmail);
     }
 
-    // Create order record with proper attribution
+    // Create simplified order record
     const orderData = {
       order_number: `PW-${Date.now()}-${paymentIntent.id.slice(-6)}`,
       status: 'confirmed',
-      customer_email: customerEmail, // Client email for partner-client orders
-      // For partner-for-client orders, use client name in shipping fields, not partner name
-      shipping_first_name: orderType === 'partner_for_client' 
-        ? (metadata.clientName ? metadata.clientName.split(' ')[0] : metadata.shippingFirstName || '') 
-        : metadata.shippingFirstName || '',
-      shipping_last_name: orderType === 'partner_for_client' 
-        ? (metadata.clientName ? metadata.clientName.split(' ').slice(1).join(' ') : metadata.shippingLastName || '') 
-        : metadata.shippingLastName || '',
+      customer_email: customerEmail,
+      shipping_first_name: metadata.shippingFirstName || '',
+      shipping_last_name: metadata.shippingLastName || '',
       shipping_address: metadata.shippingAddress || '', // Keep for backward compatibility
       shipping_address_line_1: metadata.shippingAddressLine1 || metadata.shippingAddress || '',
       shipping_address_line_2: metadata.shippingAddressLine2 || null,
@@ -215,13 +158,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       payment_status: 'paid',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      
-      // New fields for partner-client order support
-      order_type: orderType,
-      placed_by_partner_id: placedByPartnerId,
-      client_email: orderType === 'partner_for_client' ? metadata.clientEmail || customerEmail : null,
-      client_name: orderType === 'partner_for_client' ? metadata.clientName || metadata.customerName : null,
-      
+
       metadata: JSON.stringify({
         stripePaymentIntentId: paymentIntent.id,
         stripeChargeId: paymentIntent.latest_charge,
@@ -229,12 +166,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
         paymentMethod: paymentIntent.payment_method_types[0] || 'card',
         shippingMethodUid: metadata.shippingMethodUid,
         shippingMethodName: metadata.shippingMethodName,
-        orderType: orderType,
-        placedByEmail: metadata.placedByEmail,
-        partnerEmail: metadata.partnerEmail,
-        isForClient: metadata.isForClient,
-        businessName: metadata.businessName,
-        partnerDiscount: metadata.partnerDiscount,
+        userType: orderingUserProfile?.user_type || 'customer'
       }),
     };
 
@@ -256,21 +188,12 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       customer_email: order.customer_email,
       total_amount: order.total_amount,
       payment_intent_id: order.payment_intent_id,
-      status: order.status
+      status: order.status,
+      user_type: orderingUserProfile?.user_type || 'customer'
     });
 
-    // Handle referral if present (customer orders only)
-    if (metadata.referralCode && orderType === 'customer') {
-      await handleReferralFromPayment(metadata.referralCode, customerEmail, paymentIntent.amount, order.id, supabase);
-    }
-
-    // Handle partner commission (for partner orders)
-    if (orderType.startsWith('partner') && placedByPartnerId) {
-      await handlePartnerCommission(order, paymentIntent, metadata, placedByPartnerId, supabase);
-    }
-
-    // Handle customer referral completion for all orders
-    await handleCustomerReferralCompletion(supabase, customerEmail, subtotalAmount, order.id);
+    // Handle commissions and credits based on simplified logic
+    await handleSimplifiedCommissions(supabase, order, orderingUserProfile, customerEmail, subtotalAmount);
 
     // Create Gelato order for fulfillment
     await createGelatoOrder(order, paymentIntent, supabase, metadata);
@@ -341,81 +264,95 @@ async function handleChargeDispute(event: any, supabase: any) {
   // TODO: Update order status if applicable
 }
 
-// Handle referral from successful payment
-async function handleReferralFromPayment(
-  referralCode: string,
+// Handle simplified commissions and credits based on user type and referral status
+async function handleSimplifiedCommissions(
+  supabase: any,
+  order: any,
+  orderingUserProfile: any,
   customerEmail: string,
-  orderAmount: number,
-  orderId: string,
-  supabase: any
+  subtotalAmount: number
 ) {
   try {
-    // Find the referral record
-    const { data: referral, error: referralError } = await supabase
-      .from('referrals')
-      .select('*')
-      .eq('referral_code', referralCode.toUpperCase())
+    console.log('🎯 Processing simplified commissions for order:', order.id, {
+      userType: orderingUserProfile?.user_type,
+      customerEmail,
+      subtotalAmount
+    });
+
+    // Case 1: Partner Orders - No commission, they get 20% discount (handled at checkout)
+    if (orderingUserProfile?.user_type === 'partner') {
+      console.log('✅ Partner order - no commission processing needed');
+      return;
+    }
+
+    // Case 2-4: Customer Orders - Check referral status
+    const { data: customer, error: customerError } = await supabase
+      .from('customers')
+      .select(`
+        id,
+        email,
+        referral_type,
+        referrer_id,
+        referral_code_used,
+        referral_discount_applied,
+        referral_commission_rate,
+        referral_order_id
+      `)
+      .eq('email', customerEmail.toLowerCase())
       .single();
 
-    if (referralError || !referral) {
-      console.log('Referral not found for code:', referralCode);
+    if (customerError || !customer) {
+      console.log('ℹ️ Customer not found or organic order - no commission processing');
       return;
     }
 
-    // Check if this is the customer's first order (for commission calculation)
-    const { data: existingOrders } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('customer_email', customerEmail)
-      .neq('id', orderId); // Exclude the current order
+    // Skip if customer already has a completed referral order
+    if (customer.referral_order_id) {
+      console.log('ℹ️ Customer already has completed referral order - no additional processing');
+      return;
+    }
 
-    const isFirstOrder = !existingOrders || existingOrders.length === 0;
-    const commissionRate = isFirstOrder ? 20.00 : 5.00;
-    const commissionAmount = Math.round(orderAmount * (commissionRate / 100));
+    // Skip if organic customer
+    if (!customer.referral_type || customer.referral_type === 'ORGANIC') {
+      console.log('ℹ️ Organic customer - no commission processing');
+      return;
+    }
 
-    // Update referral record
+    const isFirstOrder = !customer.referral_order_id;
+    console.log('📊 Processing referral:', {
+      referralType: customer.referral_type,
+      referrerId: customer.referrer_id,
+      isFirstOrder
+    });
+
+    // Update customer to mark referral as completed
     const { error: updateError } = await supabase
-      .from('referrals')
+      .from('customers')
       .update({
-        status: 'applied',
-        order_id: orderId,
-        order_value: orderAmount,
-        commission_amount: commissionAmount,
-        purchased_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        referral_order_id: order.id,
+        updated_at: new Date().toISOString()
       })
-      .eq('id', referral.id);
+      .eq('id', customer.id);
 
     if (updateError) {
-      console.error('Failed to update referral:', updateError);
+      console.error('❌ Error updating customer referral completion:', updateError);
       return;
     }
 
-    // Create client_orders record for commission tracking
-    const { error: clientOrderError } = await supabase
-      .from('client_orders')
-      .insert({
-        client_email: customerEmail,
-        referral_id: referral.id,
-        partner_id: referral.partner_id,
-        order_value: orderAmount,
-        is_initial_order: isFirstOrder,
-        commission_rate: commissionRate,
-        commission_amount: commissionAmount,
-        commission_paid: false,
-        order_status: 'completed',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-
-    if (clientOrderError) {
-      console.error('Failed to create client order record:', clientOrderError);
-    } else {
-      console.log('Commission tracking created for referral:', referral.id);
+    // Case 3: Partner Referred Customer - 10% commission to partner
+    if (customer.referral_type === 'PARTNER' && customer.referrer_id) {
+      await handlePartnerCommission(supabase, order, customer, subtotalAmount);
     }
 
+    // Case 4: Customer Referred Customer - 10% credit to referring customer
+    if (customer.referral_type === 'CUSTOMER' && customer.referrer_id) {
+      await handleCustomerCredit(supabase, order, customer, subtotalAmount);
+    }
+
+    console.log('🎉 Simplified commission processing completed');
+
   } catch (error) {
-    console.error('Error handling referral from payment:', error);
+    console.error('💥 Error in simplified commission processing:', error);
   }
 }
 
@@ -697,175 +634,124 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, 
   }
 }
 
-// Handle partner commission for partner orders
+// Handle 10% commission for partner-referred customers
 async function handlePartnerCommission(
+  supabase: any,
   order: any,
-  paymentIntent: any,
-  metadata: any,
-  partnerId: string,
-  supabase: any
+  customer: any,
+  subtotalAmount: number
 ) {
   try {
-    console.log('Creating partner commission record for:', {
+    console.log('🎯 Creating partner commission (10%):', {
       orderId: order.id,
-      partnerId,
-      orderType: metadata.orderType,
-      totalAmount: order.total_amount,
-      subtotalAmount: order.subtotal_amount
+      partnerId: customer.referrer_id,
+      customerEmail: customer.email,
+      subtotalAmount
     });
 
-    // Get partner-specific commission rates
-    const { data: partnerData, error: partnerRateError } = await supabase
-      .from('partners')
-      .select('initial_commission_rate, subsequent_commission_rate')
-      .eq('id', partnerId)
+    // Get partner information
+    const { data: partnerProfile, error: partnerError } = await supabase
+      .from('user_profiles')
+      .select(`
+        id,
+        email,
+        partner_id,
+        partner:partners (
+          id,
+          business_name,
+          first_name,
+          last_name
+        )
+      `)
+      .eq('id', customer.referrer_id)
       .single();
 
-    if (partnerRateError) {
-      console.error('Failed to get partner commission rates:', partnerRateError);
-      // Use default rates if we can't fetch partner rates
-      partnerData = { initial_commission_rate: 20.00, subsequent_commission_rate: 5.00 };
+    if (partnerError || !partnerProfile?.partner) {
+      console.error('❌ Failed to get partner information:', partnerError);
+      return;
     }
-    
-    // For partner-client orders, the "client" is the actual customer
-    const clientEmail = metadata.orderType === 'partner_for_client' 
-      ? metadata.clientEmail || order.customer_email
-      : order.customer_email;
-    
-    const clientName = metadata.orderType === 'partner_for_client'
-      ? metadata.clientName || order.customer_email
-      : `${order.shipping_first_name} ${order.shipping_last_name}`.trim();
 
-    // Check if this is the client's first order (for partner commission tracking)
-    const { data: existingOrders } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('customer_email', clientEmail)
-      .neq('id', order.id); // Exclude current order
+    // Fixed 10% commission rate
+    const commissionRate = 10.00;
+    const commissionAmount = Math.round(subtotalAmount * (commissionRate / 100));
 
-    const isInitialOrder = !existingOrders || existingOrders.length === 0;
-    
-    // Use partner-specific commission rates based on whether this is first order
-    const commissionRate = isInitialOrder 
-      ? partnerData.initial_commission_rate 
-      : partnerData.subsequent_commission_rate;
-      
-    const commissionAmount = Math.round(order.subtotal_amount * (commissionRate / 100));
-
-    // Create client_orders record for commission tracking
-    const { error: clientOrderError } = await supabase
+    // Create commission record in client_orders table
+    const { error: commissionError } = await supabase
       .from('client_orders')
       .insert({
-        client_email: clientEmail,
-        client_name: clientName,
-        partner_id: partnerId,
+        client_email: customer.email,
+        client_name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
+        partner_id: partnerProfile.partner.id,
         order_id: order.id,
-        order_value: order.subtotal_amount, // Subtotal only (no shipping)
-        is_initial_order: isInitialOrder,
+        order_value: subtotalAmount,
+        is_initial_order: true, // Always first order with simplified logic
         commission_rate: commissionRate,
         commission_amount: commissionAmount,
         commission_paid: false,
         order_status: 'completed',
-        order_type: metadata.orderType,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       });
 
-    if (clientOrderError) {
-      console.error('Failed to create partner commission record:', clientOrderError);
-      console.error('Commission record data:', {
-        client_email: clientEmail,
-        client_name: clientName,
-        partner_id: partnerId,
-        order_id: order.id,
-        order_value: order.subtotal_amount,
-        commission_amount: commissionAmount
-      });
+    if (commissionError) {
+      console.error('❌ Failed to create partner commission record:', commissionError);
     } else {
-      console.log('✅ Successfully created partner commission record:', {
-        partnerId,
-        clientEmail,
-        orderValue: order.subtotal_amount,
-        commissionAmount,
-        commissionRate,
-        isInitialOrder
+      console.log('✅ Partner commission created:', {
+        partnerId: partnerProfile.partner.id,
+        partnerName: partnerProfile.partner.business_name,
+        commissionAmount: commissionAmount / 100, // Convert to pounds for logging
+        commissionRate
       });
     }
 
   } catch (error) {
-    console.error('Error handling partner commission:', error);
+    console.error('💥 Error handling partner commission:', error);
   }
 }
 
-// Handle customer referral completion
-async function handleCustomerReferralCompletion(supabase: any, customerEmail: string, orderValue: number, orderId: string) {
+// Handle 10% credit for customer-referred customers
+async function handleCustomerCredit(
+  supabase: any,
+  order: any,
+  customer: any,
+  subtotalAmount: number
+) {
   try {
-    console.log('🎯 Processing referral completion using simplified system for:', customerEmail);
-
-    // Find customer with referral data using simplified system
-    const { data: customer, error: customerError } = await supabase
-      .from('customers')
-      .select(`
-        id,
-        email,
-        referral_type,
-        referrer_id,
-        referral_code_used,
-        referral_discount_applied,
-        referral_commission_rate,
-        referral_order_id
-      `)
-      .eq('email', customerEmail.toLowerCase())
-      .single();
-
-    if (customerError || !customer) {
-      console.log('⚠️ Customer not found for referral completion:', customerEmail);
-      return;
-    }
-
-    // Only process if customer has referral data and this is their first order
-    if (!customer.referral_type || customer.referral_type === 'ORGANIC' || customer.referral_order_id) {
-      console.log('ℹ️ Customer has no referral or already has completed referral order');
-      return;
-    }
-
-    console.log('✅ Processing referral completion:', {
-      customerId: customer.id,
-      referralType: customer.referral_type,
-      referralCode: customer.referral_code_used,
-      discountApplied: customer.referral_discount_applied,
-      commissionRate: customer.referral_commission_rate
+    console.log('🎯 Creating customer credit (10%):', {
+      orderId: order.id,
+      referrerId: customer.referrer_id,
+      customerEmail: customer.email,
+      subtotalAmount
     });
 
-    // Update customer record to mark referral as completed
-    const { error: updateError } = await supabase
-      .from('customers')
-      .update({
-        referral_order_id: orderId,
+    // Fixed 10% credit amount
+    const creditAmount = Math.round(subtotalAmount * 0.10); // 10% in pence
+
+    // Create customer credit record in database
+    const { error: creditError } = await supabase
+      .from('customer_credits')
+      .insert({
+        customer_id: customer.referrer_id,
+        credit_amount: creditAmount,
+        earned_from_order_id: order.id,
+        status: 'available',
+        expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year expiry
+        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      })
-      .eq('id', customer.id);
+      });
 
-    if (updateError) {
-      console.error('❌ Error updating customer referral completion:', updateError);
-      return;
+    if (creditError) {
+      console.error('❌ Failed to create customer credit:', creditError);
+    } else {
+      console.log('✅ Customer credit created:', {
+        referrerId: customer.referrer_id,
+        creditAmount: creditAmount / 100, // Convert to pounds for logging
+        earnedFromOrderId: order.id
+      });
     }
-
-    // Handle commission/rewards based on referral type
-    if (customer.referral_type === 'PARTNER' && customer.referrer_id && customer.referral_commission_rate > 0) {
-      console.log('🎯 Processing partner commission from referral');
-      // For now, just log - full commission system update is next task
-    } else if (customer.referral_type === 'CUSTOMER' && customer.referrer_id) {
-      console.log('🎯 Processing customer referral credit');
-      // For now, just log - full credit system update is next task
-    } else if (customer.referral_type === 'INFLUENCER' && customer.referrer_id && customer.referral_commission_rate > 0) {
-      console.log('🎯 Processing influencer commission from referral');
-      // For now, just log - full commission system update is next task
-    }
-
-    console.log('🎉 Simplified referral completion processed successfully');
 
   } catch (error) {
-    console.error('💥 Error handling simplified referral completion:', error);
+    console.error('💥 Error handling customer credit:', error);
   }
 }
+

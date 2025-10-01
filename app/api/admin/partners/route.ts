@@ -90,13 +90,29 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // Get commission data from client_orders table
+      const { data: commissionRecords } = await supabaseAdmin
+        .from('client_orders')
+        .select('commission_amount, commission_paid')
+        .eq('partner_id', partner.id);
+
+      const totalCommissions = commissionRecords
+        ? commissionRecords.reduce((sum, record) => sum + (record.commission_amount || 0), 0)
+        : 0;
+
+      const paidCommissions = commissionRecords
+        ? commissionRecords.filter(r => r.commission_paid).reduce((sum, record) => sum + (record.commission_amount || 0), 0)
+        : 0;
+
       const analytics = {
         summary: {
           total_scans: totalScans,
           total_signups: totalSignups,
           total_orders: ordersCount,
           total_order_value: ordersValue,
-          total_commissions: 0 // TODO: Calculate commissions based on orders
+          total_commissions: totalCommissions,
+          paid_commissions: paidCommissions,
+          unpaid_commissions: totalCommissions - paidCommissions
         }
       };
 
@@ -104,9 +120,9 @@ export async function GET(request: NextRequest) {
       const successfulReferrals = analytics?.summary?.total_signups || 0; // Total customer signups using referral codes
       const totalOrders = analytics?.summary?.total_orders || 0; // Total orders from referred customers
       const totalOrderValue = analytics?.summary?.total_order_value || 0; // Total order value from referred customers
-      const totalCommissions = analytics?.summary?.total_commissions || 0;
-      const paidCommissions = 0; // TODO: Implement commission payment tracking
-      const unpaidCommissions = totalCommissions - paidCommissions;
+      const partnerTotalCommissions = analytics?.summary?.total_commissions || 0;
+      const partnerPaidCommissions = analytics?.summary?.paid_commissions || 0;
+      const partnerUnpaidCommissions = analytics?.summary?.unpaid_commissions || 0;
 
       partnersWithData.push({
         ...partner,
@@ -116,9 +132,9 @@ export async function GET(request: NextRequest) {
         successful_referrals: successfulReferrals,
         total_orders: totalOrders,
         total_order_value: totalOrderValue,
-        total_commissions: totalCommissions,
-        paid_commissions: paidCommissions,
-        unpaid_commissions: unpaidCommissions
+        total_commissions: partnerTotalCommissions,
+        paid_commissions: partnerPaidCommissions,
+        unpaid_commissions: partnerUnpaidCommissions
       });
     }
 

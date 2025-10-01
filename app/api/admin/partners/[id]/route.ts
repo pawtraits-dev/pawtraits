@@ -85,14 +85,28 @@ export async function GET(
       }
     }
 
+    // Get commission data from client_orders table
+    const { data: commissionRecords } = await supabase
+      .from('client_orders')
+      .select('commission_amount, commission_paid')
+      .eq('partner_id', partner.id);
+
+    const totalCommissions = commissionRecords
+      ? commissionRecords.reduce((sum, record) => sum + (record.commission_amount || 0), 0)
+      : 0;
+
+    const paidCommissions = commissionRecords
+      ? commissionRecords.filter(r => r.commission_paid).reduce((sum, record) => sum + (record.commission_amount || 0), 0)
+      : 0;
+
     const analytics = {
       total_scans: totalScans,
       total_signups: totalSignups,
       total_orders: ordersCount,
       total_order_value: ordersValue,
-      total_commissions: 0, // TODO: Calculate commissions based on orders
-      paid_commissions: 0,
-      unpaid_commissions: 0
+      total_commissions: totalCommissions,
+      paid_commissions: paidCommissions,
+      unpaid_commissions: totalCommissions - paidCommissions
     };
 
     const enhancedPartner = {

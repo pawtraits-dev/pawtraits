@@ -139,9 +139,21 @@ function CheckoutPageContent() {
 
   const subtotal = totalPrice / 100; // Convert from pence to pounds
   const shipping = selectedShippingOption ? (selectedShippingOption.price / 100) : 0;
-  const discount = referralValidation?.valid && referralValidation?.discount?.eligible
-    ? referralValidation.discount.amount / 100
-    : 0;
+
+  // Calculate discounts based on simplified commission rules
+  let discount = 0;
+  let discountType = '';
+
+  if (userProfile?.user_type === 'partner') {
+    // Partner orders get 20% discount, no commission
+    discount = subtotal * 0.20;
+    discountType = 'Partner discount (20%)';
+  } else if (referralValidation?.valid && referralValidation?.discount?.eligible) {
+    // Customer using referral code gets 10% discount (first order only)
+    discount = referralValidation.discount.amount / 100;
+    discountType = 'First Order Discount (10%)';
+  }
+
   const total = subtotal - discount + shipping;
 
   const orderSummary = {
@@ -302,7 +314,7 @@ function CheckoutPageContent() {
         currency: 'gbp',
         customerEmail: shippingData.email.trim(),
         customerName: customerName,
-        userType: 'customer',
+        userType: userProfile?.user_type || 'customer',
         shippingAddress: shippingData,
         shippingOption: selectedShippingOption,
         cartItems: items.map(item => ({
@@ -318,10 +330,14 @@ function CheckoutPageContent() {
         })),
         // Customer-specific metadata
         referralCode: referralCode || undefined,
+        // Include discount data for webhook processing
+        discountAmount: discount > 0 ? Math.round(discount * 100) : undefined, // discount amount in pence
+        discountType: discountType || undefined,
         // Include referral validation data for webhook processing
         referralDiscount: referralValidation?.valid && referralValidation?.discount?.eligible
           ? Math.round(discount * 100) // discount amount in pence
-          : undefined
+          : undefined,
+        referralType: referralValidation?.referral?.type || undefined
       };
 
       console.log('Creating Customer PaymentIntent with data:', {
@@ -956,7 +972,16 @@ function CheckoutPageContent() {
                     )}
                   </span>
                 </div>
-                {referralCode && (
+                {/* Show partner discount */}
+                {userProfile?.user_type === 'partner' && discount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>{discountType}</span>
+                    <span className="font-medium">-£{discount.toFixed(2)}</span>
+                  </div>
+                )}
+
+                {/* Show referral code section only for customer users */}
+                {userProfile?.user_type === 'customer' && referralCode && (
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm text-purple-600">
                       <span>Referral Code Applied</span>
@@ -967,8 +992,8 @@ function CheckoutPageContent() {
                     )}
                     {referralValidation?.valid && referralValidation?.discount?.eligible && (
                       <div className="flex justify-between text-green-600">
-                        <span>First Order Discount (20%)</span>
-                        <span className="font-medium">-£{orderSummary.discount.toFixed(2)}</span>
+                        <span>{discountType}</span>
+                        <span className="font-medium">-£{discount.toFixed(2)}</span>
                       </div>
                     )}
                     {referralValidation?.valid && !referralValidation?.discount?.eligible && (

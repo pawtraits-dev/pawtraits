@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get referral details
+    // First, try to find partner referral
     const { data: referral, error: referralError } = await supabase
       .from('referrals')
       .select(`
@@ -34,10 +34,24 @@ export async function POST(request: NextRequest) {
       .eq('referral_code', referralCode.toUpperCase())
       .single();
 
+    // If not found as partner referral, try as customer referral
+    let customerReferral = null;
     if (referralError || !referral) {
-      console.log('[REFERRAL] Referral code not found:', referralCode, 'Error:', referralError?.message);
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('id, first_name, last_name, email, personal_referral_code')
+        .eq('personal_referral_code', referralCode.toUpperCase())
+        .single();
+
+      if (customer && !customerError) {
+        customerReferral = customer;
+      }
+    }
+
+    if ((referralError || !referral) && !customerReferral) {
+      console.log('[REFERRAL] Referral code not found:', referralCode, 'Errors:', referralError?.message);
       return NextResponse.json(
-        { 
+        {
           valid: false,
           error: 'Referral code not found',
           discount: null
@@ -46,10 +60,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if expired
-    if (new Date(referral.expires_at) < new Date()) {
+    // Check if expired (only for partner referrals, customer referrals don't expire)
+    if (referral && new Date(referral.expires_at) < new Date()) {
       return NextResponse.json(
-        { 
+        {
           valid: false,
           error: 'Referral code has expired',
           discount: null
@@ -74,28 +88,46 @@ export async function POST(request: NextRequest) {
     
     const isEligibleForDiscount = !hasCompletedReferralOrder;
 
-    // Calculate potential discount (20% for eligible customers)
+    // Determine referral type and calculate discount
+    const isPartnerReferral = !!referral;
+    const isCustomerReferral = !!customerReferral;
+
+    // Calculate potential discount (10% for eligible customers per simplified commission rules)
     let discountAmount = 0;
     let discountPercentage = 0;
-    
+    let referralType = '';
+
     if (isEligibleForDiscount) {
       const subtotal = orderTotal; // Assuming orderTotal is the subtotal (no shipping)
-      discountPercentage = 20;
-      discountAmount = Math.round(subtotal * 0.20 * 100); // Convert to pence
+      discountPercentage = 10;
+      discountAmount = Math.round(subtotal * 0.10 * 100); // Convert to pence
+      referralType = isPartnerReferral ? 'partner' : 'customer';
     }
 
-    // Calculate commission for partner info
-    const commissionRate = isEligibleForDiscount ? 20.00 : 5.00;
+    // Calculate commission for partner info (10% per simplified commission rules)
+    const commissionRate = isEligibleForDiscount && isPartnerReferral ? 10.00 : 0.00;
     const commissionAmount = Math.round(orderTotal * (commissionRate / 100));
+
+    // Prepare referral data based on type
+    const referralData = isPartnerReferral
+      ? {
+          id: referral.id,
+          code: referral.referral_code,
+          type: 'partner',
+          clientName: `${referral.client_first_name || ''} ${referral.client_last_name || ''}`.trim(),
+          partner: referral.partners
+        }
+      : {
+          id: customerReferral.id,
+          code: customerReferral.personal_referral_code,
+          type: 'customer',
+          customerName: `${customerReferral.first_name || ''} ${customerReferral.last_name || ''}`.trim(),
+          customerEmail: customerReferral.email
+        };
 
     return NextResponse.json({
       valid: true,
-      referral: {
-        id: referral.id,
-        code: referral.referral_code,
-        clientName: `${referral.client_first_name || ''} ${referral.client_last_name || ''}`.trim(),
-        partner: referral.partners
-      },
+      referral: referralData,
       customer: {
         email: customerEmail,
         isEligibleForDiscount: isEligibleForDiscount,
@@ -105,8 +137,9 @@ export async function POST(request: NextRequest) {
         eligible: isEligibleForDiscount,
         percentage: discountPercentage,
         amount: discountAmount,
-        description: isEligibleForDiscount 
-          ? '20% referral discount!' 
+        type: referralType,
+        description: isEligibleForDiscount
+          ? '10% referral discount!'
           : 'You have already used a referral discount on a previous order'
       },
       commission: {
