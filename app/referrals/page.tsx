@@ -213,6 +213,7 @@ function UserReferralContent({ userType }: { userType: string }) {
       setLoading(true);
       setError(null);
 
+      // Use proper service-based API endpoint
       const response = await fetch('/api/referrals/analytics', {
         credentials: 'include',
       });

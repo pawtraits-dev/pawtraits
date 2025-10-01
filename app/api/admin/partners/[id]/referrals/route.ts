@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SupabaseService } from '@/lib/supabase';
 
-const supabaseService = new SupabaseService();
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -10,29 +8,37 @@ export async function GET(
   try {
     // TODO: Add admin authentication check
     const { id } = await params;
-    
-    console.log('Admin referrals API: Fetching referrals for partner:', id);
-    
-    // Get referrals for the specified partner
-    const { data: referrals, error } = await supabaseService['supabase']
-      .from('referrals')
-      .select('*')
-      .eq('partner_id', id)
-      .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching partner referrals:', error);
-      throw error;
+    console.log('Admin referrals API: Fetching referrals for partner using SupabaseService:', id);
+
+    const supabaseService = new SupabaseService();
+
+    // Get partner referral analytics using proper service method
+    const analytics = await supabaseService.getPartnerReferralAnalytics(id);
+
+    if (!analytics) {
+      return NextResponse.json([]);
     }
 
-    // Convert commission amounts from pence to pounds for display
-    const convertedReferrals = referrals?.map((referral: any) => ({
-      ...referral,
-      commission_amount: referral.commission_amount ? referral.commission_amount / 100 : referral.commission_amount
-    }));
+    // Convert analytics data to legacy referral format for admin compatibility
+    const convertedReferrals = analytics.recent_activity?.map((activity: any) => ({
+      id: activity.id,
+      referral_code: activity.referral_code || 'N/A',
+      client_name: activity.client_name || 'Anonymous',
+      client_email: activity.client_email || 'N/A',
+      status: activity.type === 'purchase' ? 'purchased' : 'accepted',
+      commission_rate: activity.commission_rate || 0,
+      commission_amount: activity.commission || 0,
+      commission_paid: false, // TODO: Implement commission payment tracking
+      created_at: activity.date,
+      purchased_at: activity.type === 'purchase' ? activity.date : null,
+      order_total: activity.order_value || null,
+      order_number: activity.order_number || null,
+      discount_applied: activity.discount_applied || 0
+    })) || [];
 
-    console.log('Admin referrals API: Found', referrals?.length || 0, 'referrals for partner', id);
-    return NextResponse.json(convertedReferrals || []);
+    console.log('Admin referrals API: Found', convertedReferrals.length, 'referrals for partner', id);
+    return NextResponse.json(convertedReferrals);
   } catch (error) {
     console.error('Error fetching partner referrals for admin:', error);
     return NextResponse.json(

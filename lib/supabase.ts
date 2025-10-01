@@ -982,6 +982,33 @@ export class SupabaseService {
     return data;
   }
 
+  async getAllPartners(): Promise<Partner[]> {
+    const { data, error } = await this.supabase
+      .from('partners')
+      .select(`
+        id,
+        email,
+        first_name,
+        last_name,
+        business_name,
+        business_type,
+        approval_status,
+        is_active,
+        is_verified,
+        created_at,
+        last_login_at
+      `)
+      .not('business_name', 'is', null)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching all partners:', error);
+      throw error;
+    }
+
+    return data || [];
+  }
+
   async createPartner(partnerData: PartnerCreate, userId?: string): Promise<Partner> {
     let userIdToUse = userId;
     
@@ -1906,6 +1933,228 @@ export class SupabaseService {
     } catch (error) {
       console.error('Error generating personal referral code:', error);
       return null;
+    }
+  }
+
+  // Simplified Referral Analytics Methods
+  async getUserReferralAnalytics(userType: UserType, userId: string): Promise<any> {
+    try {
+      if (userType === 'partner') {
+        return await this.getPartnerReferralAnalytics(userId);
+      } else if (userType === 'customer') {
+        return await this.getCustomerReferralAnalytics(userId);
+      } else if (userType === 'influencer') {
+        return await this.getInfluencerReferralAnalytics(userId);
+      } else {
+        throw new Error('Invalid user type for referral analytics');
+      }
+    } catch (error) {
+      console.error('Error fetching user referral analytics:', error);
+      return null;
+    }
+  }
+
+  private async getPartnerReferralAnalytics(userProfileId: string): Promise<any> {
+    try {
+      const { data: referredCustomers, error } = await this.supabase
+        .from('customers')
+        .select(`
+          id,
+          referral_type,
+          referral_applied_at,
+          referral_order_id,
+          referral_discount_applied,
+          referral_commission_rate,
+          referred_order:orders!referral_order_id (
+            total_amount,
+            created_at,
+            status
+          )
+        `)
+        .eq('referral_type', 'PARTNER')
+        .eq('referrer_id', userProfileId);
+
+      if (error) throw error;
+
+      const customers = referredCustomers || [];
+      const totalScans = customers.length;
+      const totalSignups = customers.length;
+      const totalPurchases = customers.filter(c => c.referred_order).length;
+
+      const totalCommissions = customers.reduce((sum, customer) => {
+        if (customer.referred_order && customer.referral_commission_rate > 0) {
+          const orderValue = customer.referred_order.total_amount / 100;
+          const commission = orderValue * (customer.referral_commission_rate / 100);
+          return sum + commission;
+        }
+        return sum;
+      }, 0);
+
+      const totalOrderValue = customers.reduce((sum, customer) => {
+        if (customer.referred_order) {
+          return sum + (customer.referred_order.total_amount / 100);
+        }
+        return sum;
+      }, 0);
+
+      const recentActivity = customers.map(customer => ({
+        id: customer.id,
+        type: customer.referred_order ? 'purchase' : 'signup',
+        date: customer.referred_order ? customer.referred_order.created_at : customer.referral_applied_at,
+        order_value: customer.referred_order ? customer.referred_order.total_amount / 100 : null,
+        commission: customer.referred_order && customer.referral_commission_rate > 0
+          ? (customer.referred_order.total_amount / 100) * (customer.referral_commission_rate / 100)
+          : null,
+      })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      return {
+        summary: {
+          total_scans: totalScans,
+          total_signups: totalSignups,
+          total_purchases: totalPurchases,
+          conversion_rate: totalScans > 0 ? (totalPurchases / totalScans * 100) : 0,
+          total_commissions: totalCommissions,
+          total_order_value: totalOrderValue,
+          avg_order_value: totalPurchases > 0 ? (totalOrderValue / totalPurchases) : 0
+        },
+        recent_activity: recentActivity.slice(0, 20),
+        user_type: 'partner'
+      };
+    } catch (error) {
+      console.error('Error fetching partner referral analytics:', error);
+      throw error;
+    }
+  }
+
+  private async getCustomerReferralAnalytics(userProfileId: string): Promise<any> {
+    try {
+      const { data: referredCustomers, error } = await this.supabase
+        .from('customers')
+        .select(`
+          id,
+          referral_type,
+          referral_applied_at,
+          referral_order_id,
+          referral_code_used,
+          referred_order:orders!referral_order_id (
+            total_amount,
+            created_at,
+            status
+          )
+        `)
+        .eq('referral_type', 'CUSTOMER')
+        .eq('referrer_id', userProfileId);
+
+      if (error) throw error;
+
+      const customers = referredCustomers || [];
+      const totalScans = customers.length;
+      const totalSignups = customers.length;
+      const totalPurchases = customers.filter(c => c.referred_order).length;
+      const totalRewards = totalPurchases * 5; // £5 credit per successful referral
+
+      const totalOrderValue = customers.reduce((sum, customer) => {
+        if (customer.referred_order) {
+          return sum + (customer.referred_order.total_amount / 100);
+        }
+        return sum;
+      }, 0);
+
+      const recentActivity = customers.map(customer => ({
+        id: customer.id,
+        type: customer.referred_order ? 'purchase' : 'signup',
+        date: customer.referred_order ? customer.referred_order.created_at : customer.referral_applied_at,
+        order_value: customer.referred_order ? customer.referred_order.total_amount / 100 : null,
+        reward: customer.referred_order ? 5 : null,
+      })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      return {
+        summary: {
+          total_scans: totalScans,
+          total_signups: totalSignups,
+          total_purchases: totalPurchases,
+          conversion_rate: totalScans > 0 ? (totalPurchases / totalScans * 100) : 0,
+          total_rewards: totalRewards,
+          total_order_value: totalOrderValue,
+          avg_order_value: totalPurchases > 0 ? (totalOrderValue / totalPurchases) : 0
+        },
+        recent_activity: recentActivity.slice(0, 20),
+        user_type: 'customer'
+      };
+    } catch (error) {
+      console.error('Error fetching customer referral analytics:', error);
+      throw error;
+    }
+  }
+
+  private async getInfluencerReferralAnalytics(userProfileId: string): Promise<any> {
+    try {
+      const { data: referredCustomers, error } = await this.supabase
+        .from('customers')
+        .select(`
+          id,
+          referral_type,
+          referral_applied_at,
+          referral_order_id,
+          referral_commission_rate,
+          referred_order:orders!referral_order_id (
+            total_amount,
+            created_at,
+            status
+          )
+        `)
+        .eq('referral_type', 'INFLUENCER')
+        .eq('referrer_id', userProfileId);
+
+      if (error) throw error;
+
+      const customers = referredCustomers || [];
+      const totalScans = customers.length;
+      const totalSignups = customers.length;
+      const totalPurchases = customers.filter(c => c.referred_order).length;
+
+      const totalCommissions = customers.reduce((sum, customer) => {
+        if (customer.referred_order && customer.referral_commission_rate > 0) {
+          const orderValue = customer.referred_order.total_amount / 100;
+          const commission = orderValue * (customer.referral_commission_rate / 100);
+          return sum + commission;
+        }
+        return sum;
+      }, 0);
+
+      const totalOrderValue = customers.reduce((sum, customer) => {
+        if (customer.referred_order) {
+          return sum + (customer.referred_order.total_amount / 100);
+        }
+        return sum;
+      }, 0);
+
+      const recentActivity = customers.map(customer => ({
+        id: customer.id,
+        type: customer.referred_order ? 'purchase' : 'signup',
+        date: customer.referred_order ? customer.referred_order.created_at : customer.referral_applied_at,
+        order_value: customer.referred_order ? customer.referred_order.total_amount / 100 : null,
+        commission: customer.referred_order && customer.referral_commission_rate > 0
+          ? (customer.referred_order.total_amount / 100) * (customer.referral_commission_rate / 100)
+          : null,
+      })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      return {
+        summary: {
+          total_scans: totalScans,
+          total_signups: totalSignups,
+          total_purchases: totalPurchases,
+          conversion_rate: totalScans > 0 ? (totalPurchases / totalScans * 100) : 0,
+          total_commissions: totalCommissions,
+          total_order_value: totalOrderValue,
+          avg_order_value: totalPurchases > 0 ? (totalOrderValue / totalPurchases) : 0
+        },
+        recent_activity: recentActivity.slice(0, 20),
+        user_type: 'influencer'
+      };
+    } catch (error) {
+      console.error('Error fetching influencer referral analytics:', error);
+      throw error;
     }
   }
 }
