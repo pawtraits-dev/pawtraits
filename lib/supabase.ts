@@ -2008,32 +2008,72 @@ export class SupabaseService {
 
       const customers = referredCustomers || [];
       const totalSignups = customers.length; // This is the actual signups count
-      const totalPurchases = 0; // TODO: Calculate purchases when order relationship is fixed
 
-      const totalCommissions = customers.reduce((sum, customer) => {
-        if (false) { // TODO: Fix after order join is working
-          // TODO: Calculate commission when orders are properly joined
-          return sum;
+      // Get actual commission data from client_orders table
+      let totalCommissions = 0;
+      let totalOrderValue = 0;
+      let totalPurchases = 0;
+
+      if (partnerId) {
+        const { data: commissionRecords, error: commissionError } = await this.supabase
+          .from('client_orders')
+          .select('commission_amount, order_value, client_email, created_at')
+          .eq('partner_id', partnerId);
+
+        if (!commissionError && commissionRecords) {
+          totalCommissions = commissionRecords.reduce((sum, record) => sum + (record.commission_amount || 0), 0);
+          totalOrderValue = commissionRecords.reduce((sum, record) => sum + (record.order_value || 0), 0);
+          totalPurchases = commissionRecords.length;
+          console.log('📊 Commission data:', {
+            totalCommissions: totalCommissions / 100,
+            totalOrderValue: totalOrderValue / 100,
+            totalPurchases
+          });
+        } else if (commissionError) {
+          console.error('❌ Error getting commission records:', commissionError);
         }
-        return sum;
-      }, 0);
+      }
 
-      const totalOrderValue = customers.reduce((sum, customer) => {
-        if (false) { // TODO: Fix after order join is working
-          // TODO: Add order value when orders are properly joined
-          return sum;
+      // Create recent activity from commission records
+      const recentActivity = [];
+
+      // Add commission records (purchases)
+      if (partnerId) {
+        const { data: commissionRecords, error: commissionError } = await this.supabase
+          .from('client_orders')
+          .select('commission_amount, order_value, client_email, created_at')
+          .eq('partner_id', partnerId)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (!commissionError && commissionRecords) {
+          commissionRecords.forEach(record => {
+            recentActivity.push({
+              id: `commission_${record.created_at}`,
+              type: 'purchase',
+              date: record.created_at,
+              order_value: record.order_value / 100, // Convert to pounds
+              commission: record.commission_amount / 100 // Convert to pounds
+            });
+          });
         }
-        return sum;
-      }, 0);
+      }
 
-      const recentActivity = customers.map(customer => ({
-        id: customer.id,
-        type: 'signup', // All are signups for now until order relationship is fixed
-        date: customer.referral_applied_at,
-        order_value: null, // TODO: Look up order value separately
-        commission: null, // TODO: Calculate commission separately
-        // TODO: Fix commission calculation syntax
-      })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // Add signup records
+      customers.forEach(customer => {
+        if (customer.referral_applied_at) {
+          recentActivity.push({
+            id: customer.id,
+            type: 'signup',
+            date: customer.referral_applied_at,
+            order_value: null,
+            commission: null
+          });
+        }
+      });
+
+      // Sort by date
+      recentActivity.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       return {
         summary: {
@@ -2041,9 +2081,9 @@ export class SupabaseService {
           total_signups: totalSignups,
           total_purchases: totalPurchases,
           conversion_rate: totalScans > 0 ? (totalPurchases / totalScans * 100) : 0,
-          total_commissions: totalCommissions,
-          total_order_value: totalOrderValue,
-          avg_order_value: totalPurchases > 0 ? (totalOrderValue / totalPurchases) : 0
+          total_commissions: totalCommissions / 100, // Convert to pounds
+          total_order_value: totalOrderValue / 100, // Convert to pounds
+          avg_order_value: totalPurchases > 0 ? (totalOrderValue / totalPurchases / 100) : 0 // Convert to pounds
         },
         recent_activity: recentActivity.slice(0, 20),
         user_type: 'partner'

@@ -193,7 +193,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     });
 
     // Handle commissions and credits based on simplified logic
-    await handleSimplifiedCommissions(supabase, order, orderingUserProfile, customerEmail, subtotalAmount);
+    await handleSimplifiedCommissions(supabase, order, orderingUserProfile, customerEmail, subtotalAmount, metadata);
 
     // Create Gelato order for fulfillment
     await createGelatoOrder(order, paymentIntent, supabase, metadata);
@@ -270,13 +270,16 @@ async function handleSimplifiedCommissions(
   order: any,
   orderingUserProfile: any,
   customerEmail: string,
-  subtotalAmount: number
+  subtotalAmount: number,
+  metadata: any
 ) {
   try {
     console.log('🎯 Processing simplified commissions for order:', order.id, {
       userType: orderingUserProfile?.user_type,
       customerEmail,
-      subtotalAmount
+      subtotalAmount,
+      referralCode: metadata.referralCode,
+      referralType: metadata.referralType
     });
 
     // Case 1: Partner Orders - No commission, they get 20% discount (handled at checkout)
@@ -285,7 +288,22 @@ async function handleSimplifiedCommissions(
       return;
     }
 
-    // Case 2-4: Customer Orders - Check referral status
+    // Check if there's a referral code in the payment metadata (from checkout)
+    if (metadata.referralCode && metadata.referralType) {
+      console.log('🎯 Processing referral from payment metadata:', {
+        referralCode: metadata.referralCode,
+        referralType: metadata.referralType
+      });
+
+      if (metadata.referralType === 'partner') {
+        await handlePartnerCommissionFromMetadata(supabase, order, customerEmail, subtotalAmount, metadata);
+      } else if (metadata.referralType === 'customer') {
+        await handleCustomerCreditFromMetadata(supabase, order, customerEmail, subtotalAmount, metadata);
+      }
+      return;
+    }
+
+    // Fallback: Check referral status in customers table (legacy support)
     const { data: customer, error: customerError } = await supabase
       .from('customers')
       .select(`
@@ -634,7 +652,142 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, 
   }
 }
 
-// Handle 10% commission for partner-referred customers
+// Handle partner commission using metadata from checkout
+async function handlePartnerCommissionFromMetadata(
+  supabase: any,
+  order: any,
+  customerEmail: string,
+  subtotalAmount: number,
+  metadata: any
+) {
+  try {
+    console.log('🎯 Creating partner commission from metadata (10%):', {
+      orderId: order.id,
+      referralCode: metadata.referralCode,
+      customerEmail,
+      subtotalAmount
+    });
+
+    // Find the partner using the referral code
+    const { data: referral, error: referralError } = await supabase
+      .from('referrals')
+      .select(`
+        id,
+        partner_id,
+        referral_code,
+        partners (
+          id,
+          business_name,
+          first_name,
+          last_name
+        )
+      `)
+      .eq('referral_code', metadata.referralCode.toUpperCase())
+      .single();
+
+    if (referralError || !referral) {
+      console.error('❌ Failed to find referral for code:', metadata.referralCode, referralError);
+      return;
+    }
+
+    // Fixed 10% commission rate
+    const commissionRate = 10.00;
+    const commissionAmount = Math.round(subtotalAmount * (commissionRate / 100));
+
+    // Create commission record in client_orders table
+    const { error: commissionError } = await supabase
+      .from('client_orders')
+      .insert({
+        client_email: customerEmail,
+        client_name: `${order.shipping_first_name || ''} ${order.shipping_last_name || ''}`.trim(),
+        partner_id: referral.partner_id,
+        order_id: order.id,
+        order_value: subtotalAmount,
+        is_initial_order: true, // Always first order with simplified logic
+        commission_rate: commissionRate,
+        commission_amount: commissionAmount,
+        commission_paid: false,
+        order_status: 'completed',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+    if (commissionError) {
+      console.error('❌ Failed to create partner commission record:', commissionError);
+    } else {
+      console.log('✅ Partner commission created from metadata:', {
+        partnerId: referral.partner_id,
+        partnerName: referral.partners?.business_name,
+        commissionAmount: commissionAmount / 100, // Convert to pounds for logging
+        commissionRate
+      });
+    }
+
+  } catch (error) {
+    console.error('💥 Error handling partner commission from metadata:', error);
+  }
+}
+
+// Handle customer credit using metadata from checkout
+async function handleCustomerCreditFromMetadata(
+  supabase: any,
+  order: any,
+  customerEmail: string,
+  subtotalAmount: number,
+  metadata: any
+) {
+  try {
+    console.log('🎯 Creating customer credit from metadata (10%):', {
+      orderId: order.id,
+      referralCode: metadata.referralCode,
+      customerEmail,
+      subtotalAmount
+    });
+
+    // Find the referring customer using the referral code
+    const { data: referringCustomer, error: customerError } = await supabase
+      .from('customers')
+      .select('id, first_name, last_name, email, personal_referral_code')
+      .eq('personal_referral_code', metadata.referralCode.toUpperCase())
+      .single();
+
+    if (customerError || !referringCustomer) {
+      console.error('❌ Failed to find referring customer for code:', metadata.referralCode, customerError);
+      return;
+    }
+
+    // Calculate 10% credit amount
+    const creditAmount = Math.round(subtotalAmount * 0.10);
+
+    // Create credit record in customer_credits table
+    const { error: creditError } = await supabase
+      .from('customer_credits')
+      .insert({
+        customer_id: referringCustomer.id,
+        credit_amount: creditAmount,
+        earned_from_order_id: order.id,
+        status: 'available',
+        expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year from now
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+    if (creditError) {
+      console.error('❌ Failed to create customer credit record:', creditError);
+    } else {
+      console.log('✅ Customer credit created from metadata:', {
+        referringCustomerId: referringCustomer.id,
+        referringCustomerEmail: referringCustomer.email,
+        creditAmount: creditAmount / 100, // Convert to pounds for logging
+      });
+    }
+
+  } catch (error) {
+    console.error('💥 Error handling customer credit from metadata:', error);
+  }
+}
+
+// Handle 10% commission for partner-referred customers (legacy support)
 async function handlePartnerCommission(
   supabase: any,
   order: any,

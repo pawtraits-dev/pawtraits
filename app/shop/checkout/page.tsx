@@ -124,7 +124,9 @@ function CheckoutPageContent() {
       setReferralValidation(data)
 
       if (!data.valid) {
-        setErrors(prev => ({ ...prev, referral: data.error }))
+        // Don't show error for invalid referral codes, just clear the validation
+        setReferralValidation(data)
+        setErrors(prev => ({ ...prev, referral: '' }))
       } else {
         setErrors(prev => ({ ...prev, referral: '' }))
       }
@@ -980,8 +982,8 @@ function CheckoutPageContent() {
                   </div>
                 )}
 
-                {/* Show referral code section only for customer users */}
-                {userProfile?.user_type === 'customer' && referralCode && (
+                {/* Show referral code section only for customer users with valid discounts */}
+                {userProfile?.user_type === 'customer' && referralCode && referralValidation?.valid && (
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm text-purple-600">
                       <span>Referral Code Applied</span>
@@ -990,19 +992,16 @@ function CheckoutPageContent() {
                     {validatingReferral && (
                       <div className="text-xs text-gray-500">Validating referral code...</div>
                     )}
-                    {referralValidation?.valid && referralValidation?.discount?.eligible && (
+                    {referralValidation.discount?.eligible && (
                       <div className="flex justify-between text-green-600">
                         <span>{discountType}</span>
                         <span className="font-medium">-£{discount.toFixed(2)}</span>
                       </div>
                     )}
-                    {referralValidation?.valid && !referralValidation?.discount?.eligible && (
+                    {!referralValidation.discount?.eligible && (
                       <div className="text-xs text-gray-500">
-                        {referralValidation.discount.description}
+                        {referralValidation.discount?.description}
                       </div>
-                    )}
-                    {errors.referral && (
-                      <div className="text-xs text-red-600">{errors.referral}</div>
                     )}
                   </div>
                 )}
