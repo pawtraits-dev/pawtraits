@@ -136,6 +136,11 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       console.log('Webhook: No user profile found for customer email:', customerEmail);
     }
 
+    // Debug referral code handling
+    console.log('🔍 WEBHOOK DEBUG - Payment metadata keys:', Object.keys(metadata));
+    console.log('🎯 WEBHOOK DEBUG - Referral code from metadata:', metadata.referralCode || 'NOT FOUND');
+    console.log('🎯 WEBHOOK DEBUG - Full metadata:', JSON.stringify(metadata, null, 2));
+
     // Create simplified order record
     const orderData = {
       order_number: `PW-${Date.now()}-${paymentIntent.id.slice(-6)}`,
@@ -156,6 +161,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       estimated_delivery: metadata.shippingDeliveryEstimate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       payment_intent_id: paymentIntent.id,
       payment_status: 'paid',
+      referral_code: metadata.referralCode || null, // Add referral code to dedicated field
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
 
