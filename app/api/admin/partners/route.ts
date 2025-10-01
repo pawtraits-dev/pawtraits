@@ -62,17 +62,48 @@ export async function GET(request: NextRequest) {
 
       const totalSignups = referredCustomers ? referredCustomers.length : 0;
 
+      // Get order data: orders → customers (via email) → partners (via referrer_id)
+      let ordersCount = 0;
+      let ordersValue = 0;
+
+      if (referredCustomers && referredCustomers.length > 0) {
+        // Get emails of all referred customers
+        const customerEmails = await supabaseAdmin
+          .from('customers')
+          .select('email')
+          .eq('referral_type', 'PARTNER')
+          .eq('referrer_id', userProfile?.id || '');
+
+        if (customerEmails.data && customerEmails.data.length > 0) {
+          const emails = customerEmails.data.map(c => c.email).filter(Boolean);
+
+          if (emails.length > 0) {
+            // Get orders from these customers
+            const { data: orders } = await supabaseAdmin
+              .from('orders')
+              .select('id, subtotal_amount')
+              .in('customer_email', emails);
+
+            ordersCount = orders ? orders.length : 0;
+            ordersValue = orders ? orders.reduce((sum, order) => sum + (order.subtotal_amount || 0), 0) : 0;
+          }
+        }
+      }
+
       const analytics = {
         summary: {
           total_scans: totalScans,
           total_signups: totalSignups,
-          total_commissions: 0, // TODO: Calculate from orders
-          total_order_value: 0 // TODO: Calculate from orders
+          total_orders: ordersCount,
+          total_order_value: ordersValue,
+          total_commissions: 0 // TODO: Calculate commissions based on orders
         }
       };
 
       const totalReferrals = analytics?.summary?.total_scans || 0; // Total scans from pre-registration codes
       const successfulReferrals = analytics?.summary?.total_signups || 0; // Total customer signups using referral codes
+      const totalOrders = analytics?.summary?.total_orders || 0; // Total orders from referred customers
+      const totalOrderValue = analytics?.summary?.total_order_value || 0; // Total order value from referred customers
       const totalCommissions = analytics?.summary?.total_commissions || 0;
       const paidCommissions = 0; // TODO: Implement commission payment tracking
       const unpaidCommissions = totalCommissions - paidCommissions;
@@ -83,6 +114,8 @@ export async function GET(request: NextRequest) {
         approval_status: partner.approval_status || 'pending' as const,
         total_referrals: totalReferrals,
         successful_referrals: successfulReferrals,
+        total_orders: totalOrders,
+        total_order_value: totalOrderValue,
         total_commissions: totalCommissions,
         paid_commissions: paidCommissions,
         unpaid_commissions: unpaidCommissions

@@ -241,10 +241,10 @@ export default function AdminPartnersPage() {
                 <DollarSign className="w-5 h-5 text-orange-600" />
               </div>
               <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.total_commissions)}</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.total_commissions / 100)}</p>
                 <p className="text-sm text-gray-600">Total Commissions</p>
                 {stats.unpaid_commissions > 0 && (
-                  <p className="text-xs text-orange-600">{formatCurrency(stats.unpaid_commissions)} unpaid</p>
+                  <p className="text-xs text-orange-600">{formatCurrency(stats.unpaid_commissions / 100)} unpaid</p>
                 )}
               </div>
             </div>
@@ -362,17 +362,20 @@ export default function AdminPartnersPage() {
                         <div className="text-gray-600">
                           {partner.successful_referrals} signups ({getConversionRate(partner.total_referrals, partner.successful_referrals)}%)
                         </div>
+                        <div className="text-blue-600 font-medium">
+                          {partner.total_orders} orders • {formatCurrency(partner.total_order_value / 100)}
+                        </div>
                         <div className="text-purple-600 font-medium">
-                          {formatCurrency(partner.total_commissions)} total
+                          {formatCurrency(partner.total_commissions / 100)} commission total
                         </div>
                         {partner.unpaid_commissions > 0 && (
                           <div className="text-orange-600 text-xs">
-                            {formatCurrency(partner.unpaid_commissions)} unpaid
+                            {formatCurrency(partner.unpaid_commissions / 100)} unpaid
                           </div>
                         )}
                         {partner.paid_commissions > 0 && (
                           <div className="text-green-600 text-xs">
-                            {formatCurrency(partner.paid_commissions)} paid
+                            {formatCurrency(partner.paid_commissions / 100)} paid
                           </div>
                         )}
                       </div>

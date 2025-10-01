@@ -611,7 +611,11 @@ export interface AdminPartnerOverview {
   last_login_at?: string;
   total_referrals: number;
   successful_referrals: number;
+  total_orders: number;
+  total_order_value: number;
   total_commissions: number;
+  paid_commissions: number;
+  unpaid_commissions: number;
 }
 
 export interface AdminCustomerOverview {

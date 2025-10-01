@@ -401,9 +401,11 @@ export default function PartnerDetailPage() {
     );
   }
 
-  const totalCommissions = commissionData?.summary.totalEarned || referrals.reduce((sum, r) => sum + (r.commission_amount || 0), 0);
-  const successfulReferrals = commissionData?.summary.successfulReferrals || referrals.filter(r => r.status === 'applied').length;
-  const conversionRate = referrals.length > 0 ? ((successfulReferrals / referrals.length) * 100).toFixed(1) : '0';
+  const totalCommissions = commissionData?.summary.totalEarned || (partner.total_commissions ? partner.total_commissions / 100 : 0);
+  const successfulReferrals = commissionData?.summary.successfulReferrals || partner.successful_referrals || 0;
+  const totalOrders = partner.total_orders || 0;
+  const totalOrderValue = partner.total_order_value ? partner.total_order_value / 100 : 0;
+  const conversionRate = (partner.total_referrals || referrals.length) > 0 ? ((successfulReferrals / (partner.total_referrals || referrals.length)) * 100).toFixed(1) : '0';
 
   return (
     <div className="p-8 space-y-6">
@@ -455,7 +457,7 @@ export default function PartnerDetailPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -463,7 +465,7 @@ export default function PartnerDetailPage() {
                 <Users className="w-5 h-5 text-blue-600" />
               </div>
               <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900">{referrals.length}</p>
+                <p className="text-2xl font-bold text-gray-900">{partner.total_referrals || referrals.length}</p>
                 <p className="text-sm text-gray-600">Total Referrals</p>
               </div>
             </div>
@@ -487,12 +489,26 @@ export default function PartnerDetailPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-purple-600" />
+              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-orange-600" />
               </div>
               <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900">{conversionRate}%</p>
-                <p className="text-sm text-gray-600">Conversion Rate</p>
+                <p className="text-2xl font-bold text-gray-900">{totalOrders}</p>
+                <p className="text-sm text-gray-600">Orders</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalOrderValue)}</p>
+                <p className="text-sm text-gray-600">Order Value</p>
               </div>
             </div>
           </CardContent>
@@ -506,7 +522,8 @@ export default function PartnerDetailPage() {
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalCommissions)}</p>
-                <p className="text-sm text-gray-600">Total Commissions</p>
+                <p className="text-sm text-gray-600">Commissions</p>
+                <p className="text-xs text-gray-500">{conversionRate}% conversion</p>
               </div>
             </div>
           </CardContent>
