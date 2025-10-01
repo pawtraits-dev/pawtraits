@@ -358,9 +358,9 @@ export default function AdminPartnersPage() {
                     </td>
                     <td className="p-4">
                       <div className="text-sm">
-                        <div className="font-medium">{partner.total_referrals} referrals</div>
+                        <div className="font-medium">{partner.total_referrals} code scans</div>
                         <div className="text-gray-600">
-                          {partner.successful_referrals} successful ({getConversionRate(partner.total_referrals, partner.successful_referrals)}%)
+                          {partner.successful_referrals} signups ({getConversionRate(partner.total_referrals, partner.successful_referrals)}%)
                         </div>
                         <div className="text-purple-600 font-medium">
                           {formatCurrency(partner.total_commissions)} total

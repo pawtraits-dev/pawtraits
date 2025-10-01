@@ -29,7 +29,6 @@ export async function GET(request: NextRequest) {
         referral_discount_applied,
         referral_commission_rate,
         referral_applied_at,
-        referral_order_id,
         created_at,
         referrer:user_profiles!referrer_id (
           id,
@@ -48,14 +47,6 @@ export async function GET(request: NextRequest) {
             first_name,
             last_name
           )
-        ),
-        referred_order:orders!referral_order_id (
-          id,
-          order_number,
-          total_amount,
-          currency,
-          created_at,
-          status
         )
       `)
       .not('referral_type', 'eq', 'ORGANIC')

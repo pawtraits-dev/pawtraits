@@ -1956,13 +1956,48 @@ export class SupabaseService {
 
   private async getPartnerReferralAnalytics(userProfileId: string): Promise<any> {
     try {
+      console.log('🔍 getPartnerReferralAnalytics called with userProfileId:', userProfileId);
+
+      // First get the partner ID for this user profile
+      const { data: userProfile, error: profileError } = await this.supabase
+        .from('user_profiles')
+        .select('partner_id')
+        .eq('id', userProfileId)
+        .single();
+
+      if (profileError) {
+        console.error('❌ Error getting user profile:', profileError);
+        throw profileError;
+      }
+
+      const partnerId = userProfile?.partner_id;
+      console.log('📄 Found partner ID:', partnerId);
+
+      // Get referral code scans count from pre-registration codes
+      let totalScans = 0;
+      if (partnerId) {
+        const { data: preRegCodes, error: codesError } = await this.supabase
+          .from('pre_registration_codes')
+          .select('scans_count')
+          .eq('partner_id', partnerId);
+
+        if (!codesError && preRegCodes) {
+          totalScans = preRegCodes.reduce((sum, code) => sum + (code.scans_count || 0), 0);
+          console.log('📊 Found pre-reg codes:', preRegCodes.length, 'Total scans:', totalScans);
+        } else if (codesError) {
+          console.error('❌ Error getting pre-reg codes:', codesError);
+        }
+      } else {
+        console.log('⚠️ No partner ID found for user profile');
+      }
+
+      // Get customer signups using referral codes
       const { data: referredCustomers, error } = await this.supabase
         .from('customers')
         .select(`
           id,
           referral_type,
           referral_applied_at,
-          referral_order_id,
           referral_discount_applied,
           referral_commission_rate
         `)
@@ -1972,9 +2007,8 @@ export class SupabaseService {
       if (error) throw error;
 
       const customers = referredCustomers || [];
-      const totalScans = customers.length;
-      const totalSignups = customers.length;
-      const totalPurchases = customers.filter(c => c.referral_order_id).length;
+      const totalSignups = customers.length; // This is the actual signups count
+      const totalPurchases = 0; // TODO: Calculate purchases when order relationship is fixed
 
       const totalCommissions = customers.reduce((sum, customer) => {
         if (false) { // TODO: Fix after order join is working
@@ -1994,7 +2028,7 @@ export class SupabaseService {
 
       const recentActivity = customers.map(customer => ({
         id: customer.id,
-        type: customer.referral_order_id ? 'purchase' : 'signup',
+        type: 'signup', // All are signups for now until order relationship is fixed
         date: customer.referral_applied_at,
         order_value: null, // TODO: Look up order value separately
         commission: null, // TODO: Calculate commission separately
@@ -2028,13 +2062,7 @@ export class SupabaseService {
           id,
           referral_type,
           referral_applied_at,
-          referral_order_id,
-          referral_code_used,
-          // referred_order:orders!referral_order_id (
-            total_amount,
-            created_at,
-            status
-          )
+          referral_code_used
         `)
         .eq('referral_type', 'CUSTOMER')
         .eq('referrer_id', userProfileId);
@@ -2044,7 +2072,7 @@ export class SupabaseService {
       const customers = referredCustomers || [];
       const totalScans = customers.length;
       const totalSignups = customers.length;
-      const totalPurchases = customers.filter(c => c.referral_order_id).length;
+      const totalPurchases = 0; // TODO: Calculate purchases when order relationship is properly established
       const totalRewards = totalPurchases * 5; // £5 credit per successful referral
 
       const totalOrderValue = customers.reduce((sum, customer) => {
@@ -2057,10 +2085,10 @@ export class SupabaseService {
 
       const recentActivity = customers.map(customer => ({
         id: customer.id,
-        type: customer.referral_order_id ? 'purchase' : 'signup',
+        type: 'signup', // All are signups for now until order relationship is fixed
         date: customer.referral_applied_at,
         order_value: null, // TODO: Look up order value separately
-        reward: customer.referral_order_id ? 5 : null,
+        reward: 5, // Standard referral reward
       })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       return {
@@ -2090,13 +2118,7 @@ export class SupabaseService {
           id,
           referral_type,
           referral_applied_at,
-          referral_order_id,
-          referral_commission_rate,
-          // referred_order:orders!referral_order_id (
-            total_amount,
-            created_at,
-            status
-          )
+          referral_commission_rate
         `)
         .eq('referral_type', 'INFLUENCER')
         .eq('referrer_id', userProfileId);
@@ -2106,7 +2128,7 @@ export class SupabaseService {
       const customers = referredCustomers || [];
       const totalScans = customers.length;
       const totalSignups = customers.length;
-      const totalPurchases = customers.filter(c => c.referral_order_id).length;
+      const totalPurchases = 0; // TODO: Calculate purchases when order relationship is properly established
 
       const totalCommissions = customers.reduce((sum, customer) => {
         if (false) { // TODO: Fix after order join is working
@@ -2126,7 +2148,7 @@ export class SupabaseService {
 
       const recentActivity = customers.map(customer => ({
         id: customer.id,
-        type: customer.referral_order_id ? 'purchase' : 'signup',
+        type: 'signup', // All are signups for now until order relationship is fixed
         date: customer.referral_applied_at,
         order_value: null, // TODO: Look up order value separately
         commission: null, // TODO: Calculate commission separately
