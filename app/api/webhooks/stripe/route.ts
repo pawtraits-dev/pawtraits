@@ -161,7 +161,6 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       estimated_delivery: metadata.shippingDeliveryEstimate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       payment_intent_id: paymentIntent.id,
       payment_status: 'paid',
-      referral_code: metadata.referralCode || null, // Add referral code to dedicated field
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
 
@@ -309,7 +308,9 @@ async function handleSimplifiedCommissions(
       return;
     }
 
-    // Fallback: Check referral status in customers table (legacy support)
+    // Fallback: Check referral status in customers table (main flow for customer-based referrals)
+    console.log('🔍 Looking up customer referral status for:', customerEmail.toLowerCase());
+
     const { data: customer, error: customerError } = await supabase
       .from('customers')
       .select(`
@@ -324,6 +325,18 @@ async function handleSimplifiedCommissions(
       `)
       .eq('email', customerEmail.toLowerCase())
       .single();
+
+    console.log('🎯 Customer lookup result:', {
+      found: !!customer,
+      error: customerError?.message,
+      customerData: customer ? {
+        id: customer.id,
+        email: customer.email,
+        referral_type: customer.referral_type,
+        referrer_id: customer.referrer_id,
+        referral_order_id: customer.referral_order_id
+      } : null
+    });
 
     if (customerError || !customer) {
       console.log('ℹ️ Customer not found or organic order - no commission processing');
