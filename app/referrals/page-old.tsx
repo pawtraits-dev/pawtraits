@@ -121,7 +121,8 @@ function InfluencerReferralsContent() {
         setReferrals(transformedReferrals);
       } else {
         // Use fallback data structure
-        const mockInfluencerData = {
+        try {
+          const mockInfluencerData = {
         stats: {
           total_codes: 2,
           active_codes: 2,
@@ -177,8 +178,12 @@ function InfluencerReferralsContent() {
         ]
       };
 
-      setInfluencerData(mockInfluencerData);
-      setReferrals(mockInfluencerData.recent_referrals);
+          setInfluencerData(mockInfluencerData);
+          setReferrals(mockInfluencerData.recent_referrals);
+        } catch (fallbackError) {
+          console.error('Error setting fallback data:', fallbackError);
+        }
+      }
 
     } catch (error) {
       console.error('Error fetching influencer data:', error)
