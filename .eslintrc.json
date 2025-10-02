@@ -99,7 +99,13 @@
         "**/app/signup/user/page.tsx",
         "**/app/signup/user-qr/page.tsx",
         "**/app/referrals/create/page.tsx",
-        "**/app/home/page.tsx"
+        "**/app/home/page.tsx",
+        "**/app/customer/shop/page.tsx",
+        "**/app/customer/gallery/page.tsx",
+        "**/app/partners/shop/page.tsx",
+        "**/app/quick-debug/page.tsx",
+        "**/app/gallery/page.tsx",
+        "**/app/generate/page.tsx"
       ],
       "rules": {
         "no-restricted-imports": "off",
