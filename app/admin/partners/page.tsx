@@ -388,13 +388,13 @@ export default function AdminPartnersPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <SortableHeader field="business_name">Business Name / Type</SortableHeader>
-                  <SortableHeader field="approval_status">Status / Date Joined</SortableHeader>
-                  <SortableHeader field="total_referrals"># Code Scans</SortableHeader>
-                  <SortableHeader field="successful_referrals"># Signups / Conversion %</SortableHeader>
-                  <SortableHeader field="total_orders"># Orders</SortableHeader>
-                  <SortableHeader field="total_order_value">Total Order Value</SortableHeader>
-                  <SortableHeader field="total_commissions">Commission Total</SortableHeader>
+                  <SortableHeader field="business_name">Business</SortableHeader>
+                  <SortableHeader field="approval_status">Status</SortableHeader>
+                  <SortableHeader field="total_referrals">Scans</SortableHeader>
+                  <SortableHeader field="successful_referrals">Signups</SortableHeader>
+                  <SortableHeader field="total_orders">Orders</SortableHeader>
+                  <SortableHeader field="total_order_value">Value</SortableHeader>
+                  <SortableHeader field="total_commissions">Commissions</SortableHeader>
                 </tr>
               </thead>
               <tbody>
