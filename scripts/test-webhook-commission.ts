@@ -84,6 +84,23 @@ async function testWebhookCommissionFlow() {
         commission_rate: partnerProfile.partner?.commission_rate
       });
 
+      // Test the partner API endpoint that webhook will use
+      console.log('\n🔍 Step 2b: Testing partner API endpoint');
+      const partnerApiResponse = await fetch(`http://localhost:3000/api/partners/by-email/${encodeURIComponent(partnerProfile.email)}`);
+
+      if (partnerApiResponse.ok) {
+        const partnerApiData = await partnerApiResponse.json();
+        console.log('✅ Partner API returned:', {
+          id: partnerApiData.id,
+          email: partnerApiData.email,
+          business_name: partnerApiData.business_name,
+          commission_rate: partnerApiData.commission_rate,
+          lifetime_commission_rate: partnerApiData.lifetime_commission_rate
+        });
+      } else {
+        console.error('❌ Partner API failed:', partnerApiResponse.status);
+      }
+
       // Step 3: Simulate commission creation
       console.log('\n💰 Step 3: Commission calculation');
       const testOrderValue = 50.00;

@@ -26,10 +26,10 @@ export async function GET(
     // Decode the email from URL encoding
     const decodedEmail = decodeURIComponent(email);
 
-    // Get partner by email
+    // Get partner by email including commission rates
     const { data: partner, error } = await supabase
       .from('partners')
-      .select('id, email, first_name, last_name, business_name, business_type')
+      .select('id, email, first_name, last_name, business_name, business_type, commission_rate, lifetime_commission_rate')
       .eq('email', decodedEmail)
       .eq('is_active', true)
       .eq('is_verified', true)
