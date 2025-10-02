@@ -395,6 +395,20 @@ const response = await fetch('/api/referrals', {
 });  // ✅ Good
 ```
 
+#### Webhook Routes (`/api/webhooks/*`)
+```typescript
+// ✅ CORRECT: Use API endpoints with proper production URLs for consistency
+const baseUrl = process.env.VERCEL_URL
+  ? `https://${process.env.VERCEL_URL}`
+  : process.env.NEXT_PUBLIC_BASE_URL
+  || 'http://localhost:3000';
+
+const response = await fetch(`${baseUrl}/api/partners/by-email/${email}`);  // ✅ Good
+const response = await fetch(`${baseUrl}/api/commissions/partner`, {...});   // ✅ Good
+```
+
+**🚨 CRITICAL: Never hardcode localhost in webhooks - they run in production!**
+
 **❌ ANTI-PATTERNS - NEVER DO THESE:**
 
 ```typescript
@@ -410,6 +424,9 @@ const { data } = await supabase.from('orders').select('*');    // ❌ WRONG
 
 // ❌ NEVER: Direct database access from frontend
 import { createClient } from '@supabase/supabase-js';          // ❌ WRONG in components
+
+// ❌ NEVER: Hardcode localhost URLs in webhooks (production failure)
+const response = await fetch('http://localhost:3000/api/endpoint'); // ❌ WRONG - fails in production
 ```
 
 ### Authentication Flow Patterns
