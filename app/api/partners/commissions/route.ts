@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     console.log('Partner commissions API: Fetching commission data for partner:', partnerId);
 
-    // Get commission data from new commissions table
+    // Get commission data from new commissions table with rich order details
     let query = supabase
       .from('commissions')
       .select(`
@@ -55,7 +55,23 @@ export async function GET(request: NextRequest) {
         status,
         created_at,
         updated_at,
-        metadata
+        metadata,
+        commission_payment_id,
+        orders (
+          id,
+          created_at,
+          subtotal_amount,
+          shipping_amount,
+          total_amount,
+          order_items (
+            id,
+            product_name,
+            product_description,
+            thumbnail_url,
+            quantity,
+            unit_price
+          )
+        )
       `)
       .eq('recipient_id', partnerId)
       .eq('recipient_type', 'partner');

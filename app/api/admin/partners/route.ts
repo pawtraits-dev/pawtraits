@@ -90,18 +90,19 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Get commission data from client_orders table
+      // Get commission data from new commissions table
       const { data: commissionRecords } = await supabaseAdmin
-        .from('client_orders')
-        .select('commission_amount, commission_paid')
-        .eq('partner_id', partner.id);
+        .from('commissions')
+        .select('commission_amount, status')
+        .eq('recipient_id', userProfile?.id || '')
+        .eq('recipient_type', 'partner');
 
       const totalCommissions = commissionRecords
         ? commissionRecords.reduce((sum, record) => sum + (record.commission_amount || 0), 0)
         : 0;
 
       const paidCommissions = commissionRecords
-        ? commissionRecords.filter(r => r.commission_paid).reduce((sum, record) => sum + (record.commission_amount || 0), 0)
+        ? commissionRecords.filter(r => r.status === 'paid').reduce((sum, record) => sum + (record.commission_amount || 0), 0)
         : 0;
 
       const analytics = {
