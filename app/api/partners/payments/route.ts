@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
         .from('commissions')
         .select('id, commission_amount')
         .eq('commission_payment_id', payment.id)
-        .eq('recipient_id', user.id)
+        .eq('recipient_id', partnerId)
         .eq('recipient_type', 'partner');
 
       if (commissionError) {
