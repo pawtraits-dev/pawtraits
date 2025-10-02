@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { constructWebhookEvent } from '@/lib/stripe-server';
 import { createClient } from '@supabase/supabase-js';
 import { createGelatoService } from '@/lib/gelato-service';
+import { createPartnerCommission, createCustomerCredit } from '@/lib/commission-functions';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -377,22 +378,9 @@ async function handleSimplifiedCommissions(
       commissionCreated = true;
     }
 
-    // Only update customer after commission record is created
+    // Commission tracking is now handled by the new commissions table
     if (commissionCreated) {
-      const { error: updateError } = await supabase
-        .from('customers')
-        .update({
-          referral_order_id: order.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', customer.id);
-
-      if (updateError) {
-        console.error('❌ Error updating customer referral completion:', updateError);
-        // Don't return here - commission was already created successfully
-      } else {
-        console.log('✅ Customer referral completion updated successfully');
-      }
+      console.log('✅ Commission created successfully using new tracking system');
     }
 
     console.log('🎉 Simplified commission processing completed');
@@ -707,7 +695,8 @@ async function handlePartnerCommissionFromMetadata(
           id,
           business_name,
           first_name,
-          last_name
+          last_name,
+          email
         )
       `)
       .eq('referral_code', metadata.referralCode.toUpperCase())
@@ -718,38 +707,30 @@ async function handlePartnerCommissionFromMetadata(
       return;
     }
 
-    // Fixed 10% commission rate
-    const commissionRate = 10.00;
-    const commissionAmount = Math.round(subtotalAmount * (commissionRate / 100));
+    // Prepare customer data object
+    const customer = {
+      id: null, // Customer ID not available in metadata flow
+      email: customerEmail,
+      referral_code_used: metadata.referralCode,
+      referral_type: 'partner'
+    };
 
-    // Create commission record in client_orders table
-    const { error: commissionError } = await supabase
-      .from('client_orders')
-      .insert({
-        client_email: customerEmail,
-        client_name: `${order.shipping_first_name || ''} ${order.shipping_last_name || ''}`.trim(),
-        partner_id: referral.partner_id,
-        order_id: order.id,
-        order_value: subtotalAmount,
-        is_initial_order: true, // Always first order with simplified logic
-        commission_rate: commissionRate,
-        commission_amount: commissionAmount,
-        commission_paid: false,
-        order_status: 'completed',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
+    // Use new commission tracking system
+    const commission = await createPartnerCommission(
+      supabase,
+      order.id,
+      subtotalAmount,
+      customer,
+      referral.partner_id,
+      referral.partners?.email || ''
+    );
 
-    if (commissionError) {
-      console.error('❌ Failed to create partner commission record:', commissionError);
-    } else {
-      console.log('✅ Partner commission created from metadata:', {
-        partnerId: referral.partner_id,
-        partnerName: referral.partners?.business_name,
-        commissionAmount: commissionAmount / 100, // Convert to pounds for logging
-        commissionRate
-      });
-    }
+    console.log('✅ Partner commission created from metadata using new system:', {
+      commissionId: commission.id,
+      partnerId: referral.partner_id,
+      partnerName: referral.partners?.business_name,
+      commissionAmount: commission.commission_amount / 100 // Convert to pounds for logging
+    });
 
   } catch (error) {
     console.error('💥 Error handling partner commission from metadata:', error);
@@ -784,31 +765,30 @@ async function handleCustomerCreditFromMetadata(
       return;
     }
 
-    // Calculate 10% credit amount
-    const creditAmount = Math.round(subtotalAmount * 0.10);
+    // Prepare referred customer data object
+    const referredCustomer = {
+      id: null, // Customer ID not available in metadata flow
+      email: customerEmail,
+      referral_code_used: metadata.referralCode,
+      referral_type: 'customer'
+    };
 
-    // Create credit record in customer_credits table
-    const { error: creditError } = await supabase
-      .from('customer_credits')
-      .insert({
-        customer_id: referringCustomer.id,
-        credit_amount: creditAmount,
-        earned_from_order_id: order.id,
-        status: 'available',
-        expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year from now
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
+    // Use new commission tracking system
+    const credit = await createCustomerCredit(
+      supabase,
+      order.id,
+      subtotalAmount,
+      referredCustomer,
+      referringCustomer.id,
+      referringCustomer.email
+    );
 
-    if (creditError) {
-      console.error('❌ Failed to create customer credit record:', creditError);
-    } else {
-      console.log('✅ Customer credit created from metadata:', {
-        referringCustomerId: referringCustomer.id,
-        referringCustomerEmail: referringCustomer.email,
-        creditAmount: creditAmount / 100, // Convert to pounds for logging
-      });
-    }
+    console.log('✅ Customer credit created from metadata using new system:', {
+      creditId: credit.id,
+      referringCustomerId: referringCustomer.id,
+      referringCustomerEmail: referringCustomer.email,
+      creditAmount: credit.commission_amount / 100 // Convert to pounds for logging
+    });
 
   } catch (error) {
     console.error('💥 Error handling customer credit from metadata:', error);
@@ -841,7 +821,8 @@ async function handlePartnerCommission(
           id,
           business_name,
           first_name,
-          last_name
+          last_name,
+          email
         )
       `)
       .eq('id', customer.referrer_id)
@@ -852,38 +833,22 @@ async function handlePartnerCommission(
       return;
     }
 
-    // Fixed 10% commission rate
-    const commissionRate = 10.00;
-    const commissionAmount = Math.round(subtotalAmount * (commissionRate / 100));
+    // Use new commission tracking system
+    const commission = await createPartnerCommission(
+      supabase,
+      order.id,
+      subtotalAmount,
+      customer,
+      partnerProfile.partner.id,
+      partnerProfile.partner.email || partnerProfile.email
+    );
 
-    // Create commission record in client_orders table
-    const { error: commissionError } = await supabase
-      .from('client_orders')
-      .insert({
-        client_email: customer.email,
-        client_name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
-        partner_id: partnerProfile.partner.id,
-        order_id: order.id,
-        order_value: subtotalAmount,
-        is_initial_order: true, // Always first order with simplified logic
-        commission_rate: commissionRate,
-        commission_amount: commissionAmount,
-        commission_paid: false,
-        order_status: 'completed',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-
-    if (commissionError) {
-      console.error('❌ Failed to create partner commission record:', commissionError);
-    } else {
-      console.log('✅ Partner commission created:', {
-        partnerId: partnerProfile.partner.id,
-        partnerName: partnerProfile.partner.business_name,
-        commissionAmount: commissionAmount / 100, // Convert to pounds for logging
-        commissionRate
-      });
-    }
+    console.log('✅ Partner commission created using new system:', {
+      commissionId: commission.id,
+      partnerId: partnerProfile.partner.id,
+      partnerName: partnerProfile.partner.business_name,
+      commissionAmount: commission.commission_amount / 100 // Convert to pounds for logging
+    });
 
   } catch (error) {
     console.error('💥 Error handling partner commission:', error);
@@ -905,31 +870,34 @@ async function handleCustomerCredit(
       subtotalAmount
     });
 
-    // Fixed 10% credit amount
-    const creditAmount = Math.round(subtotalAmount * 0.10); // 10% in pence
+    // Get referring customer email
+    const { data: referringCustomer, error: referringCustomerError } = await supabase
+      .from('customers')
+      .select('email')
+      .eq('id', customer.referrer_id)
+      .single();
 
-    // Create customer credit record in database
-    const { error: creditError } = await supabase
-      .from('customer_credits')
-      .insert({
-        customer_id: customer.referrer_id,
-        credit_amount: creditAmount,
-        earned_from_order_id: order.id,
-        status: 'available',
-        expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year expiry
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-
-    if (creditError) {
-      console.error('❌ Failed to create customer credit:', creditError);
-    } else {
-      console.log('✅ Customer credit created:', {
-        referrerId: customer.referrer_id,
-        creditAmount: creditAmount / 100, // Convert to pounds for logging
-        earnedFromOrderId: order.id
-      });
+    if (referringCustomerError || !referringCustomer) {
+      console.error('❌ Failed to get referring customer email:', referringCustomerError);
+      return;
     }
+
+    // Use new commission tracking system
+    const credit = await createCustomerCredit(
+      supabase,
+      order.id,
+      subtotalAmount,
+      customer, // The referred customer making the purchase
+      customer.referrer_id, // ID of the customer who made the referral
+      referringCustomer.email // Email of the referring customer
+    );
+
+    console.log('✅ Customer credit created using new system:', {
+      creditId: credit.id,
+      referrerId: customer.referrer_id,
+      referrerEmail: referringCustomer.email,
+      creditAmount: credit.commission_amount / 100 // Convert to pounds for logging
+    });
 
   } catch (error) {
     console.error('💥 Error handling customer credit:', error);
