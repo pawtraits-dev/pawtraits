@@ -385,23 +385,38 @@ export default function AdminPartnersPage() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full table-auto"
+              style={{ tableLayout: 'auto', width: '100%' }}>
               <thead>
                 <tr className="border-b">
-                  <SortableHeader field="business_name">Business</SortableHeader>
-                  <SortableHeader field="approval_status">Status</SortableHeader>
-                  <SortableHeader field="total_referrals">Scans</SortableHeader>
-                  <SortableHeader field="successful_referrals">Signups</SortableHeader>
-                  <SortableHeader field="total_orders">Orders</SortableHeader>
-                  <SortableHeader field="total_order_value">Value</SortableHeader>
-                  <SortableHeader field="total_commissions">Commissions</SortableHeader>
+                  <SortableHeader field="business_name">
+                    <div style={{ minWidth: '200px' }}>Business</div>
+                  </SortableHeader>
+                  <SortableHeader field="approval_status">
+                    <div style={{ minWidth: '120px' }}>Status</div>
+                  </SortableHeader>
+                  <SortableHeader field="total_referrals">
+                    <div style={{ minWidth: '80px' }}>Scans</div>
+                  </SortableHeader>
+                  <SortableHeader field="successful_referrals">
+                    <div style={{ minWidth: '80px' }}>Signups</div>
+                  </SortableHeader>
+                  <SortableHeader field="total_orders">
+                    <div style={{ minWidth: '80px' }}>Orders</div>
+                  </SortableHeader>
+                  <SortableHeader field="total_order_value">
+                    <div style={{ minWidth: '100px' }}>Value</div>
+                  </SortableHeader>
+                  <SortableHeader field="total_commissions">
+                    <div style={{ minWidth: '120px' }}>Commissions</div>
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody>
                 {filteredPartners.map((partner) => (
                   <Link key={partner.id} href={`/admin/partners/${partner.id}`}>
                     <tr className="border-b hover:bg-gray-50 cursor-pointer transition-colors">
-                      <td className="p-4">
+                      <td className="p-4" style={{ minWidth: '200px' }}>
                         <div>
                           <div className="font-medium text-gray-900">
                             {partner.business_name || partner.full_name}
@@ -411,7 +426,7 @@ export default function AdminPartnersPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4" style={{ minWidth: '120px' }}>
                         <div className="space-y-1">
                           <Badge className={approvalStatusColors[partner.approval_status as keyof typeof approvalStatusColors]}>
                             {partner.approval_status.charAt(0).toUpperCase() + partner.approval_status.slice(1)}
@@ -421,12 +436,12 @@ export default function AdminPartnersPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4" style={{ minWidth: '80px' }}>
                         <div className="font-medium text-gray-900">
                           {partner.total_referrals.toLocaleString()}
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4" style={{ minWidth: '80px' }}>
                         <div>
                           <div className="font-medium text-gray-900">
                             {partner.successful_referrals.toLocaleString()}
@@ -436,17 +451,17 @@ export default function AdminPartnersPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4" style={{ minWidth: '80px' }}>
                         <div className="font-medium text-gray-900">
                           {partner.total_orders.toLocaleString()}
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4" style={{ minWidth: '100px' }}>
                         <div className="font-medium text-gray-900">
                           {formatCurrency(partner.total_order_value / 100)}
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4" style={{ minWidth: '120px' }}>
                         <div>
                           <div className="font-medium text-gray-900">
                             {formatCurrency(partner.total_commissions / 100)}
