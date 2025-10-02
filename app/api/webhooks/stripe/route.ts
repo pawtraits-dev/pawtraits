@@ -748,27 +748,30 @@ async function handlePartnerCommission(
       subtotalAmount
     });
 
-    // Get partner profile to find email
+    // Get partner information including commission rates directly from database
     const { data: partnerProfile, error: partnerError } = await supabase
       .from('user_profiles')
-      .select('id, email')
+      .select(`
+        id,
+        email,
+        partner_id,
+        partner:partners (
+          id,
+          business_name,
+          first_name,
+          last_name,
+          email,
+          commission_rate,
+          lifetime_commission_rate
+        )
+      `)
       .eq('id', customer.referrer_id)
       .single();
 
-    if (partnerError || !partnerProfile) {
-      console.error('❌ Failed to get partner profile:', partnerError);
+    if (partnerError || !partnerProfile?.partner) {
+      console.error('❌ Failed to get partner information:', partnerError);
       return;
     }
-
-    // Get partner commission rates via API
-    const partnerResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/partners/by-email/${encodeURIComponent(partnerProfile.email)}`);
-
-    if (!partnerResponse.ok) {
-      console.error('❌ Failed to get partner commission rates via API:', partnerResponse.status);
-      return;
-    }
-
-    const partnerData = await partnerResponse.json();
 
     // Determine if this is the customer's first order (for commission rate calculation)
     const { data: previousOrders } = await supabase
@@ -781,8 +784,8 @@ async function handlePartnerCommission(
 
     // Use appropriate commission rate: commission_rate for first order, lifetime_commission_rate for subsequent
     const commissionRate = isFirstOrder
-      ? (partnerData.commission_rate || 10.00)
-      : (partnerData.lifetime_commission_rate || 10.00);
+      ? (partnerProfile.partner.commission_rate || 10.00)
+      : (partnerProfile.partner.lifetime_commission_rate || 10.00);
 
     console.log('📊 Commission rate determination:', {
       customerEmail: customer.email,
@@ -791,37 +794,52 @@ async function handlePartnerCommission(
       commissionRate: `${commissionRate}%`,
       rateType: isFirstOrder ? 'initial' : 'lifetime',
       partnerRates: {
-        initial: partnerData.commission_rate,
-        lifetime: partnerData.lifetime_commission_rate
+        initial: partnerProfile.partner.commission_rate,
+        lifetime: partnerProfile.partner.lifetime_commission_rate
       }
     });
 
-    // Use API endpoint for commission creation
-    const commissionResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/commissions/partner`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId: order.id,
-        orderAmount: subtotalAmount,
-        customer,
-        partnerId: partnerData.id,
-        partnerEmail: partnerData.email,
-        commissionRate: commissionRate
-      })
-    });
+    // Create commission directly in database using service role client
+    const commissionAmount = Math.round(subtotalAmount * (commissionRate / 100));
 
-    if (commissionResponse.ok) {
-      const commission = await commissionResponse.json();
-      console.log('✅ Partner commission created using API:', {
+    const commissionData = {
+      order_id: order.id,
+      order_amount: subtotalAmount,
+      recipient_type: 'partner',
+      recipient_id: partnerProfile.partner.id,
+      recipient_email: partnerProfile.partner.email || partnerProfile.email,
+      referrer_type: 'partner',
+      referrer_id: partnerProfile.partner.id,
+      referral_code: customer.referral_code_used || null,
+      commission_type: 'partner_commission',
+      commission_rate: commissionRate,
+      commission_amount: commissionAmount,
+      status: 'pending',
+      metadata: {
+        customer_id: customer.id,
+        customer_email: customer.email,
+        referral_type: customer.referral_type,
+        created_via: 'webhook'
+      }
+    };
+
+    const { data: commission, error: commissionError } = await supabase
+      .from('commissions')
+      .insert(commissionData)
+      .select()
+      .single();
+
+    if (commissionError) {
+      console.error('❌ Failed to create partner commission:', commissionError);
+    } else {
+      console.log('✅ Partner commission created:', {
         commissionId: commission.id,
-        partnerId: partnerData.id,
-        partnerName: partnerData.business_name,
-        partnerEmail: partnerData.email,
-        commissionAmount: commission.commission_amount / 100,
+        partnerId: partnerProfile.partner.id,
+        partnerName: partnerProfile.partner.business_name,
+        partnerEmail: partnerProfile.partner.email || partnerProfile.email,
+        commissionAmount: commissionAmount / 100,
         rateUsed: `${commissionRate}%`
       });
-    } else {
-      console.error('❌ Failed to create partner commission via API:', await commissionResponse.text());
     }
 
   } catch (error) {
