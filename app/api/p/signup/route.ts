@@ -57,8 +57,8 @@ export async function POST(request: NextRequest) {
           email_referrals: true,
           sms_enabled: false
         },
-        commission_rate: 0.20,
-        lifetime_commission_rate: 0.05
+        commission_rate: 0.10,
+        lifetime_commission_rate: 0.10
       })
       .select()
       .single();

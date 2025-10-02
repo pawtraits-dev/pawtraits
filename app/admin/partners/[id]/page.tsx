@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 import {
   ArrowLeft,
   User,
@@ -31,7 +32,10 @@ import {
   Trash2,
   Loader2,
   Image,
-  EyeOff
+  EyeOff,
+  Edit,
+  Save,
+  XCircle
 } from 'lucide-react';
 import type { Partner, Referral } from '@/lib/types';
 import { qrCodeService } from '@/lib/qr-code';
@@ -112,6 +116,12 @@ export default function PartnerDetailPage() {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [showQrCode, setShowQrCode] = useState(false);
   const [generatingQr, setGeneratingQr] = useState(false);
+  const [editingCommissionRates, setEditingCommissionRates] = useState(false);
+  const [commissionRates, setCommissionRates] = useState({
+    commission_rate: 0,
+    lifetime_commission_rate: 0
+  });
+  const [savingCommissionRates, setSavingCommissionRates] = useState(false);
 
   useEffect(() => {
     if (params.id) {
@@ -124,6 +134,10 @@ export default function PartnerDetailPage() {
   useEffect(() => {
     if (partner) {
       loadPartnerReferralCode();
+      setCommissionRates({
+        commission_rate: partner.commission_rate || 20.00,
+        lifetime_commission_rate: partner.lifetime_commission_rate || 5.00
+      });
     }
   }, [partner]);
 
@@ -341,14 +355,14 @@ export default function PartnerDetailPage() {
 
   const handleStatusChange = async (newStatus: string, reason?: string) => {
     if (!partner) return;
-    
+
     try {
       const response = await fetch(`/api/admin/partners/${partner.id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           approval_status: newStatus,
-          rejection_reason: reason 
+          rejection_reason: reason
         })
       });
 
@@ -357,6 +371,45 @@ export default function PartnerDetailPage() {
       }
     } catch (error) {
       console.error('Error updating partner status:', error);
+    }
+  };
+
+  const handleCommissionRatesSave = async () => {
+    if (!partner) return;
+
+    try {
+      setSavingCommissionRates(true);
+      const response = await fetch(`/api/admin/partners/${partner.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          commission_rate: commissionRates.commission_rate,
+          lifetime_commission_rate: commissionRates.lifetime_commission_rate
+        })
+      });
+
+      if (response.ok) {
+        setEditingCommissionRates(false);
+        loadPartnerDetails();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update commission rates');
+      }
+    } catch (error) {
+      console.error('Error updating commission rates:', error);
+      alert('Failed to update commission rates. Please try again.');
+    } finally {
+      setSavingCommissionRates(false);
+    }
+  };
+
+  const handleCommissionRatesCancel = () => {
+    setEditingCommissionRates(false);
+    if (partner) {
+      setCommissionRates({
+        commission_rate: partner.commission_rate || 20.00,
+        lifetime_commission_rate: partner.lifetime_commission_rate || 5.00
+      });
     }
   };
 
@@ -838,7 +891,7 @@ export default function PartnerDetailPage() {
                     {/* Usage Information */}
                     <div className="mt-4 pt-4 border-t border-gray-200 text-sm text-gray-600">
                       <p className="mb-2"><strong>Usage:</strong> Share this code or URL with customers for direct referrals</p>
-                      <p><strong>Commission:</strong> {partner?.commission_rate ? `${(partner.commission_rate * 100).toFixed(0)}%` : '20%'} on first order, {partner?.lifetime_commission_rate ? `${(partner.lifetime_commission_rate * 100).toFixed(0)}%` : '5%'} lifetime</p>
+                      <p><strong>Commission:</strong> {partner?.commission_rate ? `${partner.commission_rate}%` : '20%'} on first order, {partner?.lifetime_commission_rate ? `${partner.lifetime_commission_rate}%` : '5%'} lifetime</p>
                     </div>
                   </div>
                 )}
@@ -848,36 +901,132 @@ export default function PartnerDetailPage() {
             {/* Commission Settings */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <DollarSign className="w-5 h-5 mr-2" />
-                  Commission Settings
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <DollarSign className="w-5 h-5 mr-2" />
+                    Commission Settings
+                  </div>
+                  {!editingCommissionRates && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingCommissionRates(true)}
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Rates
+                    </Button>
+                  )}
                 </CardTitle>
                 <CardDescription>
                   Commission rates for this partner's referrals
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <TrendingUp className="w-4 h-4 text-green-600" />
-                  <div>
-                    <p className="font-medium">{partner.initial_commission_rate || 20.00}%</p>
-                    <p className="text-sm text-gray-600">Initial Commission Rate</p>
-                    <p className="text-xs text-gray-500">Applied to first-time customer orders</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-3">
-                  <TrendingUp className="w-4 h-4 text-blue-600" />
-                  <div>
-                    <p className="font-medium">{partner.subsequent_commission_rate || 5.00}%</p>
-                    <p className="text-sm text-gray-600">Subsequent Commission Rate</p>
-                    <p className="text-xs text-gray-500">Applied to repeat customer orders</p>
-                  </div>
-                </div>
+                {editingCommissionRates ? (
+                  <>
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-3">
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={commissionRates.commission_rate}
+                              onChange={(e) => setCommissionRates(prev => ({
+                                ...prev,
+                                commission_rate: parseFloat(e.target.value) || 0
+                              }))}
+                              className="w-20"
+                            />
+                            <span>%</span>
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Initial Commission Rate</p>
+                          <p className="text-xs text-gray-500">Applied to first-time customer orders</p>
+                        </div>
+                      </div>
 
-                <div className="pt-2 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-                  <p><strong>How it works:</strong> Partners earn the initial rate on a customer's first purchase, then the subsequent rate for all future orders from that customer.</p>
-                </div>
+                      <div className="flex items-center space-x-3">
+                        <TrendingUp className="w-4 h-4 text-blue-600" />
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={commissionRates.lifetime_commission_rate}
+                              onChange={(e) => setCommissionRates(prev => ({
+                                ...prev,
+                                lifetime_commission_rate: parseFloat(e.target.value) || 0
+                              }))}
+                              className="w-20"
+                            />
+                            <span>%</span>
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Subsequent Commission Rate</p>
+                          <p className="text-xs text-gray-500">Applied to repeat customer orders</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 pt-4 border-t">
+                      <Button
+                        size="sm"
+                        onClick={handleCommissionRatesSave}
+                        disabled={savingCommissionRates}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {savingCommissionRates ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4 mr-2" />
+                            Save Changes
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCommissionRatesCancel}
+                        disabled={savingCommissionRates}
+                      >
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Cancel
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center space-x-3">
+                      <TrendingUp className="w-4 h-4 text-green-600" />
+                      <div>
+                        <p className="font-medium">{partner.commission_rate || 20.00}%</p>
+                        <p className="text-sm text-gray-600">Initial Commission Rate</p>
+                        <p className="text-xs text-gray-500">Applied to first-time customer orders</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <TrendingUp className="w-4 h-4 text-blue-600" />
+                      <div>
+                        <p className="font-medium">{partner.lifetime_commission_rate || 5.00}%</p>
+                        <p className="text-sm text-gray-600">Subsequent Commission Rate</p>
+                        <p className="text-xs text-gray-500">Applied to repeat customer orders</p>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                      <p><strong>How it works:</strong> Partners earn the initial rate on a customer's first purchase, then the subsequent rate for all future orders from that customer.</p>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>

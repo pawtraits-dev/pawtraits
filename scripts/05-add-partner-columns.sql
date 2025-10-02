@@ -2,10 +2,10 @@
 
 -- Add the missing commission columns
 ALTER TABLE partners 
-ADD COLUMN IF NOT EXISTS commission_rate DECIMAL(5,2) DEFAULT 20.00;
+ADD COLUMN IF NOT EXISTS commission_rate DECIMAL(5,2) DEFAULT 10.00;
 
 ALTER TABLE partners 
-ADD COLUMN IF NOT EXISTS lifetime_commission_rate DECIMAL(5,2) DEFAULT 5.00;
+ADD COLUMN IF NOT EXISTS lifetime_commission_rate DECIMAL(5,2) DEFAULT 10.00;
 
 -- Update the function without the missing columns
 CREATE OR REPLACE FUNCTION create_partner_profile(
@@ -55,8 +55,8 @@ BEGIN
         p_business_phone,
         p_business_website,
         'pending',
-        20.00,
-        5.00,
+        10.00,
+        10.00,
         NOW(),
         NOW()
     ) RETURNING * INTO new_partner;

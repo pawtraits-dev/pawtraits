@@ -11,22 +11,25 @@ export async function POST(request: NextRequest) {
       orderAmount,
       customer,
       partnerId,
-      partnerEmail
+      partnerEmail,
+      commissionRate // Now passed from webhook based on actual partner rate
     } = await request.json();
 
     console.log('💰 API: Creating partner commission:', {
       orderId,
       orderAmount,
       partnerId,
-      partnerEmail
+      partnerEmail,
+      commissionRate
     });
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    const commissionRate = 10.00; // 10%
-    const commissionAmount = Math.round(orderAmount * (commissionRate / 100));
+    // Use the commission rate passed from the webhook (from partner's database record)
+    const finalCommissionRate = commissionRate || 10.00; // Fallback to 10% if not provided
+    const commissionAmount = Math.round(orderAmount * (finalCommissionRate / 100));
 
     const commissionData = {
       order_id: orderId,
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
       referrer_id: partnerId,
       referral_code: customer.referral_code_used || null,
       commission_type: 'partner_commission',
-      commission_rate: commissionRate,
+      commission_rate: finalCommissionRate,
       commission_amount: commissionAmount,
       status: 'pending',
       metadata: {

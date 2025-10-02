@@ -301,7 +301,7 @@ async function handleSimplifiedCommissions(
       });
 
       if (metadata.referralType === 'partner') {
-        await handlePartnerCommissionFromMetadata(supabase, order, customerEmail, subtotalAmount, metadata);
+        console.log('⚠️ Metadata-based referrals no longer supported. Use customer table referral_type and referrer_id instead.');
       } else if (metadata.referralType === 'customer') {
         await handleCustomerCreditFromMetadata(supabase, order, customerEmail, subtotalAmount, metadata);
       }
@@ -668,81 +668,7 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, 
 }
 
 // Handle partner commission using metadata from checkout
-async function handlePartnerCommissionFromMetadata(
-  supabase: any,
-  order: any,
-  customerEmail: string,
-  subtotalAmount: number,
-  metadata: any
-) {
-  try {
-    console.log('🎯 Creating partner commission from metadata (10%):', {
-      orderId: order.id,
-      referralCode: metadata.referralCode,
-      customerEmail,
-      subtotalAmount
-    });
-
-    // Find the partner using the referral code
-    const { data: referral, error: referralError } = await supabase
-      .from('referrals')
-      .select(`
-        id,
-        partner_id,
-        referral_code,
-        partners (
-          id,
-          business_name,
-          first_name,
-          last_name,
-          email
-        )
-      `)
-      .eq('referral_code', metadata.referralCode.toUpperCase())
-      .single();
-
-    if (referralError || !referral) {
-      console.error('❌ Failed to find referral for code:', metadata.referralCode, referralError);
-      return;
-    }
-
-    // Prepare customer data object
-    const customer = {
-      id: null, // Customer ID not available in metadata flow
-      email: customerEmail,
-      referral_code_used: metadata.referralCode,
-      referral_type: 'partner'
-    };
-
-    // Use API endpoint for commission creation
-    const commissionResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/commissions/partner`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId: order.id,
-        orderAmount: subtotalAmount,
-        customer,
-        partnerId: referral.partner_id,
-        partnerEmail: referral.partners?.email || ''
-      })
-    });
-
-    if (commissionResponse.ok) {
-      const commission = await commissionResponse.json();
-      console.log('✅ Partner commission created from metadata using API:', {
-        commissionId: commission.id,
-        partnerId: referral.partner_id,
-        partnerName: referral.partners?.business_name,
-        commissionAmount: commission.commission_amount / 100
-      });
-    } else {
-      console.error('❌ Failed to create partner commission via API:', await commissionResponse.text());
-    }
-
-  } catch (error) {
-    console.error('💥 Error handling partner commission from metadata:', error);
-  }
-}
+// Legacy function removed - partner commissions now handled via customer table referral_type and referrer_id
 
 // Handle customer credit using metadata from checkout
 async function handleCustomerCreditFromMetadata(
@@ -825,7 +751,7 @@ async function handlePartnerCommission(
       subtotalAmount
     });
 
-    // Get partner information
+    // Get partner information including commission rates
     const { data: partnerProfile, error: partnerError } = await supabase
       .from('user_profiles')
       .select(`
@@ -837,7 +763,9 @@ async function handlePartnerCommission(
           business_name,
           first_name,
           last_name,
-          email
+          email,
+          commission_rate,
+          lifetime_commission_rate
         )
       `)
       .eq('id', customer.referrer_id)
@@ -848,6 +776,28 @@ async function handlePartnerCommission(
       return;
     }
 
+    // Determine if this is the customer's first order (for commission rate calculation)
+    const { data: previousOrders } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('customer_email', customer.email.toLowerCase())
+      .neq('id', order.id); // Exclude current order
+
+    const isFirstOrder = !previousOrders || previousOrders.length === 0;
+
+    // Use appropriate commission rate: commission_rate for first order, lifetime_commission_rate for subsequent
+    const commissionRate = isFirstOrder
+      ? (partnerProfile.partner.commission_rate || 10.00)
+      : (partnerProfile.partner.lifetime_commission_rate || 10.00);
+
+    console.log('📊 Commission rate determination:', {
+      customerEmail: customer.email,
+      previousOrderCount: previousOrders?.length || 0,
+      isFirstOrder,
+      commissionRate: `${commissionRate}%`,
+      rateType: isFirstOrder ? 'initial' : 'lifetime'
+    });
+
     // Use API endpoint for commission creation
     const commissionResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/commissions/partner`, {
       method: 'POST',
@@ -857,7 +807,8 @@ async function handlePartnerCommission(
         orderAmount: subtotalAmount,
         customer,
         partnerId: partnerProfile.partner.id,
-        partnerEmail: partnerProfile.partner.email || partnerProfile.email
+        partnerEmail: partnerProfile.partner.email || partnerProfile.email,
+        commissionRate: commissionRate
       })
     });
 
