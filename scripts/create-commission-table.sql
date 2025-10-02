@@ -57,7 +57,7 @@ CREATE POLICY "Partners can view their own commissions" ON commissions
   FOR SELECT USING (
     recipient_type = 'partner' AND
     recipient_id IN (
-      SELECT id FROM partners WHERE user_id = auth.uid()
+      SELECT partner_id FROM user_profiles WHERE user_id = auth.uid()
     )
   );
 
@@ -65,7 +65,7 @@ CREATE POLICY "Customers can view their own commission credits" ON commissions
   FOR SELECT USING (
     recipient_type = 'customer' AND
     recipient_id IN (
-      SELECT id FROM customers WHERE user_id = auth.uid()
+      SELECT customer_id FROM user_profiles WHERE user_id = auth.uid()
     )
   );
 
