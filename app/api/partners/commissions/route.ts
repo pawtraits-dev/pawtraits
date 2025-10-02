@@ -6,84 +6,118 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function GET(request: NextRequest) {
   try {
+    // Get authorization header
+    const authHeader = request.headers.get('authorization');
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('No auth header found for partner commissions');
+      return NextResponse.json(
+        { error: 'Authorization required' },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+
+    // Create service role client to bypass RLS
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    const { searchParams } = new URL(request.url);
-    const partnerId = searchParams.get('partnerId');
-    const status = searchParams.get('status'); // 'paid' or 'unpaid'
+    // Get user from token
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
-    if (!partnerId) {
+    if (authError || !user) {
+      console.error('Auth error:', authError);
       return NextResponse.json(
-        { error: 'Partner ID is required' },
-        { status: 400 }
+        { error: 'Invalid authorization' },
+        { status: 401 }
       );
     }
 
-    // Get commission summary
+    const partnerId = user.id; // Partner ID is the user ID
+
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status'); // 'paid' or 'unpaid'
+
+    console.log('Partner commissions API: Fetching commission data for partner:', partnerId);
+
+    // Get commission data from new commissions table
     let query = supabase
-      .from('client_orders')
+      .from('commissions')
       .select(`
-        *,
-        referrals (
-          referral_code,
-          client_name,
-          client_email
-        )
+        id,
+        recipient_id,
+        recipient_type,
+        order_id,
+        commission_amount,
+        commission_rate,
+        status,
+        created_at,
+        updated_at,
+        metadata
       `)
-      .eq('partner_id', partnerId);
+      .eq('recipient_id', partnerId)
+      .eq('recipient_type', 'partner');
 
     if (status === 'paid') {
-      query = query.eq('commission_paid', true);
+      query = query.eq('status', 'paid');
     } else if (status === 'unpaid') {
-      query = query.eq('commission_paid', false);
+      query = query.neq('status', 'paid');
     }
 
-    const { data: orders, error } = await query
+    const { data: commissions, error } = await query
       .order('created_at', { ascending: false });
 
     if (error) {
+      console.error('Error fetching commission records:', error);
       throw error;
     }
 
-    // Calculate totals
-    const unpaidCommissions = orders?.filter(o => !o.commission_paid) || [];
-    const paidCommissions = orders?.filter(o => o.commission_paid) || [];
-    
-    const unpaidTotal = unpaidCommissions.reduce((sum, order) => 
-      sum + (parseFloat(order.commission_amount) || 0), 0
+    // Calculate totals (amounts are stored in cents)
+    const unpaidCommissions = commissions?.filter(c => c.status !== 'paid') || [];
+    const paidCommissions = commissions?.filter(c => c.status === 'paid') || [];
+
+    const unpaidTotal = unpaidCommissions.reduce((sum, commission) =>
+      sum + ((commission.commission_amount || 0) / 100), 0
     );
-    
-    const paidTotal = paidCommissions.reduce((sum, order) => 
-      sum + (parseFloat(order.commission_amount) || 0), 0
+
+    const paidTotal = paidCommissions.reduce((sum, commission) =>
+      sum + ((commission.commission_amount || 0) / 100), 0
     );
 
     const totalCommissions = unpaidTotal + paidTotal;
 
-    // Separate by commission type
-    const initialOrders = orders?.filter(o => o.is_initial_order) || [];
-    const subsequentOrders = orders?.filter(o => !o.is_initial_order) || [];
+    // Count initial vs lifetime commissions based on metadata
+    const initialCommissions = commissions?.filter(c =>
+      c.metadata && typeof c.metadata === 'object' && c.metadata.commission_type === 'initial'
+    ) || [];
+    const lifetimeCommissions = commissions?.filter(c =>
+      c.metadata && typeof c.metadata === 'object' && c.metadata.commission_type === 'lifetime'
+    ) || [];
 
-    return NextResponse.json({
+    const response = {
       summary: {
         totalCommissions: totalCommissions.toFixed(2),
         unpaidTotal: unpaidTotal.toFixed(2),
         paidTotal: paidTotal.toFixed(2),
         unpaidCount: unpaidCommissions.length,
         paidCount: paidCommissions.length,
-        initialOrdersCount: initialOrders.length,
-        subsequentOrdersCount: subsequentOrders.length
+        initialOrdersCount: initialCommissions.length,
+        subsequentOrdersCount: lifetimeCommissions.length
       },
-      orders: orders || [],
+      commissions: commissions || [],
       unpaidCommissions,
       paidCommissions
-    });
+    };
+
+    console.log('Partner commissions API: Found', commissions?.length || 0, 'commission records for partner', partnerId);
+    return NextResponse.json(response);
 
   } catch (error) {
-    console.error('Error fetching partner commissions:', error);
+    console.error('Error fetching partner commission data:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch commissions' },
+      { error: 'Failed to fetch commission data' },
       { status: 500 }
     );
   }
@@ -91,35 +125,75 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    // Get authorization header
+    const authHeader = request.headers.get('authorization');
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Authorization required' },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+
+    // Create service role client to bypass RLS
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    const { orderIds, action } = await request.json();
+    // Get user from token
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
-    if (!orderIds || !Array.isArray(orderIds)) {
+    if (authError || !user) {
       return NextResponse.json(
-        { error: 'Order IDs array is required' },
+        { error: 'Invalid authorization' },
+        { status: 401 }
+      );
+    }
+
+    const partnerId = user.id; // Partner ID is the user ID
+
+    const { commissionIds, action } = await request.json();
+
+    if (!commissionIds || !Array.isArray(commissionIds)) {
+      return NextResponse.json(
+        { error: 'Commission IDs array is required' },
         { status: 400 }
       );
     }
 
     if (action === 'markPaid') {
+      // Verify all commissions belong to this partner before updating
+      const { data: existingCommissions, error: verifyError } = await supabase
+        .from('commissions')
+        .select('id')
+        .eq('recipient_id', partnerId)
+        .eq('recipient_type', 'partner')
+        .in('id', commissionIds);
+
+      if (verifyError || !existingCommissions || existingCommissions.length !== commissionIds.length) {
+        return NextResponse.json(
+          { error: 'Invalid commission IDs or unauthorized' },
+          { status: 400 }
+        );
+      }
+
       const { error } = await supabase
-        .from('client_orders')
-        .update({ 
-          commission_paid: true,
+        .from('commissions')
+        .update({
+          status: 'paid',
           updated_at: new Date().toISOString()
         })
-        .in('id', orderIds);
+        .in('id', commissionIds);
 
       if (error) {
         throw error;
       }
 
-      return NextResponse.json({ 
-        success: true, 
-        message: `Marked ${orderIds.length} commissions as paid` 
+      return NextResponse.json({
+        success: true,
+        message: `Marked ${commissionIds.length} commissions as paid`
       });
     }
 

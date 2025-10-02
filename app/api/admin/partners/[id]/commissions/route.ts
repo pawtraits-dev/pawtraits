@@ -19,18 +19,19 @@ export async function GET(
       auth: { autoRefreshToken: false, persistSession: false }
     });
     
-    // Get commission data from client_orders table (actual commission records)
-    const { data: clientOrders, error: ordersError } = await supabase
-      .from('client_orders')
+    // Get commission data from new commissions table
+    const { data: commissions, error: commissionsError } = await supabase
+      .from('commissions')
       .select('*')
-      .eq('partner_id', id)
+      .eq('recipient_id', id)
+      .eq('recipient_type', 'partner')
       .order('created_at', { ascending: false });
 
-    console.log('📊 Client orders for partner:', clientOrders?.length || 0);
-    
-    if (ordersError) {
-      console.error('❌ Error fetching client orders:', ordersError);
-      throw ordersError;
+    console.log('📊 Commissions for partner:', commissions?.length || 0);
+
+    if (commissionsError) {
+      console.error('❌ Error fetching commissions:', commissionsError);
+      throw commissionsError;
     }
     
     // Get commission payments for the specified partner (legacy table)
@@ -53,25 +54,25 @@ export async function GET(
       throw paymentsError;
     }
 
-    // Use client_orders data as commission data (the actual commission records)
-    const referralCommissions = clientOrders?.map((order: any) => ({
-      id: order.id,
-      referral_code: order.order_id, // Use order ID as referral code
-      client_name: order.client_name || 'Unknown',
-      client_email: order.client_email || '',
-      status: order.order_status,
-      commission_amount: order.commission_amount, // Already in pennies
-      commission_paid: order.commission_paid,
-      commission_rate: order.commission_rate,
-      purchased_at: order.created_at,
-      created_at: order.created_at
+    // Use commissions data as commission records
+    const referralCommissions = commissions?.map((commission: any) => ({
+      id: commission.id,
+      referral_code: commission.order_id || 'N/A',
+      client_name: commission.metadata?.customer_name || 'Customer',
+      client_email: 'Protected', // Don't show customer emails in admin
+      status: commission.status,
+      commission_amount: commission.commission_amount, // Already in cents
+      commission_paid: commission.status === 'paid',
+      commission_rate: commission.commission_rate,
+      purchased_at: commission.created_at,
+      created_at: commission.created_at
     })) || [];
 
-    // Calculate commission summary - convert from pennies to pounds
-    const totalEarned = clientOrders?.reduce((sum: number, order: any) => sum + ((order.commission_amount || 0) / 100), 0) || 0;
-    const totalPaid = clientOrders?.reduce((sum: number, order: any) => sum + (order.commission_paid ? ((order.commission_amount || 0) / 100) : 0), 0) || 0;
+    // Calculate commission summary - convert from cents to pounds
+    const totalEarned = commissions?.reduce((sum: number, commission: any) => sum + ((commission.commission_amount || 0) / 100), 0) || 0;
+    const totalPaid = commissions?.reduce((sum: number, commission: any) => sum + (commission.status === 'paid' ? ((commission.commission_amount || 0) / 100) : 0), 0) || 0;
     const totalPending = totalEarned - totalPaid;
-    const successfulReferrals = clientOrders?.filter((order: any) => order.order_status === 'completed').length || 0;
+    const successfulReferrals = commissions?.length || 0;
 
     // Convert referral commission amounts from pennies to pounds for display
     const convertedReferralCommissions = referralCommissions.map((ref: any) => ({

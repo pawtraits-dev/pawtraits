@@ -13,23 +13,20 @@ import { PartnerOnly } from '@/components/user-access-control'
 import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider } from '@/lib/country-context'
 
-interface CommissionOrder {
+interface CommissionRecord {
   id: string
+  recipient_id: string
+  recipient_type: string
   order_id: string
-  client_email: string
-  client_name: string | null
-  partner_id: string
-  order_type: string
   commission_amount: number
   commission_rate: number
-  commission_paid: boolean
-  is_initial_order: boolean
+  status: string
   created_at: string
   updated_at: string
-  referrals?: {
-    referral_code: string
-    client_name: string
-    client_email: string
+  metadata: {
+    commission_type?: string
+    order_items_count?: number
+    [key: string]: any
   }
 }
 
@@ -45,9 +42,9 @@ interface CommissionSummary {
 
 interface CommissionData {
   summary: CommissionSummary
-  orders: CommissionOrder[]
-  unpaidCommissions: CommissionOrder[]
-  paidCommissions: CommissionOrder[]
+  commissions: CommissionRecord[]
+  unpaidCommissions: CommissionRecord[]
+  paidCommissions: CommissionRecord[]
 }
 
 function CommissionsPageContent() {
@@ -77,8 +74,8 @@ function CommissionsPageContent() {
         params.append('status', statusFilter)
       }
 
-      console.log('Fetching commissions from /api/partner/commissions...')
-      const response = await fetch(`/api/partner/commissions?${params}`, {
+      console.log('Fetching commissions from /api/partners/commissions...')
+      const response = await fetch(`/api/partners/commissions?${params}`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         }
@@ -102,19 +99,21 @@ function CommissionsPageContent() {
   }
 
 
-  const getOrderTypeDisplay = (orderType: string, isInitial: boolean) => {
-    if (isInitial) {
+  const getCommissionTypeDisplay = (metadata: any) => {
+    if (metadata?.commission_type === 'initial') {
       return { label: 'Initial Order', color: 'bg-green-100 text-green-800' }
-    } else {
+    } else if (metadata?.commission_type === 'lifetime') {
       return { label: 'Lifetime Commission', color: 'bg-blue-100 text-blue-800' }
+    } else {
+      return { label: 'Commission', color: 'bg-gray-100 text-gray-800' }
     }
   }
 
-  const ordersToDisplay = statusFilter === 'paid' 
+  const commissionsToDisplay = statusFilter === 'paid'
     ? commissionData?.paidCommissions || []
-    : statusFilter === 'unpaid' 
+    : statusFilter === 'unpaid'
     ? commissionData?.unpaidCommissions || []
-    : commissionData?.orders || []
+    : commissionData?.commissions || []
 
   if (loading) {
     return (
@@ -245,11 +244,11 @@ function CommissionsPageContent() {
           <CardHeader>
             <CardTitle className="text-green-900">Commission Details</CardTitle>
             <CardDescription>
-              Showing {ordersToDisplay.length} commission record{ordersToDisplay.length !== 1 ? 's' : ''}
+              Showing {commissionsToDisplay.length} commission record{commissionsToDisplay.length !== 1 ? 's' : ''}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {ordersToDisplay.length === 0 ? (
+            {commissionsToDisplay.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <DollarSign className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>No commission records found</p>
@@ -260,8 +259,8 @@ function CommissionsPageContent() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Order ID</TableHead>
-                      <TableHead>Client</TableHead>
+                      <TableHead>Commission ID</TableHead>
+                      <TableHead>Order Items</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Commission</TableHead>
                       <TableHead>Rate</TableHead>
@@ -270,43 +269,39 @@ function CommissionsPageContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {ordersToDisplay.map((order) => {
-                      const orderType = getOrderTypeDisplay(order.order_type, order.is_initial_order)
+                    {commissionsToDisplay.map((commission) => {
+                      const commissionType = getCommissionTypeDisplay(commission.metadata)
+                      const itemsCount = commission.metadata?.order_items_count || 1
                       return (
-                        <TableRow key={order.id}>
+                        <TableRow key={commission.id}>
                           <TableCell className="font-mono text-sm">
-                            <Link href={`/orders/${order.order_id}`} className="text-blue-600 hover:underline">
-                              {order.order_id}
-                            </Link>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              <div className="font-medium">{order.client_name || 'N/A'}</div>
-                              <div className="text-gray-500">{order.client_email}</div>
-                              {order.referrals && (
-                                <div className="text-xs text-blue-600">
-                                  Ref: {order.referrals.referral_code}
-                                </div>
-                              )}
+                            <div className="text-blue-600">
+                              #{commission.id.slice(-8)}
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge className={orderType.color}>{orderType.label}</Badge>
+                            <div className="text-sm">
+                              <div className="font-medium">{itemsCount} item{itemsCount !== 1 ? 's' : ''}</div>
+                              <div className="text-gray-500 text-xs">Order placed</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={commissionType.color}>{commissionType.label}</Badge>
                           </TableCell>
                           <TableCell className="font-medium">
-                            £{(order.commission_amount / 100).toFixed(2)}
+                            £{(commission.commission_amount / 100).toFixed(2)}
                           </TableCell>
-                          <TableCell>{order.commission_rate}%</TableCell>
+                          <TableCell>{commission.commission_rate}%</TableCell>
                           <TableCell>
-                            <Badge className={order.commission_paid 
-                              ? "bg-green-100 text-green-800" 
+                            <Badge className={commission.status === 'paid'
+                              ? "bg-green-100 text-green-800"
                               : "bg-orange-100 text-orange-800"
                             }>
-                              {order.commission_paid ? 'Paid' : 'Unpaid'}
+                              {commission.status === 'paid' ? 'Paid' : 'Unpaid'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm">
-                            {new Date(order.created_at).toLocaleDateString()}
+                            {new Date(commission.created_at).toLocaleDateString()}
                           </TableCell>
                         </TableRow>
                       )
