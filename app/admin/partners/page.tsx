@@ -200,10 +200,10 @@ export default function AdminPartnersPage() {
 
   const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <th
-      className="text-left p-4 font-medium cursor-pointer hover:bg-gray-50 select-none"
+      className="text-left font-medium cursor-pointer hover:bg-gray-50 select-none"
       onClick={() => handleSort(field)}
     >
-      <div className="flex items-center space-x-1">
+      <div className="flex items-center space-x-1 p-4">
         <span>{children}</span>
         {sortField === field && (
           sortDirection === 'asc' ? (
