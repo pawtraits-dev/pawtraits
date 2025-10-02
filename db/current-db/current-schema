@@ -261,6 +261,29 @@ CREATE TABLE public.commission_payments (
   CONSTRAINT commission_payments_pkey PRIMARY KEY (id),
   CONSTRAINT commission_payments_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id)
 );
+CREATE TABLE public.commissions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL,
+  order_amount integer NOT NULL,
+  recipient_type text NOT NULL CHECK (recipient_type = ANY (ARRAY['partner'::text, 'customer'::text])),
+  recipient_id uuid NOT NULL,
+  recipient_email text NOT NULL,
+  referrer_type text NOT NULL CHECK (referrer_type = ANY (ARRAY['partner'::text, 'customer'::text])),
+  referrer_id uuid,
+  referral_code text,
+  commission_type text NOT NULL CHECK (commission_type = ANY (ARRAY['partner_commission'::text, 'customer_credit'::text])),
+  commission_rate numeric NOT NULL DEFAULT 10.00,
+  commission_amount integer NOT NULL,
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'approved'::text, 'paid'::text, 'cancelled'::text])),
+  payment_date timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  metadata jsonb,
+  commission_payment_id uuid,
+  CONSTRAINT commissions_pkey PRIMARY KEY (id),
+  CONSTRAINT commissions_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT commissions_commission_payment_id_fkey FOREIGN KEY (commission_payment_id) REFERENCES public.commission_payments(id)
+);
 CREATE TABLE public.countries (
   code text NOT NULL,
   name text NOT NULL,
@@ -362,8 +385,7 @@ CREATE TABLE public.customers (
   referral_order_id uuid,
   CONSTRAINT customers_pkey PRIMARY KEY (id),
   CONSTRAINT customers_referred_by_partner_id_fkey FOREIGN KEY (referred_by_partner_id) REFERENCES public.partners(id),
-  CONSTRAINT customers_referrer_id_fkey FOREIGN KEY (referrer_id) REFERENCES public.user_profiles(id),
-  CONSTRAINT customers_referral_order_id_fkey FOREIGN KEY (referral_order_id) REFERENCES public.client_orders(id)
+  CONSTRAINT customers_referrer_id_fkey FOREIGN KEY (referrer_id) REFERENCES public.user_profiles(id)
 );
 CREATE TABLE public.data_protection_events (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

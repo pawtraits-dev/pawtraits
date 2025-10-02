@@ -65,11 +65,11 @@ export async function GET(request: NextRequest) {
           total_amount,
           order_items (
             id,
-            product_name,
-            product_description,
-            thumbnail_url,
+            product_data,
             quantity,
-            unit_price
+            unit_price,
+            total_price,
+            image_url
           )
         )
       `)

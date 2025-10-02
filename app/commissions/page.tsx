@@ -39,11 +39,15 @@ interface CommissionRecord {
     total_amount: number
     order_items: Array<{
       id: string
-      product_name: string
-      product_description: string
-      thumbnail_url: string
+      product_data: {
+        name?: string
+        description?: string
+        thumbnail_url?: string
+      }
       quantity: number
       unit_price: number
+      total_price: number
+      image_url?: string
     }>
   }
 }
@@ -98,7 +102,7 @@ function CommissionsPageContent() {
   useEffect(() => {
     fetchCommissions()
     fetchPayments()
-  }, [statusFilter])
+  }, [statusFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchCommissions = async () => {
     try {
@@ -383,29 +387,35 @@ function CommissionsPageContent() {
                               </TableCell>
                               <TableCell>
                                 <div className="space-y-2 max-w-xs">
-                                  {order?.order_items?.slice(0, 2).map((item, index) => (
-                                    <div key={item.id} className="flex items-center gap-2 text-sm">
-                                      {item.thumbnail_url && (
-                                        <div className="w-8 h-8 rounded-md overflow-hidden bg-gray-100 flex-shrink-0">
-                                          <Image
-                                            src={item.thumbnail_url}
-                                            alt={item.product_name}
-                                            width={32}
-                                            height={32}
-                                            className="w-full h-full object-cover"
-                                          />
-                                        </div>
-                                      )}
-                                      <div className="min-w-0 flex-1">
-                                        <div className="font-medium text-xs truncate">
-                                          {item.product_name}
-                                        </div>
-                                        <div className="text-gray-500 text-xs">
-                                          {item.quantity}x £{(item.unit_price / 100).toFixed(2)}
+                                  {order?.order_items?.slice(0, 2).map((item, index) => {
+                                    const productData = item.product_data || {};
+                                    const thumbnailUrl = productData.thumbnail_url || item.image_url;
+                                    const productName = productData.name || 'Product';
+
+                                    return (
+                                      <div key={item.id} className="flex items-center gap-2 text-sm">
+                                        {thumbnailUrl && (
+                                          <div className="w-8 h-8 rounded-md overflow-hidden bg-gray-100 flex-shrink-0">
+                                            <Image
+                                              src={thumbnailUrl}
+                                              alt={productName}
+                                              width={32}
+                                              height={32}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          </div>
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                          <div className="font-medium text-xs truncate">
+                                            {productName}
+                                          </div>
+                                          <div className="text-gray-500 text-xs">
+                                            {item.quantity}x £{(item.unit_price / 100).toFixed(2)}
+                                          </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  ))}
+                                    )
+                                  })}
                                   {order && order.order_items && order.order_items.length > 2 && (
                                     <div className="text-xs text-gray-500">
                                       +{order.order_items.length - 2} more items
