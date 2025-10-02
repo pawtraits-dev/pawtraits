@@ -362,28 +362,37 @@ async function handleSimplifiedCommissions(
       isFirstOrder
     });
 
-    // Update customer to mark referral as completed
-    const { error: updateError } = await supabase
-      .from('customers')
-      .update({
-        referral_order_id: order.id,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', customer.id);
-
-    if (updateError) {
-      console.error('❌ Error updating customer referral completion:', updateError);
-      return;
-    }
+    // First create the commission record, then update customer
+    let commissionCreated = false;
 
     // Case 3: Partner Referred Customer - 10% commission to partner
     if (customer.referral_type === 'PARTNER' && customer.referrer_id) {
       await handlePartnerCommission(supabase, order, customer, subtotalAmount);
+      commissionCreated = true;
     }
 
     // Case 4: Customer Referred Customer - 10% credit to referring customer
     if (customer.referral_type === 'CUSTOMER' && customer.referrer_id) {
       await handleCustomerCredit(supabase, order, customer, subtotalAmount);
+      commissionCreated = true;
+    }
+
+    // Only update customer after commission record is created
+    if (commissionCreated) {
+      const { error: updateError } = await supabase
+        .from('customers')
+        .update({
+          referral_order_id: order.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', customer.id);
+
+      if (updateError) {
+        console.error('❌ Error updating customer referral completion:', updateError);
+        // Don't return here - commission was already created successfully
+      } else {
+        console.log('✅ Customer referral completion updated successfully');
+      }
     }
 
     console.log('🎉 Simplified commission processing completed');
