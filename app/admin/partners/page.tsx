@@ -6,19 +6,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { 
-  Search, 
-  Filter, 
-  Eye, 
-  Check, 
-  X, 
-  Pause, 
-  Play, 
-  MoreHorizontal,
+import {
+  Search,
+  Filter,
+  Check,
+  X,
+  Pause,
+  Play,
   Calendar,
   DollarSign,
   Users,
-  TrendingUp
+  TrendingUp,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -45,6 +45,9 @@ const businessTypeLabels = {
   chain: '🏢 Chain/Franchise'
 };
 
+type SortField = 'business_name' | 'approval_status' | 'created_at' | 'total_referrals' | 'successful_referrals' | 'total_orders' | 'total_order_value' | 'total_commissions';
+type SortDirection = 'asc' | 'desc';
+
 export default function AdminPartnersPage() {
   const [partners, setPartners] = useState<AdminPartnerOverview[]>([]);
   const [filteredPartners, setFilteredPartners] = useState<AdminPartnerOverview[]>([]);
@@ -52,6 +55,8 @@ export default function AdminPartnersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [businessTypeFilter, setBusinessTypeFilter] = useState('all');
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   useEffect(() => {
     loadPartners();
@@ -59,7 +64,7 @@ export default function AdminPartnersPage() {
 
   useEffect(() => {
     filterPartners();
-  }, [partners, searchTerm, statusFilter, businessTypeFilter]);
+  }, [partners, searchTerm, statusFilter, businessTypeFilter, sortField, sortDirection]);
 
   const loadPartners = async () => {
     try {
@@ -76,12 +81,44 @@ export default function AdminPartnersPage() {
     }
   };
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortValue = (partner: AdminPartnerOverview, field: SortField) => {
+    switch (field) {
+      case 'business_name':
+        return partner.business_name || partner.full_name;
+      case 'approval_status':
+        return partner.approval_status;
+      case 'created_at':
+        return new Date(partner.created_at).getTime();
+      case 'total_referrals':
+        return partner.total_referrals;
+      case 'successful_referrals':
+        return partner.successful_referrals;
+      case 'total_orders':
+        return partner.total_orders;
+      case 'total_order_value':
+        return partner.total_order_value;
+      case 'total_commissions':
+        return partner.total_commissions;
+      default:
+        return 0;
+    }
+  };
+
   const filterPartners = () => {
     let filtered = partners;
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(partner => 
+      filtered = filtered.filter(partner =>
         partner.full_name.toLowerCase().includes(term) ||
         partner.email.toLowerCase().includes(term) ||
         partner.business_name?.toLowerCase().includes(term)
@@ -95,6 +132,18 @@ export default function AdminPartnersPage() {
     if (businessTypeFilter !== 'all') {
       filtered = filtered.filter(partner => partner.business_type === businessTypeFilter);
     }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      const aValue = getSortValue(a, sortField);
+      const bValue = getSortValue(b, sortField);
+
+      let comparison = 0;
+      if (aValue < bValue) comparison = -1;
+      if (aValue > bValue) comparison = 1;
+
+      return sortDirection === 'desc' ? -comparison : comparison;
+    });
 
     setFilteredPartners(filtered);
   };
@@ -148,6 +197,24 @@ export default function AdminPartnersPage() {
   const getConversionRate = (total: number, successful: number) => {
     return total > 0 ? ((successful / total) * 100).toFixed(1) : '0';
   };
+
+  const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
+    <th
+      className="text-left p-4 font-medium cursor-pointer hover:bg-gray-50 select-none"
+      onClick={() => handleSort(field)}
+    >
+      <div className="flex items-center space-x-1">
+        <span>{children}</span>
+        {sortField === field && (
+          sortDirection === 'asc' ? (
+            <ChevronUp className="w-4 h-4" />
+          ) : (
+            <ChevronDown className="w-4 h-4" />
+          )
+        )}
+      </div>
+    </th>
+  );
 
   const stats = {
     total: partners.length,
@@ -298,6 +365,8 @@ export default function AdminPartnersPage() {
                   setSearchTerm('');
                   setStatusFilter('all');
                   setBusinessTypeFilter('all');
+                  setSortField('created_at');
+                  setSortDirection('desc');
                 }} size="sm">
                   <Filter className="w-4 h-4 mr-2" />
                   Clear
@@ -312,144 +381,85 @@ export default function AdminPartnersPage() {
       <Card>
         <CardHeader>
           <CardTitle>Partners</CardTitle>
-          <CardDescription>Manage partner accounts and approvals</CardDescription>
+          <CardDescription>Click on any row to view partner details</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left p-4 font-medium">Partner</th>
-                  <th className="text-left p-4 font-medium">Business</th>
-                  <th className="text-left p-4 font-medium">Status</th>
-                  <th className="text-left p-4 font-medium">Performance</th>
-                  <th className="text-left p-4 font-medium">Joined</th>
-                  <th className="text-right p-4 font-medium">Actions</th>
+                  <SortableHeader field="business_name">Business Name / Type</SortableHeader>
+                  <SortableHeader field="approval_status">Status / Date Joined</SortableHeader>
+                  <SortableHeader field="total_referrals"># Code Scans</SortableHeader>
+                  <SortableHeader field="successful_referrals"># Signups / Conversion %</SortableHeader>
+                  <SortableHeader field="total_orders"># Orders</SortableHeader>
+                  <SortableHeader field="total_order_value">Total Order Value</SortableHeader>
+                  <SortableHeader field="total_commissions">Commission Total</SortableHeader>
                 </tr>
               </thead>
               <tbody>
                 {filteredPartners.map((partner) => (
-                  <tr key={partner.id} className="border-b hover:bg-gray-50">
-                    <td className="p-4">
-                      <div>
-                        <div className="font-medium text-gray-900">{partner.full_name}</div>
-                        <div className="text-sm text-gray-600">{partner.email}</div>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div>
-                        <div className="font-medium text-gray-900">{partner.business_name || 'N/A'}</div>
-                        <div className="text-sm text-gray-600">
-                          {partner.business_type ? businessTypeLabels[partner.business_type as keyof typeof businessTypeLabels] : 'N/A'}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="space-y-1">
-                        <Badge className={approvalStatusColors[partner.approval_status as keyof typeof approvalStatusColors]}>
-                          {partner.approval_status.charAt(0).toUpperCase() + partner.approval_status.slice(1)}
-                        </Badge>
-                        {partner.is_active ? (
-                          <div className="text-xs text-green-600">Active</div>
-                        ) : (
-                          <div className="text-xs text-gray-500">Inactive</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="text-sm">
-                        <div className="font-medium">{partner.total_referrals} code scans</div>
-                        <div className="text-gray-600">
-                          {partner.successful_referrals} signups ({getConversionRate(partner.total_referrals, partner.successful_referrals)}%)
-                        </div>
-                        <div className="text-blue-600 font-medium">
-                          {partner.total_orders} orders • {formatCurrency(partner.total_order_value / 100)}
-                        </div>
-                        <div className="text-purple-600 font-medium">
-                          {formatCurrency(partner.total_commissions / 100)} commission total
-                        </div>
-                        {partner.unpaid_commissions > 0 && (
-                          <div className="text-orange-600 text-xs">
-                            {formatCurrency(partner.unpaid_commissions / 100)} unpaid
+                  <Link key={partner.id} href={`/admin/partners/${partner.id}`}>
+                    <tr className="border-b hover:bg-gray-50 cursor-pointer transition-colors">
+                      <td className="p-4">
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {partner.business_name || partner.full_name}
                           </div>
-                        )}
-                        {partner.paid_commissions > 0 && (
-                          <div className="text-green-600 text-xs">
-                            {formatCurrency(partner.paid_commissions / 100)} paid
+                          <div className="text-sm text-gray-600">
+                            {partner.business_type ? businessTypeLabels[partner.business_type as keyof typeof businessTypeLabels] : 'N/A'}
                           </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="text-sm">
-                        <div>{formatDate(partner.created_at)}</div>
-                        {partner.last_login_at && (
-                          <div className="text-gray-600">
-                            Last: {formatDate(partner.last_login_at)}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="space-y-1">
+                          <Badge className={approvalStatusColors[partner.approval_status as keyof typeof approvalStatusColors]}>
+                            {partner.approval_status.charAt(0).toUpperCase() + partner.approval_status.slice(1)}
+                          </Badge>
+                          <div className="text-sm text-gray-600">
+                            {formatDate(partner.created_at)}
                           </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-end space-x-2">
-                        <Link href={`/admin/partners/${partner.id}`}>
-                          <Button variant="outline" size="sm">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </Link>
-                        
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            {partner.approval_status === 'pending' && (
-                              <>
-                                <DropdownMenuItem onClick={() => handleStatusChange(partner.id, 'approved')}>
-                                  <Check className="w-4 h-4 mr-2" />
-                                  Approve
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => {
-                                  const reason = prompt('Rejection reason:');
-                                  if (reason) handleStatusChange(partner.id, 'rejected', reason);
-                                }}>
-                                  <X className="w-4 h-4 mr-2" />
-                                  Reject
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            {partner.approval_status === 'approved' && (
-                              <DropdownMenuItem onClick={() => handleStatusChange(partner.id, 'suspended')}>
-                                <Pause className="w-4 h-4 mr-2" />
-                                Suspend
-                              </DropdownMenuItem>
-                            )}
-                            {partner.approval_status === 'suspended' && (
-                              <DropdownMenuItem onClick={() => handleStatusChange(partner.id, 'approved')}>
-                                <Play className="w-4 h-4 mr-2" />
-                                Reactivate
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onClick={() => handleToggleActive(partner.id, partner.is_active)}>
-                              {partner.is_active ? (
-                                <>
-                                  <Pause className="w-4 h-4 mr-2" />
-                                  Deactivate
-                                </>
-                              ) : (
-                                <>
-                                  <Play className="w-4 h-4 mr-2" />
-                                  Activate
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </td>
-                  </tr>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-medium text-gray-900">
+                          {partner.total_referrals.toLocaleString()}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {partner.successful_referrals.toLocaleString()}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {getConversionRate(partner.total_referrals, partner.successful_referrals)}% conversion
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-medium text-gray-900">
+                          {partner.total_orders.toLocaleString()}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-medium text-gray-900">
+                          {formatCurrency(partner.total_order_value / 100)}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {formatCurrency(partner.total_commissions / 100)}
+                          </div>
+                          {partner.unpaid_commissions > 0 && (
+                            <div className="text-sm text-orange-600">
+                              {formatCurrency(partner.unpaid_commissions / 100)} unpaid
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  </Link>
                 ))}
               </tbody>
             </table>
