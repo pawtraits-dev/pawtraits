@@ -288,17 +288,15 @@ CREATE TABLE public.customer_credit_transactions (
 );
 CREATE TABLE public.customer_credits (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  customer_id uuid NOT NULL UNIQUE,
-  total_earned integer DEFAULT 0 CHECK (total_earned >= 0),
-  total_used integer DEFAULT 0 CHECK (total_used >= 0),
-  available_balance integer DEFAULT 0 CHECK (available_balance >= 0),
-  pending_credits integer DEFAULT 0,
-  last_credit_earned_at timestamp with time zone,
-  last_credit_used_at timestamp with time zone,
+  customer_id uuid NOT NULL,
+  credit_amount integer NOT NULL,
+  earned_from_order_id uuid,
+  used_in_order_id uuid,
+  status text DEFAULT 'available'::text,
+  expires_at timestamp with time zone DEFAULT (now() + '1 year'::interval),
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT customer_credits_pkey PRIMARY KEY (id),
-  CONSTRAINT customer_credits_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
+  CONSTRAINT customer_credits_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.customer_referrals (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -355,8 +353,17 @@ CREATE TABLE public.customers (
   successful_referrals integer DEFAULT 0,
   rewards_earned numeric DEFAULT 0.00,
   signup_discount_used integer DEFAULT 0,
+  referral_type USER-DEFINED DEFAULT 'ORGANIC'::referral_type_enum,
+  referrer_id uuid,
+  referral_code_used text,
+  referral_discount_applied numeric DEFAULT 0,
+  referral_commission_rate numeric DEFAULT 0,
+  referral_applied_at timestamp with time zone,
+  referral_order_id uuid,
   CONSTRAINT customers_pkey PRIMARY KEY (id),
-  CONSTRAINT customers_referred_by_partner_id_fkey FOREIGN KEY (referred_by_partner_id) REFERENCES public.partners(id)
+  CONSTRAINT customers_referred_by_partner_id_fkey FOREIGN KEY (referred_by_partner_id) REFERENCES public.partners(id),
+  CONSTRAINT customers_referrer_id_fkey FOREIGN KEY (referrer_id) REFERENCES public.user_profiles(id),
+  CONSTRAINT customers_referral_order_id_fkey FOREIGN KEY (referral_order_id) REFERENCES public.client_orders(id)
 );
 CREATE TABLE public.data_protection_events (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -468,6 +475,91 @@ CREATE TABLE public.image_catalog (
   CONSTRAINT image_catalog_style_id_fkey FOREIGN KEY (style_id) REFERENCES public.styles(id),
   CONSTRAINT image_catalog_format_id_fkey FOREIGN KEY (format_id) REFERENCES public.formats(id),
   CONSTRAINT image_catalog_coat_id_fkey FOREIGN KEY (coat_id) REFERENCES public.coats(id)
+);
+CREATE TABLE public.influencer_referral_codes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  influencer_id uuid NOT NULL,
+  code text NOT NULL UNIQUE CHECK (length(code) >= 6),
+  qr_code_url text,
+  description text,
+  usage_count integer DEFAULT 0,
+  conversion_count integer DEFAULT 0,
+  total_revenue numeric DEFAULT 0,
+  total_commission numeric DEFAULT 0,
+  is_active boolean DEFAULT true,
+  expires_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT influencer_referral_codes_pkey PRIMARY KEY (id),
+  CONSTRAINT influencer_referral_codes_influencer_id_fkey FOREIGN KEY (influencer_id) REFERENCES public.influencers(id)
+);
+CREATE TABLE public.influencer_referrals (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  influencer_id uuid NOT NULL,
+  referral_code_id uuid NOT NULL,
+  customer_id uuid,
+  customer_email text,
+  status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'accessed'::text, 'signed_up'::text, 'purchased'::text, 'credited'::text, 'expired'::text])),
+  order_id uuid,
+  order_value numeric,
+  commission_amount numeric,
+  commission_paid boolean DEFAULT false,
+  source_platform text,
+  utm_source text,
+  utm_medium text,
+  utm_campaign text,
+  accessed_at timestamp with time zone,
+  signed_up_at timestamp with time zone,
+  purchased_at timestamp with time zone,
+  credited_at timestamp with time zone,
+  expires_at timestamp with time zone DEFAULT (now() + '90 days'::interval),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT influencer_referrals_pkey PRIMARY KEY (id),
+  CONSTRAINT influencer_referrals_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT influencer_referrals_influencer_id_fkey FOREIGN KEY (influencer_id) REFERENCES public.influencers(id),
+  CONSTRAINT influencer_referrals_referral_code_id_fkey FOREIGN KEY (referral_code_id) REFERENCES public.influencer_referral_codes(id),
+  CONSTRAINT influencer_referrals_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
+);
+CREATE TABLE public.influencer_social_channels (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  influencer_id uuid NOT NULL,
+  platform text NOT NULL CHECK (platform = ANY (ARRAY['instagram'::text, 'tiktok'::text, 'youtube'::text, 'twitter'::text, 'facebook'::text, 'linkedin'::text, 'pinterest'::text])),
+  username text NOT NULL,
+  profile_url text,
+  follower_count integer DEFAULT 0,
+  engagement_rate numeric DEFAULT 0.0,
+  verified boolean DEFAULT false,
+  is_primary boolean DEFAULT false,
+  is_active boolean DEFAULT true,
+  last_updated timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT influencer_social_channels_pkey PRIMARY KEY (id),
+  CONSTRAINT influencer_social_channels_influencer_id_fkey FOREIGN KEY (influencer_id) REFERENCES public.influencers(id)
+);
+CREATE TABLE public.influencers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  email text NOT NULL UNIQUE,
+  first_name text NOT NULL,
+  last_name text NOT NULL,
+  username text UNIQUE,
+  bio text,
+  avatar_url text,
+  phone text,
+  is_active boolean DEFAULT true,
+  is_verified boolean DEFAULT false,
+  commission_rate numeric DEFAULT 10.00,
+  payment_method text CHECK (payment_method = ANY (ARRAY['paypal'::text, 'bank_transfer'::text])),
+  payment_details jsonb,
+  notification_preferences jsonb DEFAULT '{"email_referrals": true, "email_commissions": true}'::jsonb,
+  approval_status text DEFAULT 'pending'::text CHECK (approval_status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'suspended'::text])),
+  approved_by uuid,
+  approved_at timestamp with time zone,
+  rejection_reason text,
+  last_login_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT influencers_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.interaction_analytics (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -948,7 +1040,7 @@ CREATE TABLE public.user_interactions (
 CREATE TABLE public.user_profiles (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL UNIQUE,
-  user_type text NOT NULL CHECK (user_type = ANY (ARRAY['admin'::text, 'partner'::text, 'customer'::text])),
+  user_type text NOT NULL CHECK (user_type = ANY (ARRAY['admin'::text, 'partner'::text, 'customer'::text, 'influencer'::text])),
   permissions ARRAY DEFAULT '{}'::text[],
   partner_id uuid,
   customer_id uuid,
@@ -960,8 +1052,10 @@ CREATE TABLE public.user_profiles (
   status text DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'inactive'::text, 'suspended'::text])),
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  influencer_id uuid,
   CONSTRAINT user_profiles_pkey PRIMARY KEY (id),
   CONSTRAINT user_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT user_profiles_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id),
-  CONSTRAINT user_profiles_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id)
+  CONSTRAINT user_profiles_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
+  CONSTRAINT user_profiles_influencer_id_fkey FOREIGN KEY (influencer_id) REFERENCES public.influencers(id)
 );

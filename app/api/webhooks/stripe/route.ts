@@ -3,7 +3,6 @@ import { headers } from 'next/headers';
 import { constructWebhookEvent } from '@/lib/stripe-server';
 import { createClient } from '@supabase/supabase-js';
 import { createGelatoService } from '@/lib/gelato-service';
-import { createPartnerCommission, createCustomerCredit } from '@/lib/commission-functions';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -715,22 +714,30 @@ async function handlePartnerCommissionFromMetadata(
       referral_type: 'partner'
     };
 
-    // Use new commission tracking system
-    const commission = await createPartnerCommission(
-      supabase,
-      order.id,
-      subtotalAmount,
-      customer,
-      referral.partner_id,
-      referral.partners?.email || ''
-    );
-
-    console.log('✅ Partner commission created from metadata using new system:', {
-      commissionId: commission.id,
-      partnerId: referral.partner_id,
-      partnerName: referral.partners?.business_name,
-      commissionAmount: commission.commission_amount / 100 // Convert to pounds for logging
+    // Use API endpoint for commission creation
+    const commissionResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/commissions/partner`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId: order.id,
+        orderAmount: subtotalAmount,
+        customer,
+        partnerId: referral.partner_id,
+        partnerEmail: referral.partners?.email || ''
+      })
     });
+
+    if (commissionResponse.ok) {
+      const commission = await commissionResponse.json();
+      console.log('✅ Partner commission created from metadata using API:', {
+        commissionId: commission.id,
+        partnerId: referral.partner_id,
+        partnerName: referral.partners?.business_name,
+        commissionAmount: commission.commission_amount / 100
+      });
+    } else {
+      console.error('❌ Failed to create partner commission via API:', await commissionResponse.text());
+    }
 
   } catch (error) {
     console.error('💥 Error handling partner commission from metadata:', error);
@@ -773,22 +780,30 @@ async function handleCustomerCreditFromMetadata(
       referral_type: 'customer'
     };
 
-    // Use new commission tracking system
-    const credit = await createCustomerCredit(
-      supabase,
-      order.id,
-      subtotalAmount,
-      referredCustomer,
-      referringCustomer.id,
-      referringCustomer.email
-    );
-
-    console.log('✅ Customer credit created from metadata using new system:', {
-      creditId: credit.id,
-      referringCustomerId: referringCustomer.id,
-      referringCustomerEmail: referringCustomer.email,
-      creditAmount: credit.commission_amount / 100 // Convert to pounds for logging
+    // Use API endpoint for customer credit creation
+    const creditResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/commissions/customer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId: order.id,
+        orderAmount: subtotalAmount,
+        referredCustomer,
+        referringCustomerId: referringCustomer.id,
+        referringCustomerEmail: referringCustomer.email
+      })
     });
+
+    if (creditResponse.ok) {
+      const credit = await creditResponse.json();
+      console.log('✅ Customer credit created from metadata using API:', {
+        creditId: credit.id,
+        referringCustomerId: referringCustomer.id,
+        referringCustomerEmail: referringCustomer.email,
+        creditAmount: credit.commission_amount / 100
+      });
+    } else {
+      console.error('❌ Failed to create customer credit via API:', await creditResponse.text());
+    }
 
   } catch (error) {
     console.error('💥 Error handling customer credit from metadata:', error);
@@ -833,22 +848,30 @@ async function handlePartnerCommission(
       return;
     }
 
-    // Use new commission tracking system
-    const commission = await createPartnerCommission(
-      supabase,
-      order.id,
-      subtotalAmount,
-      customer,
-      partnerProfile.partner.id,
-      partnerProfile.partner.email || partnerProfile.email
-    );
-
-    console.log('✅ Partner commission created using new system:', {
-      commissionId: commission.id,
-      partnerId: partnerProfile.partner.id,
-      partnerName: partnerProfile.partner.business_name,
-      commissionAmount: commission.commission_amount / 100 // Convert to pounds for logging
+    // Use API endpoint for commission creation
+    const commissionResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/commissions/partner`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId: order.id,
+        orderAmount: subtotalAmount,
+        customer,
+        partnerId: partnerProfile.partner.id,
+        partnerEmail: partnerProfile.partner.email || partnerProfile.email
+      })
     });
+
+    if (commissionResponse.ok) {
+      const commission = await commissionResponse.json();
+      console.log('✅ Partner commission created using API:', {
+        commissionId: commission.id,
+        partnerId: partnerProfile.partner.id,
+        partnerName: partnerProfile.partner.business_name,
+        commissionAmount: commission.commission_amount / 100
+      });
+    } else {
+      console.error('❌ Failed to create partner commission via API:', await commissionResponse.text());
+    }
 
   } catch (error) {
     console.error('💥 Error handling partner commission:', error);
@@ -882,22 +905,30 @@ async function handleCustomerCredit(
       return;
     }
 
-    // Use new commission tracking system
-    const credit = await createCustomerCredit(
-      supabase,
-      order.id,
-      subtotalAmount,
-      customer, // The referred customer making the purchase
-      customer.referrer_id, // ID of the customer who made the referral
-      referringCustomer.email // Email of the referring customer
-    );
-
-    console.log('✅ Customer credit created using new system:', {
-      creditId: credit.id,
-      referrerId: customer.referrer_id,
-      referrerEmail: referringCustomer.email,
-      creditAmount: credit.commission_amount / 100 // Convert to pounds for logging
+    // Use API endpoint for customer credit creation
+    const creditResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/commissions/customer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId: order.id,
+        orderAmount: subtotalAmount,
+        referredCustomer: customer, // The referred customer making the purchase
+        referringCustomerId: customer.referrer_id, // ID of the customer who made the referral
+        referringCustomerEmail: referringCustomer.email // Email of the referring customer
+      })
     });
+
+    if (creditResponse.ok) {
+      const credit = await creditResponse.json();
+      console.log('✅ Customer credit created using API:', {
+        creditId: credit.id,
+        referrerId: customer.referrer_id,
+        referrerEmail: referringCustomer.email,
+        creditAmount: credit.commission_amount / 100
+      });
+    } else {
+      console.error('❌ Failed to create customer credit via API:', await creditResponse.text());
+    }
 
   } catch (error) {
     console.error('💥 Error handling customer credit:', error);
