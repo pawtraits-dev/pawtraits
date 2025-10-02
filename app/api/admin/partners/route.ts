@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
       const { data: commissionRecords } = await supabaseAdmin
         .from('commissions')
         .select('commission_amount, status')
-        .eq('recipient_id', userProfile?.id || '')
+        .eq('recipient_id', partner.id)
         .eq('recipient_type', 'partner');
 
       const totalCommissions = commissionRecords
