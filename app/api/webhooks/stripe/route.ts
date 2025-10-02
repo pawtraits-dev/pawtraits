@@ -309,37 +309,38 @@ async function handleSimplifiedCommissions(
     }
 
     // Fallback: Check referral status in customers table (main flow for customer-based referrals)
-    console.log('🔍 Looking up customer referral status for:', customerEmail.toLowerCase());
+    console.log('🔍 Looking up customer referral status via API for:', customerEmail.toLowerCase());
 
-    const { data: customer, error: customerError } = await supabase
-      .from('customers')
-      .select(`
-        id,
-        email,
-        referral_type,
-        referrer_id,
-        referral_code_used,
-        referral_discount_applied,
-        referral_commission_rate,
-        referral_order_id
-      `)
-      .eq('email', customerEmail.toLowerCase())
-      .single();
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+      const customerLookupResponse = await fetch(
+        `${baseUrl}/api/customers/lookup?email=${encodeURIComponent(customerEmail.toLowerCase())}`
+      );
 
-    console.log('🎯 Customer lookup result:', {
-      found: !!customer,
-      error: customerError?.message,
-      customerData: customer ? {
-        id: customer.id,
-        email: customer.email,
-        referral_type: customer.referral_type,
-        referrer_id: customer.referrer_id,
-        referral_order_id: customer.referral_order_id
-      } : null
-    });
+      const customerLookupData = await customerLookupResponse.json();
 
-    if (customerError || !customer) {
-      console.log('ℹ️ Customer not found or organic order - no commission processing');
+      console.log('🎯 Customer lookup result:', {
+        status: customerLookupResponse.status,
+        found: customerLookupData.success,
+        error: customerLookupData.error,
+        customerData: customerLookupData.customer ? {
+          id: customerLookupData.customer.id,
+          email: customerLookupData.customer.email,
+          referral_type: customerLookupData.customer.referral_type,
+          referrer_id: customerLookupData.customer.referrer_id,
+          referral_order_id: customerLookupData.customer.referral_order_id
+        } : null
+      });
+
+      if (!customerLookupResponse.ok || !customerLookupData.success || !customerLookupData.customer) {
+        console.log('ℹ️ Customer not found or organic order - no commission processing');
+        return;
+      }
+
+      const customer = customerLookupData.customer;
+    } catch (error) {
+      console.error('💥 Error looking up customer via API:', error);
+      console.log('ℹ️ Customer lookup failed - no commission processing');
       return;
     }
 
