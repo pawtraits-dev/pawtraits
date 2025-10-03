@@ -115,11 +115,13 @@ export default function CommissionTrackingPage() {
         order_amount: commission.order_amount || 0,
         commission_rate: commission.commission_rate / 100, // Convert percentage to decimal
         commission_amount: commission.commission_amount, // Already in pennies from database
-        status: commission.commission_paid ? 'paid' : 'pending',
+        status: commission.status, // Use actual status from database
         created_at: commission.created_at,
-        paid_at: commission.commission_paid ? commission.updated_at : undefined,
+        paid_at: commission.paid_at || (commission.status === 'paid' ? commission.updated_at : undefined),
         referral_code: commission.referral_code || commission.order_id,
-        customer_name: commission.client_name || commission.client_email
+        customer_name: commission.customer_name,
+        commission_type: commission.commission_type,
+        recipient_type: commission.recipient_type
       }));
 
       console.log('🔄 Client: Processed commissions:', processedCommissions.length);
