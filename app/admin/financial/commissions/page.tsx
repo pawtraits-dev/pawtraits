@@ -596,39 +596,26 @@ export default function CommissionTrackingPage() {
             <div className="lg:col-span-2">
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Commission Details</CardTitle>
-                      <CardDescription>Individual commission records and payouts</CardDescription>
-                    </div>
-                    {filteredCommissions.some(c => c.status === 'pending') && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const pendingCommissions = filteredCommissions
-                            .filter(c => c.status === 'pending')
-                            .map(c => c.id);
-                          setSelectedCommissions(pendingCommissions);
-                        }}
-                      >
-                        Select All Pending
-                      </Button>
-                    )}
+                  <div>
+                    <CardTitle>Commission Details</CardTitle>
+                    <CardDescription>Individual commission records and payouts by partner</CardDescription>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
                     {Object.entries(groupedCommissions()).map(([partnerId, partnerOrders]) => {
                       const firstCommission = Object.values(partnerOrders)[0][0];
-                      const partnerTotalCommissions = Object.values(partnerOrders).flat().reduce((sum, c) => sum + c.commission_amount, 0);
+                      const allPartnerCommissions = Object.values(partnerOrders).flat();
+                      const partnerTotalCommissions = allPartnerCommissions.reduce((sum, c) => sum + c.commission_amount, 0);
+                      const partnerPendingCommissions = allPartnerCommissions.filter(c => c.status === 'pending');
+                      const selectedPartnerCommissions = allPartnerCommissions.filter(c => selectedCommissions.includes(c.id));
 
                       return (
                         <div key={partnerId} className="border border-gray-200 rounded-lg bg-white">
                           {/* Partner Header */}
                           <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 rounded-t-lg">
                             <div className="flex items-center justify-between">
-                              <div>
+                              <div className="flex-1">
                                 <h3 className="text-lg font-medium text-gray-900">{firstCommission.partner_name}</h3>
                                 <p className="text-sm text-gray-600">{Object.keys(partnerOrders).length} order{Object.keys(partnerOrders).length !== 1 ? 's' : ''}</p>
                               </div>
@@ -636,6 +623,57 @@ export default function CommissionTrackingPage() {
                                 <p className="text-lg font-bold text-gray-900">{formatCurrency(partnerTotalCommissions)}</p>
                                 <p className="text-sm text-gray-600">Total commissions</p>
                               </div>
+                              {partnerPendingCommissions.length > 0 && (
+                                <div className="ml-4 flex flex-col gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const partnerPendingIds = partnerPendingCommissions.map(c => c.id);
+                                      // Toggle selection: if all are selected, deselect; otherwise select all
+                                      const allSelected = partnerPendingIds.every(id => selectedCommissions.includes(id));
+                                      if (allSelected) {
+                                        setSelectedCommissions(selectedCommissions.filter(id => !partnerPendingIds.includes(id)));
+                                      } else {
+                                        setSelectedCommissions([...new Set([...selectedCommissions, ...partnerPendingIds])]);
+                                      }
+                                    }}
+                                  >
+                                    {partnerPendingCommissions.every(c => selectedCommissions.includes(c.id)) ? 'Deselect All' : 'Select All Pending'}
+                                  </Button>
+                                  {selectedPartnerCommissions.length > 0 && (
+                                    <Button
+                                      size="sm"
+                                      className="bg-green-600 hover:bg-green-700"
+                                      onClick={async () => {
+                                        const partnerSelectedIds = selectedPartnerCommissions.map(c => c.id);
+                                        try {
+                                          setProcessingPayment(true);
+                                          const response = await fetch('/api/admin/commissions', {
+                                            method: 'PATCH',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                              commissionIds: partnerSelectedIds,
+                                              action: 'markPaid'
+                                            })
+                                          });
+                                          if (!response.ok) throw new Error('Failed to mark commissions as paid');
+                                          await loadCommissionData();
+                                          setSelectedCommissions(selectedCommissions.filter(id => !partnerSelectedIds.includes(id)));
+                                        } catch (error) {
+                                          console.error('Error marking commissions as paid:', error);
+                                        } finally {
+                                          setProcessingPayment(false);
+                                        }
+                                      }}
+                                      disabled={processingPayment}
+                                    >
+                                      <CheckCircle className="w-4 h-4 mr-1" />
+                                      Mark {selectedPartnerCommissions.length} Paid
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
 
