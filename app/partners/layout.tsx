@@ -63,6 +63,61 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
     checkPartnerAccess();
   }, []);
 
+  // Set green favicon for partner portal
+  useEffect(() => {
+    const setFavicon = () => {
+      // Remove existing favicon links
+      const existingLinks = document.querySelectorAll("link[rel*='icon']");
+      existingLinks.forEach(link => link.remove());
+
+      // Add green favicon
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/svg+xml';
+      link.href = '/assets/logos/paw-svgrepo-200x200-green.svg';
+      document.head.appendChild(link);
+
+      // Add apple touch icon
+      const appleLink = document.createElement('link');
+      appleLink.rel = 'apple-touch-icon';
+      appleLink.href = '/assets/logos/paw-svgrepo-200x200-green.svg';
+      document.head.appendChild(appleLink);
+
+      // Update theme color to green
+      let themeMetaTag = document.querySelector('meta[name="theme-color"]');
+      if (!themeMetaTag) {
+        themeMetaTag = document.createElement('meta');
+        themeMetaTag.setAttribute('name', 'theme-color');
+        document.head.appendChild(themeMetaTag);
+      }
+      themeMetaTag.setAttribute('content', '#10b981'); // Green color
+    };
+
+    setFavicon();
+
+    // Cleanup: restore purple favicon when leaving partner routes
+    return () => {
+      const existingLinks = document.querySelectorAll("link[rel*='icon']");
+      existingLinks.forEach(link => link.remove());
+
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/svg+xml';
+      link.href = '/assets/logos/paw-svgrepo-200x200-purple.svg';
+      document.head.appendChild(link);
+
+      const appleLink = document.createElement('link');
+      appleLink.rel = 'apple-touch-icon';
+      appleLink.href = '/assets/logos/paw-svgrepo-200x200-purple.svg';
+      document.head.appendChild(appleLink);
+
+      const themeMetaTag = document.querySelector('meta[name="theme-color"]');
+      if (themeMetaTag) {
+        themeMetaTag.setAttribute('content', '#7c3aed'); // Purple color
+      }
+    };
+  }, []);
+
   const checkPartnerAccess = async () => {
     try {
       const { data: { user } } = await supabaseService.getClient().auth.getUser();
