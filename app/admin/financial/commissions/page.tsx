@@ -26,7 +26,6 @@ interface Commission {
   commission_type: string;
   recipient_type: string;
   orders?: {
-    order_number?: string;
     customer_email?: string;
     shipping_first_name?: string;
     shipping_last_name?: string;
@@ -657,7 +656,7 @@ export default function CommissionTrackingPage() {
                                           href={`/admin/orders/${orderId}`}
                                           className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
                                         >
-                                          Order #{firstOrderCommission.orders?.order_number || orderId.slice(-8)}
+                                          Order #{orderId}
                                         </a>
                                         <span className="text-sm text-gray-500">•</span>
                                         <span className="text-sm text-gray-600">{customerName}</span>

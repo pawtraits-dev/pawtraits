@@ -36,7 +36,6 @@ export async function GET(request: NextRequest) {
         updated_at,
         metadata,
         orders (
-          order_number,
           customer_email,
           shipping_first_name,
           shipping_last_name
@@ -94,7 +93,7 @@ export async function GET(request: NextRequest) {
         status: commission.status, // New table has proper status field
         created_at: commission.created_at,
         paid_at: commission.payment_date,
-        referral_code: commission.referral_code || commission.orders?.order_number || commission.order_id,
+        referral_code: commission.referral_code || commission.order_id,
         customer_name: commission.orders ?
           `${commission.orders.shipping_first_name || ''} ${commission.orders.shipping_last_name || ''}`.trim() ||
           commission.orders.customer_email :
