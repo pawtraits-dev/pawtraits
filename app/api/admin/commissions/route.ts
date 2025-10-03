@@ -36,9 +36,7 @@ export async function GET(request: NextRequest) {
         updated_at,
         metadata,
         orders (
-          customer_email,
-          shipping_first_name,
-          shipping_last_name
+          customer_email
         )
       `)
       .order('created_at', { ascending: false });
@@ -52,7 +50,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (commissionData && commissionData.length > 0) {
-      console.log('📋 Sample commission record:', commissionData[0]);
+      console.log('📋 Sample commission record:', JSON.stringify(commissionData[0], null, 2));
+      console.log('📋 Sample orders data:', JSON.stringify(commissionData[0].orders, null, 2));
     }
 
     // Transform data to match expected admin UI format
@@ -81,6 +80,24 @@ export async function GET(request: NextRequest) {
         partner_name = `Customer Credit (${commission.recipient_email})`;
       }
 
+      // Get customer name from customers table using email from orders
+      let customer_name = 'Unknown Customer';
+      if (commission.orders?.customer_email) {
+        const { data: customerData } = await supabase
+          .from('customers')
+          .select('first_name, last_name')
+          .eq('email', commission.orders.customer_email)
+          .single();
+
+        if (customerData && customerData.first_name && customerData.last_name) {
+          customer_name = `${customerData.first_name} ${customerData.last_name}`.trim();
+        } else if (customerData && (customerData.first_name || customerData.last_name)) {
+          customer_name = (customerData.first_name || customerData.last_name).trim();
+        } else {
+          customer_name = commission.orders.customer_email;
+        }
+      }
+
       return {
         id: commission.id,
         partner_id: commission.recipient_id,
@@ -94,10 +111,7 @@ export async function GET(request: NextRequest) {
         created_at: commission.created_at,
         paid_at: commission.payment_date,
         referral_code: commission.referral_code || commission.order_id,
-        customer_name: commission.orders ?
-          `${commission.orders.shipping_first_name || ''} ${commission.orders.shipping_last_name || ''}`.trim() ||
-          commission.orders.customer_email :
-          'Unknown Customer',
+        customer_name,
         commission_type: commission.commission_type,
         recipient_type: commission.recipient_type,
         orders: commission.orders // Include the orders data

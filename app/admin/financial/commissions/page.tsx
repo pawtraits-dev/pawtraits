@@ -27,8 +27,6 @@ interface Commission {
   recipient_type: string;
   orders?: {
     customer_email?: string;
-    shipping_first_name?: string;
-    shipping_last_name?: string;
   };
 }
 
