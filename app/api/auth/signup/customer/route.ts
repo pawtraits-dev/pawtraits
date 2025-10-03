@@ -1,5 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SupabaseService } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
+
+/**
+ * Generate a unique referral code
+ */
+function generateReferralCode(prefix: string, length: number = 8): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = prefix.toUpperCase();
+  for (let i = 0; i < length; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+/**
+ * Check if a referral code is unique
+ */
+async function isCodeUnique(supabase: any, code: string): Promise<boolean> {
+  // Check customers.personal_referral_code
+  const { data: customer } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('personal_referral_code', code)
+    .maybeSingle();
+
+  if (customer) return false;
+
+  // Check customer_referrals.referral_code
+  const { data: custRef } = await supabase
+    .from('customer_referrals')
+    .select('id')
+    .eq('referral_code', code)
+    .maybeSingle();
+
+  return !custRef;
+}
+
+/**
+ * Generate unique code with retries
+ */
+async function generateUniqueCode(supabase: any, prefix: string, maxRetries: number = 10): Promise<string | null> {
+  for (let i = 0; i < maxRetries; i++) {
+    const code = generateReferralCode(prefix, 8);
+    if (await isCodeUnique(supabase, code)) {
+      return code;
+    }
+  }
+  return null;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,14 +131,32 @@ export async function POST(request: NextRequest) {
       console.warn('Email confirmation failed:', confirmError)
     }
 
-    // 3. Create customer record
+    // 3. Create customer record with personal referral code
     let customerId = null
     try {
+      // Generate unique personal referral code using service role client
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+      const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+      });
+
+      const codePrefix = firstName.substring(0, 4).replace(/[^A-Z0-9]/gi, '') || 'CUST';
+      const personalReferralCode = await generateUniqueCode(supabaseAdmin, codePrefix);
+
+      if (!personalReferralCode) {
+        console.error('Failed to generate unique referral code for customer');
+        // Continue without personal referral code - it's not critical for signup
+      } else {
+        console.log(`Generated personal referral code for customer: ${personalReferralCode}`);
+      }
+
       const customerData = {
         email: email.toLowerCase().trim(),
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         user_id: authData.user.id,
+        personal_referral_code: personalReferralCode || null,
         is_registered: true,
         referred_by_partner_id: null, // Will be set by referral tracking below
         referral_code: referralCode || null,

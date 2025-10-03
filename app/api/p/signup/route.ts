@@ -1,6 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+/**
+ * Generate a unique referral code
+ */
+function generateReferralCode(prefix: string, length: number = 6): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = prefix.toUpperCase();
+  for (let i = 0; i < length; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+/**
+ * Check if a referral code is unique
+ */
+async function isCodeUnique(supabase: any, code: string): Promise<boolean> {
+  // Check partners.personal_referral_code
+  const { data: partner } = await supabase
+    .from('partners')
+    .select('id')
+    .eq('personal_referral_code', code)
+    .maybeSingle();
+
+  if (partner) return false;
+
+  // Check pre_registration_codes.code
+  const { data: preReg } = await supabase
+    .from('pre_registration_codes')
+    .select('id')
+    .eq('code', code)
+    .maybeSingle();
+
+  return !preReg;
+}
+
+/**
+ * Generate unique code with retries
+ */
+async function generateUniqueCode(supabase: any, prefix: string, maxRetries: number = 10): Promise<string | null> {
+  for (let i = 0; i < maxRetries; i++) {
+    const code = generateReferralCode(prefix, 6);
+    if (await isCodeUnique(supabase, code)) {
+      return code;
+    }
+  }
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Use service role key for partner creation
@@ -34,6 +82,19 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Generate unique personal referral code
+    const codePrefix = businessName.substring(0, 3).replace(/[^A-Z0-9]/gi, '') || 'PAR';
+    const personalReferralCode = await generateUniqueCode(supabase, codePrefix);
+
+    if (!personalReferralCode) {
+      console.error('Failed to generate unique referral code for partner');
+      return NextResponse.json({
+        error: 'Failed to generate referral code'
+      }, { status: 500 });
+    }
+
+    console.log(`Generated personal referral code for partner: ${personalReferralCode}`);
+
     // Create partner profile using service role
     const { data: partner, error: partnerError } = await supabase
       .from('partners')
@@ -48,6 +109,7 @@ export async function POST(request: NextRequest) {
         business_phone: businessPhone || null,
         business_website: businessWebsite || null,
         business_address: businessAddress || null,
+        personal_referral_code: personalReferralCode,
         is_active: true,
         is_verified: true,  // Auto-approve
         onboarding_completed: false,
