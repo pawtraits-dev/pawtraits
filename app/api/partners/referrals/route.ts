@@ -54,13 +54,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get pre-registration codes for this partner
-    const { data: preRegCodes, error: preRegError } = await supabase
+    // Get pre-registration codes for this partner (all statuses for accurate scan count)
+    const { data: allPreRegCodes, error: preRegError } = await supabase
       .from('pre_registration_codes')
       .select('code, qr_code_url, status, scans_count, conversions_count, created_at')
       .eq('partner_id', partnerId)
-      .eq('status', 'active')
       .order('created_at', { ascending: false });
+
+    // Filter to active codes for display
+    const preRegCodes = allPreRegCodes?.filter(code => code.status === 'active') || [];
 
     if (preRegError) {
       console.warn('Error fetching pre-registration codes:', preRegError);
@@ -109,8 +111,8 @@ export async function GET(request: NextRequest) {
 
     // Get referral analytics using proven query pattern from /admin/partners
 
-    // 1. Get total scans from pre_registration_codes
-    const totalScans = preRegCodes ? preRegCodes.reduce((sum, code) => sum + (code.scans_count || 0), 0) : 0;
+    // 1. Get total scans from pre_registration_codes (all statuses)
+    const totalScans = allPreRegCodes ? allPreRegCodes.reduce((sum, code) => sum + (code.scans_count || 0), 0) : 0;
 
     // 2. Get signup data from customers table
     const { data: userProfileData } = await supabase
