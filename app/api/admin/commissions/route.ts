@@ -41,17 +41,9 @@ export async function GET(request: NextRequest) {
       `)
       .order('created_at', { ascending: false });
 
-    console.log('🔍 Commission data query error:', error);
-    console.log('🔍 Commission data count:', commissionData?.length || 0);
-
     if (error) {
       console.error('❌ Error fetching commission data:', error);
       throw error;
-    }
-
-    if (commissionData && commissionData.length > 0) {
-      console.log('📋 Sample commission record:', JSON.stringify(commissionData[0], null, 2));
-      console.log('📋 Sample orders data:', JSON.stringify(commissionData[0].orders, null, 2));
     }
 
     // Transform data to match expected admin UI format
@@ -105,7 +97,6 @@ export async function GET(request: NextRequest) {
     }));
 
     console.log('✅ Admin commissions API: Found', transformedData.length, 'commission records from new table');
-    console.log('📤 Returning transformed data sample:', transformedData[0] || 'No data');
     return NextResponse.json(transformedData);
 
   } catch (error) {
