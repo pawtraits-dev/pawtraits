@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
+import { SupabaseService } from '@/lib/supabase';
 
 interface UserProfile {
   id: string;
@@ -414,10 +415,23 @@ function UserReferralContent({ userType }: { userType: string }) {
       setLoading(true);
       setError(null);
 
+      // Get auth session for Bearer token using SupabaseService
+      const supabaseService = new SupabaseService();
+      const { data: { session } } = await supabaseService.getClient().auth.getSession();
+
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      };
+
       // Fetch both analytics and referral code in parallel
       const [analyticsResponse, codeResponse] = await Promise.all([
-        fetch('/api/referrals/analytics', { credentials: 'include' }),
-        fetch('/api/referrals/my-code', { credentials: 'include' })
+        fetch('/api/referrals/analytics', { headers }),
+        fetch('/api/referrals/my-code', { headers })
       ]);
 
       if (!analyticsResponse.ok) {
