@@ -135,24 +135,88 @@ export async function PATCH(request: NextRequest) {
     });
 
     if (action === 'markPaid') {
-      const { error } = await supabase
+      // First get the commission records to group by partner
+      const { data: commissions, error: fetchError } = await supabase
         .from('commissions')
-        .update({
-          status: 'paid',
-          payment_date: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .in('id', commissionIds);
+        .select('id, recipient_id, commission_amount')
+        .in('id', commissionIds)
+        .eq('recipient_type', 'partner');
 
-      if (error) {
-        console.error('Error updating commissions:', error);
-        throw error;
+      if (fetchError) {
+        console.error('Error fetching commissions for payment:', fetchError);
+        throw fetchError;
       }
 
-      console.log('Admin commissions API: Marked', commissionIds.length, 'commissions as paid');
+      if (!commissions || commissions.length === 0) {
+        return NextResponse.json(
+          { error: 'No valid commissions found' },
+          { status: 400 }
+        );
+      }
+
+      // Group commissions by partner (recipient_id)
+      const partnerGroups = commissions.reduce((groups: any, commission) => {
+        const partnerId = commission.recipient_id;
+        if (!groups[partnerId]) {
+          groups[partnerId] = {
+            partner_id: partnerId,
+            commission_ids: [],
+            total_amount: 0
+          };
+        }
+        groups[partnerId].commission_ids.push(commission.id);
+        groups[partnerId].total_amount += commission.commission_amount;
+        return groups;
+      }, {});
+
+      const paymentDate = new Date().toISOString();
+
+      // Create commission_payment records for each partner and update commissions
+      for (const partnerGroup of Object.values(partnerGroups) as any[]) {
+        // Create commission payment record
+        const { data: paymentRecord, error: paymentError } = await supabase
+          .from('commission_payments')
+          .insert({
+            partner_id: partnerGroup.partner_id,
+            payment_period_start: new Date().toISOString().split('T')[0],
+            payment_period_end: new Date().toISOString().split('T')[0],
+            total_amount: partnerGroup.total_amount / 100, // Convert cents to pounds
+            referral_count: partnerGroup.commission_ids.length,
+            initial_commission_amount: partnerGroup.total_amount / 100,
+            lifetime_commission_amount: 0,
+            status: 'paid',
+            payment_method: 'manual',
+            paid_at: paymentDate
+          })
+          .select('id')
+          .single();
+
+        if (paymentError) {
+          console.error('Error creating commission payment:', paymentError);
+          throw paymentError;
+        }
+
+        // Update commission records with payment_id and status
+        const { error: updateError } = await supabase
+          .from('commissions')
+          .update({
+            status: 'paid',
+            payment_date: paymentDate,
+            commission_payment_id: paymentRecord.id,
+            updated_at: paymentDate
+          })
+          .in('id', partnerGroup.commission_ids);
+
+        if (updateError) {
+          console.error('Error updating commissions with payment_id:', updateError);
+          throw updateError;
+        }
+      }
+
+      console.log('Admin commissions API: Created payments and marked', commissionIds.length, 'commissions as paid');
       return NextResponse.json({
         success: true,
-        message: `Marked ${commissionIds.length} commissions as paid`
+        message: `Created ${Object.keys(partnerGroups).length} payment records and marked ${commissionIds.length} commissions as paid`
       });
     }
 

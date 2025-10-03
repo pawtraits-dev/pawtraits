@@ -286,7 +286,7 @@ export default function CommissionTrackingPage() {
     }
 
     if (searchTerm) {
-      filtered = filtered.filter(c => 
+      filtered = filtered.filter(c =>
         c.partner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.referral_code.toLowerCase().includes(searchTerm.toLowerCase())
@@ -294,6 +294,26 @@ export default function CommissionTrackingPage() {
     }
 
     setFilteredCommissions(filtered);
+  };
+
+  // Group commissions by partner, then by order
+  const groupedCommissions = () => {
+    const groups: Record<string, Record<string, Commission[]>> = {};
+
+    filteredCommissions.forEach(commission => {
+      const partnerId = commission.partner_id;
+      const orderId = commission.order_id;
+
+      if (!groups[partnerId]) {
+        groups[partnerId] = {};
+      }
+      if (!groups[partnerId][orderId]) {
+        groups[partnerId][orderId] = [];
+      }
+      groups[partnerId][orderId].push(commission);
+    });
+
+    return groups;
   };
 
   const updateCommissionStatus = async (commissionId: string, newStatus: Commission['status']) => {
@@ -591,66 +611,123 @@ export default function CommissionTrackingPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {filteredCommissions.map((commission) => (
-                      <div key={commission.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-3">
-                            {commission.status === 'pending' && (
-                              <input
-                                type="checkbox"
-                                checked={selectedCommissions.includes(commission.id)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedCommissions([...selectedCommissions, commission.id]);
-                                  } else {
-                                    setSelectedCommissions(selectedCommissions.filter(id => id !== commission.id));
-                                  }
-                                }}
-                                className="mt-1"
-                              />
-                            )}
-                            <div className="space-y-2">
-                              <div className="flex items-center space-x-3">
-                                <span className="font-medium text-gray-900">{commission.partner_name}</span>
-                                {getStatusBadge(commission.status)}
+                  <div className="space-y-6">
+                    {Object.entries(groupedCommissions()).map(([partnerId, partnerOrders]) => {
+                      const firstCommission = Object.values(partnerOrders)[0][0];
+                      const partnerTotalCommissions = Object.values(partnerOrders).flat().reduce((sum, c) => sum + c.commission_amount, 0);
+
+                      return (
+                        <div key={partnerId} className="border border-gray-200 rounded-lg bg-white">
+                          {/* Partner Header */}
+                          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 rounded-t-lg">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h3 className="text-lg font-medium text-gray-900">{firstCommission.partner_name}</h3>
+                                <p className="text-sm text-gray-600">{Object.keys(partnerOrders).length} order{Object.keys(partnerOrders).length !== 1 ? 's' : ''}</p>
                               </div>
-                              <div className="text-sm text-gray-600 space-y-1">
-                                <p>Customer: {commission.customer_name || 'Unknown'}</p>
-                                <p>Code: {commission.referral_code}</p>
-                                <p>Order: {formatCurrency(commission.order_amount)} × {(commission.commission_rate * 100).toFixed(1)}%</p>
-                                <p>Date: {formatDate(commission.created_at)}</p>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-gray-900">{formatCurrency(partnerTotalCommissions)}</p>
+                                <p className="text-sm text-gray-600">Total commissions</p>
                               </div>
                             </div>
                           </div>
-                          
-                          <div className="text-right space-y-2">
-                            <p className="text-xl font-bold text-gray-900">
-                              {formatCurrency(commission.commission_amount)}
-                            </p>
-                            <div className="flex space-x-2">
-                              {commission.status === 'pending' && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => updateCommissionStatus(commission.id, 'approved')}
-                                >
-                                  Approve
-                                </Button>
-                              )}
-                              {commission.status === 'approved' && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => updateCommissionStatus(commission.id, 'paid')}
-                                >
-                                  Mark Paid
-                                </Button>
-                              )}
-                            </div>
+
+                          {/* Orders for this Partner */}
+                          <div className="divide-y divide-gray-100">
+                            {Object.entries(partnerOrders).map(([orderId, orderCommissions]) => {
+                              const firstOrderCommission = orderCommissions[0];
+                              const orderTotal = orderCommissions.reduce((sum, c) => sum + c.commission_amount, 0);
+                              const customerName = firstOrderCommission.customer_name || 'Unknown Customer';
+
+                              return (
+                                <div key={orderId} className="p-4">
+                                  {/* Order Header */}
+                                  <div className="flex items-start justify-between mb-3">
+                                    <div>
+                                      <div className="flex items-center space-x-2">
+                                        <a
+                                          href={`/admin/orders/${orderId}`}
+                                          className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                                        >
+                                          Order #{firstOrderCommission.referral_code || orderId.slice(-8)}
+                                        </a>
+                                        <span className="text-sm text-gray-500">•</span>
+                                        <span className="text-sm text-gray-600">{customerName}</span>
+                                      </div>
+                                      <p className="text-sm text-gray-500 mt-1">
+                                        {formatDate(firstOrderCommission.created_at)} • Order Value: {formatCurrency(firstOrderCommission.order_amount)}
+                                      </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="font-semibold text-gray-900">{formatCurrency(orderTotal)}</p>
+                                      <p className="text-sm text-gray-500">{orderCommissions.length} commission{orderCommissions.length !== 1 ? 's' : ''}</p>
+                                    </div>
+                                  </div>
+
+                                  {/* Individual Commissions for this Order */}
+                                  <div className="space-y-2 ml-4 border-l-2 border-gray-100 pl-4">
+                                    {orderCommissions.map((commission) => (
+                                      <div key={commission.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-b-0">
+                                        <div className="flex items-center space-x-3">
+                                          {commission.status === 'pending' && (
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedCommissions.includes(commission.id)}
+                                              onChange={(e) => {
+                                                if (e.target.checked) {
+                                                  setSelectedCommissions([...selectedCommissions, commission.id]);
+                                                } else {
+                                                  setSelectedCommissions(selectedCommissions.filter(id => id !== commission.id));
+                                                }
+                                              }}
+                                              className="rounded"
+                                            />
+                                          )}
+                                          <div>
+                                            <div className="flex items-center space-x-2">
+                                              <span className="text-sm font-medium text-gray-700">
+                                                {commission.commission_type === 'partner_commission' ? 'Partner Commission' : 'Customer Credit'}
+                                              </span>
+                                              {getStatusBadge(commission.status)}
+                                            </div>
+                                            <p className="text-xs text-gray-500">
+                                              {(commission.commission_rate * 100).toFixed(1)}% rate
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center space-x-3">
+                                          <span className="font-semibold text-gray-900">{formatCurrency(commission.commission_amount)}</span>
+                                          <div className="flex space-x-1">
+                                            {commission.status === 'pending' && (
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => updateCommissionStatus(commission.id, 'approved')}
+                                              >
+                                                Approve
+                                              </Button>
+                                            )}
+                                            {commission.status === 'approved' && (
+                                              <Button
+                                                size="sm"
+                                                onClick={() => updateCommissionStatus(commission.id, 'paid')}
+                                              >
+                                                Mark Paid
+                                              </Button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     
                     {filteredCommissions.length === 0 && (
                       <div className="text-center py-8">
