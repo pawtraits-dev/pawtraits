@@ -80,23 +80,8 @@ export async function GET(request: NextRequest) {
         partner_name = `Customer Credit (${commission.recipient_email})`;
       }
 
-      // Get customer name from customers table using email from orders
-      let customer_name = 'Unknown Customer';
-      if (commission.orders?.customer_email) {
-        const { data: customerData } = await supabase
-          .from('customers')
-          .select('first_name, last_name')
-          .eq('email', commission.orders.customer_email)
-          .single();
-
-        if (customerData && customerData.first_name && customerData.last_name) {
-          customer_name = `${customerData.first_name} ${customerData.last_name}`.trim();
-        } else if (customerData && (customerData.first_name || customerData.last_name)) {
-          customer_name = (customerData.first_name || customerData.last_name).trim();
-        } else {
-          customer_name = commission.orders.customer_email;
-        }
-      }
+      // Just use the customer email
+      const customer_name = commission.orders?.customer_email || 'Unknown Customer';
 
       return {
         id: commission.id,
