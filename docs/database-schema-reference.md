@@ -1,6 +1,6 @@
 # Database Schema Reference
 
-Generated: 2025-09-25T12:58:37.819Z
+Generated: 2025-10-03T10:23:54.106Z
 
 This document provides the actual database schema for the influencer system.
 **Use this as the source of truth when writing tests and implementing features.**
@@ -45,18 +45,18 @@ when writing tests or implementing features that interact with the database.
 
 | Column | Type | Nullable | Default |
 |--------|------|----------|----------|
-| id | unknown | ❌ | - |
-| influencer_id | unknown | ❌ | - |
-| platform | unknown | ❌ | - |
-| username | unknown | ❌ | - |
-| profile_url | unknown | ❌ | - |
-| follower_count | unknown | ❌ | - |
-| engagement_rate | unknown | ❌ | - |
-| verified | unknown | ❌ | - |
-| is_primary | unknown | ❌ | - |
-| is_active | unknown | ❌ | - |
-| created_at | unknown | ❌ | - |
-| last_updated | unknown | ❌ | - |
+| id | text | ❌ | - |
+| influencer_id | text | ❌ | - |
+| platform | text | ❌ | - |
+| username | text | ❌ | - |
+| profile_url | text | ✅ | - |
+| follower_count | numeric | ❌ | - |
+| engagement_rate | text | ✅ | - |
+| verified | text | ❌ | - |
+| is_primary | text | ❌ | - |
+| is_active | text | ❌ | - |
+| last_updated | text | ❌ | - |
+| created_at | text | ❌ | - |
 
 **Column Count:** 12
 
@@ -64,20 +64,21 @@ when writing tests or implementing features that interact with the database.
 
 | Column | Type | Nullable | Default |
 |--------|------|----------|----------|
-| id | unknown | ❌ | - |
-| influencer_id | unknown | ❌ | - |
-| code | unknown | ❌ | - |
-| description | unknown | ❌ | - |
-| expires_at | unknown | ❌ | - |
-| usage_count | unknown | ❌ | - |
-| conversion_count | unknown | ❌ | - |
-| total_revenue | unknown | ❌ | - |
-| total_commission | unknown | ❌ | - |
-| is_active | unknown | ❌ | - |
-| created_at | unknown | ❌ | - |
-| updated_at | unknown | ❌ | - |
+| id | text | ❌ | - |
+| influencer_id | text | ❌ | - |
+| code | text | ❌ | - |
+| qr_code_url | text | ✅ | - |
+| description | text | ❌ | - |
+| usage_count | numeric | ❌ | - |
+| conversion_count | numeric | ❌ | - |
+| total_revenue | numeric | ❌ | - |
+| total_commission | numeric | ❌ | - |
+| is_active | text | ❌ | - |
+| expires_at | text | ✅ | - |
+| created_at | text | ❌ | - |
+| updated_at | text | ❌ | - |
 
-**Column Count:** 12
+**Column Count:** 13
 
 ### influencer_referrals
 
