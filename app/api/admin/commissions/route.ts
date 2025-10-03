@@ -100,7 +100,8 @@ export async function GET(request: NextRequest) {
           commission.orders.customer_email :
           'Unknown Customer',
         commission_type: commission.commission_type,
-        recipient_type: commission.recipient_type
+        recipient_type: commission.recipient_type,
+        orders: commission.orders // Include the orders data
       };
     }));
 
