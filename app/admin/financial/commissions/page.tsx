@@ -452,6 +452,11 @@ export default function CommissionTrackingPage() {
     return `£${(amountInPence / 100).toFixed(2)}`;
   };
 
+  const formatCurrencyDirect = (amount: number) => {
+    // For amounts already in proper currency format (not pennies)
+    return `£${Number(amount).toFixed(2)}`;
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -883,7 +888,7 @@ export default function CommissionTrackingPage() {
                                 </div>
                               </div>
                               <div className="text-right">
-                                <p className="text-lg font-bold text-gray-900">{formatCurrency(payment.total_amount)}</p>
+                                <p className="text-lg font-bold text-gray-900">{formatCurrencyDirect(payment.total_amount)}</p>
                                 {getStatusBadge(payment.status)}
                               </div>
                             </div>
@@ -915,12 +920,12 @@ export default function CommissionTrackingPage() {
                               <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-4 text-sm">
                                 <div>
                                   <p className="text-gray-600 mb-1">Initial Commissions</p>
-                                  <p className="font-medium text-green-600">{formatCurrency(payment.initial_commission_amount)}</p>
+                                  <p className="font-medium text-green-600">{formatCurrencyDirect(payment.initial_commission_amount)}</p>
                                 </div>
                                 {payment.lifetime_commission_amount > 0 && (
                                   <div>
                                     <p className="text-gray-600 mb-1">Lifetime Commissions</p>
-                                    <p className="font-medium text-blue-600">{formatCurrency(payment.lifetime_commission_amount)}</p>
+                                    <p className="font-medium text-blue-600">{formatCurrencyDirect(payment.lifetime_commission_amount)}</p>
                                   </div>
                                 )}
                               </div>
