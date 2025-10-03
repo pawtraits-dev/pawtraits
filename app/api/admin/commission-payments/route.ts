@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AdminSupabaseService } from '@/lib/admin-supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function GET(request: NextRequest) {
   try {
     console.log('📥 API: Fetching commission payment records...');
 
-    const adminService = new AdminSupabaseService();
+    // Create service role client to bypass RLS (same pattern as /api/admin/commissions)
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
 
     // Fetch payment records with partner information
-    const { data: payments, error } = await adminService.getClient()
+    const { data: payments, error } = await supabase
       .from('commission_payments')
       .select(`
         *,
