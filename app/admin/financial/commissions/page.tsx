@@ -591,10 +591,8 @@ export default function CommissionTrackingPage() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Commission List */}
-            <div className="lg:col-span-2">
-              <Card>
+          {/* Commission List */}
+          <Card>
                 <CardHeader>
                   <div>
                     <CardTitle>Commission Details</CardTitle>
@@ -783,38 +781,6 @@ export default function CommissionTrackingPage() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
-
-            {/* Top Earners */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Earners</CardTitle>
-                <CardDescription>Partners with highest commission earnings</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {commissionSummary.top_earners.slice(0, 5).map((earner, index) => (
-                    <div key={earner.partner_name} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                          <span className="text-sm font-medium text-purple-600">#{index + 1}</span>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{earner.partner_name}</p>
-                          <p className="text-sm text-gray-500">
-                            {earner.orders_count} orders • {(earner.avg_rate * 100).toFixed(1)}% avg
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium text-gray-900">{formatCurrency(earner.total_earned)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </>
       )}
     </div>
