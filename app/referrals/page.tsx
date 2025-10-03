@@ -16,7 +16,13 @@ import {
   Gift,
   Activity,
   Calendar,
-  BarChart3
+  BarChart3,
+  Copy,
+  Download,
+  QrCode,
+  Share2,
+  ExternalLink,
+  CheckCircle
 } from 'lucide-react';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
@@ -27,6 +33,24 @@ interface UserProfile {
   first_name: string;
   last_name: string;
   email: string;
+}
+
+interface ReferralCode {
+  code: string;
+  qr_code_url: string | null;
+  type: 'pre_registration' | 'personal';
+  scans_count: number;
+  conversions_count: number;
+  share_url: string;
+  created_at?: string;
+}
+
+interface MyReferralCodeResponse {
+  user_type: 'partner' | 'customer';
+  partner_name?: string;
+  customer_name?: string;
+  primary_code: ReferralCode;
+  all_codes: ReferralCode[];
 }
 
 interface ReferralAnalytics {
@@ -49,6 +73,187 @@ interface ReferralAnalytics {
     reward?: number;
   }>;
   user_type: string;
+}
+
+function ReferralCodeDisplay({ codeData }: { codeData: MyReferralCodeResponse }) {
+  const [copied, setCopied] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+
+  const { primary_code, user_type } = codeData;
+  const fullUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}${primary_code.share_url}`
+    : primary_code.share_url;
+
+  const copyToClipboard = async (text: string, type: 'code' | 'url') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (type === 'code') {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } else {
+        setCopiedUrl(true);
+        setTimeout(() => setCopiedUrl(false), 2000);
+      }
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  return (
+    <Card className="mb-8 border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-2xl flex items-center">
+              <Share2 className="h-6 w-6 mr-2 text-purple-600" />
+              Your Referral Code
+            </CardTitle>
+            <CardDescription className="mt-2">
+              {user_type === 'partner'
+                ? 'Share this code with customers to earn commissions on their purchases'
+                : 'Share this code with friends to earn rewards when they make their first purchase'}
+            </CardDescription>
+          </div>
+          {primary_code.qr_code_url && (
+            <div className="flex items-center">
+              <QrCode className="h-5 w-5 text-purple-600 mr-2" />
+              <span className="text-sm text-muted-foreground">QR Code Available</span>
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Referral Code */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">
+            Referral Code
+          </label>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-white border-2 border-purple-300 rounded-lg px-6 py-4">
+              <p className="text-3xl font-bold text-purple-600 tracking-wider text-center">
+                {primary_code.code}
+              </p>
+            </div>
+            <Button
+              onClick={() => copyToClipboard(primary_code.code, 'code')}
+              variant="outline"
+              size="lg"
+              className="h-full"
+            >
+              {copied ? (
+                <>
+                  <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-5 w-5 mr-2" />
+                  Copy
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Share URL */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">
+            Share Link
+          </label>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-white border border-gray-300 rounded-lg px-4 py-3">
+              <p className="text-sm text-gray-700 truncate">
+                {fullUrl}
+              </p>
+            </div>
+            <Button
+              onClick={() => copyToClipboard(fullUrl, 'url')}
+              variant="outline"
+            >
+              {copiedUrl ? (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy Link
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={() => window.open(fullUrl, '_blank')}
+              variant="outline"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Preview
+            </Button>
+          </div>
+        </div>
+
+        {/* QR Code Display */}
+        {primary_code.qr_code_url && (
+          <div className="pt-4 border-t border-gray-200">
+            <label className="text-sm font-medium text-gray-700 mb-3 block">
+              QR Code
+            </label>
+            <div className="flex items-start gap-4">
+              <div className="bg-white p-4 rounded-lg border-2 border-gray-200">
+                <img
+                  src={primary_code.qr_code_url}
+                  alt="Referral QR Code"
+                  className="w-48 h-48 object-contain"
+                />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-gray-600 mb-4">
+                  Print this QR code and display it in your business, or share it digitally.
+                  Customers can scan it to access your referral page instantly.
+                </p>
+                <Button
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = primary_code.qr_code_url!;
+                    link.download = `referral-qr-${primary_code.code}.png`;
+                    link.click();
+                  }}
+                  variant="outline"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download QR Code
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-gray-900">{primary_code.scans_count}</p>
+            <p className="text-sm text-gray-600">Total Scans/Views</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold text-green-600">{primary_code.conversions_count}</p>
+            <p className="text-sm text-gray-600">Conversions</p>
+          </div>
+        </div>
+
+        {/* Code Type Badge */}
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <Badge variant="outline" className="capitalize">
+            {primary_code.type.replace('_', ' ')} Code
+          </Badge>
+          {primary_code.created_at && (
+            <span>
+              Created: {new Date(primary_code.created_at).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function ReferralSummaryCards({ analytics }: { analytics: ReferralAnalytics }) {
@@ -201,32 +406,42 @@ function ReferralActivityTable({ activities }: { activities: ReferralAnalytics['
 
 function UserReferralContent({ userType }: { userType: string }) {
   const [analytics, setAnalytics] = useState<ReferralAnalytics | null>(null);
+  const [referralCode, setReferralCode] = useState<MyReferralCodeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchReferralAnalytics();
+    fetchData();
   }, [userType]);
 
-  const fetchReferralAnalytics = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Use proper service-based API endpoint
-      const response = await fetch('/api/referrals/analytics', {
-        credentials: 'include',
-      });
+      // Fetch both analytics and referral code in parallel
+      const [analyticsResponse, codeResponse] = await Promise.all([
+        fetch('/api/referrals/analytics', { credentials: 'include' }),
+        fetch('/api/referrals/my-code', { credentials: 'include' })
+      ]);
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch analytics: ${response.statusText}`);
+      if (!analyticsResponse.ok) {
+        throw new Error(`Failed to fetch analytics: ${analyticsResponse.statusText}`);
       }
 
-      const data = await response.json();
-      setAnalytics(data);
+      if (!codeResponse.ok) {
+        console.error('Failed to fetch referral code:', await codeResponse.text());
+        // Don't fail the whole page if just the code is missing
+      } else {
+        const codeData = await codeResponse.json();
+        setReferralCode(codeData);
+      }
+
+      const analyticsData = await analyticsResponse.json();
+      setAnalytics(analyticsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load referral data');
-      console.error('Error fetching referral analytics:', err);
+      console.error('Error fetching referral data:', err);
     } finally {
       setLoading(false);
     }
@@ -253,7 +468,7 @@ function UserReferralContent({ userType }: { userType: string }) {
             </div>
             <h3 className="text-lg font-semibold mb-2">Unable to load referral data</h3>
             <p className="text-muted-foreground mb-4">{error}</p>
-            <Button onClick={fetchReferralAnalytics} variant="outline">
+            <Button onClick={fetchData} variant="outline">
               Try Again
             </Button>
           </div>
@@ -283,6 +498,9 @@ function UserReferralContent({ userType }: { userType: string }) {
           Track your referral performance and earnings with privacy-protected analytics
         </p>
       </div>
+
+      {/* Display referral code if available */}
+      {referralCode && <ReferralCodeDisplay codeData={referralCode} />}
 
       <ReferralSummaryCards analytics={analytics} />
 
