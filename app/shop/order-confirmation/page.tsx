@@ -13,6 +13,7 @@ import { useUserRouting } from "@/hooks/use-user-routing"
 import UserInteractionsService from '@/lib/user-interactions'
 import Image from "next/image"
 import { extractDescriptionTitle } from '@/lib/utils'
+import UserAwareNavigation from '@/components/UserAwareNavigation'
 
 interface OrderItem {
   id: string
@@ -127,35 +128,43 @@ function OrderConfirmationContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-purple-600" />
-          <p className="text-gray-600">Loading order details...</p>
+      <>
+        <UserAwareNavigation />
+        <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-purple-600" />
+            <p className="text-gray-600">Loading order details...</p>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
   if (error || !order) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Package className="w-12 h-12 text-red-600" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Not Found</h1>
-          <p className="text-gray-600 mb-4">{error || 'We couldn\'t find the order you\'re looking for.'}</p>
-          <Link href={continueShoppingRoute}>
-            <Button className="bg-purple-600 hover:bg-purple-700 text-white">Continue Shopping</Button>
+      <>
+        <UserAwareNavigation />
+        <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Package className="w-12 h-12 text-red-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Not Found</h1>
+            <p className="text-gray-600 mb-4">{error || 'We couldn\'t find the order you\'re looking for.'}</p>
+            <Link href={continueShoppingRoute}>
+              <Button className="bg-purple-600 hover:bg-purple-700 text-white">Continue Shopping</Button>
           </Link>
         </div>
       </div>
+      </>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <>
+      <UserAwareNavigation />
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Success Header */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -312,8 +321,9 @@ function OrderConfirmationContent() {
             Contact Customer Support
           </Link>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 

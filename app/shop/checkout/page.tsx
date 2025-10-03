@@ -774,36 +774,6 @@ function CheckoutPageContent() {
                           </div>
                         ))}
                       </div>
-
-                      <div className="flex gap-4">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setCurrentStep(1)}
-                          className="flex-1"
-                        >
-                          <ArrowLeft className="w-4 h-4 mr-2" />
-                          Back to Address
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={handleShippingOptionSubmit}
-                          disabled={!selectedShippingOption || isProcessing}
-                          className="flex-1 bg-purple-600 hover:bg-purple-700"
-                        >
-                          {isProcessing ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Processing...
-                            </>
-                          ) : (
-                            <>
-                              Continue to Payment
-                              <ArrowRight className="w-4 h-4 ml-2" />
-                            </>
-                          )}
-                        </Button>
-                      </div>
                     </>
                   )}
                 </CardContent>
@@ -1014,6 +984,42 @@ function CheckoutPageContent() {
                   <div className="text-xs text-gray-500 text-center">
                     Shipping will be added after selecting delivery option
                   </div>
+                )}
+
+                {/* Navigation buttons for step 2 */}
+                {currentStep === 2 && (
+                  <>
+                    <Separator />
+                    <div className="flex gap-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setCurrentStep(1)}
+                        className="flex-1"
+                      >
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Back
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleShippingOptionSubmit}
+                        disabled={!selectedShippingOption || isProcessing}
+                        className="flex-1 bg-purple-600 hover:bg-purple-700"
+                      >
+                        {isProcessing ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            Continue
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
