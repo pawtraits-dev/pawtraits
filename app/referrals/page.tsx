@@ -430,8 +430,8 @@ function UserReferralContent({ userType }: { userType: string }) {
 
       // Fetch both analytics and referral code in parallel
       const [analyticsResponse, codeResponse] = await Promise.all([
-        fetch('/api/referrals/stats', { headers }),
-        fetch('/api/referrals/code-details', { headers })
+        fetch('/api/user-referrals/stats', { headers }),
+        fetch('/api/user-referrals/code-details', { headers })
       ]);
 
       if (!analyticsResponse.ok) {
