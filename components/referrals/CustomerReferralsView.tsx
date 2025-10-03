@@ -259,7 +259,7 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
     }
   };
 
-  const filteredRewards = referralData?.rewards.filter(reward => {
+  const filteredRewards = referralData?.rewards?.filter(reward => {
     if (rewardFilter === 'all') return true;
     return reward.status === rewardFilter;
   }) || [];
@@ -393,7 +393,7 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
                 <CardDescription>Your latest referral events</CardDescription>
               </CardHeader>
               <CardContent>
-                {referralData.recent_activity.length === 0 ? (
+                {!referralData.recent_activity || referralData.recent_activity.length === 0 ? (
                   <div className="text-center py-8">
                     <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                     <p className="text-gray-500">No referral activity yet</p>

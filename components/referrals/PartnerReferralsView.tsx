@@ -562,7 +562,7 @@ export default function PartnerReferralsView({ userProfile }: { userProfile: any
                   <CardDescription>Recent referrals and conversions</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {referralData.recent_activity.length === 0 ? (
+                  {!referralData.recent_activity || referralData.recent_activity.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
                       <p>No recent activity</p>
