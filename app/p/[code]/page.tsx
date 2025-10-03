@@ -21,6 +21,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
+import { CountryProvider } from '@/lib/country-context';
 
 interface Partner {
   id: string;
@@ -468,6 +469,8 @@ function PreRegistrationLandingPageContent() {
 
 export default function PreRegistrationLandingPage() {
   return (
-    <PreRegistrationLandingPageContent />
+    <CountryProvider>
+      <PreRegistrationLandingPageContent />
+    </CountryProvider>
   );
 }
