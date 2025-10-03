@@ -240,17 +240,12 @@ function ReferralCodeDisplay({ codeData }: { codeData: MyReferralCodeResponse })
           </div>
         </div>
 
-        {/* Code Type Badge */}
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <Badge variant="outline" className="capitalize">
-            {primary_code.type.replace('_', ' ')} Code
-          </Badge>
-          {primary_code.created_at && (
-            <span>
-              Created: {new Date(primary_code.created_at).toLocaleDateString()}
-            </span>
-          )}
-        </div>
+        {/* Created Date */}
+        {primary_code.created_at && (
+          <div className="text-center text-xs text-gray-500 pt-2">
+            Created: {new Date(primary_code.created_at).toLocaleDateString()}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
