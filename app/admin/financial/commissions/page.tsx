@@ -644,13 +644,6 @@ export default function CommissionTrackingPage() {
                               const orderTotal = orderCommissions.reduce((sum, c) => sum + c.commission_amount, 0);
                               const customerName = firstOrderCommission.customer_name || 'Unknown Customer';
 
-                              // Debug frontend data
-                              console.log('🎯 Frontend Debug:', {
-                                orderId,
-                                firstOrderCommission: firstOrderCommission,
-                                customer_name: firstOrderCommission.customer_name,
-                                customerName: customerName
-                              });
 
                               return (
                                 <div key={orderId} className="p-4">
