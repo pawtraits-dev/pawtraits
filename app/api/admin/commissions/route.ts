@@ -83,6 +83,13 @@ export async function GET(request: NextRequest) {
       // Just use the customer email
       const customer_name = commission.orders?.customer_email || 'Unknown Customer';
 
+      // Debug logging
+      console.log(`🔍 Commission ${commission.id}:`);
+      console.log(`   Order ID: ${commission.order_id}`);
+      console.log(`   Orders data:`, commission.orders);
+      console.log(`   Customer email from orders:`, commission.orders?.customer_email);
+      console.log(`   Final customer_name:`, customer_name);
+
       return {
         id: commission.id,
         partner_id: commission.recipient_id,
