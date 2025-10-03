@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, DollarSign, TrendingUp, CheckCircle, Clock, AlertCircle, RefreshCw } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Users, DollarSign, TrendingUp, CheckCircle, Clock, AlertCircle, RefreshCw, Receipt } from 'lucide-react';
 
 interface Commission {
   id: string;
@@ -28,6 +29,26 @@ interface Commission {
   orders?: {
     customer_email?: string;
   };
+}
+
+interface PaymentRecord {
+  id: string;
+  partner_id: string;
+  partner_name: string;
+  partner_email: string;
+  payment_period_start: string;
+  payment_period_end: string;
+  total_amount: number;
+  referral_count: number;
+  initial_commission_amount: number;
+  lifetime_commission_amount: number;
+  status: 'pending' | 'processing' | 'paid' | 'failed' | 'cancelled';
+  payment_method: string;
+  payment_details?: any;
+  failure_reason?: string;
+  paid_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface CommissionSummary {
@@ -58,12 +79,15 @@ export default function CommissionTrackingPage() {
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [filteredCommissions, setFilteredCommissions] = useState<Commission[]>([]);
   const [commissionSummary, setCommissionSummary] = useState<CommissionSummary | null>(null);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCommissions, setSelectedCommissions] = useState<string[]>([]);
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [activeTab, setActiveTab] = useState('commissions');
 
 
   useEffect(() => {
@@ -151,6 +175,38 @@ export default function CommissionTrackingPage() {
       setLoading(false);
     }
   };
+
+  const loadPaymentData = async () => {
+    try {
+      setPaymentsLoading(true);
+      console.log('🔄 Client: Loading payment records from /api/admin/commission-payments...');
+
+      const response = await fetch('/api/admin/commission-payments');
+      console.log('📡 Client: Payment API response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Client: Payment API Error:', errorText);
+        throw new Error('Failed to fetch payment records');
+      }
+
+      const paymentData = await response.json();
+      console.log('📥 Client: Payment records loaded:', paymentData.length, 'records');
+      setPayments(paymentData);
+    } catch (error) {
+      console.error('Error loading payment records:', error);
+      setPayments([]);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
+
+  // Load payments when switching to payments tab
+  useEffect(() => {
+    if (activeTab === 'payments' && payments.length === 0) {
+      loadPaymentData();
+    }
+  }, [activeTab]);
 
   const generateSampleCommissions = (): Commission[] => {
     return [
@@ -534,8 +590,22 @@ export default function CommissionTrackingPage() {
             </Card>
           </div>
 
-          {/* Filters */}
-          <Card>
+          {/* Tabs for Commissions and Payments */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="commissions">
+                <DollarSign className="w-4 h-4 mr-2" />
+                Commissions
+              </TabsTrigger>
+              <TabsTrigger value="payments">
+                <Receipt className="w-4 h-4 mr-2" />
+                Payments
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="commissions" className="space-y-6 mt-6">
+              {/* Filters */}
+              <Card>
             <CardHeader>
               <CardTitle>Filters</CardTitle>
             </CardHeader>
@@ -781,6 +851,97 @@ export default function CommissionTrackingPage() {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="payments" className="space-y-6 mt-6">
+              {paymentsLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+                </div>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Payment Records</CardTitle>
+                    <CardDescription>Completed commission payment batches</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {payments.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Receipt className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500">No payment records found</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {payments.map((payment) => (
+                          <div key={payment.id} className="border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center space-x-3">
+                                <Receipt className="w-5 h-5 text-gray-400" />
+                                <div>
+                                  <h3 className="font-semibold text-gray-900">{payment.partner_name}</h3>
+                                  <p className="text-sm text-gray-600">{payment.partner_email}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-gray-900">{formatCurrency(payment.total_amount)}</p>
+                                {getStatusBadge(payment.status)}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-t border-gray-100 pt-3">
+                              <div>
+                                <p className="text-gray-600 mb-1">Payment Period</p>
+                                <p className="font-medium text-gray-900">
+                                  {new Date(payment.payment_period_start).toLocaleDateString()} - {new Date(payment.payment_period_end).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-gray-600 mb-1">Referral Count</p>
+                                <p className="font-medium text-gray-900">{payment.referral_count} orders</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-600 mb-1">Payment Method</p>
+                                <p className="font-medium text-gray-900">{payment.payment_method}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-600 mb-1">Paid At</p>
+                                <p className="font-medium text-gray-900">
+                                  {payment.paid_at ? new Date(payment.paid_at).toLocaleDateString() : 'Not paid'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {payment.initial_commission_amount > 0 && (
+                              <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <p className="text-gray-600 mb-1">Initial Commissions</p>
+                                  <p className="font-medium text-green-600">{formatCurrency(payment.initial_commission_amount)}</p>
+                                </div>
+                                {payment.lifetime_commission_amount > 0 && (
+                                  <div>
+                                    <p className="text-gray-600 mb-1">Lifetime Commissions</p>
+                                    <p className="font-medium text-blue-600">{formatCurrency(payment.lifetime_commission_amount)}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {payment.failure_reason && (
+                              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <p className="text-sm text-red-800">
+                                  <span className="font-medium">Failure Reason:</span> {payment.failure_reason}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          </Tabs>
         </>
       )}
     </div>
