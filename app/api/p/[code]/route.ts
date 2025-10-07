@@ -75,14 +75,15 @@ export async function GET(
       return NextResponse.json({ error: 'Code has expired' }, { status: 410 });
     }
 
-    // Increment scan count
-    await supabase
-      .from('pre_registration_codes')
-      .update({
-        scans_count: codeData.scans_count + 1,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', codeData.id);
+    // Increment scan count atomically using RPC function
+    const { error: incrementError } = await supabase.rpc('increment_prereg_scan_count', {
+      p_code_id: codeData.id
+    });
+
+    if (incrementError) {
+      console.error('Failed to increment scan count:', incrementError);
+      // Continue anyway - this is not critical
+    }
 
     return NextResponse.json(codeData);
   } catch (error) {

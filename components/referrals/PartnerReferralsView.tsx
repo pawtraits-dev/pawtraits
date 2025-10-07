@@ -141,12 +141,12 @@ function ReferralCodeDisplay({ primaryCode }: { primaryCode: ReferralCode }) {
   }
 
   return (
-    <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white">
+    <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-2xl flex items-center">
-              <Share2 className="h-6 w-6 mr-2 text-purple-600" />
+              <Share2 className="h-6 w-6 mr-2 text-green-600" />
               Your Referral Code
             </CardTitle>
             <CardDescription className="mt-2">
@@ -155,7 +155,7 @@ function ReferralCodeDisplay({ primaryCode }: { primaryCode: ReferralCode }) {
           </div>
           {primaryCode.qr_code_url && (
             <div className="flex items-center">
-              <QrCode className="h-5 w-5 text-purple-600 mr-2" />
+              <QrCode className="h-5 w-5 text-green-600 mr-2" />
               <span className="text-sm text-muted-foreground">QR Code Available</span>
             </div>
           )}
@@ -168,8 +168,8 @@ function ReferralCodeDisplay({ primaryCode }: { primaryCode: ReferralCode }) {
             Referral Code
           </label>
           <div className="flex items-center gap-2">
-            <div className="flex-1 bg-white border-2 border-purple-300 rounded-lg px-6 py-4">
-              <p className="text-3xl font-bold text-purple-600 tracking-wider text-center">
+            <div className="flex-1 bg-white border-2 border-green-300 rounded-lg px-6 py-4">
+              <p className="text-3xl font-bold text-green-600 tracking-wider text-center">
                 {primaryCode.code}
               </p>
             </div>
@@ -238,7 +238,7 @@ function ReferralCodeDisplay({ primaryCode }: { primaryCode: ReferralCode }) {
               QR Code
             </label>
             <div className="flex items-center gap-4">
-              <div className="bg-white p-4 rounded-lg border-2 border-purple-200">
+              <div className="bg-white p-4 rounded-lg border-2 border-green-200">
                 <Image
                   src={primaryCode.qr_code_url}
                   alt="Referral QR Code"
@@ -405,9 +405,9 @@ export default function PartnerReferralsView({ userProfile }: { userProfile: any
     return (
       <CountryProvider>
         <UserAwareNavigation />
-        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Loading referral data...</p>
           </div>
         </div>
@@ -419,7 +419,7 @@ export default function PartnerReferralsView({ userProfile }: { userProfile: any
     return (
       <CountryProvider>
         <UserAwareNavigation />
-        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
           <div className="text-center">
             <p className="text-red-600 mb-4">{error}</p>
             <Button onClick={fetchReferrals}>Try Again</Button>
@@ -436,7 +436,7 @@ export default function PartnerReferralsView({ userProfile }: { userProfile: any
   return (
     <CountryProvider>
       <UserAwareNavigation />
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-8">
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 p-8">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -486,13 +486,13 @@ export default function PartnerReferralsView({ userProfile }: { userProfile: any
               </CardContent>
             </Card>
 
-            <Card className="border-purple-200">
+            <Card className="border-green-200">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
-                  <TrendingUp className="w-5 h-5 text-purple-600" />
+                  <TrendingUp className="w-5 h-5 text-green-600" />
                   <div>
-                    <div className="text-2xl font-bold text-purple-900">{referralData.summary.total_purchases}</div>
-                    <div className="text-sm text-purple-700">Orders</div>
+                    <div className="text-2xl font-bold text-green-900">{referralData.summary.total_purchases}</div>
+                    <div className="text-sm text-green-700">Orders</div>
                   </div>
                 </div>
               </CardContent>
@@ -523,9 +523,9 @@ export default function PartnerReferralsView({ userProfile }: { userProfile: any
 
             {/* Tab 1: Referrals & Activity */}
             <TabsContent value="referrals" className="space-y-4">
-              <Card className="border-purple-200">
+              <Card className="border-green-200">
                 <CardHeader>
-                  <CardTitle className="text-purple-900">Performance Metrics</CardTitle>
+                  <CardTitle className="text-green-900">Performance Metrics</CardTitle>
                   <CardDescription>Your referral performance statistics</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -556,9 +556,9 @@ export default function PartnerReferralsView({ userProfile }: { userProfile: any
                 </CardContent>
               </Card>
 
-              <Card className="border-purple-200">
+              <Card className="border-green-200">
                 <CardHeader>
-                  <CardTitle className="text-purple-900">Recent Activity</CardTitle>
+                  <CardTitle className="text-green-900">Recent Activity</CardTitle>
                   <CardDescription>Recent referrals and conversions</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -859,13 +859,13 @@ export default function PartnerReferralsView({ userProfile }: { userProfile: any
                     </CardContent>
                   </Card>
 
-                  <Card className="border-purple-200">
+                  <Card className="border-green-200">
                     <CardContent className="p-4">
                       <div className="flex items-center space-x-2">
-                        <TrendingUp className="w-5 h-5 text-purple-600" />
+                        <TrendingUp className="w-5 h-5 text-green-600" />
                         <div>
-                          <div className="text-2xl font-bold text-purple-900">{paymentData.summary.total_payments}</div>
-                          <div className="text-sm text-purple-700">Total Payments</div>
+                          <div className="text-2xl font-bold text-green-900">{paymentData.summary.total_payments}</div>
+                          <div className="text-sm text-green-700">Total Payments</div>
                         </div>
                       </div>
                     </CardContent>
