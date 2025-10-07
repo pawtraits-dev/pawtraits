@@ -23,7 +23,8 @@ interface FormData {
   firstName: string;
   lastName: string;
   phone: string;
-  
+  manualReferralCode: string;
+
   // Pet details
   petName: string;
   breedId: string;
@@ -52,6 +53,7 @@ function UserSignupContent() {
     firstName: '',
     lastName: '',
     phone: '',
+    manualReferralCode: '',
     petName: '',
     breedId: '',
     coatId: '',
@@ -250,8 +252,8 @@ function UserSignupContent() {
         personalityTraits: formData.personalityTraits,
         specialNotes: formData.specialNotes,
 
-        // Referral data
-        referralCode: referralCode || null,
+        // Referral data (prioritize URL param, then manual input)
+        referralCode: referralCode || formData.manualReferralCode || null,
 
         // Photo URL (will be set below if photo upload succeeds)
         petPhotoUrl: null
@@ -446,6 +448,23 @@ function UserSignupContent() {
                       placeholder="+44 7123 456789"
                     />
                   </div>
+
+                  {/* Manual Referral Code Input */}
+                  {!referralCode && (
+                    <div className="space-y-2">
+                      <Label htmlFor="manualReferralCode">Referral Code (Optional)</Label>
+                      <Input
+                        id="manualReferralCode"
+                        value={formData.manualReferralCode}
+                        onChange={(e) => handleInputChange('manualReferralCode', e.target.value.toUpperCase())}
+                        placeholder="Enter referral code (e.g., JOHN1234ABCD)"
+                        className="uppercase"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Have a referral code from a friend or partner? Enter it here to get 10% off your first order.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">

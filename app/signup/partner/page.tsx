@@ -29,6 +29,7 @@ interface FormData {
   firstName: string;
   lastName: string;
   phone: string;
+  manualReferralCode: string;
   businessName: string;
   businessType: string;
   businessPhone: string;
@@ -53,6 +54,7 @@ function PartnerSignupForm() {
     firstName: '',
     lastName: '',
     phone: '',
+    manualReferralCode: '',
     businessName: '',
     businessType: '',
     businessPhone: '',
@@ -220,7 +222,7 @@ function PartnerSignupForm() {
               businessType: formData.businessType,
               businessPhone: formData.businessPhone || null,
               businessWebsite: formData.businessWebsite || null,
-              preRegCode: referralCode || null,
+              preRegCode: referralCode || formData.manualReferralCode || null,
               businessAddress: {
                 street: formData.address.street || null,
                 city: formData.address.city || null,
@@ -430,6 +432,23 @@ function PartnerSignupForm() {
                       placeholder="(555) 123-4567"
                     />
                   </div>
+
+                  {/* Manual Referral Code Input */}
+                  {!referralCode && (
+                    <div className="space-y-2">
+                      <Label htmlFor="manualReferralCode">Referral Code (Optional)</Label>
+                      <Input
+                        id="manualReferralCode"
+                        value={formData.manualReferralCode}
+                        onChange={(e) => handleInputChange('manualReferralCode', e.target.value.toUpperCase())}
+                        placeholder="Enter referral code (e.g., JOHN1234ABCD)"
+                        className="uppercase"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Have a referral code? Enter it here to get started.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">

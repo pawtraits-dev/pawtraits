@@ -204,20 +204,15 @@ export default function PartnerDetailPage() {
 
   const loadPartnerReferralCode = async () => {
     try {
-      // Generate a referral code for the partner based on business name or partner name
-      if (partner?.business_name) {
-        const prefix = partner.business_name.substring(0, 3).toUpperCase();
-        const suffix = partner.id.substring(0, 4).toUpperCase();
-        setPartnerReferralCode(`${prefix}${suffix}`);
-      } else if (partner?.first_name) {
-        const prefix = partner.first_name.substring(0, 3).toUpperCase();
-        const suffix = partner.id.substring(0, 4).toUpperCase();
-        setPartnerReferralCode(`${prefix}${suffix}`);
+      // Use the actual personal_referral_code from the database
+      if (partner?.personal_referral_code) {
+        setPartnerReferralCode(partner.personal_referral_code);
       } else {
-        setPartnerReferralCode(partner?.id?.substring(0, 8).toUpperCase() || 'UNKNOWN');
+        console.warn('Partner does not have a personal_referral_code:', partner?.id);
+        setPartnerReferralCode(null);
       }
     } catch (error) {
-      console.error('Error generating partner referral code:', error);
+      console.error('Error loading partner referral code:', error);
     }
   };
 
@@ -264,7 +259,7 @@ export default function PartnerDetailPage() {
     if (!partnerReferralCode) return;
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pawtraits.pics';
-    const referralUrl = `${baseUrl}/r/${partnerReferralCode}`;
+    const referralUrl = `${baseUrl}/p/${partnerReferralCode}`;
 
     navigator.clipboard.writeText(referralUrl).then(() => {
       const originalTitle = document.title;
@@ -866,8 +861,8 @@ export default function PartnerDetailPage() {
                       <p className="text-sm font-medium text-gray-700 mb-2">Referral URL:</p>
                       <div className="bg-white p-3 rounded-md border font-mono text-sm text-gray-700 break-all">
                         {typeof window !== 'undefined'
-                          ? `${window.location.origin}/r/${partnerReferralCode}`
-                          : `https://pawtraits.pics/r/${partnerReferralCode}`
+                          ? `${window.location.origin}/p/${partnerReferralCode}`
+                          : `https://pawtraits.pics/p/${partnerReferralCode}`
                         }
                       </div>
                     </div>
