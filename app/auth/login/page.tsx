@@ -243,7 +243,7 @@ function LoginPageContent() {
               <div className="text-center">
                 <p className="text-sm text-gray-600">
                   Don't have an account?{" "}
-                  <Link href={returnTo ? `/signup?returnTo=${encodeURIComponent(returnTo)}` : "/signup"} className="text-purple-600 hover:text-purple-700 font-medium">
+                  <Link href={returnTo ? `/signup/user?returnTo=${encodeURIComponent(returnTo)}` : "/signup/user"} className="text-purple-600 hover:text-purple-700 font-medium">
                     Sign up here
                   </Link>
                 </p>
