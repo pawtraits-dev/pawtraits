@@ -174,12 +174,19 @@ export async function POST(request: NextRequest) {
 
     // If a pre-registration code was used, update its status
     if (preRegCode) {
+      // First get current conversions_count
+      const { data: codeData } = await supabase
+        .from('pre_registration_codes')
+        .select('conversions_count')
+        .eq('code', preRegCode)
+        .single();
+
       const { error: updateError } = await supabase
         .from('pre_registration_codes')
         .update({
           status: 'used',
           partner_id: partner.id,
-          conversions_count: supabase.raw('COALESCE(conversions_count, 0) + 1'),
+          conversions_count: (codeData?.conversions_count || 0) + 1,
           updated_at: new Date().toISOString()
         })
         .eq('code', preRegCode);
