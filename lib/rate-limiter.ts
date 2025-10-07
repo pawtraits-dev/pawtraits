@@ -65,8 +65,8 @@ export class RateLimiter {
   constructor(abuseConfig?: Partial<AbuseDetectionConfig>) {
     this.abuseConfig = {
       suspiciousThreshold: 60,      // 60 req/min
-      blockThreshold: 120,          // 120 req/min  
-      blockDurationMs: 15 * 60 * 1000, // 15 minutes
+      blockThreshold: 120,          // 120 req/min
+      blockDurationMs: 5 * 60 * 1000, // 5 minutes
       enableAutoBlock: true,
       ...abuseConfig
     }
@@ -93,9 +93,19 @@ export class RateLimiter {
    * Check if request should be rate limited
    */
   async checkRateLimit(req: NextRequest, userType?: string): Promise<RateLimitInfo> {
+    // Check if rate limiting is disabled via environment variable
+    if (process.env.DISABLE_RATE_LIMITING === 'true') {
+      return {
+        totalRequests: 0,
+        remainingRequests: 999999,
+        resetTime: Date.now() + 60000,
+        limited: false
+      }
+    }
+
     const clientKey = this.generateClientKey(req, userType)
     const rule = this.findMatchingRule(req, userType || 'anonymous')
-    
+
     if (!rule) {
       // No specific rule found, use default
       const defaultConfig: RateLimitConfig = {

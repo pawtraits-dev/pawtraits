@@ -8,7 +8,7 @@ import { createDLPMiddleware } from './lib/dlp-integration'
 const rateLimiter = new RateLimiter({
   suspiciousThreshold: 60,
   blockThreshold: 120,
-  blockDurationMs: 15 * 60 * 1000,
+  blockDurationMs: 5 * 60 * 1000, // 5 minutes
   enableAutoBlock: true
 })
 
