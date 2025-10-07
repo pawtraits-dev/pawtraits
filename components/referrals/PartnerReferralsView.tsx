@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { getSupabaseClient } from '@/lib/supabase-client'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,6 +31,7 @@ import Link from "next/link"
 import Image from "next/image"
 import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider } from '@/lib/country-context'
+import { QRCodeSVG } from 'qrcode.react'
 
 interface ReferralCode {
   code: string
@@ -120,6 +121,7 @@ interface PaymentData {
 function ReferralCodeDisplay({ primaryCode }: { primaryCode: ReferralCode }) {
   const [copied, setCopied] = useState(false)
   const [copiedUrl, setCopiedUrl] = useState(false)
+  const qrCodeRef = useRef<HTMLDivElement>(null)
 
   const fullUrl = typeof window !== 'undefined'
     ? `${window.location.origin}${primaryCode.share_url}`
@@ -140,6 +142,42 @@ function ReferralCodeDisplay({ primaryCode }: { primaryCode: ReferralCode }) {
     }
   }
 
+  const downloadQRCode = () => {
+    if (!qrCodeRef.current) return
+
+    const svg = qrCodeRef.current.querySelector('svg')
+    if (!svg) return
+
+    // Convert SVG to canvas
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const svgData = new XMLSerializer().serializeToString(svg)
+    const img = new Image()
+
+    img.onload = () => {
+      canvas.width = img.width
+      canvas.height = img.height
+      ctx.fillStyle = 'white'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(img, 0, 0)
+
+      // Download as PNG
+      canvas.toBlob((blob) => {
+        if (!blob) return
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `referral-qr-${primaryCode.code}.png`
+        link.click()
+        URL.revokeObjectURL(url)
+      })
+    }
+
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+  }
+
   return (
     <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white">
       <CardHeader>
@@ -153,12 +191,10 @@ function ReferralCodeDisplay({ primaryCode }: { primaryCode: ReferralCode }) {
               Share this code with customers to earn commissions on their purchases
             </CardDescription>
           </div>
-          {primaryCode.qr_code_url && (
-            <div className="flex items-center">
-              <QrCode className="h-5 w-5 text-green-600 mr-2" />
-              <span className="text-sm text-muted-foreground">QR Code Available</span>
-            </div>
-          )}
+          <div className="flex items-center">
+            <QrCode className="h-5 w-5 text-green-600 mr-2" />
+            <span className="text-sm text-muted-foreground">QR Code Available</span>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -232,42 +268,34 @@ function ReferralCodeDisplay({ primaryCode }: { primaryCode: ReferralCode }) {
         </div>
 
         {/* QR Code Display */}
-        {primaryCode.qr_code_url && (
-          <div className="pt-4 border-t border-gray-200">
-            <label className="text-sm font-medium text-gray-700 mb-3 block">
-              QR Code
-            </label>
-            <div className="flex items-center gap-4">
-              <div className="bg-white p-4 rounded-lg border-2 border-green-200">
-                <Image
-                  src={primaryCode.qr_code_url}
-                  alt="Referral QR Code"
-                  width={200}
-                  height={200}
-                  className="rounded"
-                />
-              </div>
-              <div className="flex-1 space-y-2">
-                <p className="text-sm text-gray-600">
-                  Download and share this QR code at your business location or on marketing materials
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const link = document.createElement('a')
-                    link.href = primaryCode.qr_code_url!
-                    link.download = `referral-qr-${primaryCode.code}.png`
-                    link.click()
-                  }}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download QR Code
-                </Button>
-              </div>
+        <div className="pt-4 border-t border-gray-200">
+          <label className="text-sm font-medium text-gray-700 mb-3 block">
+            QR Code
+          </label>
+          <div className="flex flex-col md:flex-row items-center gap-4">
+            <div ref={qrCodeRef} className="bg-white p-4 rounded-lg border-2 border-green-200">
+              <QRCodeSVG
+                value={fullUrl}
+                size={200}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+            <div className="flex-1 space-y-2">
+              <p className="text-sm text-gray-600">
+                Download and share this QR code at your business location or on marketing materials
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={downloadQRCode}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download QR Code
+              </Button>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Stats */}
         <div className="pt-4 border-t border-gray-200 grid grid-cols-2 gap-4">

@@ -733,6 +733,7 @@ CREATE TABLE public.partners (
   commission_rate numeric DEFAULT 20.00,
   lifetime_commission_rate numeric DEFAULT 5.00,
   logo_url text,
+  personal_referral_code character varying UNIQUE,
   CONSTRAINT partners_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.pet_photos (
