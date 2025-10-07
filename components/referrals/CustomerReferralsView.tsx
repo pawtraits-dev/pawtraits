@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -17,9 +17,10 @@ import {
   DollarSign,
   CheckCircle2,
   Clock,
-  QrCode
+  QrCode,
+  ExternalLink
 } from 'lucide-react';
-import QRCode from 'qrcode';
+import { QRCodeSVG } from 'qrcode.react';
 
 // 🏗️ CUSTOMER REFERRALS VIEW COMPONENT
 // User-type specific view for customer referrals page
@@ -84,53 +85,13 @@ interface CustomerReferralData {
 
 // Referral Code Display Component
 function ReferralCodeDisplay({ code }: { code: ReferralCode | null }) {
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (code) {
-      const fullUrl = `${window.location.origin}${code.share_url}`;
-      QRCode.toDataURL(fullUrl, { width: 200 })
-        .then(setQrCodeDataUrl)
-        .catch(console.error);
-    }
-  }, [code]);
-
-  const handleCopy = () => {
-    if (code) {
-      const fullUrl = `${window.location.origin}${code.share_url}`;
-      navigator.clipboard.writeText(fullUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handleShare = async () => {
-    if (code && navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Join Pawtraits!',
-          text: 'Get amazing AI-generated pet portraits! Use my referral code to get started.',
-          url: `${window.location.origin}${code.share_url}`
-        });
-      } catch (err) {
-        console.error('Share failed:', err);
-      }
-    }
-  };
-
-  const handleDownloadQR = () => {
-    if (qrCodeDataUrl) {
-      const link = document.createElement('a');
-      link.href = qrCodeDataUrl;
-      link.download = `pawtraits-referral-${code?.code}.png`;
-      link.click();
-    }
-  };
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const qrCodeRef = useRef<HTMLDivElement>(null);
 
   if (!code) {
     return (
-      <Card className="bg-gradient-to-br from-purple-50 to-pink-50">
+      <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white">
         <CardContent className="pt-6">
           <p className="text-gray-600 text-center">No referral code available</p>
         </CardContent>
@@ -138,63 +99,218 @@ function ReferralCodeDisplay({ code }: { code: ReferralCode | null }) {
     );
   }
 
-  const fullUrl = `${window.location.origin}${code.share_url}`;
+  const fullUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}${code.share_url}`
+    : code.share_url;
+
+  const copyToClipboard = async (text: string, type: 'code' | 'url') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (type === 'code') {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } else {
+        setCopiedUrl(true);
+        setTimeout(() => setCopiedUrl(false), 2000);
+      }
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const downloadQRCode = () => {
+    if (!qrCodeRef.current) return;
+
+    const svg = qrCodeRef.current.querySelector('svg');
+    if (!svg) return;
+
+    // Convert SVG to canvas
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const img = new Image();
+
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+
+      // Download as PNG
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `referral-qr-${code.code}.png`;
+        link.click();
+        URL.revokeObjectURL(url);
+      });
+    };
+
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Join Pawtraits!',
+          text: 'Get amazing AI-generated pet portraits! Use my referral code to get started.',
+          url: fullUrl
+        });
+      } catch (err) {
+        console.error('Share failed:', err);
+      }
+    }
+  };
 
   return (
-    <Card className="bg-gradient-to-br from-purple-50 to-pink-50">
+    <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white">
       <CardHeader>
-        <CardTitle>Your Referral Code</CardTitle>
-        <CardDescription>Share with friends to earn rewards!</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between bg-white p-4 rounded-lg">
+        <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 mb-1">Referral Code</p>
-            <p className="text-2xl font-bold text-purple-600">{code.code}</p>
-            <p className="text-xs text-gray-500 mt-1">{fullUrl}</p>
+            <CardTitle className="text-2xl flex items-center">
+              <Share2 className="h-6 w-6 mr-2 text-purple-600" />
+              Your Referral Code
+            </CardTitle>
+            <CardDescription className="mt-2">
+              Share with friends to earn rewards!
+            </CardDescription>
           </div>
-          {qrCodeDataUrl && (
-            <div className="flex flex-col items-center gap-2">
-              <img src={qrCodeDataUrl} alt="QR Code" className="w-24 h-24" />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownloadQR}
-                className="text-xs"
-              >
-                <Download className="w-3 h-3 mr-1" />
-                Download
-              </Button>
+          <div className="flex items-center">
+            <QrCode className="h-5 w-5 text-purple-600 mr-2" />
+            <span className="text-sm text-muted-foreground">QR Code Available</span>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Referral Code */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">
+            Referral Code
+          </label>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-white border-2 border-purple-300 rounded-lg px-6 py-4">
+              <p className="text-3xl font-bold text-purple-600 tracking-wider text-center">
+                {code.code}
+              </p>
             </div>
-          )}
-        </div>
-
-        <div className="flex gap-2">
-          <Button
-            onClick={handleCopy}
-            variant="outline"
-            className="flex-1"
-          >
-            <Copy className="w-4 h-4 mr-2" />
-            {copied ? 'Copied!' : 'Copy Link'}
-          </Button>
-          {navigator.share && (
             <Button
-              onClick={handleShare}
+              onClick={() => copyToClipboard(code.code, 'code')}
               variant="outline"
-              className="flex-1"
+              size="lg"
+              className="h-full"
             >
-              <Share2 className="w-4 h-4 mr-2" />
-              Share
+              {copied ? (
+                <>
+                  <CheckCircle2 className="h-5 w-5 mr-2 text-purple-600" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-5 w-5 mr-2" />
+                  Copy
+                </>
+              )}
             </Button>
-          )}
+          </div>
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <p className="text-sm text-blue-800">
-            <strong>How it works:</strong> When your friends sign up using your code, you earn £5 credit.
-            When they make their first purchase, you earn an additional £10 credit!
-          </p>
+        {/* Share URL */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">
+            Share Link
+          </label>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-white border border-gray-300 rounded-lg px-4 py-3">
+              <p className="text-sm text-gray-700 truncate">
+                {fullUrl}
+              </p>
+            </div>
+            <Button
+              onClick={() => copyToClipboard(fullUrl, 'url')}
+              variant="outline"
+            >
+              {copiedUrl ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2 text-purple-600" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy Link
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={() => window.open(fullUrl, '_blank')}
+              variant="outline"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Preview
+            </Button>
+          </div>
+        </div>
+
+        {/* QR Code Display */}
+        <div className="pt-4 border-t border-gray-200">
+          <label className="text-sm font-medium text-gray-700 mb-3 block">
+            QR Code
+          </label>
+          <div className="flex flex-col md:flex-row items-center gap-4">
+            <div ref={qrCodeRef} className="bg-white p-4 rounded-lg border-2 border-purple-200">
+              <QRCodeSVG
+                value={fullUrl}
+                size={200}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+            <div className="flex-1 space-y-2">
+              <p className="text-sm text-gray-600">
+                Download and share this QR code with friends or on social media
+              </p>
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={downloadQRCode}
+                  className="w-full"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download QR Code
+                </Button>
+                {navigator.share && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleShare}
+                    className="w-full"
+                  >
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share via...
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* How it Works */}
+        <div className="pt-4 border-t border-gray-200">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-900 font-medium mb-2">💰 How Rewards Work:</p>
+            <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+              <li>Friend signs up with your code: <strong>You get 10% credit</strong></li>
+              <li>Friend makes first purchase: <strong>They get 10% discount</strong></li>
+              <li>Use credits on any future order!</li>
+            </ul>
+          </div>
         </div>
       </CardContent>
     </Card>
