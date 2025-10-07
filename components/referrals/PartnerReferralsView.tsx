@@ -732,7 +732,7 @@ export default function PartnerReferralsView({ userProfile }: { userProfile: any
                                 <TableCell>
                                   <div className="text-sm">
                                     <div className="font-medium text-blue-600">
-                                      #{commission.id.slice(-8)}
+                                      #{commission.id ? commission.id.slice(-8) : 'N/A'}
                                     </div>
                                     <div className="text-gray-500 text-xs flex items-center gap-1 mt-1">
                                       <Calendar className="w-3 h-3" />
@@ -746,7 +746,7 @@ export default function PartnerReferralsView({ userProfile }: { userProfile: any
                                 </TableCell>
                                 <TableCell>
                                   <div className="space-y-2 max-w-xs">
-                                    {order?.order_items?.slice(0, 2).map((item) => {
+                                    {(order?.order_items || []).slice(0, 2).map((item) => {
                                       const productData = item.product_data || {};
                                       const thumbnailUrl = productData.thumbnail_url || item.image_url;
                                       const productName = productData.name || 'Product';

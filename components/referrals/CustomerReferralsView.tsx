@@ -573,7 +573,7 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
                               }>
                                 {reward.status === 'earned' && <CheckCircle2 className="w-3 h-3 mr-1" />}
                                 {reward.status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
-                                {reward.status.charAt(0).toUpperCase() + reward.status.slice(1)}
+                                {reward.status ? reward.status.charAt(0).toUpperCase() + reward.status.slice(1) : 'Unknown'}
                               </Badge>
                             </td>
                             <td className="px-4 py-3 text-sm font-bold text-green-600 text-right">
@@ -668,7 +668,7 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
                               </div>
                             </td>
                             <td className="px-4 py-3 text-sm font-mono text-gray-600">
-                              {redemption.order_id.substring(0, 8)}...
+                              {redemption.order_id ? redemption.order_id.substring(0, 8) : 'N/A'}...
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-900 text-right">
                               £{redemption.order_total.toFixed(2)}
