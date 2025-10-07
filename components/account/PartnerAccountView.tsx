@@ -16,6 +16,7 @@ import type { UserProfile } from '@/lib/user-types';
 import { getUserDisplayName } from '@/lib/user-types';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
+import ReferralCodeCard from '@/components/account/ReferralCodeCard';
 
 // 🏗️ PARTNER ACCOUNT VIEW COMPONENT
 // Following architectural patterns from docs/patterns/
@@ -415,6 +416,11 @@ export default function PartnerAccountView({ userProfile }: PartnerAccountViewPr
             <p className="text-green-700 mt-2">
               Welcome, {getUserDisplayName(userProfile)} - Manage your partner account
             </p>
+          </div>
+
+          {/* Referral Code Quick Access */}
+          <div className="mb-6">
+            <ReferralCodeCard userType="partner" userEmail={userProfile.email} />
           </div>
 
           <Tabs defaultValue="profile" className="space-y-6">

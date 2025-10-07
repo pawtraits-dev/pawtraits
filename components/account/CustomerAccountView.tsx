@@ -14,6 +14,7 @@ import type { UserProfile } from '@/lib/user-types';
 import { getUserDisplayName } from '@/lib/user-types';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
+import ReferralCodeCard from '@/components/account/ReferralCodeCard';
 
 // 🏗️ CUSTOMER ACCOUNT VIEW COMPONENT
 // Following architectural patterns from docs/patterns/
@@ -173,6 +174,11 @@ export default function CustomerAccountView({ userProfile }: CustomerAccountView
             <p className="text-gray-600">
               Manage your account information and preferences
             </p>
+          </div>
+
+          {/* Referral Code Quick Access */}
+          <div className="mb-6">
+            <ReferralCodeCard userType="customer" userEmail={userProfile.email} />
           </div>
 
           <Tabs defaultValue="profile" className="space-y-6">
