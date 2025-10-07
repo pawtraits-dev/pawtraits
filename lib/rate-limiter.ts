@@ -474,7 +474,7 @@ export class RateLimiter {
       userTypes: ['anonymous'],
       config: {
         windowMs: 15 * 60 * 1000,  // 15 minutes
-        maxRequests: 5,            // 5 attempts per 15 min
+        maxRequests: 25,           // 25 attempts per 15 min
         strategy: 'sliding'
       },
       priority: 100,
