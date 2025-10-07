@@ -220,6 +220,7 @@ function PartnerSignupForm() {
               businessType: formData.businessType,
               businessPhone: formData.businessPhone || null,
               businessWebsite: formData.businessWebsite || null,
+              preRegCode: referralCode || null,
               businessAddress: {
                 street: formData.address.street || null,
                 city: formData.address.city || null,

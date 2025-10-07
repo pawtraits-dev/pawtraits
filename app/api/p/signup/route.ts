@@ -73,7 +73,8 @@ export async function POST(request: NextRequest) {
       businessType,
       businessPhone,
       businessWebsite,
-      businessAddress
+      businessAddress,
+      preRegCode
     } = body;
 
     if (!userId || !email || !firstName || !lastName || !businessName || !businessType) {
@@ -82,18 +83,25 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Generate unique personal referral code
-    const codePrefix = businessName.substring(0, 3).replace(/[^A-Z0-9]/gi, '') || 'PAR';
-    const personalReferralCode = await generateUniqueCode(supabase, codePrefix);
+    // Use pre-registration code if provided, otherwise generate new one
+    let personalReferralCode = preRegCode;
 
     if (!personalReferralCode) {
-      console.error('Failed to generate unique referral code for partner');
-      return NextResponse.json({
-        error: 'Failed to generate referral code'
-      }, { status: 500 });
-    }
+      // Generate unique personal referral code for organic signups
+      const codePrefix = businessName.substring(0, 3).replace(/[^A-Z0-9]/gi, '') || 'PAR';
+      personalReferralCode = await generateUniqueCode(supabase, codePrefix);
 
-    console.log(`Generated personal referral code for partner: ${personalReferralCode}`);
+      if (!personalReferralCode) {
+        console.error('Failed to generate unique referral code for partner');
+        return NextResponse.json({
+          error: 'Failed to generate referral code'
+        }, { status: 500 });
+      }
+
+      console.log(`Generated personal referral code for organic partner signup: ${personalReferralCode}`);
+    } else {
+      console.log(`Using pre-registration code as personal referral code: ${personalReferralCode}`);
+    }
 
     // Create partner profile using service role
     const { data: partner, error: partnerError } = await supabase
@@ -163,6 +171,26 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ Created user profile for partner:', userProfile.id);
+
+    // If a pre-registration code was used, update its status
+    if (preRegCode) {
+      const { error: updateError } = await supabase
+        .from('pre_registration_codes')
+        .update({
+          status: 'used',
+          partner_id: partner.id,
+          conversions_count: supabase.raw('COALESCE(conversions_count, 0) + 1'),
+          updated_at: new Date().toISOString()
+        })
+        .eq('code', preRegCode);
+
+      if (updateError) {
+        console.error('Failed to update pre-registration code status:', updateError);
+        // Continue anyway - this is not critical to signup success
+      } else {
+        console.log(`✅ Updated pre-registration code ${preRegCode} to 'used' status`);
+      }
+    }
 
     return NextResponse.json({
       success: true,

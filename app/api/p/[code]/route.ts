@@ -24,7 +24,10 @@ export async function GET(
     }
 
     // Get the pre-registration code with partner information
-    const { data: codeData, error } = await supabase
+    let codeData = null;
+    let isOrganicPartnerCode = false;
+
+    const { data: preRegData, error: preRegError } = await supabase
       .from('pre_registration_codes')
       .select(`
         *,
@@ -37,14 +40,41 @@ export async function GET(
         )
       `)
       .eq('code', code)
-      .single();
+      .maybeSingle();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Code not found' }, { status: 404 });
+    if (preRegData) {
+      codeData = preRegData;
+    } else {
+      // If not found in pre_registration_codes, check partners.personal_referral_code
+      const { data: partnerData, error: partnerError } = await supabase
+        .from('partners')
+        .select('id, business_name, first_name, last_name, logo_url, personal_referral_code, is_active, approval_status')
+        .eq('personal_referral_code', code)
+        .single();
+
+      if (partnerData) {
+        // Found organic partner code - construct compatible format
+        isOrganicPartnerCode = true;
+        codeData = {
+          id: partnerData.id,
+          code: partnerData.personal_referral_code,
+          status: partnerData.is_active && partnerData.approval_status === 'approved' ? 'active' : 'inactive',
+          partner_id: partnerData.id,
+          partner: {
+            id: partnerData.id,
+            business_name: partnerData.business_name,
+            first_name: partnerData.first_name,
+            last_name: partnerData.last_name,
+            logo_url: partnerData.logo_url
+          },
+          scans_count: 0,
+          expiration_date: null
+        };
       }
-      console.error('Failed to fetch pre-registration code:', error);
-      return NextResponse.json({ error: 'Failed to verify code' }, { status: 500 });
+    }
+
+    if (!codeData) {
+      return NextResponse.json({ error: 'Code not found' }, { status: 404 });
     }
 
     // Check if code is active
@@ -76,13 +106,16 @@ export async function GET(
     }
 
     // Increment scan count atomically using RPC function
-    const { error: incrementError } = await supabase.rpc('increment_prereg_scan_count', {
-      p_code_id: codeData.id
-    });
+    // Only for pre-registration codes (not organic partner codes)
+    if (!isOrganicPartnerCode) {
+      const { error: incrementError } = await supabase.rpc('increment_prereg_scan_count', {
+        p_code_id: codeData.id
+      });
 
-    if (incrementError) {
-      console.error('Failed to increment scan count:', incrementError);
-      // Continue anyway - this is not critical
+      if (incrementError) {
+        console.error('Failed to increment scan count:', incrementError);
+        // Continue anyway - this is not critical
+      }
     }
 
     return NextResponse.json(codeData);
