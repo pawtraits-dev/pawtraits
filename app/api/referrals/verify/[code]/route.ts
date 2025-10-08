@@ -201,20 +201,19 @@ export async function GET(
     if (!referralData) {
       const { data, error } = await supabase
         .from('customers')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          email,
-          personal_referral_code,
-          is_registered,
-          user_profiles!inner(id)
-        `)
+        .select('id, first_name, last_name, email, personal_referral_code, is_registered')
         .eq('personal_referral_code', referralCode)
         .eq('is_registered', true)
         .single();
 
       if (!error && data) {
+        // Get user_profile separately (may not exist for all customers)
+        const { data: userProfileData } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('email', data.email)
+          .maybeSingle();
+
         referralData = {
           id: data.id,
           code: data.personal_referral_code,
@@ -226,7 +225,7 @@ export async function GET(
         };
         referralType = 'CUSTOMER';
         referrerInfo = {
-          id: data.user_profiles?.[0]?.id || data.user_profiles?.id,
+          id: userProfileData?.id || data.id, // Use user_profile id if exists, otherwise customer id
           type: 'customer',
           name: `${data.first_name} ${data.last_name}`,
           avatar_url: null,
