@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     console.log('Admin customers API: Found', customerProfiles.length, 'customer profiles');
 
-    // Get pet counts for each customer
+    // Get pet counts and referral data for each customer
     const customersWithPets = await Promise.all(
       customerProfiles.map(async (profile) => {
         try {
@@ -56,6 +56,24 @@ export async function GET(request: NextRequest) {
 
           const petCount = petsError || !pets ? 0 : pets.length;
 
+          // Get customer record to check for referral_scans_count
+          const { data: customerRecord } = await supabase
+            .from('customers')
+            .select('referral_scans_count, personal_referral_code')
+            .eq('email', profile.email)
+            .maybeSingle();
+
+          const totalScans = customerRecord?.referral_scans_count || 0;
+
+          // Get referred customers (signups using this customer's code)
+          const { data: referredCustomers } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('referral_type', 'CUSTOMER')
+            .eq('referrer_id', profile.id);
+
+          const totalSignups = referredCustomers ? referredCustomers.length : 0;
+
           // Transform to match expected AdminCustomerOverview interface
           return {
             id: profile.id,
@@ -63,8 +81,8 @@ export async function GET(request: NextRequest) {
             email: profile.email || '',
             first_name: profile.first_name || null,
             last_name: profile.last_name || null,
-            full_name: profile.first_name && profile.last_name 
-              ? `${profile.first_name} ${profile.last_name}` 
+            full_name: profile.first_name && profile.last_name
+              ? `${profile.first_name} ${profile.last_name}`
               : profile.first_name || profile.last_name || null,
             phone: profile.phone || null,
             is_registered: true, // Since they're in user_profiles, they're registered
@@ -81,10 +99,12 @@ export async function GET(request: NextRequest) {
             phone_verified: false, // Default to false
             created_at: profile.created_at,
             updated_at: profile.updated_at,
-            referred_by_partner_id: null // TODO: Get from referral system if needed
+            referred_by_partner_id: null, // TODO: Get from referral system if needed
+            referral_scans: totalScans,
+            referral_signups: totalSignups
           };
         } catch (petError) {
-          console.error('Error fetching pets for user', profile.user_id, ':', petError);
+          console.error('Error fetching data for user', profile.user_id, ':', petError);
           // Return customer data without pet count if pet query fails
           return {
             id: profile.id,
@@ -92,8 +112,8 @@ export async function GET(request: NextRequest) {
             email: profile.email || '',
             first_name: profile.first_name || null,
             last_name: profile.last_name || null,
-            full_name: profile.first_name && profile.last_name 
-              ? `${profile.first_name} ${profile.last_name}` 
+            full_name: profile.first_name && profile.last_name
+              ? `${profile.first_name} ${profile.last_name}`
               : profile.first_name || profile.last_name || null,
             phone: profile.phone || null,
             is_registered: true,
@@ -110,7 +130,9 @@ export async function GET(request: NextRequest) {
             phone_verified: false,
             created_at: profile.created_at,
             updated_at: profile.updated_at,
-            referred_by_partner_id: null
+            referred_by_partner_id: null,
+            referral_scans: 0,
+            referral_signups: 0
           };
         }
       })

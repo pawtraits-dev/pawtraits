@@ -273,6 +273,7 @@ export default function AdminCustomersPage() {
                   <th className="text-left p-4 font-medium">Contact</th>
                   <th className="text-left p-4 font-medium">Status</th>
                   <th className="text-left p-4 font-medium">Activity</th>
+                  <th className="text-left p-4 font-medium">Referrals</th>
                   <th className="text-left p-4 font-medium">Joined</th>
                   <th className="text-right p-4 font-medium">Actions</th>
                 </tr>
@@ -331,6 +332,16 @@ export default function AdminCustomersPage() {
                         {customer.total_orders > 0 && (
                           <div className="text-purple-600 text-xs">Customer</div>
                         )}
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="text-sm">
+                        <div className="font-medium text-blue-600">
+                          {(customer as any).referral_scans || 0} scans
+                        </div>
+                        <div className="text-green-600">
+                          {(customer as any).referral_signups || 0} signups
+                        </div>
                       </div>
                     </td>
                     <td className="p-4">

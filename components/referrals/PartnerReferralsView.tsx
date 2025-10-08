@@ -587,9 +587,30 @@ export default function PartnerReferralsView({ userProfile }: { userProfile: any
               <Card className="border-green-200">
                 <CardHeader>
                   <CardTitle className="text-green-900">Recent Activity</CardTitle>
-                  <CardDescription>Recent referrals and conversions</CardDescription>
+                  <CardDescription>Code scans, sign-ups, and purchases from your referrals</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex items-center gap-2">
+                        <Eye className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="text-sm text-blue-700">Total Scans</p>
+                          <p className="text-2xl font-bold text-blue-900">{referralData.summary.total_scans}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center gap-2">
+                        <UserPlus className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="text-sm text-green-700">Total Signups</p>
+                          <p className="text-2xl font-bold text-green-900">{referralData.summary.total_signups}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {!referralData.recent_activity || referralData.recent_activity.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />

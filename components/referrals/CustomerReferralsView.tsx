@@ -21,6 +21,8 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
+import { CountryProvider } from '@/lib/country-context';
 
 // 🏗️ CUSTOMER REFERRALS VIEW COMPONENT
 // User-type specific view for customer referrals page
@@ -382,34 +384,42 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
 
   if (loadingReferrals) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full"></div>
+      <CountryProvider>
+        <UserAwareNavigation />
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full"></div>
+            </div>
           </div>
         </div>
-      </div>
+      </CountryProvider>
     );
   }
 
   if (error || !referralData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <p className="text-red-800">{error || 'Failed to load referral data'}</p>
-            <Button onClick={fetchReferralData} className="mt-4">
-              Try Again
-            </Button>
+      <CountryProvider>
+        <UserAwareNavigation />
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+              <p className="text-red-800">{error || 'Failed to load referral data'}</p>
+              <Button onClick={fetchReferralData} className="mt-4">
+                Try Again
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </CountryProvider>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <CountryProvider>
+      <UserAwareNavigation />
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -805,8 +815,9 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
             </Card>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
-    </div>
+    </CountryProvider>
   );
 }
 
