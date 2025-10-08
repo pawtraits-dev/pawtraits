@@ -39,13 +39,9 @@ export async function GET(request: NextRequest) {
       !p.email?.includes('@admin') && // Basic admin email pattern check
       !p.email?.includes('admin@')
     )) {
-      // Get scan data directly from pre_registration_codes table using service role
-      const { data: preRegCodes, error: preRegError } = await supabaseAdmin
-        .from('pre_registration_codes')
-        .select('scans_count')
-        .eq('partner_id', partner.id);
-
-      const totalScans = preRegCodes ? preRegCodes.reduce((sum, code) => sum + (code.scans_count || 0), 0) : 0;
+      // Get scan data from partner's referral_scans_count (customer scans after activation)
+      // This tracks scans of the partner's active referral code (either converted pre-reg or personal code)
+      const totalScans = partner.referral_scans_count || 0;
 
       // Get signup data from customers table using service role
       const { data: userProfile } = await supabaseAdmin

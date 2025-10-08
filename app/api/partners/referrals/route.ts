@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     // Get partner details
     const { data: partner, error: partnerError } = await supabase
       .from('partners')
-      .select('business_name, first_name, last_name, email, personal_referral_code')
+      .select('business_name, first_name, last_name, email, personal_referral_code, referral_scans_count')
       .eq('id', partnerId)
       .single();
 
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
         code: partner.personal_referral_code,
         qr_code_url: null,
         type: 'personal' as const,
-        scans_count: 0,
+        scans_count: partner.referral_scans_count || 0,
         conversions_count: 0,
         share_url: `/p/${partner.personal_referral_code}`
       };
@@ -111,8 +111,9 @@ export async function GET(request: NextRequest) {
 
     // Get referral analytics using proven query pattern from /admin/partners
 
-    // 1. Get total scans from pre_registration_codes (all statuses)
-    const totalScans = allPreRegCodes ? allPreRegCodes.reduce((sum, code) => sum + (code.scans_count || 0), 0) : 0;
+    // 1. Get total scans - use partner's referral_scans_count (customer scans after activation)
+    // This tracks scans of the partner's active referral code (either converted pre-reg or personal code)
+    const totalScans = partner.referral_scans_count || 0;
 
     // 2. Get signup data from customers table
     const { data: userProfileData } = await supabase
