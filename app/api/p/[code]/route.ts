@@ -83,6 +83,18 @@ export async function GET(
         return NextResponse.json({ error: 'Code has expired' }, { status: 410 });
       } else if (codeData.status === 'used') {
         // If code is used, redirect to customer signup with partner referral
+        // Increment partner's referral scans BEFORE redirecting
+        if (codeData.partner_id) {
+          const { error: incrementError } = await supabase.rpc('increment_partner_referral_scans', {
+            p_partner_id: codeData.partner_id
+          });
+
+          if (incrementError) {
+            console.error('Failed to increment partner scan count:', incrementError);
+            // Continue anyway - this is not critical
+          }
+        }
+
         // Get partner email by joining with partners table
         const { data: partnerData } = await supabase
           .from('partners')
@@ -106,14 +118,24 @@ export async function GET(
     }
 
     // Increment scan count atomically using RPC function
-    // Only for pre-registration codes (not organic partner codes)
-    if (!isOrganicPartnerCode) {
+    if (isOrganicPartnerCode) {
+      // For organic partner codes (personal_referral_code), increment partner scan count
+      const { error: incrementError } = await supabase.rpc('increment_partner_referral_scans', {
+        p_partner_id: codeData.partner_id
+      });
+
+      if (incrementError) {
+        console.error('Failed to increment partner scan count:', incrementError);
+        // Continue anyway - this is not critical
+      }
+    } else {
+      // For pre-registration codes, increment pre-reg scan count
       const { error: incrementError } = await supabase.rpc('increment_prereg_scan_count', {
         p_code_id: codeData.id
       });
 
       if (incrementError) {
-        console.error('Failed to increment scan count:', incrementError);
+        console.error('Failed to increment pre-reg scan count:', incrementError);
         // Continue anyway - this is not critical
       }
     }

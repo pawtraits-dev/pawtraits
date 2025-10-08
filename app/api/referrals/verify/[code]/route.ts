@@ -197,6 +197,45 @@ export async function GET(
       }
     }
 
+    // 5. Check customer personal referral codes (new system)
+    if (!referralData) {
+      const { data, error } = await supabase
+        .from('customers')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          email,
+          personal_referral_code,
+          is_registered,
+          user_profiles!inner(id)
+        `)
+        .eq('personal_referral_code', referralCode)
+        .eq('is_registered', true)
+        .single();
+
+      if (!error && data) {
+        referralData = {
+          id: data.id,
+          code: data.personal_referral_code,
+          type: 'customer_personal_code',
+          status: 'active',
+          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
+          commission_rate: 0, // Customers get credits, not commissions
+          discount_rate: 10.0, // 10% discount for referred customers
+        };
+        referralType = 'CUSTOMER';
+        referrerInfo = {
+          id: data.user_profiles?.[0]?.id || data.user_profiles?.id,
+          type: 'customer',
+          name: `${data.first_name} ${data.last_name}`,
+          avatar_url: null,
+          email: data.email,
+        };
+        console.log('✅ Found customer personal referral code');
+      }
+    }
+
     // If no referral found
     if (!referralData) {
       console.log('❌ No referral found for code:', referralCode);
