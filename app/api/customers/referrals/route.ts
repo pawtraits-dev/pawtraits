@@ -40,6 +40,13 @@ export async function GET(request: NextRequest) {
 
     const customerId = customer.id;
 
+    // Get user_profile ID for this customer (referrer_id might use this instead of customer.id)
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('email', customer.email)
+      .maybeSingle();
+
     // Get primary referral code
     const primaryCode = customer.personal_referral_code ? {
       code: customer.personal_referral_code,
@@ -49,11 +56,17 @@ export async function GET(request: NextRequest) {
     } : null;
 
     // Get referred customers (friends who used this customer's referral code)
+    // Query for both customer.id and user_profile.id as referrer_id
+    const referrerIds = [customerId];
+    if (userProfile?.id) {
+      referrerIds.push(userProfile.id);
+    }
+
     const { data: referredCustomers, error: referredError } = await supabase
       .from('customers')
       .select('id, email, first_name, last_name, created_at')
       .eq('referral_type', 'CUSTOMER')
-      .eq('referrer_id', customerId);
+      .in('referrer_id', referrerIds);
 
     if (referredError) {
       console.warn('Error fetching referred customers:', referredError);

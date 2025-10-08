@@ -18,7 +18,9 @@ import {
   CheckCircle2,
   Clock,
   QrCode,
-  ExternalLink
+  ExternalLink,
+  Eye,
+  UserPlus
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
@@ -516,9 +518,30 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
             <Card>
               <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Your latest referral events</CardDescription>
+                <CardDescription>Code scans, sign-ups, and purchases from your referrals</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2">
+                      <Eye className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <p className="text-sm text-blue-700">Total Scans</p>
+                        <p className="text-2xl font-bold text-blue-900">{referralData.summary.total_scans || 0}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="text-sm text-green-700">Total Signups</p>
+                        <p className="text-2xl font-bold text-green-900">{referralData.summary.total_friends_referred}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {!referralData.recent_activity || referralData.recent_activity.length === 0 ? (
                   <div className="text-center py-8">
                     <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
