@@ -310,8 +310,8 @@ function ReferralCodeDisplay({ code }: { code: ReferralCode | null }) {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-900 font-medium mb-2">💰 How Rewards Work:</p>
             <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-              <li>Friend signs up with your code: <strong>You get 10% credit</strong></li>
-              <li>Friend makes first purchase: <strong>They get 10% discount</strong></li>
+              <li>Friend signs up with your code: <strong>They get 10% off their first order</strong></li>
+              <li>Friend makes a purchase: <strong>You earn 10% of their order value (excl. tax & shipping) as credit</strong></li>
               <li>Use credits on any future order!</li>
             </ul>
           </div>
@@ -451,69 +451,6 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
 
           {/* Tab 1: Referrals & Activity */}
           <TabsContent value="referrals" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Referral Code Card */}
-              <div>
-                <ReferralCodeDisplay code={referralData.primary_code} />
-              </div>
-
-              {/* Performance Metrics */}
-              <div className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Your Performance</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-5 h-5 text-purple-600" />
-                        <span className="text-sm text-gray-600">Friends Referred</span>
-                      </div>
-                      <span className="text-2xl font-bold text-purple-600">
-                        {referralData.summary.total_friends_referred}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ShoppingBag className="w-5 h-5 text-green-600" />
-                        <span className="text-sm text-gray-600">Friends Purchased</span>
-                      </div>
-                      <span className="text-2xl font-bold text-green-600">
-                        {referralData.summary.total_friends_purchased}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5 text-blue-600" />
-                        <span className="text-sm text-gray-600">Conversion Rate</span>
-                      </div>
-                      <span className="text-2xl font-bold text-blue-600">
-                        {referralData.summary.total_friends_referred > 0
-                          ? Math.round((referralData.summary.total_friends_purchased / referralData.summary.total_friends_referred) * 100)
-                          : 0}%
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-green-50 to-emerald-50">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Available Balance</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-4xl font-bold text-green-600">
-                      £{referralData.summary.available_balance.toFixed(2)}
-                    </div>
-                    <p className="text-sm text-gray-600 mt-2">
-                      Ready to use on your next purchase!
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
             {/* Recent Activity */}
             <Card>
               <CardHeader>
@@ -571,10 +508,7 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
                           </div>
                           <div>
                             <p className="font-medium text-gray-900">
-                              {activity.customer_name}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {activity.type === 'purchase' ? 'Made a purchase' : 'Signed up'}
+                              {activity.type === 'purchase' ? 'Someone made a purchase' : 'A friend signed up'}
                             </p>
                             <p className="text-xs text-gray-400">
                               {new Date(activity.date).toLocaleDateString()}

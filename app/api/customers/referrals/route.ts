@@ -140,31 +140,35 @@ export async function GET(request: NextRequest) {
 
     if (referredCustomers) {
       for (const refCustomer of referredCustomers.slice(0, 20)) {
-        // Signup activity
+        // Signup activity (no reward for signup)
         recentActivity.push({
           id: `signup-${refCustomer.id}`,
           type: 'signup' as const,
           date: refCustomer.created_at,
           customer_name: `${refCustomer.first_name || ''} ${refCustomer.last_name || ''}`.trim() || 'Customer',
-          reward: 5.00, // £5 signup bonus
+          reward: 0, // No signup bonus
           status: 'earned'
         });
 
         // Check if they made a purchase
         const { data: customerOrders } = await supabase
           .from('orders')
-          .select('id, created_at')
+          .select('id, created_at, subtotal_amount')
           .eq('customer_email', refCustomer.email)
           .order('created_at', { ascending: true })
           .limit(1);
 
         if (customerOrders && customerOrders.length > 0) {
+          // Calculate 10% reward from subtotal (excluding tax and shipping)
+          const orderSubtotal = customerOrders[0].subtotal_amount || 0;
+          const rewardAmount = (orderSubtotal * 0.1) / 100; // Convert pence to pounds with 10%
+
           recentActivity.push({
             id: `purchase-${refCustomer.id}`,
             type: 'purchase' as const,
             date: customerOrders[0].created_at,
             customer_name: `${refCustomer.first_name || ''} ${refCustomer.last_name || ''}`.trim() || 'Customer',
-            reward: 10.00, // £10 purchase bonus
+            reward: rewardAmount,
             status: 'earned'
           });
         }
@@ -179,34 +183,27 @@ export async function GET(request: NextRequest) {
 
     if (referredCustomers) {
       for (const refCustomer of referredCustomers) {
-        // Signup reward
-        rewards.push({
-          id: `reward-signup-${refCustomer.id}`,
-          customer_id: customerId,
-          friend_customer_id: refCustomer.id,
-          order_id: null,
-          reward_amount: 5.00,
-          reward_type: 'signup' as const,
-          status: 'earned' as const,
-          created_at: refCustomer.created_at,
-          redeemed_at: null
-        });
+        // No signup reward - customers only get rewards when referred friends make purchases
 
-        // Purchase reward (if they purchased)
+        // Purchase reward (if they purchased) - 10% of order subtotal
         const { data: customerOrders } = await supabase
           .from('orders')
-          .select('id, created_at')
+          .select('id, created_at, subtotal_amount')
           .eq('customer_email', refCustomer.email)
           .order('created_at', { ascending: true })
           .limit(1);
 
         if (customerOrders && customerOrders.length > 0) {
+          // Calculate 10% reward from subtotal (excluding tax and shipping)
+          const orderSubtotal = customerOrders[0].subtotal_amount || 0;
+          const rewardAmount = (orderSubtotal * 0.1) / 100; // Convert pence to pounds with 10%
+
           rewards.push({
             id: `reward-purchase-${refCustomer.id}`,
             customer_id: customerId,
             friend_customer_id: refCustomer.id,
             order_id: customerOrders[0].id,
-            reward_amount: 10.00,
+            reward_amount: rewardAmount,
             reward_type: 'purchase' as const,
             status: 'earned' as const,
             created_at: customerOrders[0].created_at,
