@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     // Get customer record
     const { data: customer, error: customerError } = await supabase
       .from('customers')
-      .select('id, first_name, last_name, email, personal_referral_code')
+      .select('id, first_name, last_name, email, personal_referral_code, referral_scans_count')
       .eq('email', customerEmail)
       .single();
 
@@ -208,6 +208,7 @@ export async function GET(request: NextRequest) {
       customer_name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || customer.email,
       primary_code: primaryCode,
       summary: {
+        total_scans: customer.referral_scans_count || 0,
         total_friends_referred: totalFriendsReferred,
         total_friends_purchased: totalFriendsPurchased,
         total_rewards_earned: totalRewardsEarned,

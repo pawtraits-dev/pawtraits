@@ -75,6 +75,16 @@ function CustomerInvitationPageContent() {
         const data = await response.json();
         setReferralData(data);
         setScanRecorded(true);
+
+        // Record scan for customer codes
+        if (data.referral_type === 'CUSTOMER') {
+          try {
+            await fetch(`/api/c/${params.code}`);
+          } catch (scanError) {
+            console.error('Failed to record scan:', scanError);
+            // Non-critical - continue anyway
+          }
+        }
       } else if (response.status === 404) {
         setError('This referral code is not valid or has been deactivated.');
       } else if (response.status === 410) {
