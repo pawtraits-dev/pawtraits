@@ -77,17 +77,30 @@ function CheckoutPageContent() {
   // Fetch customer's available reward balance
   useEffect(() => {
     const fetchRewardBalance = async () => {
-      if (!shippingData.email || userProfile?.user_type !== 'customer') return
+      if (!shippingData.email || userProfile?.user_type !== 'customer') {
+        console.log('[CHECKOUT] Skipping reward balance fetch:', {
+          hasEmail: !!shippingData.email,
+          userType: userProfile?.user_type
+        });
+        return
+      }
 
       setLoadingRewards(true)
       try {
         const response = await fetch(`/api/customers/balance?email=${encodeURIComponent(shippingData.email)}`)
         if (response.ok) {
           const data = await response.json()
+          console.log('[CHECKOUT] Reward balance fetched:', {
+            email: shippingData.email,
+            balancePence: data.available_balance,
+            balancePounds: (data.available_balance || 0) / 100
+          });
           setAvailableRewards(data.available_balance || 0) // in pence
+        } else {
+          console.error('[CHECKOUT] Failed to fetch reward balance:', response.status);
         }
       } catch (error) {
-        console.error('Error fetching reward balance:', error)
+        console.error('[CHECKOUT] Error fetching reward balance:', error)
       } finally {
         setLoadingRewards(false)
       }
@@ -146,6 +159,13 @@ function CheckoutPageContent() {
       })
 
       const data = await response.json()
+      console.log('[CHECKOUT] Referral validation response:', {
+        valid: data.valid,
+        discountEligible: data.discount?.eligible,
+        discountAmount: data.discount?.amount,
+        error: data.error,
+        referralType: data.referral?.type
+      });
       setReferralValidation(data)
 
       if (!data.valid) {

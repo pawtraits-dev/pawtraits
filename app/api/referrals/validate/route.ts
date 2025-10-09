@@ -85,20 +85,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if this customer has existing orders that used referral discounts
-    const { data: existingOrders } = await supabase
+    const { data: existingOrders, error: ordersError } = await supabase
       .from('orders')
       .select('id, referral_code, status')
       .eq('customer_email', customerEmail);
 
+    console.log('[REFERRAL VALIDATION] Customer orders check:', {
+      customerEmail,
+      existingOrdersCount: existingOrders?.length || 0,
+      existingOrders: existingOrders,
+      ordersError: ordersError?.message
+    });
+
     // Customer is eligible for referral discount if:
     // 1. They have no orders at all (truly first-time customer), OR
     // 2. They have never completed an order with a referral discount
-    const hasCompletedReferralOrder = existingOrders?.some(order => 
-      order.referral_code && 
+    const hasCompletedReferralOrder = existingOrders?.some(order =>
+      order.referral_code &&
       ['confirmed', 'processing', 'shipped', 'delivered', 'completed'].includes(order.status)
     );
-    
+
     const isEligibleForDiscount = !hasCompletedReferralOrder;
+
+    console.log('[REFERRAL VALIDATION] Eligibility check:', {
+      hasCompletedReferralOrder,
+      isEligibleForDiscount,
+      ordersWithReferralCode: existingOrders?.filter(o => o.referral_code).length || 0
+    });
 
     // Determine referral type and calculate discount
     const isPartnerReferral = !!referral;
@@ -137,7 +150,7 @@ export async function POST(request: NextRequest) {
           customerEmail: customerReferral.email
         };
 
-    return NextResponse.json({
+    const response = {
       valid: true,
       referral: referralData,
       customer: {
@@ -158,7 +171,18 @@ export async function POST(request: NextRequest) {
         rate: commissionRate,
         amount: commissionAmount
       }
+    };
+
+    console.log('[REFERRAL VALIDATION] Returning response:', {
+      valid: response.valid,
+      referralCode: referralCode,
+      referralType: response.referral.type,
+      discountEligible: response.discount.eligible,
+      discountAmount: response.discount.amount,
+      discountPercentage: response.discount.percentage
     });
+
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error('Error validating referral code:', error);
