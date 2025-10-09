@@ -106,11 +106,19 @@ export default function CustomerDetailPage() {
 
   const loadCustomerOrders = async () => {
     try {
-      // This would be a new API endpoint for customer orders  
+      // This would be a new API endpoint for customer orders
       const response = await fetch(`/api/customers/${params.id}/orders`);
       if (response.ok) {
         const data = await response.json();
-        setOrders(data);
+        // Transform orders data to match OrderSummary interface
+        const transformedOrders = data.map((order: any) => ({
+          id: order.id,
+          order_date: order.created_at, // Map created_at to order_date
+          total_amount: order.total_amount,
+          status: order.status,
+          items_count: order.order_items ? order.order_items.length : 0
+        }));
+        setOrders(transformedOrders);
       }
     } catch (error) {
       console.error('Error loading customer orders:', error);
@@ -158,11 +166,13 @@ export default function CustomerDetailPage() {
     setShowPetModal(true);
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+  const formatCurrency = (amountInPence: number) => {
+    // Convert pence to pounds
+    const amountInPounds = amountInPence / 100;
+    return new Intl.NumberFormat('en-GB', {
       style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+      currency: 'GBP'
+    }).format(amountInPounds);
   };
 
   const formatDate = (dateString: string) => {

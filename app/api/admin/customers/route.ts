@@ -74,6 +74,22 @@ export async function GET(request: NextRequest) {
 
           const totalSignups = referredCustomers ? referredCustomers.length : 0;
 
+          // Get orders for this customer
+          const { data: orders } = await supabase
+            .from('orders')
+            .select('id, total_amount, created_at')
+            .eq('customer_email', profile.email);
+
+          const totalOrders = orders ? orders.length : 0;
+          const totalSpent = orders ? orders.reduce((sum, order) => sum + (order.total_amount || 0), 0) : 0;
+          const avgOrderValue = totalOrders > 0 ? (totalSpent / totalOrders) : 0;
+          const firstOrderDate = orders && orders.length > 0
+            ? orders.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0].created_at
+            : null;
+          const lastOrderDate = orders && orders.length > 0
+            ? orders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at
+            : null;
+
           // Transform to match expected AdminCustomerOverview interface
           return {
             id: profile.id,
@@ -87,13 +103,13 @@ export async function GET(request: NextRequest) {
             phone: profile.phone || null,
             is_registered: true, // Since they're in user_profiles, they're registered
             total_pets: petCount,
-            total_orders: 0, // TODO: Calculate from orders table if needed
-            total_spent: 0, // TODO: Calculate from orders table if needed
-            avg_order_value: 0,
-            first_order_date: null,
-            last_order_date: null,
+            total_orders: totalOrders,
+            total_spent: totalSpent,
+            avg_order_value: avgOrderValue,
+            first_order_date: firstOrderDate,
+            last_order_date: lastOrderDate,
             customer_status: profile.status || 'active',
-            customer_segment: 'New', // Default segment
+            customer_segment: totalOrders > 0 ? 'Customer' : 'New', // Customer if they have orders
             marketing_consent: false, // TODO: Get from customer preferences if needed
             email_verified: true, // Assume verified if in system
             phone_verified: false, // Default to false
