@@ -44,6 +44,18 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (customer && !customerError) {
+        // Check if customer is trying to use their own referral code
+        if (customer.email.toLowerCase() === customerEmail.toLowerCase()) {
+          console.log('[REFERRAL] Customer attempting to use their own referral code:', customerEmail);
+          return NextResponse.json(
+            {
+              valid: false,
+              error: 'You cannot use your own referral code',
+              discount: null
+            },
+            { status: 200 }
+          );
+        }
         customerReferral = customer;
       }
     }

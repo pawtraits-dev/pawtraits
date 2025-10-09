@@ -292,8 +292,41 @@ async function handleSimplifiedCommissions(
       customerEmail,
       subtotalAmount,
       referralCode: metadata.referralCode,
-      referralType: metadata.referralType
+      referralType: metadata.referralType,
+      rewardRedemption: metadata.rewardRedemption
     });
+
+    // Handle reward redemption if present (deduct from customer's credit balance)
+    if (metadata.rewardRedemption && parseInt(metadata.rewardRedemption) > 0) {
+      const rewardAmountPence = parseInt(metadata.rewardRedemption);
+      const rewardAmountPounds = rewardAmountPence / 100;
+
+      console.log(`💰 Processing reward redemption: £${rewardAmountPounds} (${rewardAmountPence} pence) for ${customerEmail}`);
+
+      // Get customer to deduct from their credit balance
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('id, credit_balance')
+        .eq('email', customerEmail.toLowerCase())
+        .single();
+
+      if (!customerError && customer) {
+        const newBalance = Math.max(0, (customer.credit_balance || 0) - rewardAmountPounds);
+
+        const { error: updateError } = await supabase
+          .from('customers')
+          .update({ credit_balance: newBalance })
+          .eq('id', customer.id);
+
+        if (updateError) {
+          console.error('Failed to deduct reward redemption:', updateError);
+        } else {
+          console.log(`✅ Reward redeemed: Deducted £${rewardAmountPounds} from customer balance. New balance: £${newBalance}`);
+        }
+      } else {
+        console.error('Failed to find customer for reward redemption:', customerError);
+      }
+    }
 
     // Case 1: Partner Orders - No commission, they get 20% discount (handled at checkout)
     if (orderingUserProfile?.user_type === 'partner') {

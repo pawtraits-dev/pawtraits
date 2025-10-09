@@ -48,6 +48,9 @@ function CheckoutPageContent() {
   const [loadingShipping, setLoadingShipping] = useState(false)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
+  const [availableRewards, setAvailableRewards] = useState(0) // in pence
+  const [applyRewards, setApplyRewards] = useState(false)
+  const [loadingRewards, setLoadingRewards] = useState(false)
   const { items, totalItems, totalPrice, clearCart } = useHybridCart()
   const router = useRouter()
   const { userProfile, loading: userLoading } = useUserRouting()
@@ -70,6 +73,28 @@ function CheckoutPageContent() {
       }))
     }
   }, [userProfile])
+
+  // Fetch customer's available reward balance
+  useEffect(() => {
+    const fetchRewardBalance = async () => {
+      if (!shippingData.email || userProfile?.user_type !== 'customer') return
+
+      setLoadingRewards(true)
+      try {
+        const response = await fetch(`/api/customers/balance?email=${encodeURIComponent(shippingData.email)}`)
+        if (response.ok) {
+          const data = await response.json()
+          setAvailableRewards(data.available_balance || 0) // in pence
+        }
+      } catch (error) {
+        console.error('Error fetching reward balance:', error)
+      } finally {
+        setLoadingRewards(false)
+      }
+    }
+
+    fetchRewardBalance()
+  }, [shippingData.email, userProfile?.user_type])
 
   // Update country when selectedCountry changes
   useEffect(() => {
@@ -156,12 +181,20 @@ function CheckoutPageContent() {
     discountType = 'First Order Discount (10%)';
   }
 
-  const total = subtotal - discount + shipping;
+  // Calculate reward redemption (only for customers, not partners)
+  let rewardRedemption = 0;
+  if (applyRewards && availableRewards > 0 && userProfile?.user_type === 'customer') {
+    const maxRedeemable = Math.min(availableRewards, totalPrice); // Can't redeem more than order total
+    rewardRedemption = maxRedeemable / 100; // Convert pence to pounds
+  }
+
+  const total = subtotal - discount - rewardRedemption + shipping;
 
   const orderSummary = {
     subtotal: subtotal,
     shipping: shipping,
     discount: discount,
+    rewardRedemption: rewardRedemption,
     total: total,
     items: items.map(item => ({
       title: item.imageTitle,
@@ -293,6 +326,7 @@ function CheckoutPageContent() {
         subtotal: subtotal,
         shipping: shipping,
         discount: discount,
+        rewardRedemption: rewardRedemption,
         total: total,
         totalAmountPence: totalAmount,
         referralValidation: referralValidation
@@ -339,7 +373,11 @@ function CheckoutPageContent() {
         referralDiscount: referralValidation?.valid && referralValidation?.discount?.eligible
           ? Math.round(discount * 100) // discount amount in pence
           : undefined,
-        referralType: referralValidation?.referral?.type || undefined
+        referralType: referralValidation?.referral?.type || undefined,
+        // Include reward redemption data
+        rewardRedemption: applyRewards && rewardRedemption > 0
+          ? Math.round(rewardRedemption * 100) // reward amount in pence
+          : undefined
       };
 
       console.log('Creating Customer PaymentIntent with data:', {
@@ -975,6 +1013,36 @@ function CheckoutPageContent() {
                     )}
                   </div>
                 )}
+
+                {/* Show reward redemption option for customers with available balance */}
+                {userProfile?.user_type === 'customer' && availableRewards > 0 && (
+                  <div className="space-y-2 bg-purple-50 p-3 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="apply-rewards" className="flex items-center cursor-pointer text-sm">
+                        <input
+                          id="apply-rewards"
+                          type="checkbox"
+                          checked={applyRewards}
+                          onChange={(e) => setApplyRewards(e.target.checked)}
+                          className="mr-2 h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                        />
+                        <span className="font-medium text-purple-900">
+                          Use Reward Balance
+                        </span>
+                      </label>
+                      <span className="text-sm text-purple-700 font-medium">
+                        £{(availableRewards / 100).toFixed(2)} available
+                      </span>
+                    </div>
+                    {applyRewards && rewardRedemption > 0 && (
+                      <div className="flex justify-between text-green-600 text-sm pt-1">
+                        <span>Rewards Applied</span>
+                        <span className="font-medium">-£{rewardRedemption.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>

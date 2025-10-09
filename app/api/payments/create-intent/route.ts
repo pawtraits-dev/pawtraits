@@ -43,6 +43,7 @@ interface CreatePaymentIntentRequest {
   }>;
   referralCode?: string;
   referralDiscount?: number; // Discount amount in pence
+  rewardRedemption?: number; // Reward amount redeemed in pence
   // Shipping option data
   shippingOption?: {
     uid: string;
@@ -171,6 +172,12 @@ export async function POST(request: NextRequest) {
         metadata.referralDiscount = body.referralDiscount.toString();
         console.log(`🎯 Customer referral discount applied: ${body.referralDiscount} pence for code ${body.referralCode}`);
       }
+    }
+
+    // Add reward redemption if provided (customer orders only)
+    if (body.rewardRedemption && body.rewardRedemption > 0 && orderType === 'customer') {
+      metadata.rewardRedemption = body.rewardRedemption.toString();
+      console.log(`💰 Customer reward redemption: ${body.rewardRedemption} pence`);
     }
 
     // Add partner-specific metadata
