@@ -14,6 +14,7 @@ import UserInteractionsService from '@/lib/user-interactions'
 import Image from "next/image"
 import { extractDescriptionTitle } from '@/lib/utils'
 import UserAwareNavigation from '@/components/UserAwareNavigation'
+import { CountryProvider } from '@/lib/country-context'
 
 interface OrderItem {
   id: string
@@ -128,7 +129,7 @@ function OrderConfirmationContent() {
 
   if (loading) {
     return (
-      <>
+      <CountryProvider>
         <UserAwareNavigation />
         <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
           <div className="text-center">
@@ -136,13 +137,13 @@ function OrderConfirmationContent() {
             <p className="text-gray-600">Loading order details...</p>
           </div>
         </div>
-      </>
+      </CountryProvider>
     )
   }
 
   if (error || !order) {
     return (
-      <>
+      <CountryProvider>
         <UserAwareNavigation />
         <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
           <div className="text-center">
@@ -156,12 +157,12 @@ function OrderConfirmationContent() {
           </Link>
         </div>
       </div>
-      </>
+      </CountryProvider>
     )
   }
 
   return (
-    <>
+    <CountryProvider>
       <UserAwareNavigation />
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -323,7 +324,7 @@ function OrderConfirmationContent() {
         </div>
         </div>
       </div>
-    </>
+    </CountryProvider>
   )
 }
 
