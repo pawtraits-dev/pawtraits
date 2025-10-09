@@ -152,6 +152,12 @@ function CheckoutPageContent() {
         // Don't show error for invalid referral codes, just clear the validation
         setReferralValidation(data)
         setErrors(prev => ({ ...prev, referral: '' }))
+
+        // If the error is about using own code, clear the referral code and localStorage
+        if (data.error === 'You cannot use your own referral code') {
+          setReferralCode('')
+          localStorage.removeItem('referralCode')
+        }
       } else {
         setErrors(prev => ({ ...prev, referral: '' }))
       }
