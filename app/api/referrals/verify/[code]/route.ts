@@ -197,7 +197,45 @@ export async function GET(
       }
     }
 
-    // 5. Check customer personal referral codes (new system)
+    // 5. Check partner personal referral codes (for referring customers)
+    if (!referralData) {
+      const { data, error } = await supabase
+        .from('partners')
+        .select('id, first_name, last_name, email, business_name, personal_referral_code, logo_url, avatar_url, is_active')
+        .eq('personal_referral_code', referralCode)
+        .eq('is_active', true)
+        .single();
+
+      if (!error && data) {
+        // Get user_profile separately
+        const { data: userProfileData } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('email', data.email)
+          .maybeSingle();
+
+        referralData = {
+          id: data.id,
+          code: data.personal_referral_code,
+          type: 'partner_personal_code',
+          status: 'active',
+          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
+          commission_rate: 10.0, // Partners earn commissions
+          discount_rate: 10.0, // 10% discount for referred customers
+        };
+        referralType = 'PARTNER';
+        referrerInfo = {
+          id: userProfileData?.id || data.id, // Use user_profile id if exists, otherwise partner id
+          type: 'partner',
+          name: data.business_name || `${data.first_name} ${data.last_name}`,
+          avatar_url: data.logo_url || data.avatar_url,
+          business_name: data.business_name,
+        };
+        console.log('✅ Found partner personal referral code');
+      }
+    }
+
+    // 6. Check customer personal referral codes (new system)
     if (!referralData) {
       const { data, error } = await supabase
         .from('customers')

@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     // Fetch partner's personal referral code
     const { data: partner, error } = await supabaseAdmin
       .from('partners')
-      .select('id, personal_referral_code')
+      .select('id, personal_referral_code, personal_qr_code_url')
       .eq('email', user.email)
       .single();
 
@@ -42,10 +42,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No referral code found for partner' }, { status: 404 });
     }
 
-    // Return code and share URL (partner personal codes refer customers, not partners)
+    // Return code, share URL, and QR code URL (partner personal codes refer customers, not partners)
     return NextResponse.json({
       code: partner.personal_referral_code,
-      share_url: `/c/${partner.personal_referral_code}`
+      share_url: `/c/${partner.personal_referral_code}`,
+      qr_code_url: partner.personal_qr_code_url
     });
 
   } catch (error) {

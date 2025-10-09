@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     // Get partner details
     const { data: partner, error: partnerError } = await supabase
       .from('partners')
-      .select('business_name, first_name, last_name, email, personal_referral_code, referral_scans_count')
+      .select('business_name, first_name, last_name, email, personal_referral_code, personal_qr_code_url, referral_scans_count')
       .eq('id', partnerId)
       .single();
 
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     if (!primaryCode && partner.personal_referral_code) {
       primaryCode = {
         code: partner.personal_referral_code,
-        qr_code_url: null,
+        qr_code_url: partner.personal_qr_code_url || null,
         type: 'personal' as const,
         scans_count: partner.referral_scans_count || 0,
         conversions_count: 0,

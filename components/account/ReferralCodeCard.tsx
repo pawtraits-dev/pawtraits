@@ -26,6 +26,7 @@ interface ReferralCodeCardProps {
 interface ReferralCodeData {
   code: string;
   share_url: string;
+  qr_code_url?: string | null;
 }
 
 export default function ReferralCodeCard({ userType, userEmail }: ReferralCodeCardProps) {
@@ -95,9 +96,27 @@ export default function ReferralCodeCard({ userType, userEmail }: ReferralCodeCa
     }
   };
 
-  const downloadQRCode = () => {
-    if (!qrCodeRef.current) return;
+  const downloadQRCode = async () => {
+    if (!qrCodeRef.current || !referralCode) return;
 
+    // If we have a branded QR code URL, download it directly
+    if (referralCode.qr_code_url) {
+      try {
+        const response = await fetch(referralCode.qr_code_url);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `referral-qr-${referralCode.code}.png`;
+        link.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Failed to download QR code:', error);
+      }
+      return;
+    }
+
+    // Fallback: Download the client-side generated SVG QR code
     const svg = qrCodeRef.current.querySelector('svg');
     if (!svg) return;
 
@@ -120,7 +139,7 @@ export default function ReferralCodeCard({ userType, userEmail }: ReferralCodeCa
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `referral-qr-${referralCode?.code}.png`;
+        link.download = `referral-qr-${referralCode.code}.png`;
         link.click();
         URL.revokeObjectURL(url);
       });
@@ -273,12 +292,24 @@ export default function ReferralCodeCard({ userType, userEmail }: ReferralCodeCa
           {/* Right: QR Code */}
           <div className="flex flex-col items-center justify-center space-y-2">
             <div ref={qrCodeRef} className={`bg-white p-3 rounded-lg border ${colorScheme.accentBorder}`}>
-              <QRCodeSVG
-                value={fullUrl}
-                size={140}
-                level="H"
-                includeMargin={true}
-              />
+              {referralCode.qr_code_url ? (
+                // Use stored branded QR code
+                <img
+                  src={referralCode.qr_code_url}
+                  alt="Branded QR Code"
+                  width={140}
+                  height={140}
+                  className="rounded"
+                />
+              ) : (
+                // Fallback to client-side generated QR code
+                <QRCodeSVG
+                  value={fullUrl}
+                  size={140}
+                  level="H"
+                  includeMargin={true}
+                />
+              )}
             </div>
             <Button
               variant="outline"

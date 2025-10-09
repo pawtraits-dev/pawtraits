@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     // Fetch customer's personal referral code
     const { data: customer, error } = await supabase
       .from('customers')
-      .select('id, personal_referral_code')
+      .select('id, personal_referral_code, personal_qr_code_url')
       .eq('email', customerEmail.toLowerCase().trim())
       .single();
 
@@ -37,10 +37,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No referral code found for customer' }, { status: 404 });
     }
 
-    // Return code and share URL
+    // Return code, share URL, and QR code URL
     return NextResponse.json({
       code: customer.personal_referral_code,
-      share_url: `/c/${customer.personal_referral_code}`
+      share_url: `/c/${customer.personal_referral_code}`,
+      qr_code_url: customer.personal_qr_code_url
     });
 
   } catch (error) {
