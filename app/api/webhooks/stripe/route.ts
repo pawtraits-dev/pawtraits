@@ -109,9 +109,16 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       return;
     }
 
-    // Extract shipping cost from metadata and calculate subtotal
+    // Extract shipping cost and referral discount from metadata
     const shippingCost = parseInt(metadata.shippingCost || '0');
-    const subtotalAmount = paymentIntent.amount - shippingCost;
+    const referralDiscount = parseInt(metadata.referralDiscount || '0');
+
+    // Calculate pre-discount subtotal for accurate reward calculations
+    // paymentIntent.amount is AFTER discount, so we add the discount back
+    const preDiscountSubtotal = paymentIntent.amount + referralDiscount - shippingCost;
+
+    // Store both pre-discount and post-discount amounts
+    const subtotalAmount = paymentIntent.amount - shippingCost; // Post-discount (what customer actually paid)
 
     // Check if this is a partner order (user placing order is a partner)
     let orderingUserProfile = null;
@@ -154,7 +161,8 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       shipping_city: metadata.shippingCity || '',
       shipping_postcode: metadata.shippingPostcode || '',
       shipping_country: metadata.shippingCountry || 'United Kingdom',
-      subtotal_amount: subtotalAmount,
+      subtotal_amount: preDiscountSubtotal, // Store pre-discount amount for reward calculations
+      discount_amount: referralDiscount,
       shipping_amount: shippingCost,
       total_amount: paymentIntent.amount,
       currency: paymentIntent.currency.toUpperCase(),
