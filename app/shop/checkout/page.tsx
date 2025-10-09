@@ -124,20 +124,41 @@ function CheckoutPageContent() {
     const urlParams = new URLSearchParams(window.location.search)
     const urlReferralCode = urlParams.get('ref') || urlParams.get('referral')
     const storedReferralCode = localStorage.getItem('referralCode')
-    
+
+    console.log('[CHECKOUT] Checking for referral code:', {
+      urlReferralCode,
+      storedReferralCode,
+      windowLocation: window.location.href
+    });
+
     if (urlReferralCode) {
+      console.log('[CHECKOUT] Setting referral code from URL:', urlReferralCode.toUpperCase());
       setReferralCode(urlReferralCode.toUpperCase())
       localStorage.setItem('referralCode', urlReferralCode.toUpperCase())
     } else if (storedReferralCode) {
+      console.log('[CHECKOUT] Setting referral code from localStorage:', storedReferralCode);
       setReferralCode(storedReferralCode)
+    } else {
+      console.log('[CHECKOUT] No referral code found in URL or localStorage');
     }
   }, [])
 
   // Validate referral code when it changes and user email is available
   useEffect(() => {
+    console.log('[CHECKOUT] Referral validation trigger check:', {
+      hasReferralCode: !!referralCode,
+      referralCode: referralCode,
+      hasEmail: !!shippingData.email,
+      email: shippingData.email,
+      totalPrice: totalPrice,
+      willValidate: !!(referralCode && shippingData.email && totalPrice > 0)
+    });
+
     if (referralCode && shippingData.email && totalPrice > 0) {
+      console.log('[CHECKOUT] Triggering referral validation...');
       validateReferralCode()
     } else {
+      console.log('[CHECKOUT] Not validating referral - missing requirements');
       setReferralValidation(null)
     }
   }, [referralCode, shippingData.email, totalPrice])
