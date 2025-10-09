@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
       }));
     }
 
-    // If no pre-reg code, use personal referral code
+    // If no pre-reg code, use personal referral code (partner personal codes refer customers, not partners)
     if (!primaryCode && partner.personal_referral_code) {
       primaryCode = {
         code: partner.personal_referral_code,
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
         type: 'personal' as const,
         scans_count: partner.referral_scans_count || 0,
         conversions_count: 0,
-        share_url: `/p/${partner.personal_referral_code}`
+        share_url: `/c/${partner.personal_referral_code}`
       };
 
       allCodes.push(primaryCode);

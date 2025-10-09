@@ -42,10 +42,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No referral code found for partner' }, { status: 404 });
     }
 
-    // Return code and share URL
+    // Return code and share URL (partner personal codes refer customers, not partners)
     return NextResponse.json({
       code: partner.personal_referral_code,
-      share_url: `/p/${partner.personal_referral_code}`
+      share_url: `/c/${partner.personal_referral_code}`
     });
 
   } catch (error) {
