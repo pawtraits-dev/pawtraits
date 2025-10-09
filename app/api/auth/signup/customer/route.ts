@@ -151,12 +151,32 @@ export async function POST(request: NextRequest) {
         console.log(`Generated personal referral code for customer: ${personalReferralCode}`);
       }
 
+      // Generate branded QR code for personal referral code
+      let personalQRCodeUrl = null;
+      if (personalReferralCode) {
+        try {
+          const { generatePersonalReferralQR } = await import('@/lib/qr-code');
+          const qrResult = await generatePersonalReferralQR(personalReferralCode, 'customer');
+          if (qrResult.success) {
+            personalQRCodeUrl = qrResult.qrCodeUrl;
+            console.log(`Generated branded QR code for customer: ${personalQRCodeUrl}`);
+          } else {
+            console.warn(`Failed to generate QR code for customer: ${qrResult.error}`);
+            // Continue without QR code - it's not critical for signup
+          }
+        } catch (qrError) {
+          console.warn('QR code generation failed:', qrError);
+          // Continue without QR code - it's not critical for signup
+        }
+      }
+
       const customerData = {
         email: email.toLowerCase().trim(),
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         user_id: authData.user.id,
         personal_referral_code: personalReferralCode || null,
+        personal_qr_code_url: personalQRCodeUrl || null,
         is_registered: true,
         referred_by_partner_id: null, // Will be set by referral tracking below
         referral_code: referralCode || null,

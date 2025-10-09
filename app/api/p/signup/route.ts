@@ -103,6 +103,25 @@ export async function POST(request: NextRequest) {
       console.log(`Using pre-registration code as personal referral code: ${personalReferralCode}`);
     }
 
+    // Generate branded QR code for personal referral code
+    let personalQRCodeUrl = null;
+    if (personalReferralCode) {
+      try {
+        const { generatePersonalReferralQR } = await import('@/lib/qr-code');
+        const qrResult = await generatePersonalReferralQR(personalReferralCode, 'partner');
+        if (qrResult.success) {
+          personalQRCodeUrl = qrResult.qrCodeUrl;
+          console.log(`Generated branded QR code for partner: ${personalQRCodeUrl}`);
+        } else {
+          console.warn(`Failed to generate QR code for partner: ${qrResult.error}`);
+          // Continue without QR code - it's not critical for signup
+        }
+      } catch (qrError) {
+        console.warn('QR code generation failed:', qrError);
+        // Continue without QR code - it's not critical for signup
+      }
+    }
+
     // Create partner profile using service role
     const { data: partner, error: partnerError } = await supabase
       .from('partners')
@@ -118,6 +137,7 @@ export async function POST(request: NextRequest) {
         business_website: businessWebsite || null,
         business_address: businessAddress || null,
         personal_referral_code: personalReferralCode,
+        personal_qr_code_url: personalQRCodeUrl || null,
         is_active: true,
         is_verified: true,  // Auto-approve
         onboarding_completed: false,
