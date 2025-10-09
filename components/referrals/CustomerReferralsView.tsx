@@ -617,6 +617,20 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
                     >
                       Redeemed
                     </Button>
+                    <Button
+                      variant={rewardFilter === 'used' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setRewardFilter('used')}
+                    >
+                      Used
+                    </Button>
+                    <Button
+                      variant={rewardFilter === 'unused' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setRewardFilter('unused')}
+                    >
+                      Unused
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -645,17 +659,23 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
                             </td>
                             <td className="px-4 py-3 text-sm">
                               <Badge variant="outline">
-                                {reward.reward_type === 'signup' ? 'Sign-up Bonus' : 'Purchase Bonus'}
+                                {reward.reward_type === 'signup' ? 'Sign-up Bonus' :
+                                 reward.reward_type === 'referral_discount' ? 'Referral Discount (10%)' :
+                                 'Purchase Bonus'}
                               </Badge>
                             </td>
                             <td className="px-4 py-3 text-sm">
                               <Badge variant={
                                 reward.status === 'earned' ? 'default' :
+                                reward.status === 'used' ? 'default' :
+                                reward.status === 'unused' ? 'secondary' :
                                 reward.status === 'pending' ? 'secondary' :
                                 'outline'
                               }>
                                 {reward.status === 'earned' && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                                {reward.status === 'used' && <CheckCircle2 className="w-3 h-3 mr-1" />}
                                 {reward.status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
+                                {reward.status === 'unused' && <Clock className="w-3 h-3 mr-1" />}
                                 {reward.status ? reward.status.charAt(0).toUpperCase() + reward.status.slice(1) : 'Unknown'}
                               </Badge>
                             </td>

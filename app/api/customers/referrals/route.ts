@@ -23,10 +23,10 @@ export async function GET(request: NextRequest) {
 
     console.log('Customer referrals API: Fetching data for customer:', customerEmail);
 
-    // Get customer record
+    // Get customer record with referral information
     const { data: customer, error: customerError } = await supabase
       .from('customers')
-      .select('id, first_name, last_name, email, personal_referral_code, referral_scans_count')
+      .select('id, first_name, last_name, email, personal_referral_code, referral_scans_count, referral_type, referrer_id, created_at')
       .eq('email', customerEmail)
       .single();
 
@@ -181,6 +181,41 @@ export async function GET(request: NextRequest) {
     // Build rewards array for detailed tracking
     const rewards = [];
 
+    // First, add the customer's own referral discount if they signed up with a code
+    if (customer.referral_type && customer.referral_type !== 'ORGANIC') {
+      // Check if they've used their discount (have an order with a referral_code)
+      const { data: customerOrders } = await supabase
+        .from('orders')
+        .select('id, referral_code, created_at, subtotal_amount, discount_amount')
+        .eq('customer_email', customer.email)
+        .not('referral_code', 'is', null)
+        .order('created_at', { ascending: true })
+        .limit(1);
+
+      const hasUsedDiscount = customerOrders && customerOrders.length > 0;
+      const discountOrder = hasUsedDiscount ? customerOrders[0] : null;
+
+      // Calculate the discount amount (10% of subtotal if used, or potential discount if not used)
+      let discountAmount = 0;
+      if (hasUsedDiscount && discountOrder) {
+        // Use the actual discount_amount from the order if available
+        discountAmount = discountOrder.discount_amount ? (discountOrder.discount_amount / 100) : 0;
+      }
+
+      rewards.push({
+        id: `own-referral-discount-${customer.id}`,
+        customer_id: customerId,
+        friend_customer_id: null, // This is their own discount, not from referring someone
+        order_id: discountOrder?.id || null,
+        reward_amount: discountAmount,
+        reward_type: 'referral_discount' as const,
+        status: hasUsedDiscount ? 'used' as const : 'unused' as const,
+        created_at: customer.created_at, // When they signed up
+        redeemed_at: discountOrder?.created_at || null
+      });
+    }
+
+    // Then add rewards from referring friends
     if (referredCustomers) {
       for (const refCustomer of referredCustomers) {
         // No signup reward - customers only get rewards when referred friends make purchases
