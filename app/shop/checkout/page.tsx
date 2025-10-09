@@ -185,6 +185,12 @@ function CheckoutPageContent() {
     // Customer using referral code gets 10% discount (first order only)
     discount = referralValidation.discount.amount / 100;
     discountType = 'First Order Discount (10%)';
+    console.log('✅ Referral discount applied:', { discount, discountType, referralCode });
+  } else if (referralCode && referralValidation?.valid && !referralValidation?.discount?.eligible) {
+    console.log('⚠️ Referral code valid but discount not eligible:', {
+      referralCode,
+      reason: referralValidation?.discount?.description
+    });
   }
 
   // Calculate reward redemption (only for customers, not partners)
@@ -192,9 +198,30 @@ function CheckoutPageContent() {
   if (applyRewards && availableRewards > 0 && userProfile?.user_type === 'customer') {
     const maxRedeemable = Math.min(availableRewards, totalPrice); // Can't redeem more than order total
     rewardRedemption = maxRedeemable / 100; // Convert pence to pounds
+    console.log('✅ Reward redemption applied:', {
+      rewardRedemption,
+      availableRewards: availableRewards / 100,
+      maxRedeemable: maxRedeemable / 100
+    });
+  } else if (availableRewards > 0) {
+    console.log('⚠️ Rewards available but not applied:', {
+      applyRewards,
+      availableRewards: availableRewards / 100,
+      userType: userProfile?.user_type
+    });
   }
 
   const total = subtotal - discount - rewardRedemption + shipping;
+
+  console.log('💰 Order total calculation:', {
+    subtotal,
+    discount,
+    rewardRedemption,
+    shipping,
+    total,
+    totalPrice,
+    availableRewards: availableRewards / 100
+  });
 
   const orderSummary = {
     subtotal: subtotal,
@@ -996,8 +1023,8 @@ function CheckoutPageContent() {
                   </div>
                 )}
 
-                {/* Show referral code section only for customer users with valid discounts */}
-                {userProfile?.user_type === 'customer' && referralCode && referralValidation?.valid && (
+                {/* Show referral code section only for customer users with valid AND eligible discounts */}
+                {userProfile?.user_type === 'customer' && referralCode && referralValidation?.valid && referralValidation?.discount?.eligible && (
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm text-purple-600">
                       <span>Referral Code Applied</span>
@@ -1006,17 +1033,10 @@ function CheckoutPageContent() {
                     {validatingReferral && (
                       <div className="text-xs text-gray-500">Validating referral code...</div>
                     )}
-                    {referralValidation.discount?.eligible && (
-                      <div className="flex justify-between text-green-600">
-                        <span>{discountType}</span>
-                        <span className="font-medium">-£{discount.toFixed(2)}</span>
-                      </div>
-                    )}
-                    {!referralValidation.discount?.eligible && (
-                      <div className="text-xs text-gray-500">
-                        {referralValidation.discount?.description}
-                      </div>
-                    )}
+                    <div className="flex justify-between text-green-600">
+                      <span>{discountType}</span>
+                      <span className="font-medium">-£{discount.toFixed(2)}</span>
+                    </div>
                   </div>
                 )}
 
