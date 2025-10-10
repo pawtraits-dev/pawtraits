@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
         if (partner) {
           additionalData.partner_referral = {
             code: partner.personal_referral_code,
-            share_url: partner.personal_referral_code ? `/p/${partner.personal_referral_code}` : null,
+            share_url: partner.personal_referral_code ? `/c/${partner.personal_referral_code}` : null,
             qr_code_url: partner.personal_qr_code_url
           };
         }
