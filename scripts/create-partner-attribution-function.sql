@@ -26,7 +26,7 @@ BEGIN
       c.id AS customer_id,
       c.email AS customer_email,
       1 AS referral_level,
-      c.personal_referral_code AS referral_path
+      CAST(c.personal_referral_code AS TEXT) AS referral_path
     FROM customers c
     WHERE c.referral_type = 'PARTNER'
       AND c.referral_code_used = partner_code
@@ -34,14 +34,15 @@ BEGIN
     UNION ALL
 
     -- Recursive case: Get customers referred by customers in the chain
+    -- Join on referrer_id = parent customer_id
     SELECT
       c.id AS customer_id,
       c.email AS customer_email,
       ac.referral_level + 1 AS referral_level,
-      ac.referral_path || ' → ' || c.personal_referral_code AS referral_path
+      CAST(ac.referral_path || ' → ' || c.personal_referral_code AS TEXT) AS referral_path
     FROM customers c
     INNER JOIN attribution_chain ac
-      ON c.referred_by_customer_id = ac.customer_id
+      ON c.referrer_id = ac.customer_id
     WHERE c.referral_type = 'CUSTOMER'
       AND ac.referral_level < 10  -- Prevent infinite loops, max 10 levels
   )

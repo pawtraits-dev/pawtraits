@@ -143,7 +143,7 @@ export async function GET(
         };
         referralType = 'CUSTOMER';
         referrerInfo = {
-          id: data.customers.user_profiles?.[0]?.id || data.customers.user_profiles?.id,
+          id: data.customers.id, // ALWAYS use customer.id for customer referrals (for attribution chain tracking)
           type: 'customer',
           name: `${data.customers.first_name} ${data.customers.last_name}`,
           avatar_url: null,
@@ -263,7 +263,7 @@ export async function GET(
         };
         referralType = 'CUSTOMER';
         referrerInfo = {
-          id: userProfileData?.id || data.id, // Use user_profile id if exists, otherwise customer id
+          id: data.id, // ALWAYS use customer.id for customer referrals (for attribution chain tracking)
           type: 'customer',
           name: `${data.first_name} ${data.last_name}`,
           avatar_url: null,
