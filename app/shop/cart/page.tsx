@@ -258,7 +258,7 @@ function ShoppingCartPageContent() {
                     </div>
                     {referralValidation?.valid && referralValidation?.discount?.eligible && (
                       <div className="flex justify-between text-green-600">
-                        <span>Referral Discount (20%)</span>
+                        <span>Referral Discount (10%)</span>
                         <span className="font-medium">-£{discount.toFixed(2)}</span>
                       </div>
                     )}

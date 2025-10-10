@@ -85,9 +85,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if this customer has existing orders that used referral discounts
+    // NOTE: We check both referral_code and discount_amount > 0 for backward compatibility
     const { data: existingOrders, error: ordersError } = await supabase
       .from('orders')
-      .select('id, referral_code, status')
+      .select('id, referral_code, discount_amount, status')
       .eq('customer_email', customerEmail);
 
     console.log('[REFERRAL VALIDATION] Customer orders check:', {
@@ -99,9 +100,9 @@ export async function POST(request: NextRequest) {
 
     // Customer is eligible for referral discount if:
     // 1. They have no orders at all (truly first-time customer), OR
-    // 2. They have never completed an order with a referral discount
+    // 2. They have never completed an order with a referral discount (referral_code present OR discount_amount > 0)
     const hasCompletedReferralOrder = existingOrders?.some(order =>
-      order.referral_code &&
+      (order.referral_code || (order.discount_amount && order.discount_amount > 0)) &&
       ['confirmed', 'processing', 'shipped', 'delivered', 'completed'].includes(order.status)
     );
 
@@ -110,7 +111,8 @@ export async function POST(request: NextRequest) {
     console.log('[REFERRAL VALIDATION] Eligibility check:', {
       hasCompletedReferralOrder,
       isEligibleForDiscount,
-      ordersWithReferralCode: existingOrders?.filter(o => o.referral_code).length || 0
+      ordersWithReferralCode: existingOrders?.filter(o => o.referral_code).length || 0,
+      ordersWithDiscount: existingOrders?.filter(o => o.discount_amount && o.discount_amount > 0).length || 0
     });
 
     // Determine referral type and calculate discount

@@ -163,6 +163,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       shipping_country: metadata.shippingCountry || 'United Kingdom',
       subtotal_amount: preDiscountSubtotal, // Store pre-discount amount for reward calculations
       discount_amount: referralDiscount,
+      referral_code: referralDiscount > 0 && metadata.referralCode ? metadata.referralCode : null, // Track referral code used
       shipping_amount: shippingCost,
       total_amount: paymentIntent.amount,
       currency: paymentIntent.currency.toUpperCase(),
