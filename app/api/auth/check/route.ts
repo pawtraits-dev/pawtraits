@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 
         const { data: customer, error: customerError } = await serviceRoleSupabase
           .from('customers')
-          .select('personal_referral_code, qr_code_url, personal_qr_code_url, referral_code_used, referral_type')
+          .select('personal_referral_code, personal_qr_code_url, referral_code_used, referral_type')
           .eq('id', profile.customer_id)
           .single();
 
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
           additionalData.customer_referral = {
             code: customer.personal_referral_code,
             share_url: customer.personal_referral_code ? `/c/${customer.personal_referral_code}` : null,
-            qr_code_url: customer.personal_qr_code_url || customer.qr_code_url,
+            qr_code_url: customer.personal_qr_code_url,
             referral_code_used: customer.referral_code_used,
             referral_type: customer.referral_type
           };
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
       } else if (profile?.user_type === 'partner' && profile?.partner_id) {
         const { data: partner } = await serviceRoleSupabase
           .from('partners')
-          .select('personal_referral_code, qr_code_url')
+          .select('personal_referral_code, personal_qr_code_url')
           .eq('id', profile.partner_id)
           .single();
 
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
           additionalData.partner_referral = {
             code: partner.personal_referral_code,
             share_url: partner.personal_referral_code ? `/p/${partner.personal_referral_code}` : null,
-            qr_code_url: partner.qr_code_url
+            qr_code_url: partner.personal_qr_code_url
           };
           console.log(`📋 [${timestamp}] Partner referral data loaded:`, additionalData.partner_referral);
         }
