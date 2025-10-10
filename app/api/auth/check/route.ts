@@ -70,11 +70,20 @@ export async function GET(request: NextRequest) {
       let additionalData: any = {};
 
       if (profile?.user_type === 'customer' && profile?.customer_id) {
-        const { data: customer } = await serviceRoleSupabase
+        console.log(`🔍 [${timestamp}] Fetching customer data for customer_id:`, profile.customer_id);
+
+        const { data: customer, error: customerError } = await serviceRoleSupabase
           .from('customers')
           .select('personal_referral_code, qr_code_url, personal_qr_code_url, referral_code_used, referral_type')
           .eq('id', profile.customer_id)
           .single();
+
+        console.log(`🔍 [${timestamp}] Customer query result:`, {
+          hasCustomer: !!customer,
+          hasError: !!customerError,
+          error: customerError?.message,
+          customerData: customer
+        });
 
         if (customer) {
           additionalData.customer_referral = {
@@ -85,7 +94,11 @@ export async function GET(request: NextRequest) {
             referral_type: customer.referral_type
           };
           console.log(`📋 [${timestamp}] Customer referral data loaded:`, additionalData.customer_referral);
+        } else {
+          console.warn(`⚠️ [${timestamp}] No customer record found for customer_id:`, profile.customer_id);
         }
+      } else if (profile?.user_type === 'customer' && !profile?.customer_id) {
+        console.warn(`⚠️ [${timestamp}] Customer user_type but no customer_id in profile`);
       } else if (profile?.user_type === 'partner' && profile?.partner_id) {
         const { data: partner } = await serviceRoleSupabase
           .from('partners')
