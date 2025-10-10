@@ -616,6 +616,8 @@ export interface AdminPartnerOverview {
   total_commissions: number;
   paid_commissions: number;
   unpaid_commissions: number;
+  total_attributed_customers: number;
+  total_attributed_revenue: number;
 }
 
 export interface AdminCustomerOverview {

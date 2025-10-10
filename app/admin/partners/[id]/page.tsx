@@ -122,12 +122,21 @@ export default function PartnerDetailPage() {
     lifetime_commission_rate: 0
   });
   const [savingCommissionRates, setSavingCommissionRates] = useState(false);
+  const [attributionData, setAttributionData] = useState<{
+    total_attributed_customers: number;
+    total_attributed_orders: number;
+    total_attributed_revenue: number;
+    by_level: Array<{ level: number; customers: number; orders: number; revenue: number }>;
+    customers: Array<any>;
+  } | null>(null);
+  const [attributionLoading, setAttributionLoading] = useState(true);
 
   useEffect(() => {
     if (params.id) {
       loadPartnerDetails();
       loadPartnerReferrals();
       loadCommissionData();
+      loadAttributionData();
     }
   }, [params.id]);
 
@@ -199,6 +208,26 @@ export default function PartnerDetailPage() {
       console.error('Error loading commission data:', error);
     } finally {
       setCommissionsLoading(false);
+    }
+  };
+
+  const loadAttributionData = async () => {
+    try {
+      console.log('Loading attribution data for partner:', params.id);
+      const response = await fetch(`/api/admin/partners/${params.id}/attribution`);
+      console.log('Attribution API response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Attribution data received:', data);
+        setAttributionData(data);
+      } else {
+        console.error('Attribution API error:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Error loading attribution data:', error);
+    } finally {
+      setAttributionLoading(false);
     }
   };
 
@@ -505,7 +534,7 @@ export default function PartnerDetailPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -576,6 +605,34 @@ export default function PartnerDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <Users className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-2xl font-bold text-gray-900">{attributionData?.total_attributed_customers || 0}</p>
+                <p className="text-sm text-gray-600" title="Includes all customers through multi-level referral chains">Attributed</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-teal-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(attributionData?.total_attributed_revenue ? attributionData.total_attributed_revenue / 100 : 0)}</p>
+                <p className="text-sm text-gray-600" title="Total revenue from all attributed customers">Attr. Revenue</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Main Content */}
@@ -584,6 +641,7 @@ export default function PartnerDetailPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="referrals">Referrals ({referrals.length})</TabsTrigger>
           <TabsTrigger value="commissions">Commissions</TabsTrigger>
+          <TabsTrigger value="attribution">Attribution ({attributionData?.total_attributed_customers || 0})</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
@@ -1282,6 +1340,142 @@ export default function PartnerDetailPage() {
                   )}
                 </CardContent>
               </Card>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="attribution" className="space-y-6">
+          {attributionLoading ? (
+            <Card>
+              <CardContent className="p-12 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {/* Attribution Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Multi-Level Attribution Overview</CardTitle>
+                  <CardDescription>
+                    Total customers and revenue attributable to this partner through referral chains
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="p-4 bg-indigo-50 rounded-lg">
+                      <p className="text-sm text-gray-600 mb-1">Total Attributed Customers</p>
+                      <p className="text-3xl font-bold text-indigo-600">{attributionData?.total_attributed_customers || 0}</p>
+                    </div>
+                    <div className="p-4 bg-orange-50 rounded-lg">
+                      <p className="text-sm text-gray-600 mb-1">Total Attributed Orders</p>
+                      <p className="text-3xl font-bold text-orange-600">{attributionData?.total_attributed_orders || 0}</p>
+                    </div>
+                    <div className="p-4 bg-teal-50 rounded-lg">
+                      <p className="text-sm text-gray-600 mb-1">Total Attributed Revenue</p>
+                      <p className="text-3xl font-bold text-teal-600">
+                        {formatCurrency(attributionData?.total_attributed_revenue ? attributionData.total_attributed_revenue / 100 : 0)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Attribution by Level */}
+              {attributionData?.by_level && attributionData.by_level.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Breakdown by Referral Level</CardTitle>
+                    <CardDescription>
+                      Level 1 = Direct referrals, Level 2 = Customers referred by Level 1, etc.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-3 font-medium text-gray-700">Level</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Customers</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Orders</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Revenue</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {attributionData.by_level.map((level) => (
+                            <tr key={level.level} className="border-b hover:bg-gray-50">
+                              <td className="p-3">
+                                <Badge className="bg-indigo-100 text-indigo-800">
+                                  Level {level.level}
+                                </Badge>
+                              </td>
+                              <td className="p-3 font-medium">{level.customers.toLocaleString()}</td>
+                              <td className="p-3 font-medium">{level.orders.toLocaleString()}</td>
+                              <td className="p-3 font-medium">{formatCurrency(level.revenue / 100)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Attribution Customer List */}
+              {attributionData?.customers && attributionData.customers.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Attributed Customers</CardTitle>
+                    <CardDescription>
+                      All customers in the attribution chain with their referral paths
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-3 font-medium text-gray-700">Email</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Level</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Orders</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Revenue</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Referral Path</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {attributionData.customers.map((customer: any) => (
+                            <tr key={customer.customer_id} className="border-b hover:bg-gray-50">
+                              <td className="p-3 font-medium">{customer.customer_email}</td>
+                              <td className="p-3">
+                                <Badge className="bg-indigo-100 text-indigo-800">
+                                  L{customer.referral_level}
+                                </Badge>
+                              </td>
+                              <td className="p-3">{customer.order_count || 0}</td>
+                              <td className="p-3">{formatCurrency((customer.total_revenue || 0) / 100)}</td>
+                              <td className="p-3 text-sm text-gray-600 truncate max-w-md" title={customer.referral_path}>
+                                {customer.referral_path}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {(!attributionData || attributionData.total_attributed_customers === 0) && (
+                <Card>
+                  <CardContent className="p-12 text-center">
+                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-600">No attributed customers found</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      This partner has no multi-level attribution data yet
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
         </TabsContent>

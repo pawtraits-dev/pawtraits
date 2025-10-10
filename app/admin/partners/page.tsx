@@ -45,7 +45,7 @@ const businessTypeLabels = {
   chain: '🏢 Chain/Franchise'
 };
 
-type SortField = 'business_name' | 'approval_status' | 'created_at' | 'total_referrals' | 'successful_referrals' | 'total_orders' | 'total_order_value' | 'total_commissions';
+type SortField = 'business_name' | 'approval_status' | 'created_at' | 'total_referrals' | 'successful_referrals' | 'total_orders' | 'total_order_value' | 'total_commissions' | 'total_attributed_customers' | 'total_attributed_revenue';
 type SortDirection = 'asc' | 'desc';
 
 export default function AdminPartnersPage() {
@@ -108,6 +108,10 @@ export default function AdminPartnersPage() {
         return partner.total_order_value;
       case 'total_commissions':
         return partner.total_commissions;
+      case 'total_attributed_customers':
+        return partner.total_attributed_customers;
+      case 'total_attributed_revenue':
+        return partner.total_attributed_revenue;
       default:
         return 0;
     }
@@ -410,6 +414,16 @@ export default function AdminPartnersPage() {
                   <SortableHeader field="total_commissions">
                     <div style={{ minWidth: '120px' }}>Commissions</div>
                   </SortableHeader>
+                  <SortableHeader field="total_attributed_customers">
+                    <div style={{ minWidth: '100px' }} title="Total customers attributable to this partner through multi-level referral chains">
+                      Attributed
+                    </div>
+                  </SortableHeader>
+                  <SortableHeader field="total_attributed_revenue">
+                    <div style={{ minWidth: '120px' }} title="Total revenue from all attributed customers">
+                      Attr. Revenue
+                    </div>
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody>
@@ -471,6 +485,16 @@ export default function AdminPartnersPage() {
                               {formatCurrency(partner.unpaid_commissions / 100)} unpaid
                             </div>
                           )}
+                        </div>
+                      </td>
+                      <td className="p-4" style={{ minWidth: '100px' }}>
+                        <div className="font-medium text-gray-900" title="Includes all customers through multi-level referral chains">
+                          {partner.total_attributed_customers.toLocaleString()}
+                        </div>
+                      </td>
+                      <td className="p-4" style={{ minWidth: '120px' }}>
+                        <div className="font-medium text-gray-900">
+                          {formatCurrency(partner.total_attributed_revenue / 100)}
                         </div>
                       </td>
                     </tr>

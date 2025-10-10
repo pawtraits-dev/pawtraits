@@ -121,6 +121,31 @@ export async function GET(request: NextRequest) {
       const partnerPaidCommissions = analytics?.summary?.paid_commissions || 0;
       const partnerUnpaidCommissions = analytics?.summary?.unpaid_commissions || 0;
 
+      // Get multi-level attribution data
+      let totalAttributedCustomers = 0;
+      let totalAttributedRevenue = 0;
+
+      if (partner.personal_referral_code) {
+        const { data: attributedCustomers } = await supabaseAdmin
+          .rpc('get_attributed_customers', {
+            partner_code: partner.personal_referral_code
+          });
+
+        if (attributedCustomers && attributedCustomers.length > 0) {
+          totalAttributedCustomers = attributedCustomers.length;
+
+          // Get orders from all attributed customers
+          const customerEmails = attributedCustomers.map((c: any) => c.customer_email);
+          const { data: attributedOrders } = await supabaseAdmin
+            .from('orders')
+            .select('subtotal_amount')
+            .in('customer_email', customerEmails)
+            .eq('payment_status', 'paid');
+
+          totalAttributedRevenue = attributedOrders?.reduce((sum, order) => sum + (order.subtotal_amount || 0), 0) || 0;
+        }
+      }
+
       partnersWithData.push({
         ...partner,
         full_name: `${partner.first_name || ''} ${partner.last_name || ''}`.trim(),
@@ -131,7 +156,9 @@ export async function GET(request: NextRequest) {
         total_order_value: totalOrderValue,
         total_commissions: partnerTotalCommissions,
         paid_commissions: partnerPaidCommissions,
-        unpaid_commissions: partnerUnpaidCommissions
+        unpaid_commissions: partnerUnpaidCommissions,
+        total_attributed_customers: totalAttributedCustomers,
+        total_attributed_revenue: totalAttributedRevenue
       });
     }
 
