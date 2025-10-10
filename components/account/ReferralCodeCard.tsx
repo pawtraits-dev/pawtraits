@@ -66,16 +66,23 @@ export default function ReferralCodeCard({ userType, userEmail }: ReferralCodeCa
         ? '/api/partners/referral-code'
         : `/api/customers/referral-code?email=${encodeURIComponent(userEmail)}`;
 
+      console.log('[ReferralCodeCard] Fetching from endpoint:', endpoint);
+
       const response = await fetch(endpoint, {
         credentials: 'include'
       });
 
+      console.log('[ReferralCodeCard] Response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('[ReferralCodeCard] Received data:', data);
         setReferralCode(data);
+      } else {
+        console.error('[ReferralCodeCard] API error:', response.status, await response.text());
       }
     } catch (error) {
-      console.error('Failed to fetch referral code:', error);
+      console.error('[ReferralCodeCard] Failed to fetch referral code:', error);
     } finally {
       setLoading(false);
     }
