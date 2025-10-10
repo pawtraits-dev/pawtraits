@@ -147,6 +147,7 @@ function CheckoutPageContent() {
           const response = await fetch(`/api/customers/referral-code?email=${encodeURIComponent(userProfile.email)}`);
           if (response.ok) {
             const data = await response.json();
+            // Use referral_code_used for checkout (the code THEY used to sign up, for discount eligibility)
             if (data.referral_code_used) {
               console.log('[CHECKOUT] Found referral code in database:', data.referral_code_used);
               setReferralCode(data.referral_code_used);

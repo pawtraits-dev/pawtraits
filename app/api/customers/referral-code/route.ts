@@ -20,10 +20,10 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Fetch customer's referral_code_used field
+    // Fetch customer's personal referral code for sharing (not the code they used to sign up)
     const { data: customer, error } = await supabase
       .from('customers')
-      .select('id, email, referral_code_used, referral_type')
+      .select('id, email, personal_referral_code, qr_code_url, referral_code_used, referral_type')
       .eq('email', customerEmail.toLowerCase().trim())
       .single();
 
@@ -33,19 +33,30 @@ export async function GET(request: NextRequest) {
         error: error?.message
       });
       return NextResponse.json({
-        referral_code_used: null,
-        referral_type: null
+        code: null,
+        share_url: null,
+        qr_code_url: null
       });
     }
 
-    console.log('[CUSTOMER REFERRAL CODE] Retrieved referral code:', {
+    // Build the share URL for the customer's personal referral code
+    const shareUrl = customer.personal_referral_code
+      ? `/c/${customer.personal_referral_code}`
+      : null;
+
+    console.log('[CUSTOMER REFERRAL CODE] Retrieved personal referral code:', {
       email: customerEmail,
       customerId: customer.id,
-      referralCodeUsed: customer.referral_code_used,
-      referralType: customer.referral_type
+      personalReferralCode: customer.personal_referral_code,
+      qrCodeUrl: customer.qr_code_url,
+      shareUrl: shareUrl
     });
 
     return NextResponse.json({
+      code: customer.personal_referral_code,
+      share_url: shareUrl,
+      qr_code_url: customer.qr_code_url,
+      // Also include referral_code_used for checkout fallback use case
       referral_code_used: customer.referral_code_used,
       referral_type: customer.referral_type
     });
