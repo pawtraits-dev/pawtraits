@@ -76,7 +76,15 @@ export default function ReferralCodeCard({ userType, userEmail }: ReferralCodeCa
 
       if (response.ok) {
         const data = await response.json();
-        console.log('[ReferralCodeCard] Received data:', data);
+        console.log('[ReferralCodeCard] Received data:', {
+          code: data.code,
+          share_url: data.share_url,
+          qr_code_url: data.qr_code_url,
+          hasCode: !!data.code,
+          hasShareUrl: !!data.share_url,
+          hasQrCodeUrl: !!data.qr_code_url,
+          rawData: data
+        });
         setReferralCode(data);
       } else {
         console.error('[ReferralCodeCard] API error:', response.status, await response.text());
