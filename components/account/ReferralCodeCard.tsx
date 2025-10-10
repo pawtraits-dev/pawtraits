@@ -21,6 +21,7 @@ import { QRCodeSVG } from 'qrcode.react';
 interface ReferralCodeCardProps {
   userType: 'partner' | 'customer';
   userEmail: string;
+  userProfile: any; // User profile from /api/auth/check
 }
 
 interface ReferralCodeData {
@@ -29,7 +30,7 @@ interface ReferralCodeData {
   qr_code_url?: string | null;
 }
 
-export default function ReferralCodeCard({ userType, userEmail }: ReferralCodeCardProps) {
+export default function ReferralCodeCard({ userType, userEmail, userProfile }: ReferralCodeCardProps) {
   const [referralCode, setReferralCode] = useState<ReferralCodeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -56,45 +57,20 @@ export default function ReferralCodeCard({ userType, userEmail }: ReferralCodeCa
       };
 
   useEffect(() => {
-    fetchReferralCode();
-  }, []);
-
-  const fetchReferralCode = async () => {
-    try {
-      setLoading(true);
-      const endpoint = userType === 'partner'
-        ? '/api/partners/referral-code'
-        : `/api/customers/referral-code?email=${encodeURIComponent(userEmail)}`;
-
-      console.log('[ReferralCodeCard] Fetching from endpoint:', endpoint);
-
-      const response = await fetch(endpoint, {
-        credentials: 'include'
-      });
-
-      console.log('[ReferralCodeCard] Response status:', response.status);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[ReferralCodeCard] Received data:', {
-          code: data.code,
-          share_url: data.share_url,
-          qr_code_url: data.qr_code_url,
-          hasCode: !!data.code,
-          hasShareUrl: !!data.share_url,
-          hasQrCodeUrl: !!data.qr_code_url,
-          rawData: data
-        });
-        setReferralCode(data);
-      } else {
-        console.error('[ReferralCodeCard] API error:', response.status, await response.text());
-      }
-    } catch (error) {
-      console.error('[ReferralCodeCard] Failed to fetch referral code:', error);
-    } finally {
+    // Extract referral data from user profile (already loaded by /api/auth/check)
+    if (userType === 'customer' && userProfile?.customer_referral) {
+      console.log('[ReferralCodeCard] Using customer referral data from profile:', userProfile.customer_referral);
+      setReferralCode(userProfile.customer_referral);
+      setLoading(false);
+    } else if (userType === 'partner' && userProfile?.partner_referral) {
+      console.log('[ReferralCodeCard] Using partner referral data from profile:', userProfile.partner_referral);
+      setReferralCode(userProfile.partner_referral);
+      setLoading(false);
+    } else {
+      console.warn('[ReferralCodeCard] No referral data found in user profile');
       setLoading(false);
     }
-  };
+  }, [userType, userProfile]);
 
   const copyToClipboard = async (text: string, type: 'code' | 'url') => {
     try {

@@ -420,7 +420,7 @@ export default function PartnerAccountView({ userProfile }: PartnerAccountViewPr
 
           {/* Referral Code Quick Access */}
           <div className="mb-6">
-            <ReferralCodeCard userType="partner" userEmail={userProfile.email} />
+            <ReferralCodeCard userType="partner" userEmail={userProfile.email} userProfile={userProfile} />
           </div>
 
           <Tabs defaultValue="profile" className="space-y-6">

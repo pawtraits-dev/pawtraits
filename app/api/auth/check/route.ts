@@ -66,12 +66,50 @@ export async function GET(request: NextRequest) {
         });
       }
 
+      // Fetch additional user-type specific data
+      let additionalData: any = {};
+
+      if (profile?.user_type === 'customer' && profile?.customer_id) {
+        const { data: customer } = await serviceRoleSupabase
+          .from('customers')
+          .select('personal_referral_code, qr_code_url, personal_qr_code_url, referral_code_used, referral_type')
+          .eq('id', profile.customer_id)
+          .single();
+
+        if (customer) {
+          additionalData.customer_referral = {
+            code: customer.personal_referral_code,
+            share_url: customer.personal_referral_code ? `/c/${customer.personal_referral_code}` : null,
+            qr_code_url: customer.personal_qr_code_url || customer.qr_code_url,
+            referral_code_used: customer.referral_code_used,
+            referral_type: customer.referral_type
+          };
+          console.log(`📋 [${timestamp}] Customer referral data loaded:`, additionalData.customer_referral);
+        }
+      } else if (profile?.user_type === 'partner' && profile?.partner_id) {
+        const { data: partner } = await serviceRoleSupabase
+          .from('partners')
+          .select('personal_referral_code, qr_code_url')
+          .eq('id', profile.partner_id)
+          .single();
+
+        if (partner) {
+          additionalData.partner_referral = {
+            code: partner.personal_referral_code,
+            share_url: partner.personal_referral_code ? `/p/${partner.personal_referral_code}` : null,
+            qr_code_url: partner.qr_code_url
+          };
+          console.log(`📋 [${timestamp}] Partner referral data loaded:`, additionalData.partner_referral);
+        }
+      }
+
       const response = {
         isAuthenticated: true,
         user: {
           id: user.id,
           email: user.email,
           ...profile,
+          ...additionalData,
           // Ensure user_type defaults to customer if not set
           user_type: profile?.user_type || 'customer'
         }
@@ -83,7 +121,9 @@ export async function GET(request: NextRequest) {
         user_type: response.user.user_type,
         profileFetch: profile ? 'SUCCESS' : 'FAILED',
         profileUserType: profile?.user_type || 'MISSING',
-        profileKeys: profile ? Object.keys(profile) : []
+        profileKeys: profile ? Object.keys(profile) : [],
+        hasCustomerReferral: !!additionalData.customer_referral,
+        hasPartnerReferral: !!additionalData.partner_referral
       });
       return NextResponse.json(response);
     } catch (profileError) {

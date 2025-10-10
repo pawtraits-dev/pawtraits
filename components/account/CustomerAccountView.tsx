@@ -178,7 +178,7 @@ export default function CustomerAccountView({ userProfile }: CustomerAccountView
 
           {/* Referral Code Quick Access */}
           <div className="mb-6">
-            <ReferralCodeCard userType="customer" userEmail={userProfile.email} />
+            <ReferralCodeCard userType="customer" userEmail={userProfile.email} userProfile={userProfile} />
           </div>
 
           <Tabs defaultValue="profile" className="space-y-6">
