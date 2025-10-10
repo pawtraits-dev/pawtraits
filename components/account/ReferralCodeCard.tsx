@@ -59,15 +59,12 @@ export default function ReferralCodeCard({ userType, userEmail, userProfile }: R
   useEffect(() => {
     // Extract referral data from user profile (already loaded by /api/auth/check)
     if (userType === 'customer' && userProfile?.customer_referral) {
-      console.log('[ReferralCodeCard] Using customer referral data from profile:', userProfile.customer_referral);
       setReferralCode(userProfile.customer_referral);
       setLoading(false);
     } else if (userType === 'partner' && userProfile?.partner_referral) {
-      console.log('[ReferralCodeCard] Using partner referral data from profile:', userProfile.partner_referral);
       setReferralCode(userProfile.partner_referral);
       setLoading(false);
     } else {
-      console.warn('[ReferralCodeCard] No referral data found in user profile');
       setLoading(false);
     }
   }, [userType, userProfile]);

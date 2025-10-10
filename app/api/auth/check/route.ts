@@ -70,20 +70,11 @@ export async function GET(request: NextRequest) {
       let additionalData: any = {};
 
       if (profile?.user_type === 'customer' && profile?.customer_id) {
-        console.log(`🔍 [${timestamp}] Fetching customer data for customer_id:`, profile.customer_id);
-
-        const { data: customer, error: customerError } = await serviceRoleSupabase
+        const { data: customer } = await serviceRoleSupabase
           .from('customers')
           .select('personal_referral_code, personal_qr_code_url, referral_code_used, referral_type')
           .eq('id', profile.customer_id)
           .single();
-
-        console.log(`🔍 [${timestamp}] Customer query result:`, {
-          hasCustomer: !!customer,
-          hasError: !!customerError,
-          error: customerError?.message,
-          customerData: customer
-        });
 
         if (customer) {
           additionalData.customer_referral = {
@@ -93,12 +84,7 @@ export async function GET(request: NextRequest) {
             referral_code_used: customer.referral_code_used,
             referral_type: customer.referral_type
           };
-          console.log(`📋 [${timestamp}] Customer referral data loaded:`, additionalData.customer_referral);
-        } else {
-          console.warn(`⚠️ [${timestamp}] No customer record found for customer_id:`, profile.customer_id);
         }
-      } else if (profile?.user_type === 'customer' && !profile?.customer_id) {
-        console.warn(`⚠️ [${timestamp}] Customer user_type but no customer_id in profile`);
       } else if (profile?.user_type === 'partner' && profile?.partner_id) {
         const { data: partner } = await serviceRoleSupabase
           .from('partners')
@@ -112,7 +98,6 @@ export async function GET(request: NextRequest) {
             share_url: partner.personal_referral_code ? `/p/${partner.personal_referral_code}` : null,
             qr_code_url: partner.personal_qr_code_url
           };
-          console.log(`📋 [${timestamp}] Partner referral data loaded:`, additionalData.partner_referral);
         }
       }
 
@@ -127,17 +112,6 @@ export async function GET(request: NextRequest) {
           user_type: profile?.user_type || 'customer'
         }
       };
-      console.log(`📤 [${timestamp}] Returning with profile:`, {
-        isAuthenticated: response.isAuthenticated,
-        user_id: response.user.id,
-        user_email: response.user.email,
-        user_type: response.user.user_type,
-        profileFetch: profile ? 'SUCCESS' : 'FAILED',
-        profileUserType: profile?.user_type || 'MISSING',
-        profileKeys: profile ? Object.keys(profile) : [],
-        hasCustomerReferral: !!additionalData.customer_referral,
-        hasPartnerReferral: !!additionalData.partner_referral
-      });
       return NextResponse.json(response);
     } catch (profileError) {
       console.log(`🚨 [${timestamp}] Profile fetch exception:`, profileError);

@@ -383,9 +383,15 @@ CREATE TABLE public.customers (
   referral_commission_rate numeric DEFAULT 0,
   referral_applied_at timestamp with time zone,
   referral_order_id uuid,
+  referred_by_customer_id uuid,
+  referrer_type text CHECK (referrer_type IS NULL OR (referrer_type = ANY (ARRAY['partner'::text, 'customer'::text, 'influencer'::text, 'organic'::text]))),
+  referral_qr_url text,
+  referral_scans_count integer DEFAULT 0,
+  personal_qr_code_url text,
   CONSTRAINT customers_pkey PRIMARY KEY (id),
   CONSTRAINT customers_referred_by_partner_id_fkey FOREIGN KEY (referred_by_partner_id) REFERENCES public.partners(id),
-  CONSTRAINT customers_referrer_id_fkey FOREIGN KEY (referrer_id) REFERENCES public.user_profiles(id)
+  CONSTRAINT customers_referrer_id_fkey FOREIGN KEY (referrer_id) REFERENCES public.user_profiles(id),
+  CONSTRAINT customers_referred_by_customer_id_fkey FOREIGN KEY (referred_by_customer_id) REFERENCES public.customers(id)
 );
 CREATE TABLE public.data_protection_events (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -734,6 +740,8 @@ CREATE TABLE public.partners (
   lifetime_commission_rate numeric DEFAULT 5.00,
   logo_url text,
   personal_referral_code character varying UNIQUE,
+  referral_scans_count integer DEFAULT 0,
+  personal_qr_code_url text,
   CONSTRAINT partners_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.pet_photos (
