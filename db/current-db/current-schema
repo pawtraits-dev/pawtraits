@@ -390,7 +390,6 @@ CREATE TABLE public.customers (
   personal_qr_code_url text,
   CONSTRAINT customers_pkey PRIMARY KEY (id),
   CONSTRAINT customers_referred_by_partner_id_fkey FOREIGN KEY (referred_by_partner_id) REFERENCES public.partners(id),
-  CONSTRAINT customers_referrer_id_fkey FOREIGN KEY (referrer_id) REFERENCES public.user_profiles(id),
   CONSTRAINT customers_referred_by_customer_id_fkey FOREIGN KEY (referred_by_customer_id) REFERENCES public.customers(id)
 );
 CREATE TABLE public.data_protection_events (

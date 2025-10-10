@@ -306,16 +306,16 @@ async function handleSimplifiedCommissions(
       // Get customer to deduct from their credit balance
       const { data: customer, error: customerError } = await supabase
         .from('customers')
-        .select('id, credit_balance')
+        .select('id, current_credit_balance')
         .eq('email', customerEmail.toLowerCase())
         .single();
 
       if (!customerError && customer) {
-        const newBalance = Math.max(0, (customer.credit_balance || 0) - rewardAmountPounds);
+        const newBalance = Math.max(0, (customer.current_credit_balance || 0) - rewardAmountPounds);
 
         const { error: updateError } = await supabase
           .from('customers')
-          .update({ credit_balance: newBalance })
+          .update({ current_credit_balance: newBalance })
           .eq('id', customer.id);
 
         if (updateError) {
