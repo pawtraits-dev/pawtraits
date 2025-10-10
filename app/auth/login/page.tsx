@@ -17,6 +17,7 @@ import { Eye, EyeOff, Loader2, Heart, Camera } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import UserAwareNavigation from '@/components/UserAwareNavigation'
+import { CountryProvider } from '@/lib/country-context'
 
 // Security imports temporarily disabled for debugging
 // import { SecureWrapper } from '@/components/security/SecureWrapper'
@@ -307,8 +308,10 @@ function LoginPageContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
-      <LoginPageContent />
-    </Suspense>
+    <CountryProvider>
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+        <LoginPageContent />
+      </Suspense>
+    </CountryProvider>
   )
 }
