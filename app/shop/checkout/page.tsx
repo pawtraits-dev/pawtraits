@@ -119,29 +119,53 @@ function CheckoutPageContent() {
     }
   }, [selectedCountry])
 
-  // Check for referral code in URL or localStorage
+  // Check for referral code in URL, localStorage, or database (for referred customers)
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const urlReferralCode = urlParams.get('ref') || urlParams.get('referral')
-    const storedReferralCode = localStorage.getItem('referralCode')
+    const fetchReferralCode = async () => {
+      const urlParams = new URLSearchParams(window.location.search)
+      const urlReferralCode = urlParams.get('ref') || urlParams.get('referral')
+      const storedReferralCode = localStorage.getItem('referralCode')
 
-    console.log('[CHECKOUT] Checking for referral code:', {
-      urlReferralCode,
-      storedReferralCode,
-      windowLocation: window.location.href
-    });
+      console.log('[CHECKOUT] Checking for referral code:', {
+        urlReferralCode,
+        storedReferralCode,
+        windowLocation: window.location.href,
+        hasUserProfile: !!userProfile
+      });
 
-    if (urlReferralCode) {
-      console.log('[CHECKOUT] Setting referral code from URL:', urlReferralCode.toUpperCase());
-      setReferralCode(urlReferralCode.toUpperCase())
-      localStorage.setItem('referralCode', urlReferralCode.toUpperCase())
-    } else if (storedReferralCode) {
-      console.log('[CHECKOUT] Setting referral code from localStorage:', storedReferralCode);
-      setReferralCode(storedReferralCode)
-    } else {
-      console.log('[CHECKOUT] No referral code found in URL or localStorage');
-    }
-  }, [])
+      if (urlReferralCode) {
+        console.log('[CHECKOUT] Setting referral code from URL:', urlReferralCode.toUpperCase());
+        setReferralCode(urlReferralCode.toUpperCase())
+        localStorage.setItem('referralCode', urlReferralCode.toUpperCase())
+      } else if (storedReferralCode) {
+        console.log('[CHECKOUT] Setting referral code from localStorage:', storedReferralCode);
+        setReferralCode(storedReferralCode)
+      } else if (userProfile?.email && userProfile.user_type === 'customer') {
+        // Fallback: Check if customer has a referral_code_used stored in database
+        console.log('[CHECKOUT] No code in URL/localStorage, checking customer record...');
+        try {
+          const response = await fetch(`/api/customers/referral-code?email=${encodeURIComponent(userProfile.email)}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.referral_code_used) {
+              console.log('[CHECKOUT] Found referral code in database:', data.referral_code_used);
+              setReferralCode(data.referral_code_used);
+              // Optionally store in localStorage for future sessions
+              localStorage.setItem('referralCode', data.referral_code_used);
+            } else {
+              console.log('[CHECKOUT] No referral code found in customer record');
+            }
+          }
+        } catch (error) {
+          console.error('[CHECKOUT] Error fetching customer referral code:', error);
+        }
+      } else {
+        console.log('[CHECKOUT] No referral code found in URL or localStorage');
+      }
+    };
+
+    fetchReferralCode();
+  }, [userProfile])
 
   // Validate referral code when it changes and user email is available
   useEffect(() => {

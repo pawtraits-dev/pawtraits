@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -10,10 +13,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
 
-    // Use service role key to fetch customer data
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
@@ -21,31 +20,38 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Fetch customer's personal referral code
+    // Fetch customer's referral_code_used field
     const { data: customer, error } = await supabase
       .from('customers')
-      .select('id, personal_referral_code, personal_qr_code_url')
+      .select('id, email, referral_code_used, referral_type')
       .eq('email', customerEmail.toLowerCase().trim())
       .single();
 
     if (error || !customer) {
-      console.error('Failed to fetch customer referral code:', error);
-      return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
+      console.error('[CUSTOMER REFERRAL CODE] Failed to fetch customer:', {
+        email: customerEmail,
+        error: error?.message
+      });
+      return NextResponse.json({
+        referral_code_used: null,
+        referral_type: null
+      });
     }
 
-    if (!customer.personal_referral_code) {
-      return NextResponse.json({ error: 'No referral code found for customer' }, { status: 404 });
-    }
+    console.log('[CUSTOMER REFERRAL CODE] Retrieved referral code:', {
+      email: customerEmail,
+      customerId: customer.id,
+      referralCodeUsed: customer.referral_code_used,
+      referralType: customer.referral_type
+    });
 
-    // Return code, share URL, and QR code URL
     return NextResponse.json({
-      code: customer.personal_referral_code,
-      share_url: `/c/${customer.personal_referral_code}`,
-      qr_code_url: customer.personal_qr_code_url
+      referral_code_used: customer.referral_code_used,
+      referral_type: customer.referral_type
     });
 
   } catch (error) {
-    console.error('Customer referral code API error:', error);
+    console.error('[CUSTOMER REFERRAL CODE] API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

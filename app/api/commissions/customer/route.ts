@@ -61,6 +61,48 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ API: Customer credit created:', credit.id, `£${creditAmount/100}`);
+
+    // Update the referring customer's credit_balance
+    const creditAmountPounds = creditAmount / 100;
+
+    const { data: referringCustomer, error: balanceError } = await supabase
+      .from('customers')
+      .select('id, credit_balance, email')
+      .eq('id', referringCustomerId)
+      .single();
+
+    if (balanceError || !referringCustomer) {
+      console.error('❌ API Error fetching referring customer for balance update:', balanceError);
+      // Still return success for commission creation, but log the balance update failure
+      return NextResponse.json({
+        ...credit,
+        balance_update_error: 'Failed to update credit balance'
+      });
+    }
+
+    const newBalance = (referringCustomer.credit_balance || 0) + creditAmountPounds;
+
+    const { error: updateError } = await supabase
+      .from('customers')
+      .update({ credit_balance: newBalance })
+      .eq('id', referringCustomerId);
+
+    if (updateError) {
+      console.error('❌ API Error updating customer credit_balance:', updateError);
+      return NextResponse.json({
+        ...credit,
+        balance_update_error: 'Failed to update credit balance'
+      });
+    }
+
+    console.log('✅ API: Customer credit_balance updated:', {
+      customerId: referringCustomerId,
+      customerEmail: referringCustomer.email,
+      previousBalance: referringCustomer.credit_balance,
+      creditEarned: creditAmountPounds,
+      newBalance: newBalance
+    });
+
     return NextResponse.json(credit);
 
   } catch (error) {
