@@ -312,7 +312,7 @@ function UserSignupContent() {
   useEffect(() => {
     if (success) {
       const timer = setTimeout(() => {
-        router.push('/');
+        router.push('/auth/login');
       }, 2000);
       return () => clearTimeout(timer);
     }
@@ -328,7 +328,7 @@ function UserSignupContent() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Welcome to Pawtraits!</h1>
             <p className="text-gray-600 mb-6">
-              Your account has been created successfully. You're being redirected to your personalized homepage!
+              Your account has been created successfully. You're being redirected to log in!
             </p>
             {discount && (
               <Badge className="mb-4 bg-green-100 text-green-800">

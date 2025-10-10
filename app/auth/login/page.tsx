@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator"
 import { Eye, EyeOff, Loader2, Heart, Camera } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
+import UserAwareNavigation from '@/components/UserAwareNavigation'
 
 // Security imports temporarily disabled for debugging
 // import { SecureWrapper } from '@/components/security/SecureWrapper'
@@ -150,26 +151,28 @@ function LoginPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <Image
-              src="/assets/logos/paw-svgrepo-200x200-purple.svg"
-              alt="Pawtraits Logo"
-              width={60}
-              height={60}
-              className="w-15 h-15"
-            />
+    <>
+      <UserAwareNavigation />
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          {/* Brand Header */}
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <Image
+                src="/assets/logos/paw-svgrepo-200x200-purple.svg"
+                alt="Pawtraits Logo"
+                width={60}
+                height={60}
+                className="w-15 h-15"
+              />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2 font-[family-name:var(--font-life-savers)]">
+              Welcome Back to Pawtraits! 🎨
+            </h1>
+            <p className="text-gray-600">
+              Sign in to continue creating beautiful pet portraits
+            </p>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2 font-[family-name:var(--font-life-savers)]">
-            Welcome Back to Pawtraits! 🎨
-          </h1>
-          <p className="text-gray-600">
-            Sign in to continue creating beautiful pet portraits
-          </p>
-        </div>
 
         <Card className="shadow-xl border-0 bg-white/80 backdrop-blur">
           <CardHeader className="text-center pb-4">
@@ -268,6 +271,37 @@ function LoginPageContent() {
           </Card>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <div className="flex items-center justify-center space-x-2 mb-4">
+              <Image
+                src="/assets/logos/paw-svgrepo-200x200-purple.svg"
+                alt="Pawtraits Logo"
+                width={24}
+                height={24}
+                className="w-6 h-6"
+              />
+              <span className="text-xl font-bold font-[family-name:var(--font-life-savers)]">Pawtraits</span>
+            </div>
+            <p className="text-gray-400 mb-4">Perfect Pet Pawtraits</p>
+            <p className="text-sm text-gray-500">
+              Questions? Contact us at{' '}
+              <a href="mailto:support@pawtraits.pics" className="text-purple-400 hover:underline">
+                support@pawtraits.pics
+              </a>
+            </p>
+            <div className="mt-8 pt-8 border-t border-gray-800 text-center">
+              <p className="text-gray-400">
+                © 2024 Pawtraits. All rights reserved.
+              </p>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </>
   )
 }
 
