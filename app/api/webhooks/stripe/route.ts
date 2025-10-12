@@ -161,7 +161,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       shipping_city: metadata.shippingCity || '',
       shipping_postcode: metadata.shippingPostcode || '',
       shipping_country: metadata.shippingCountry || 'United Kingdom',
-      subtotal_amount: preDiscountSubtotal, // Store pre-discount amount for reward calculations
+      subtotal_amount: subtotalAmount, // Store post-discount amount (what customer actually paid for items)
       discount_amount: referralDiscount,
       referral_code: referralDiscount > 0 && metadata.referralCode ? metadata.referralCode : null, // Track referral code used
       shipping_amount: shippingCost,
@@ -207,7 +207,8 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     });
 
     // Handle commissions and credits based on simplified logic
-    await handleSimplifiedCommissions(supabase, order, orderingUserProfile, customerEmail, subtotalAmount, metadata);
+    // Pass pre-discount subtotal for commission calculations (partners earn on pre-discount amount)
+    await handleSimplifiedCommissions(supabase, order, orderingUserProfile, customerEmail, preDiscountSubtotal, metadata);
 
     // Create Gelato order for fulfillment
     await createGelatoOrder(order, paymentIntent, supabase, metadata);

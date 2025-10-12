@@ -228,6 +228,12 @@ function OrderConfirmationContent() {
                   <span className="text-gray-600">Subtotal</span>
                   <span>{formatPrice(order.subtotal_amount)}</span>
                 </div>
+                {order.discount_amount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Referral Discount</span>
+                    <span>-{formatPrice(order.discount_amount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
                   <span>{order.shipping_amount === 0 ? 'Free' : formatPrice(order.shipping_amount)}</span>

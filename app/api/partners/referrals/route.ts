@@ -35,7 +35,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const partnerId = user.id; // Partner ID is the user ID
+    // Get user_profile to find partner_id
+    const { data: userProfile, error: userProfileError } = await supabase
+      .from('user_profiles')
+      .select('id, partner_id, email')
+      .eq('id', user.id)
+      .single();
+
+    if (userProfileError || !userProfile || !userProfile.partner_id) {
+      console.error('User profile or partner_id not found:', userProfileError);
+      return NextResponse.json(
+        { error: 'Partner profile not found' },
+        { status: 404 }
+      );
+    }
+
+    const partnerId = userProfile.partner_id; // This is the actual partners.id
 
     console.log('Partner referrals API: Fetching referral data for partner:', partnerId);
 
@@ -116,17 +131,11 @@ export async function GET(request: NextRequest) {
     const totalScans = partner.referral_scans_count || 0;
 
     // 2. Get signup data from customers table
-    const { data: userProfileData } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('partner_id', partnerId)
-      .single();
-
     const { data: referredCustomers } = await supabase
       .from('customers')
       .select('id, email')
       .eq('referral_type', 'PARTNER')
-      .eq('referrer_id', userProfileData?.id || '');
+      .eq('referrer_id', userProfile.id);
 
     const totalSignups = referredCustomers ? referredCustomers.length : 0;
 
