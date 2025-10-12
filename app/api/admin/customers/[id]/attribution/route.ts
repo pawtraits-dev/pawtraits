@@ -20,11 +20,28 @@ export async function GET(
       }
     });
 
-    // Get customer's personal referral code and email
+    // Get user profile first to get email (id is user_profiles.id)
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('email')
+      .eq('id', id)
+      .single();
+
+    if (profileError || !userProfile) {
+      return NextResponse.json({
+        total_attributed_customers: 0,
+        total_attributed_orders: 0,
+        total_attributed_revenue: 0,
+        by_level: [],
+        customers: []
+      });
+    }
+
+    // Get customer's personal referral code using email
     const { data: customer, error: customerError } = await supabase
       .from('customers')
       .select('personal_referral_code, email, first_name, last_name')
-      .eq('id', id)
+      .eq('email', userProfile.email)
       .single();
 
     if (customerError || !customer || !customer.personal_referral_code) {
