@@ -1,17 +1,17 @@
 -- ========================================
--- PARTNER ATTRIBUTION TRACKING SYSTEM
+-- CUSTOMER ATTRIBUTION TRACKING SYSTEM
 -- ========================================
 -- This script creates a recursive function to track all customers
--- attributable to a partner through multi-level referral chains:
--- Partner → Customer1 → Customer2 → Customer3 → ...
+-- attributable to a customer through multi-level referral chains:
+-- Customer1 → Customer2 → Customer3 → ...
 --
 -- Execute this SQL in Supabase SQL Editor
 
 -- Drop existing function if it exists
-DROP FUNCTION IF EXISTS get_attributed_customers(TEXT);
+DROP FUNCTION IF EXISTS get_attributed_customers_for_customer(TEXT);
 
--- Create recursive function to get all customers in attribution chain
-CREATE OR REPLACE FUNCTION get_attributed_customers(partner_code TEXT)
+-- Create recursive function to get all customers in attribution chain for a customer
+CREATE OR REPLACE FUNCTION get_attributed_customers_for_customer(customer_code TEXT)
 RETURNS TABLE(
   customer_id UUID,
   customer_email TEXT,
@@ -21,7 +21,7 @@ RETURNS TABLE(
 BEGIN
   RETURN QUERY
   WITH RECURSIVE attribution_chain AS (
-    -- Base case: Get direct customers who used the partner's code
+    -- Base case: Get direct customers who used this customer's referral code
     -- Join with user_profiles to get the correct ID for admin routing
     SELECT
       COALESCE(up.id, c.id) AS customer_id,  -- Use user_profiles.id if available, fallback to customers.id
@@ -31,8 +31,8 @@ BEGIN
       c.id AS customers_table_id  -- Keep track of customers.id for recursive join
     FROM customers c
     LEFT JOIN user_profiles up ON c.email = up.email AND up.user_type = 'customer'
-    WHERE c.referral_type = 'PARTNER'
-      AND c.referral_code_used = partner_code
+    WHERE c.referral_type = 'CUSTOMER'
+      AND c.referral_code_used = customer_code
 
     UNION ALL
 
@@ -58,22 +58,21 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grant execute permissions
-GRANT EXECUTE ON FUNCTION get_attributed_customers(TEXT) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION get_attributed_customers_for_customer(TEXT) TO authenticated, anon;
 
 -- Add helpful comment
-COMMENT ON FUNCTION get_attributed_customers(TEXT) IS
-  'Recursively finds all customers attributed to a partner through multi-level referral chains. ' ||
-  'Returns customer_id, email, referral level (1=direct, 2=2nd level, etc.), and referral path.';
+COMMENT ON FUNCTION get_attributed_customers_for_customer(TEXT) IS
+  'Recursively finds all customers attributed to a customer through multi-level referral chains. ' ||
+  'Returns customer_id (user_profiles.id), email, referral level (1=direct, 2=2nd level, etc.), and referral path.';
 
 -- ========================================
 -- EXAMPLE USAGE
 -- ========================================
--- To get all attributed customers for partner code 'PEUWQLMN':
--- SELECT * FROM get_attributed_customers('PEUWQLMN');
+-- To get all attributed customers for customer code 'CUST012CODE':
+-- SELECT * FROM get_attributed_customers_for_customer('CUST012CODE');
 --
 -- Expected output:
 -- | customer_id                          | customer_email        | referral_level | referral_path         |
 -- |--------------------------------------|-----------------------|----------------|----------------------|
--- | f3599308-fc9c-43bd-bf0c-730baaed1017 | c-010@atemporal.co.uk | 1              | CUST010CODE          |
--- | 87cb8d6c-b394-4fac-9783-daf583eaecd9 | c-006@atemporal.co.uk | 1              | CUST006CODE          |
--- | ... (customers referred by c-010)    | ...                   | 2              | CUST010CODE → ...    |
+-- | 19801270-3a33-4d0e-be3f-ff1f45606f3a | c-013@atemporal.co.uk | 1              | CUST013CODE          |
+-- | 87cb8d6c-b394-4fac-9783-daf583eaecd9 | c-014@atemporal.co.uk | 2              | CUST013CODE → ...    |
