@@ -7,12 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  ArrowLeft, 
-  User, 
-  Mail, 
-  Phone, 
-  Calendar, 
+import {
+  ArrowLeft,
+  User,
+  Users,
+  Mail,
+  Phone,
+  Calendar,
   Heart,
   ShoppingCart,
   MapPin,
@@ -62,6 +63,14 @@ export default function CustomerDetailPage() {
   const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [selectedPet, setSelectedPet] = useState<PetWithDetails | null>(null);
   const [showPetModal, setShowPetModal] = useState(false);
+  const [attributionData, setAttributionData] = useState<{
+    total_attributed_customers: number;
+    total_attributed_orders: number;
+    total_attributed_revenue: number;
+    by_level: Array<{ level: number; customers: number; orders: number; revenue: number }>;
+    customers: Array<any>;
+  } | null>(null);
+  const [attributionLoading, setAttributionLoading] = useState(true);
 
   useEffect(() => {
     if (params.id) {
@@ -69,6 +78,7 @@ export default function CustomerDetailPage() {
       loadCustomerPets();
       loadCustomerOrders();
       loadCustomerActivity();
+      loadAttributionData();
     }
   }, [params.id]);
 
@@ -140,6 +150,97 @@ export default function CustomerDetailPage() {
       setActivities([]);
     } finally {
       setActivitiesLoading(false);
+    }
+  };
+
+  /**
+   * Sort customers in tree order for display
+   * Tree order: C1, C1->C2, C1->C2->C3, C1->C4, C5, C5->C6
+   * This is a depth-first traversal where we show all descendants before siblings
+   */
+  const sortCustomersInTreeOrder = (customers: any[]) => {
+    if (!customers || customers.length === 0) return [];
+
+    // Build parent -> children mapping based on referral path
+    const childrenMap = new Map<string, any[]>();
+    const rootCustomers: any[] = [];
+
+    customers.forEach(customer => {
+      // Parse referral path to find parent
+      const pathParts = customer.referral_path?.split(' → ') || [];
+
+      if (pathParts.length === 2) {
+        // Direct referral (level 1)
+        rootCustomers.push(customer);
+      } else if (pathParts.length > 2) {
+        // Multi-level: find parent by looking at second-to-last email in path
+        const parentEmail = pathParts[pathParts.length - 2];
+
+        // Find parent customer by email
+        const parent = customers.find(c => c.customer_email === parentEmail);
+        if (parent) {
+          if (!childrenMap.has(parent.customer_id)) {
+            childrenMap.set(parent.customer_id, []);
+          }
+          childrenMap.get(parent.customer_id)!.push(customer);
+        } else {
+          // If parent not found, treat as root
+          rootCustomers.push(customer);
+        }
+      } else {
+        // No path or malformed, treat as root
+        rootCustomers.push(customer);
+      }
+    });
+
+    // Depth-first traversal to build sorted list
+    const result: any[] = [];
+    const traverse = (customer: any) => {
+      result.push(customer);
+      const children = childrenMap.get(customer.customer_id) || [];
+      // Sort children by created date to maintain consistent order
+      children.sort((a, b) => {
+        const dateA = new Date(a.customer_created_at || 0).getTime();
+        const dateB = new Date(b.customer_created_at || 0).getTime();
+        return dateA - dateB;
+      });
+      children.forEach(traverse);
+    };
+
+    // Sort root customers by created date
+    rootCustomers.sort((a, b) => {
+      const dateA = new Date(a.customer_created_at || 0).getTime();
+      const dateB = new Date(b.customer_created_at || 0).getTime();
+      return dateA - dateB;
+    });
+
+    rootCustomers.forEach(traverse);
+    return result;
+  };
+
+  const loadAttributionData = async () => {
+    try {
+      console.log('Loading attribution data for customer:', params.id);
+      const response = await fetch(`/api/admin/customers/${params.id}/attribution`);
+      console.log('Attribution API response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Attribution data received:', data);
+
+        // Sort customers in tree order for display
+        if (data.customers && data.customers.length > 0) {
+          data.customers = sortCustomersInTreeOrder(data.customers);
+        }
+
+        setAttributionData(data);
+      } else {
+        console.error('Attribution API error:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Error loading attribution data:', error);
+    } finally {
+      setAttributionLoading(false);
     }
   };
 
@@ -365,6 +466,7 @@ export default function CustomerDetailPage() {
           <TabsTrigger value="pets">Pets ({pets.length})</TabsTrigger>
           <TabsTrigger value="orders">Orders ({totalOrders})</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="attribution">Attribution ({attributionData?.total_attributed_customers || 0})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -680,6 +782,172 @@ export default function CustomerDetailPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="attribution" className="space-y-6">
+          {!attributionLoading && attributionData && attributionData.total_attributed_customers > 0 && (
+            <div className="space-y-6">
+              {/* Attribution Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Attributed Customers</p>
+                        <p className="text-2xl font-bold text-gray-900">{attributionData.total_attributed_customers}</p>
+                      </div>
+                      <div className="p-3 bg-indigo-100 rounded-lg">
+                        <Users className="w-6 h-6 text-indigo-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Total Orders</p>
+                        <p className="text-2xl font-bold text-gray-900">{attributionData.total_attributed_orders}</p>
+                      </div>
+                      <div className="p-3 bg-green-100 rounded-lg">
+                        <ShoppingCart className="w-6 h-6 text-green-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1" title="Total revenue from all attributed customers">Attr. Revenue</p>
+                        <p className="text-2xl font-bold text-gray-900">{formatCurrency(attributionData.total_attributed_revenue)}</p>
+                      </div>
+                      <div className="p-3 bg-purple-100 rounded-lg">
+                        <CreditCard className="w-6 h-6 text-purple-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Attribution Customer List */}
+              {attributionData.customers && attributionData.customers.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Attributed Customers</CardTitle>
+                    <CardDescription>
+                      All customers in the referral chain with their order metrics
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-3 font-medium text-gray-700">Email</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Level</th>
+                            <th className="text-left p-3 font-medium text-gray-700">
+                              <div>Direct Orders</div>
+                              <div className="text-xs font-normal text-gray-500">(Customer Only)</div>
+                            </th>
+                            <th className="text-left p-3 font-medium text-gray-700">
+                              <div>Chain Orders</div>
+                              <div className="text-xs font-normal text-gray-500">(Referrals)</div>
+                            </th>
+                            <th className="text-left p-3 font-medium text-gray-700">
+                              <div>Total Orders</div>
+                              <div className="text-xs font-normal text-gray-500">(Direct + Chain)</div>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {attributionData.customers.map((cust: any, index: number) => {
+                            const indentLevel = Math.max(0, cust.referral_level - 1);
+                            const indentPx = indentLevel * 24;
+
+                            // Calculate chain totals
+                            let chainOrders = 0;
+                            let chainRevenue = 0;
+
+                            const findDescendants = (parentEmail: string) => {
+                              attributionData.customers.forEach((c: any, idx: number) => {
+                                if (idx > index) {
+                                  const pathParts = c.referral_path?.split(' → ') || [];
+                                  if (pathParts.includes(parentEmail)) {
+                                    chainOrders += (c.order_count || 0);
+                                    chainRevenue += (c.total_revenue || 0);
+                                  }
+                                }
+                              });
+                            };
+
+                            findDescendants(cust.customer_email);
+
+                            const directOrders = cust.order_count || 0;
+                            const directRevenue = cust.total_revenue || 0;
+                            const totalOrders = directOrders + chainOrders;
+                            const totalRevenue = directRevenue + chainRevenue;
+
+                            return (
+                              <tr key={cust.customer_id} className="border-b hover:bg-gray-50">
+                                <td className="p-3 font-medium">
+                                  <div style={{ paddingLeft: `${indentPx}px` }} className="flex items-center gap-2">
+                                    {indentLevel > 0 && (
+                                      <span className="text-gray-400 text-xs">
+                                        {'└─ '}
+                                      </span>
+                                    )}
+                                    {cust.customer_email}
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <Badge className="bg-indigo-100 text-indigo-800">
+                                    L{cust.referral_level}
+                                  </Badge>
+                                </td>
+                                <td className="p-3">
+                                  <div className="text-sm">
+                                    <div className="font-medium">{directOrders} orders</div>
+                                    <div className="text-gray-600">{formatCurrency(directRevenue)}</div>
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <div className="text-sm">
+                                    <div className="font-medium text-indigo-600">{chainOrders} orders</div>
+                                    <div className="text-indigo-600">{formatCurrency(chainRevenue)}</div>
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <div className="text-sm">
+                                    <div className="font-bold">{totalOrders} orders</div>
+                                    <div className="font-semibold text-green-600">{formatCurrency(totalRevenue)}</div>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {(!attributionData || attributionData.total_attributed_customers === 0) && !attributionLoading && (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-600">No attributed customers found</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  This customer has not referred anyone yet
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
 
