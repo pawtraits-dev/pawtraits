@@ -1512,16 +1512,50 @@ export default function PartnerDetailPage() {
                           <tr className="border-b">
                             <th className="text-left p-3 font-medium text-gray-700">Email</th>
                             <th className="text-left p-3 font-medium text-gray-700">Level</th>
-                            <th className="text-left p-3 font-medium text-gray-700">Orders</th>
-                            <th className="text-left p-3 font-medium text-gray-700">Revenue</th>
-                            <th className="text-left p-3 font-medium text-gray-700">Referral Path</th>
+                            <th className="text-left p-3 font-medium text-gray-700">
+                              <div>Direct Orders</div>
+                              <div className="text-xs font-normal text-gray-500">(Customer Only)</div>
+                            </th>
+                            <th className="text-left p-3 font-medium text-gray-700">
+                              <div>Chain Orders</div>
+                              <div className="text-xs font-normal text-gray-500">(Referrals)</div>
+                            </th>
+                            <th className="text-left p-3 font-medium text-gray-700">
+                              <div>Total Orders</div>
+                              <div className="text-xs font-normal text-gray-500">(Direct + Chain)</div>
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {attributionData.customers.map((customer: any) => {
+                          {attributionData.customers.map((customer: any, index: number) => {
                             // Calculate indentation based on referral level (0-indexed, so level 1 = no indent)
                             const indentLevel = Math.max(0, customer.referral_level - 1);
                             const indentPx = indentLevel * 24; // 24px per level
+
+                            // Calculate chain totals (all descendants)
+                            let chainOrders = 0;
+                            let chainRevenue = 0;
+
+                            // Find all descendants of this customer
+                            const findDescendants = (parentEmail: string) => {
+                              attributionData.customers.forEach((c: any, idx: number) => {
+                                if (idx > index) { // Only look at customers after this one (already in tree order)
+                                  const pathParts = c.referral_path?.split(' → ') || [];
+                                  // Check if this customer is a descendant
+                                  if (pathParts.includes(parentEmail)) {
+                                    chainOrders += (c.order_count || 0);
+                                    chainRevenue += (c.total_revenue || 0);
+                                  }
+                                }
+                              });
+                            };
+
+                            findDescendants(customer.customer_email);
+
+                            const directOrders = customer.order_count || 0;
+                            const directRevenue = customer.total_revenue || 0;
+                            const totalOrders = directOrders + chainOrders;
+                            const totalRevenue = directRevenue + chainRevenue;
 
                             return (
                               <tr key={customer.customer_id} className="border-b hover:bg-gray-50">
@@ -1540,10 +1574,23 @@ export default function PartnerDetailPage() {
                                     L{customer.referral_level}
                                   </Badge>
                                 </td>
-                                <td className="p-3">{customer.order_count || 0}</td>
-                                <td className="p-3">{formatCurrency((customer.total_revenue || 0) / 100)}</td>
-                                <td className="p-3 text-sm text-gray-600 truncate max-w-md" title={customer.referral_path}>
-                                  {customer.referral_path}
+                                <td className="p-3">
+                                  <div className="text-sm">
+                                    <div className="font-medium">{directOrders} orders</div>
+                                    <div className="text-gray-600">{formatCurrency(directRevenue / 100)}</div>
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <div className="text-sm">
+                                    <div className="font-medium text-indigo-600">{chainOrders} orders</div>
+                                    <div className="text-indigo-600">{formatCurrency(chainRevenue / 100)}</div>
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <div className="text-sm">
+                                    <div className="font-bold">{totalOrders} orders</div>
+                                    <div className="font-semibold text-green-600">{formatCurrency(totalRevenue / 100)}</div>
+                                  </div>
                                 </td>
                               </tr>
                             );
