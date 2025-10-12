@@ -22,37 +22,31 @@ BEGIN
   RETURN QUERY
   WITH RECURSIVE attribution_chain AS (
     -- Base case: Get direct customers who used this customer's referral code
-    -- Join with user_profiles to get the correct ID for admin routing
     SELECT
-      COALESCE(up.id, c.id) AS customer_id,  -- Use user_profiles.id if available, fallback to customers.id
+      c.id AS customer_id,
       c.email AS customer_email,
       1 AS referral_level,
-      CAST(c.personal_referral_code AS TEXT) AS referral_path,
-      c.id AS customers_table_id  -- Keep track of customers.id for recursive join
+      CAST(c.personal_referral_code AS TEXT) AS referral_path
     FROM customers c
-    LEFT JOIN user_profiles up ON c.email = up.email AND up.user_type = 'customer'
     WHERE c.referral_type = 'CUSTOMER'
       AND c.referral_code_used = customer_code
 
     UNION ALL
 
     -- Recursive case: Get customers referred by customers in the chain
-    -- Join on referrer_id = parent customer_id (from customers table)
+    -- Join on referrer_id = parent customer_id
     SELECT
-      COALESCE(up.id, c.id) AS customer_id,  -- Use user_profiles.id if available
+      c.id AS customer_id,
       c.email AS customer_email,
       ac.referral_level + 1 AS referral_level,
-      CAST(ac.referral_path || ' → ' || c.personal_referral_code AS TEXT) AS referral_path,
-      c.id AS customers_table_id
+      CAST(ac.referral_path || ' → ' || c.personal_referral_code AS TEXT) AS referral_path
     FROM customers c
-    LEFT JOIN user_profiles up ON c.email = up.email AND up.user_type = 'customer'
     INNER JOIN attribution_chain ac
-      ON c.referrer_id = ac.customers_table_id  -- Join on customers table ID
+      ON c.referrer_id = ac.customer_id
     WHERE c.referral_type = 'CUSTOMER'
       AND ac.referral_level < 10  -- Prevent infinite loops, max 10 levels
   )
-  SELECT customer_id, customer_email, referral_level, referral_path
-  FROM attribution_chain
+  SELECT * FROM attribution_chain
   ORDER BY referral_level, customer_email;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
