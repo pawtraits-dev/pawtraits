@@ -61,7 +61,7 @@ export async function GET(
         };
         referralType = 'PARTNER';
         referrerInfo = {
-          id: data.partner.user_profiles?.[0]?.id, // Link to user_profiles (first element of array)
+          id: data.partner.id, // Use partner.id directly (partners table ID = user_profiles ID)
           type: 'partner',
           name: data.partner.business_name || `${data.partner.first_name} ${data.partner.last_name}`,
           avatar_url: data.partner.logo_url || data.partner.avatar_url,

@@ -117,64 +117,45 @@ export async function GET(request: NextRequest) {
 
     console.log('Found partner:', partner.business_name);
 
-    // Get referrals for this partner with order and commission data (using service role bypasses RLS)
-    const { data: referrals, error } = await supabase
-      .from('referrals')
-      .select(`
-        *,
-        client_orders (
-          order_value,
-          commission_amount,
-          commission_paid,
-          order_status
-        )
-      `)
-      .eq('partner_id', user.id)
+    // Get DIRECT referrals for this partner from customers table (unified system)
+    // Only show customers where referral_type = 'PARTNER' and referrer_id = partner.id
+    const { data: customerReferrals, error: customerError } = await supabase
+      .from('customers')
+      .select('id, email, first_name, last_name, referral_type, referrer_id, referral_code_used, referral_applied_at, created_at')
+      .eq('referral_type', 'PARTNER')
+      .eq('referrer_id', user.id)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching referrals:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
+    if (customerError) {
+      console.error('Error fetching customer referrals:', customerError);
       return NextResponse.json([]);
     }
 
-    console.log('Found referrals:', referrals?.length || 0);
-    
-    // Process referrals to calculate aggregated order and commission data
-    const processedReferrals = (referrals || []).map(referral => {
-      // Calculate order statistics
-      const orders = referral.client_orders || [];
-      const orderCount = orders.length;
-      const totalOrderValue = orders.reduce((sum: number, order: any) => sum + (parseFloat(order.order_value) || 0), 0);
-      
-      // Calculate commission statistics
-      const totalCommissionAmount = orders.reduce((sum: number, order: any) => sum + (parseFloat(order.commission_amount) || 0), 0);
-      const pendingCommission = orders
-        .filter((order: any) => !order.commission_paid)
-        .reduce((sum: number, order: any) => sum + (parseFloat(order.commission_amount) || 0), 0);
-      const paidCommission = orders
-        .filter((order: any) => order.commission_paid)
-        .reduce((sum: number, order: any) => sum + (parseFloat(order.commission_amount) || 0), 0);
-      
+    console.log('Found direct customer referrals:', customerReferrals?.length || 0);
+
+    // Transform customer data to match expected referral format for dashboard
+    const processedReferrals = (customerReferrals || []).map(customer => {
       return {
-        ...referral,
-        // Remove the nested client_orders array and replace with calculated values
-        client_orders: undefined,
-        order_count: orderCount,
-        total_order_value: totalOrderValue,
-        total_commission_amount: totalCommissionAmount,
-        pending_commission: pendingCommission,
-        paid_commission: paidCommission,
-        // Update legacy fields for backward compatibility
-        order_value: totalOrderValue,
-        commission_amount: totalCommissionAmount
+        id: customer.id,
+        client_first_name: customer.first_name,
+        client_last_name: customer.last_name,
+        client_email: customer.email,
+        referral_code: customer.referral_code_used,
+        status: 'accepted', // Customer has signed up
+        created_at: customer.referral_applied_at || customer.created_at,
+        // TODO: Add order and commission data when we implement order tracking
+        order_count: 0,
+        total_order_value: 0,
+        total_commission_amount: 0,
+        pending_commission: 0,
+        paid_commission: 0
       };
     });
 
     if (processedReferrals && processedReferrals.length > 0) {
       console.log('Sample processed referral:', JSON.stringify(processedReferrals[0], null, 2));
     }
-    
+
     return NextResponse.json(processedReferrals);
   } catch (error) {
     console.error('Error in referrals API:', error);
