@@ -63,7 +63,7 @@ export async function GET(
       }
 
       // Build referral chain manually
-      const buildChain = (customers: any[], level: number = 1): any[] => {
+      const buildChain = async (customers: any[], level: number = 1): Promise<any[]> => {
         const result: any[] = [];
         for (const c of customers) {
           result.push({
