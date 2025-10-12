@@ -21,11 +21,28 @@ export async function GET(
     });
 
     // Get customer's personal referral code
-    // Note: id parameter is user_profiles.id, customers table has user_id field
+    // Note: id parameter is user_profiles.id
+    // Must join through user_profiles.customer_id (see docs/ID-RELATIONSHIPS.md)
+    const { data: userProfile, error: upError } = await supabase
+      .from('user_profiles')
+      .select('customer_id')
+      .eq('id', id)
+      .single();
+
+    if (upError || !userProfile?.customer_id) {
+      return NextResponse.json({
+        total_attributed_customers: 0,
+        total_attributed_orders: 0,
+        total_attributed_revenue: 0,
+        by_level: [],
+        customers: []
+      });
+    }
+
     const { data: customer, error: customerError } = await supabase
       .from('customers')
       .select('personal_referral_code, email, first_name, last_name')
-      .eq('user_id', id)
+      .eq('id', userProfile.customer_id)
       .single();
 
     if (customerError || !customer || !customer.personal_referral_code) {
