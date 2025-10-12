@@ -66,8 +66,16 @@ export async function GET(
       const buildChain = async (customers: any[], level: number = 1): Promise<any[]> => {
         const result: any[] = [];
         for (const c of customers) {
+          // Get user_profiles.id for this customer email
+          const { data: userProfile } = await supabase
+            .from('user_profiles')
+            .select('id')
+            .eq('email', c.email)
+            .eq('user_type', 'customer')
+            .single();
+
           result.push({
-            customer_id: c.id,
+            customer_id: userProfile?.id || c.id,  // Use user_profiles.id, fallback to customers.id
             customer_email: c.email,
             customer_first_name: c.first_name,
             customer_last_name: c.last_name,
