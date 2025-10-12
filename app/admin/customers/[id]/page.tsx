@@ -167,17 +167,18 @@ export default function CustomerDetailPage() {
 
     customers.forEach(customer => {
       // Parse referral path to find parent
+      // Path format: "CODE1" or "CODE1 → CODE2" or "CODE1 → CODE2 → CODE3"
       const pathParts = customer.referral_path?.split(' → ') || [];
 
-      if (pathParts.length === 2) {
-        // Direct referral (level 1)
+      if (pathParts.length === 1) {
+        // Direct referral (level 1) - only has their own code
         rootCustomers.push(customer);
-      } else if (pathParts.length > 2) {
-        // Multi-level: find parent by looking at second-to-last email in path
-        const parentEmail = pathParts[pathParts.length - 2];
+      } else if (pathParts.length > 1) {
+        // Multi-level: find parent by looking at second-to-last code in path
+        const parentCode = pathParts[pathParts.length - 2];
 
-        // Find parent customer by email
-        const parent = customers.find(c => c.customer_email === parentEmail);
+        // Find parent customer by their personal referral code
+        const parent = customers.find(c => c.referral_path?.endsWith(parentCode) && c.customer_id !== customer.customer_id);
         if (parent) {
           if (!childrenMap.has(parent.customer_id)) {
             childrenMap.set(parent.customer_id, []);
