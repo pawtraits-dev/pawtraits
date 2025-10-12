@@ -172,6 +172,27 @@ export async function GET(
     // Get all customer emails
     const customerEmails = attributedCustomers.map((c: any) => c.customer_email);
 
+    // Map customers.id to user_profiles.id for correct admin routing
+    // Do a batch lookup to get user_profiles.id by email
+    const { data: userProfiles } = await supabase
+      .from('user_profiles')
+      .select('id, email')
+      .in('email', customerEmails)
+      .eq('user_type', 'customer');
+
+    // Create email -> user_profiles.id map
+    const emailToProfileId = new Map(
+      (userProfiles || []).map(up => [up.email, up.id])
+    );
+
+    // Update customer_id to use user_profiles.id
+    attributedCustomers.forEach((customer: any) => {
+      const profileId = emailToProfileId.get(customer.customer_email);
+      if (profileId) {
+        customer.customer_id = profileId;
+      }
+    });
+
     // Get orders from all attributed customers
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
