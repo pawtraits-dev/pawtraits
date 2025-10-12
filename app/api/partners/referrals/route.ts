@@ -36,10 +36,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user_profile to find partner_id
+    // ✅ IMPORTANT: Look up by email, not by id (user_profiles.id ≠ auth.users.id)
     const { data: userProfile, error: userProfileError } = await supabase
       .from('user_profiles')
       .select('id, partner_id, email')
-      .eq('id', user.id)
+      .eq('email', user.email)
       .single();
 
     if (userProfileError || !userProfile || !userProfile.partner_id) {
