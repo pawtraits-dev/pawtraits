@@ -9,10 +9,28 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// Load environment variables from .env.local
+dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+
+// Validate required environment variables
+if (!SUPABASE_URL) {
+  console.error('❌ ERROR: NEXT_PUBLIC_SUPABASE_URL not found in environment variables');
+  console.error('   Make sure .env.local exists in the project root');
+  process.exit(1);
+}
+
+if (!SUPABASE_SERVICE_KEY) {
+  console.error('❌ ERROR: SUPABASE_SERVICE_ROLE_KEY not found in environment variables');
+  console.error('   Make sure .env.local exists in the project root');
+  process.exit(1);
+}
 
 // Test account credentials
 const PASSWORD = '!@£QWE123qwe';
