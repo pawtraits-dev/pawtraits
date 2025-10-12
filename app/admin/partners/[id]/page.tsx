@@ -211,6 +211,75 @@ export default function PartnerDetailPage() {
     }
   };
 
+  /**
+   * Sort customers in tree order for display
+   * Tree order: C1, C1->C2, C1->C2->C3, C1->C4, C5, C5->C6
+   * This is a depth-first traversal where we show all descendants before siblings
+   */
+  const sortCustomersInTreeOrder = (customers: any[]) => {
+    if (!customers || customers.length === 0) return [];
+
+    // Build a map of customer_id -> customer for quick lookups
+    const customerMap = new Map(customers.map(c => [c.customer_id, c]));
+
+    // Build parent -> children mapping based on referral path
+    const childrenMap = new Map<string, any[]>();
+    const rootCustomers: any[] = [];
+
+    customers.forEach(customer => {
+      // Parse referral path to find parent
+      // Path format: "Partner Name → Customer Email" or "Partner → C1 → C2"
+      const pathParts = customer.referral_path?.split(' → ') || [];
+
+      if (pathParts.length === 2) {
+        // Direct partner referral (level 1)
+        rootCustomers.push(customer);
+      } else if (pathParts.length > 2) {
+        // Multi-level: find parent by looking at second-to-last email in path
+        const parentEmail = pathParts[pathParts.length - 2];
+
+        // Find parent customer by email
+        const parent = customers.find(c => c.customer_email === parentEmail);
+        if (parent) {
+          if (!childrenMap.has(parent.customer_id)) {
+            childrenMap.set(parent.customer_id, []);
+          }
+          childrenMap.get(parent.customer_id)!.push(customer);
+        } else {
+          // If parent not found, treat as root
+          rootCustomers.push(customer);
+        }
+      } else {
+        // No path or malformed, treat as root
+        rootCustomers.push(customer);
+      }
+    });
+
+    // Depth-first traversal to build sorted list
+    const result: any[] = [];
+    const traverse = (customer: any) => {
+      result.push(customer);
+      const children = childrenMap.get(customer.customer_id) || [];
+      // Sort children by created date to maintain consistent order
+      children.sort((a, b) => {
+        const dateA = new Date(a.customer_created_at || 0).getTime();
+        const dateB = new Date(b.customer_created_at || 0).getTime();
+        return dateA - dateB;
+      });
+      children.forEach(traverse);
+    };
+
+    // Sort root customers by created date
+    rootCustomers.sort((a, b) => {
+      const dateA = new Date(a.customer_created_at || 0).getTime();
+      const dateB = new Date(b.customer_created_at || 0).getTime();
+      return dateA - dateB;
+    });
+
+    rootCustomers.forEach(traverse);
+    return result;
+  };
+
   const loadAttributionData = async () => {
     try {
       console.log('Loading attribution data for partner:', params.id);
@@ -220,6 +289,12 @@ export default function PartnerDetailPage() {
       if (response.ok) {
         const data = await response.json();
         console.log('Attribution data received:', data);
+
+        // Sort customers in tree order for display
+        if (data.customers && data.customers.length > 0) {
+          data.customers = sortCustomersInTreeOrder(data.customers);
+        }
+
         setAttributionData(data);
       } else {
         console.error('Attribution API error:', response.status, response.statusText);
@@ -1443,21 +1518,36 @@ export default function PartnerDetailPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {attributionData.customers.map((customer: any) => (
-                            <tr key={customer.customer_id} className="border-b hover:bg-gray-50">
-                              <td className="p-3 font-medium">{customer.customer_email}</td>
-                              <td className="p-3">
-                                <Badge className="bg-indigo-100 text-indigo-800">
-                                  L{customer.referral_level}
-                                </Badge>
-                              </td>
-                              <td className="p-3">{customer.order_count || 0}</td>
-                              <td className="p-3">{formatCurrency((customer.total_revenue || 0) / 100)}</td>
-                              <td className="p-3 text-sm text-gray-600 truncate max-w-md" title={customer.referral_path}>
-                                {customer.referral_path}
-                              </td>
-                            </tr>
-                          ))}
+                          {attributionData.customers.map((customer: any) => {
+                            // Calculate indentation based on referral level (0-indexed, so level 1 = no indent)
+                            const indentLevel = Math.max(0, customer.referral_level - 1);
+                            const indentPx = indentLevel * 24; // 24px per level
+
+                            return (
+                              <tr key={customer.customer_id} className="border-b hover:bg-gray-50">
+                                <td className="p-3 font-medium">
+                                  <div style={{ paddingLeft: `${indentPx}px` }} className="flex items-center gap-2">
+                                    {indentLevel > 0 && (
+                                      <span className="text-gray-400 text-xs">
+                                        {'└─ '}
+                                      </span>
+                                    )}
+                                    {customer.customer_email}
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <Badge className="bg-indigo-100 text-indigo-800">
+                                    L{customer.referral_level}
+                                  </Badge>
+                                </td>
+                                <td className="p-3">{customer.order_count || 0}</td>
+                                <td className="p-3">{formatCurrency((customer.total_revenue || 0) / 100)}</td>
+                                <td className="p-3 text-sm text-gray-600 truncate max-w-md" title={customer.referral_path}>
+                                  {customer.referral_path}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
