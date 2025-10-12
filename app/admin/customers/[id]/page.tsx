@@ -899,7 +899,12 @@ export default function CustomerDetailPage() {
                                         {'└─ '}
                                       </span>
                                     )}
-                                    {cust.customer_email}
+                                    <Link
+                                      href={`/admin/customers/${cust.customer_id}`}
+                                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                                    >
+                                      {cust.customer_email}
+                                    </Link>
                                   </div>
                                 </td>
                                 <td className="p-3">

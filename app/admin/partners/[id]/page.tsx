@@ -1566,7 +1566,12 @@ export default function PartnerDetailPage() {
                                         {'└─ '}
                                       </span>
                                     )}
-                                    {customer.customer_email}
+                                    <Link
+                                      href={`/admin/customers/${customer.customer_id}`}
+                                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                                    >
+                                      {customer.customer_email}
+                                    </Link>
                                   </div>
                                 </td>
                                 <td className="p-3">
