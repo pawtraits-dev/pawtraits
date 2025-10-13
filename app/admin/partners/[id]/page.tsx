@@ -1527,45 +1527,68 @@ export default function PartnerDetailPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {attributionData.customers.map((customer: any, index: number) => {
-                            // Calculate indentation based on referral level (0-indexed, so level 1 = no indent)
-                            const indentLevel = Math.max(0, customer.referral_level - 1);
-                            const indentPx = indentLevel * 24; // 24px per level
+                          {(() => {
+                            // Build email-to-code mapping from referral paths
+                            // Each customer's own code is the last code in their path
+                            const emailToCode = new Map<string, string>();
+                            attributionData.customers.forEach((c: any) => {
+                              const pathParts = c.referral_path?.split(' → ') || [];
+                              if (pathParts.length > 0) {
+                                // The last code in the path is this customer's own code
+                                const customerCode = pathParts[pathParts.length - 1];
+                                emailToCode.set(c.customer_email, customerCode);
+                              }
+                            });
 
-                            // Calculate chain totals (all descendants)
-                            let chainOrders = 0;
-                            let chainRevenue = 0;
+                            console.log('[DEBUG] Email-to-code mapping:', Object.fromEntries(emailToCode));
 
-                            // Find all descendants of this customer
-                            const findDescendants = (parentEmail: string) => {
-                              console.log(`[DEBUG] Finding descendants for: ${parentEmail}`);
-                              console.log(`[DEBUG] Current customer index: ${index}`);
-                              console.log(`[DEBUG] Total customers: ${attributionData.customers.length}`);
+                            return attributionData.customers.map((customer: any, index: number) => {
+                              // Calculate indentation based on referral level (0-indexed, so level 1 = no indent)
+                              const indentLevel = Math.max(0, customer.referral_level - 1);
+                              const indentPx = indentLevel * 24; // 24px per level
 
-                              attributionData.customers.forEach((c: any, idx: number) => {
-                                if (idx > index) { // Only look at customers after this one (already in tree order)
-                                  const pathParts = c.referral_path?.split(' → ') || [];
-                                  console.log(`[DEBUG]   Checking ${c.customer_email} (idx: ${idx})`);
-                                  console.log(`[DEBUG]     Path: ${c.referral_path}`);
-                                  console.log(`[DEBUG]     PathParts: ${JSON.stringify(pathParts)}`);
-                                  console.log(`[DEBUG]     Includes parent? ${pathParts.includes(parentEmail)}`);
-                                  console.log(`[DEBUG]     Order count: ${c.order_count || 0}`);
+                              // Calculate chain totals (all descendants)
+                              let chainOrders = 0;
+                              let chainRevenue = 0;
 
-                                  // Check if this customer is a descendant
-                                  if (pathParts.includes(parentEmail)) {
-                                    console.log(`[DEBUG]     ✅ MATCH - Adding ${c.order_count || 0} orders to chain`);
-                                    chainOrders += (c.order_count || 0);
-                                    chainRevenue += (c.total_revenue || 0);
-                                  } else {
-                                    console.log(`[DEBUG]     ❌ NO MATCH`);
-                                  }
+                              // Get this customer's referral code
+                              const parentCode = emailToCode.get(customer.customer_email);
+
+                              // Find all descendants of this customer
+                              const findDescendants = (parentCode: string | undefined) => {
+                                if (!parentCode) {
+                                  console.log(`[DEBUG] No code found for ${customer.customer_email}`);
+                                  return;
                                 }
-                              });
 
-                              console.log(`[DEBUG] Final chain orders for ${parentEmail}: ${chainOrders}`);
-                            };
+                                console.log(`[DEBUG] Finding descendants for: ${customer.customer_email} (code: ${parentCode})`);
+                                console.log(`[DEBUG] Current customer index: ${index}`);
 
-                            findDescendants(customer.customer_email);
+                                attributionData.customers.forEach((c: any, idx: number) => {
+                                  if (idx > index) { // Only look at customers after this one (already in tree order)
+                                    const pathParts = c.referral_path?.split(' → ') || [];
+                                    const includesParent = pathParts.includes(parentCode);
+
+                                    console.log(`[DEBUG]   Checking ${c.customer_email} (idx: ${idx})`);
+                                    console.log(`[DEBUG]     Path: ${c.referral_path}`);
+                                    console.log(`[DEBUG]     Includes parent code ${parentCode}? ${includesParent}`);
+                                    console.log(`[DEBUG]     Order count: ${c.order_count || 0}`);
+
+                                    // Check if this customer is a descendant
+                                    if (includesParent) {
+                                      console.log(`[DEBUG]     ✅ MATCH - Adding ${c.order_count || 0} orders to chain`);
+                                      chainOrders += (c.order_count || 0);
+                                      chainRevenue += (c.total_revenue || 0);
+                                    } else {
+                                      console.log(`[DEBUG]     ❌ NO MATCH`);
+                                    }
+                                  }
+                                });
+
+                                console.log(`[DEBUG] Final chain orders for ${customer.customer_email}: ${chainOrders}`);
+                              };
+
+                              findDescendants(parentCode);
 
                             const directOrders = customer.order_count || 0;
                             const directRevenue = customer.total_revenue || 0;
@@ -1614,7 +1637,8 @@ export default function PartnerDetailPage() {
                                 </td>
                               </tr>
                             );
-                          })}
+                          });
+                        })()}
                         </tbody>
                       </table>
                     </div>
