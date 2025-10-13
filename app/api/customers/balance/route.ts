@@ -21,10 +21,10 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Fetch customer's credit balance
+    // Fetch customer's credit balance (stored in pence as integer)
     const { data: customer, error } = await supabase
       .from('customers')
-      .select('id, credit_balance')
+      .select('id, current_credit_balance')
       .eq('email', customerEmail.toLowerCase().trim())
       .single();
 
@@ -38,12 +38,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const balancePence = Math.round((customer.credit_balance || 0) * 100);
+    const balancePence = customer.current_credit_balance || 0;
     console.log('[CUSTOMER BALANCE] Retrieved balance:', {
       email: customerEmail,
       customerId: customer.id,
-      balancePounds: customer.credit_balance,
-      balancePence: balancePence
+      balancePence: balancePence,
+      balancePounds: (balancePence / 100).toFixed(2)
     });
 
     // Return balance in pence for consistency with other pricing

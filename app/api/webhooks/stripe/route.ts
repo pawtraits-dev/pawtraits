@@ -799,40 +799,25 @@ async function handlePartnerCommission(
       referralCodeUsed: customer.referral_code_used
     });
 
-    // Get partner information including commission rates directly from database
-    const { data: partnerProfile, error: partnerError } = await supabase
-      .from('user_profiles')
-      .select(`
-        id,
-        email,
-        partner_id,
-        partner:partners (
-          id,
-          business_name,
-          first_name,
-          last_name,
-          email,
-          commission_rate,
-          lifetime_commission_rate
-        )
-      `)
+    // Get partner information directly (referrer_id is partners.id)
+    const { data: partner, error: partnerError } = await supabase
+      .from('partners')
+      .select('id, business_name, first_name, last_name, email, commission_rate, lifetime_commission_rate')
       .eq('id', customer.referrer_id)
       .single();
 
     console.log('🔍 COMMISSION DEBUG - Partner lookup result:', {
-      found: !!partnerProfile,
-      hasPartner: !!partnerProfile?.partner,
-      userProfileId: partnerProfile?.id,
-      partnerId: partnerProfile?.partner?.id,
-      partnerEmail: partnerProfile?.partner?.email || partnerProfile?.email
+      found: !!partner,
+      partnerId: partner?.id,
+      partnerEmail: partner?.email,
+      partnerName: partner?.business_name
     });
 
-    if (partnerError || !partnerProfile?.partner) {
+    if (partnerError || !partner) {
       console.error('❌ COMMISSION FAILED - Partner lookup failed:', {
         error: partnerError?.message,
         referrerId: customer.referrer_id,
-        hasProfile: !!partnerProfile,
-        hasPartnerData: !!partnerProfile?.partner
+        hasPartner: !!partner
       });
       return;
     }
@@ -848,8 +833,8 @@ async function handlePartnerCommission(
 
     // Use appropriate commission rate: commission_rate for first order, lifetime_commission_rate for subsequent
     const commissionRate = isFirstOrder
-      ? (partnerProfile.partner.commission_rate || 10.00)
-      : (partnerProfile.partner.lifetime_commission_rate || 10.00);
+      ? (partner.commission_rate || 10.00)
+      : (partner.lifetime_commission_rate || 10.00);
 
     console.log('📊 Commission rate determination:', {
       customerEmail: customer.email,
@@ -858,8 +843,8 @@ async function handlePartnerCommission(
       commissionRate: `${commissionRate}%`,
       rateType: isFirstOrder ? 'initial' : 'lifetime',
       partnerRates: {
-        initial: partnerProfile.partner.commission_rate,
-        lifetime: partnerProfile.partner.lifetime_commission_rate
+        initial: partner.commission_rate,
+        lifetime: partner.lifetime_commission_rate
       }
     });
 
@@ -870,10 +855,10 @@ async function handlePartnerCommission(
       order_id: order.id,
       order_amount: subtotalAmount,
       recipient_type: 'partner',
-      recipient_id: partnerProfile.partner.id,
-      recipient_email: partnerProfile.partner.email || partnerProfile.email,
+      recipient_id: partner.id,
+      recipient_email: partner.email,
       referrer_type: 'partner',
-      referrer_id: partnerProfile.partner.id,
+      referrer_id: partner.id,
       referral_code: customer.referral_code_used || null,
       commission_type: 'partner_commission',
       commission_rate: commissionRate,
@@ -909,9 +894,9 @@ async function handlePartnerCommission(
     } else {
       console.log('✅ Partner commission created successfully:', {
         commissionId: commission.id,
-        recipientId: partnerProfile.partner.id,
-        recipientEmail: partnerProfile.partner.email || partnerProfile.email,
-        partnerName: partnerProfile.partner.business_name,
+        recipientId: partner.id,
+        recipientEmail: partner.email,
+        partnerName: partner.business_name,
         amount: commissionAmount,
         amountPounds: (commissionAmount / 100).toFixed(2),
         orderAmount: subtotalAmount,
