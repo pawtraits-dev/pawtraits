@@ -1538,16 +1538,31 @@ export default function PartnerDetailPage() {
 
                             // Find all descendants of this customer
                             const findDescendants = (parentEmail: string) => {
+                              console.log(`[DEBUG] Finding descendants for: ${parentEmail}`);
+                              console.log(`[DEBUG] Current customer index: ${index}`);
+                              console.log(`[DEBUG] Total customers: ${attributionData.customers.length}`);
+
                               attributionData.customers.forEach((c: any, idx: number) => {
                                 if (idx > index) { // Only look at customers after this one (already in tree order)
                                   const pathParts = c.referral_path?.split(' → ') || [];
+                                  console.log(`[DEBUG]   Checking ${c.customer_email} (idx: ${idx})`);
+                                  console.log(`[DEBUG]     Path: ${c.referral_path}`);
+                                  console.log(`[DEBUG]     PathParts: ${JSON.stringify(pathParts)}`);
+                                  console.log(`[DEBUG]     Includes parent? ${pathParts.includes(parentEmail)}`);
+                                  console.log(`[DEBUG]     Order count: ${c.order_count || 0}`);
+
                                   // Check if this customer is a descendant
                                   if (pathParts.includes(parentEmail)) {
+                                    console.log(`[DEBUG]     ✅ MATCH - Adding ${c.order_count || 0} orders to chain`);
                                     chainOrders += (c.order_count || 0);
                                     chainRevenue += (c.total_revenue || 0);
+                                  } else {
+                                    console.log(`[DEBUG]     ❌ NO MATCH`);
                                   }
                                 }
                               });
+
+                              console.log(`[DEBUG] Final chain orders for ${parentEmail}: ${chainOrders}`);
                             };
 
                             findDescendants(customer.customer_email);
