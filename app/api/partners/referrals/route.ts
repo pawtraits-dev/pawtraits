@@ -133,11 +133,12 @@ export async function GET(request: NextRequest) {
 
     // 2. Get only direct L1 referrals where referral_type = 'PARTNER'
     // Note: This is different from admin attribution which shows multi-level chains
+    // IMPORTANT: customers.referrer_id stores partners.id, not user_profiles.id
     const { data: referredCustomers, error: customersError } = await supabase
       .from('customers')
       .select('id, email')
       .eq('referral_type', 'PARTNER')
-      .eq('referrer_id', userProfile.id);
+      .eq('referrer_id', userProfile.partner_id);
 
     if (customersError) {
       console.error('Error fetching referred customers:', customersError);
