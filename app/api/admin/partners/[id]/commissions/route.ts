@@ -19,10 +19,21 @@ export async function GET(
       auth: { autoRefreshToken: false, persistSession: false }
     });
     
-    // Get commission data from new commissions table
+    // Get commission data from new commissions table with order and customer info
     const { data: commissions, error: commissionsError } = await supabase
       .from('commissions')
-      .select('*')
+      .select(`
+        *,
+        orders!inner (
+          id,
+          order_number,
+          customer_email,
+          subtotal_amount,
+          total_amount,
+          status,
+          created_at
+        )
+      `)
       .eq('recipient_id', id)
       .eq('recipient_type', 'partner')
       .order('created_at', { ascending: false });
@@ -32,6 +43,20 @@ export async function GET(
     if (commissionsError) {
       console.error('❌ Error fetching commissions:', commissionsError);
       throw commissionsError;
+    }
+
+    // Get customer IDs from commissions to look up user_profiles.id
+    const customerEmails = [...new Set(commissions?.map((c: any) => c.orders?.customer_email).filter(Boolean))] as string[];
+
+    let customerIdMap = new Map<string, string>();
+    if (customerEmails.length > 0) {
+      const { data: userProfiles } = await supabase
+        .from('user_profiles')
+        .select('id, email')
+        .in('email', customerEmails)
+        .eq('user_type', 'customer');
+
+      customerIdMap = new Map((userProfiles || []).map((up: any) => [up.email, up.id]));
     }
     
     // Get commission payments for the specified partner (legacy table)
@@ -54,17 +79,21 @@ export async function GET(
       throw paymentsError;
     }
 
-    // Use commissions data as commission records
+    // Use commissions data as commission records with order and customer info
     const referralCommissions = commissions?.map((commission: any) => ({
       id: commission.id,
-      referral_code: commission.order_id || 'N/A',
-      client_name: commission.metadata?.customer_name || 'Customer',
-      client_email: 'Protected', // Don't show customer emails in admin
+      order_id: commission.order_id,
+      order_number: commission.orders?.order_number || 'N/A',
+      referral_code: commission.referral_code || 'N/A',
+      client_email: commission.orders?.customer_email || 'Unknown',
+      customer_id: customerIdMap.get(commission.orders?.customer_email) || null,
+      order_amount: commission.order_amount,
+      order_status: commission.orders?.status || 'unknown',
       status: commission.status,
       commission_amount: commission.commission_amount, // Already in cents
       commission_paid: commission.status === 'paid',
       commission_rate: commission.commission_rate,
-      purchased_at: commission.created_at,
+      purchased_at: commission.orders?.created_at || commission.created_at,
       created_at: commission.created_at
     })) || [];
 

@@ -1382,14 +1382,46 @@ export default function PartnerDetailPage() {
                 <CardContent>
                   {commissionData?.referralCommissions && commissionData.referralCommissions.length > 0 ? (
                     <div className="space-y-3">
-                      {commissionData.referralCommissions.map((referral) => (
+                      {commissionData.referralCommissions.map((referral: any) => (
                         <div key={referral.id} className="border rounded-lg p-4">
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
-                              <h4 className="font-medium text-gray-900">{referral.client_name}</h4>
-                              <p className="text-sm text-gray-600">{referral.client_email}</p>
-                              <p className="text-xs text-gray-500">
-                                Code: {referral.referral_code} • {referral.commission_rate}% commission
+                              <div className="flex items-center gap-2 mb-1">
+                                {referral.customer_id ? (
+                                  <Link
+                                    href={`/admin/customers/${referral.customer_id}`}
+                                    className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                  >
+                                    {referral.client_email}
+                                  </Link>
+                                ) : (
+                                  <span className="font-medium text-gray-900">{referral.client_email}</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                {referral.order_id ? (
+                                  <Link
+                                    href={`/admin/orders/${referral.order_id}`}
+                                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                                  >
+                                    Order #{referral.order_number}
+                                  </Link>
+                                ) : (
+                                  <span>Order #{referral.order_number}</span>
+                                )}
+                                <span>•</span>
+                                <Badge className={
+                                  referral.order_status === 'completed' || referral.order_status === 'paid'
+                                    ? 'bg-green-100 text-green-800 text-xs'
+                                    : referral.order_status === 'pending'
+                                    ? 'bg-yellow-100 text-yellow-800 text-xs'
+                                    : 'bg-gray-100 text-gray-800 text-xs'
+                                }>
+                                  {referral.order_status}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Code: {referral.referral_code} • {referral.commission_rate}% commission • Order: {formatCurrency(referral.order_amount / 100)}
                               </p>
                             </div>
                             <div className="text-right">
@@ -1400,7 +1432,7 @@ export default function PartnerDetailPage() {
                                 {referral.commission_paid ? 'Paid' : 'Pending'}
                               </Badge>
                               <p className="text-xs text-gray-500 mt-1">
-                                {referral.purchased_at ? `Purchased ${formatDate(referral.purchased_at)}` : formatDate(referral.created_at)}
+                                {referral.purchased_at ? formatDate(referral.purchased_at) : formatDate(referral.created_at)}
                               </p>
                             </div>
                           </div>

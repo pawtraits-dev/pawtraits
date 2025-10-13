@@ -679,27 +679,44 @@ export default function CustomerDetailPage() {
               ) : orders.length > 0 ? (
                 <div className="space-y-4">
                   {orders.map((order) => (
-                    <div key={order.id} className="border rounded-lg p-4">
+                    <div key={order.id} className="border rounded-lg p-4 hover:bg-gray-50 transition">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-4">
                             <div>
-                              <h3 className="font-medium text-gray-900">Order #{order.id.slice(-8)}</h3>
+                              <Link
+                                href={`/admin/orders/${order.id}`}
+                                className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                              >
+                                Order #{order.order_number || order.id.slice(-8)}
+                              </Link>
                               <p className="text-sm text-gray-600">{formatDate(order.order_date)}</p>
+                              {order.payment_status && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Payment: {order.payment_status}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
-                        
+
                         <div className="flex items-center space-x-4">
                           <div className="text-right">
                             <p className="font-medium text-gray-900">{formatCurrency(order.total_amount)}</p>
                             <p className="text-sm text-gray-600">{order.items_count} items</p>
+                            {order.subtotal_amount && order.subtotal_amount !== order.total_amount && (
+                              <p className="text-xs text-green-600">
+                                Subtotal: {formatCurrency(order.subtotal_amount)}
+                              </p>
+                            )}
                           </div>
                           <Badge className={
-                            order.status === 'completed' 
+                            order.status === 'completed' || order.status === 'paid'
                               ? 'bg-green-100 text-green-800'
-                              : order.status === 'processing'
+                              : order.status === 'processing' || order.status === 'pending'
                               ? 'bg-blue-100 text-blue-800'
+                              : order.status === 'cancelled'
+                              ? 'bg-red-100 text-red-800'
                               : 'bg-yellow-100 text-yellow-800'
                           }>
                             {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
