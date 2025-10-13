@@ -125,22 +125,27 @@ export async function GET(request: NextRequest) {
       allCodes.push(primaryCode);
     }
 
-    // Get referral analytics using proven query pattern from /admin/partners
+    // Get referral analytics for partner dashboard (L1 direct referrals only)
 
     // 1. Get total scans - use partner's referral_scans_count (customer scans after activation)
     // This tracks scans of the partner's active referral code (either converted pre-reg or personal code)
     const totalScans = partner.referral_scans_count || 0;
 
-    // 2. Get signup data from customers table
-    const { data: referredCustomers } = await supabase
+    // 2. Get only direct L1 referrals where referral_type = 'PARTNER'
+    // Note: This is different from admin attribution which shows multi-level chains
+    const { data: referredCustomers, error: customersError } = await supabase
       .from('customers')
       .select('id, email')
       .eq('referral_type', 'PARTNER')
       .eq('referrer_id', userProfile.id);
 
+    if (customersError) {
+      console.error('Error fetching referred customers:', customersError);
+    }
+
     const totalSignups = referredCustomers ? referredCustomers.length : 0;
 
-    // 3. Get order data from referred customers
+    // 3. Get order data from L1 referred customers only
     let ordersCount = 0;
     let ordersValue = 0;
 
@@ -151,7 +156,8 @@ export async function GET(request: NextRequest) {
         const { data: orders } = await supabase
           .from('orders')
           .select('id, subtotal_amount')
-          .in('customer_email', emails);
+          .in('customer_email', emails)
+          .eq('payment_status', 'paid');
 
         ordersCount = orders ? orders.length : 0;
         ordersValue = orders ? orders.reduce((sum, order) => sum + (order.subtotal_amount || 0), 0) : 0;

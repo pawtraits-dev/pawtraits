@@ -791,6 +791,14 @@ async function handlePartnerCommission(
       subtotalAmount
     });
 
+    console.log('🔍 COMMISSION DEBUG - Customer referral data:', {
+      customerId: customer.id,
+      customerEmail: customer.email,
+      referralType: customer.referral_type,
+      referrerId: customer.referrer_id,
+      referralCodeUsed: customer.referral_code_used
+    });
+
     // Get partner information including commission rates directly from database
     const { data: partnerProfile, error: partnerError } = await supabase
       .from('user_profiles')
@@ -811,8 +819,21 @@ async function handlePartnerCommission(
       .eq('id', customer.referrer_id)
       .single();
 
+    console.log('🔍 COMMISSION DEBUG - Partner lookup result:', {
+      found: !!partnerProfile,
+      hasPartner: !!partnerProfile?.partner,
+      userProfileId: partnerProfile?.id,
+      partnerId: partnerProfile?.partner?.id,
+      partnerEmail: partnerProfile?.partner?.email || partnerProfile?.email
+    });
+
     if (partnerError || !partnerProfile?.partner) {
-      console.error('❌ Failed to get partner information:', partnerError);
+      console.error('❌ COMMISSION FAILED - Partner lookup failed:', {
+        error: partnerError?.message,
+        referrerId: customer.referrer_id,
+        hasProfile: !!partnerProfile,
+        hasPartnerData: !!partnerProfile?.partner
+      });
       return;
     }
 
@@ -873,14 +894,28 @@ async function handlePartnerCommission(
       .single();
 
     if (commissionError) {
-      console.error('❌ Failed to create partner commission:', commissionError);
+      console.error('❌ COMMISSION INSERT FAILED:', {
+        error: commissionError.message,
+        code: commissionError.code,
+        details: commissionError.details,
+        commissionData: {
+          recipient_id: commissionData.recipient_id,
+          recipient_type: commissionData.recipient_type,
+          order_id: commissionData.order_id,
+          commission_amount: commissionData.commission_amount,
+          recipient_email: commissionData.recipient_email
+        }
+      });
     } else {
-      console.log('✅ Partner commission created:', {
+      console.log('✅ Partner commission created successfully:', {
         commissionId: commission.id,
-        partnerId: partnerProfile.partner.id,
+        recipientId: partnerProfile.partner.id,
+        recipientEmail: partnerProfile.partner.email || partnerProfile.email,
         partnerName: partnerProfile.partner.business_name,
-        partnerEmail: partnerProfile.partner.email || partnerProfile.email,
-        commissionAmount: commissionAmount / 100,
+        amount: commissionAmount,
+        amountPounds: (commissionAmount / 100).toFixed(2),
+        orderAmount: subtotalAmount,
+        orderAmountPounds: (subtotalAmount / 100).toFixed(2),
         rateUsed: `${commissionRate}%`
       });
     }

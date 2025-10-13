@@ -690,6 +690,8 @@ CREATE TABLE public.orders (
   order_type character varying DEFAULT 'customer'::character varying CHECK (order_type::text = ANY (ARRAY['customer'::character varying, 'partner'::character varying, 'partner_for_client'::character varying]::text[])),
   shipping_address_line_1 character varying CHECK (shipping_address_line_1 IS NULL OR length(TRIM(BOTH FROM shipping_address_line_1)) > 0),
   shipping_address_line_2 character varying,
+  discount_amount integer DEFAULT 0,
+  referral_code text,
   CONSTRAINT orders_pkey PRIMARY KEY (id),
   CONSTRAINT orders_placed_by_partner_id_fkey FOREIGN KEY (placed_by_partner_id) REFERENCES public.partners(id)
 );
