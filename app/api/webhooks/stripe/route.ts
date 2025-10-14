@@ -931,47 +931,119 @@ async function handleCustomerCredit(
       subtotalAmount
     });
 
-    // Get referring customer email
+    console.log('🔍 CREDIT DEBUG - Customer referral data:', {
+      customerId: customer.id,
+      customerEmail: customer.email,
+      referralType: customer.referral_type,
+      referrerId: customer.referrer_id,
+      referralCodeUsed: customer.referral_code_used
+    });
+
+    // Get referring customer information directly (referrer_id is customers.id)
     const { data: referringCustomer, error: referringCustomerError } = await supabase
       .from('customers')
-      .select('email')
+      .select('id, email, first_name, last_name, current_credit_balance')
       .eq('id', customer.referrer_id)
       .single();
 
+    console.log('🔍 CREDIT DEBUG - Referring customer lookup result:', {
+      found: !!referringCustomer,
+      customerId: referringCustomer?.id,
+      customerEmail: referringCustomer?.email,
+      currentBalance: referringCustomer?.current_credit_balance
+    });
+
     if (referringCustomerError || !referringCustomer) {
-      console.error('❌ Failed to get referring customer email:', referringCustomerError);
+      console.error('❌ CREDIT FAILED - Referring customer lookup failed:', {
+        error: referringCustomerError?.message,
+        referrerId: customer.referrer_id,
+        hasCustomer: !!referringCustomer
+      });
       return;
     }
 
-    // Build base URL for API calls (webhook runs in production)
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_BASE_URL
-      || 'http://localhost:3000';
+    // Create customer credit directly in database using service role client
+    // Customer credits are always 10% of subtotal
+    const creditAmount = Math.round(subtotalAmount * 0.10);
 
-    // Use API endpoint for customer credit creation
-    const creditResponse = await fetch(`${baseUrl}/api/commissions/customer`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId: order.id,
-        orderAmount: subtotalAmount,
-        referredCustomer: customer, // The referred customer making the purchase
-        referringCustomerId: customer.referrer_id, // ID of the customer who made the referral
-        referringCustomerEmail: referringCustomer.email // Email of the referring customer
-      })
+    const creditData = {
+      order_id: order.id,
+      order_amount: subtotalAmount,
+      recipient_type: 'customer',
+      recipient_id: referringCustomer.id,
+      recipient_email: referringCustomer.email,
+      referrer_type: 'customer',
+      referrer_id: referringCustomer.id,
+      referral_code: customer.referral_code_used || null,
+      commission_type: 'customer_credit',
+      commission_rate: 10.00,
+      commission_amount: creditAmount,
+      status: 'approved', // Customer credits are auto-approved
+      metadata: {
+        customer_id: customer.id,
+        customer_email: customer.email,
+        referral_type: customer.referral_type,
+        referred_customer_email: customer.email,
+        created_via: 'webhook'
+      }
+    };
+
+    const { data: credit, error: creditError } = await supabase
+      .from('commissions')
+      .insert(creditData)
+      .select()
+      .single();
+
+    if (creditError) {
+      console.error('❌ CREDIT INSERT FAILED:', {
+        error: creditError.message,
+        code: creditError.code,
+        details: creditError.details,
+        creditData: {
+          recipient_id: creditData.recipient_id,
+          recipient_type: creditData.recipient_type,
+          order_id: creditData.order_id,
+          commission_amount: creditData.commission_amount,
+          recipient_email: creditData.recipient_email
+        }
+      });
+      return;
+    }
+
+    console.log('✅ Customer credit created successfully:', {
+      creditId: credit.id,
+      recipientId: referringCustomer.id,
+      recipientEmail: referringCustomer.email,
+      amount: creditAmount,
+      amountPounds: (creditAmount / 100).toFixed(2),
+      orderAmount: subtotalAmount,
+      orderAmountPounds: (subtotalAmount / 100).toFixed(2)
     });
 
-    if (creditResponse.ok) {
-      const credit = await creditResponse.json();
-      console.log('✅ Customer credit created using API:', {
-        creditId: credit.id,
-        referrerId: customer.referrer_id,
-        referrerEmail: referringCustomer.email,
-        creditAmount: credit.commission_amount / 100
+    // Update referring customer's credit balance
+    const newBalance = (referringCustomer.current_credit_balance || 0) + creditAmount;
+
+    const { error: updateError } = await supabase
+      .from('customers')
+      .update({ current_credit_balance: newBalance })
+      .eq('id', referringCustomer.id);
+
+    if (updateError) {
+      console.error('❌ Failed to update customer credit balance:', {
+        error: updateError.message,
+        customerId: referringCustomer.id,
+        creditAmount,
+        newBalance
       });
     } else {
-      console.error('❌ Failed to create customer credit via API:', await creditResponse.text());
+      console.log('✅ Updated customer credit balance:', {
+        customerId: referringCustomer.id,
+        customerEmail: referringCustomer.email,
+        previousBalance: referringCustomer.current_credit_balance || 0,
+        creditAdded: creditAmount,
+        newBalance,
+        newBalancePounds: (newBalance / 100).toFixed(2)
+      });
     }
 
   } catch (error) {
