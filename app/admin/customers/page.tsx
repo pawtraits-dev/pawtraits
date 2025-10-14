@@ -6,17 +6,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { 
-  Search, 
-  Filter, 
-  Eye, 
-  Mail, 
-  Phone, 
+import {
+  Search,
+  Filter,
+  Eye,
+  Mail,
+  Phone,
   MoreHorizontal,
   Users,
   UserCheck,
   Heart,
-  ShoppingCart
+  ShoppingCart,
+  Gift,
+  DollarSign,
+  TrendingUp
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -33,9 +36,12 @@ export default function AdminCustomersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [verifiedFilter, setVerifiedFilter] = useState('all');
+  const [creditsSummary, setCreditsSummary] = useState<any>(null);
+  const [creditsLoading, setCreditsLoading] = useState(true);
 
   useEffect(() => {
     loadCustomers();
+    loadCreditsSummary();
   }, []);
 
   useEffect(() => {
@@ -54,6 +60,21 @@ export default function AdminCustomersPage() {
       console.error('Error loading customers:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCreditsSummary = async () => {
+    try {
+      setCreditsLoading(true);
+      const response = await fetch('/api/admin/customers/credits-summary');
+      if (response.ok) {
+        const data = await response.json();
+        setCreditsSummary(data);
+      }
+    } catch (error) {
+      console.error('Error loading credits summary:', error);
+    } finally {
+      setCreditsLoading(false);
     }
   };
 
@@ -202,6 +223,102 @@ export default function AdminCustomersPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Credit Liability Overview */}
+      {!creditsLoading && creditsSummary && (
+        <Card className="border-l-4 border-l-blue-500">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Gift className="w-5 h-5 mr-2 text-blue-600" />
+              Credit Liability Overview
+            </CardTitle>
+            <CardDescription>
+              Outstanding customer credit balances and lifetime statistics
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {/* Outstanding Liability */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-600">Outstanding Liability</p>
+                  <DollarSign className="w-4 h-4 text-red-600" />
+                </div>
+                <p className="text-2xl font-bold text-red-600">
+                  £{creditsSummary.aggregate_summary.total_outstanding_credits_pounds.toFixed(2)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {creditsSummary.aggregate_summary.number_of_customers_with_credits} customers
+                </p>
+              </div>
+
+              {/* Pending Future Liability */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-600">Pending Credits</p>
+                  <TrendingUp className="w-4 h-4 text-orange-600" />
+                </div>
+                <p className="text-2xl font-bold text-orange-600">
+                  £{creditsSummary.aggregate_summary.pending_credits_pounds.toFixed(2)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Awaiting approval
+                </p>
+              </div>
+
+              {/* Lifetime Issued */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-600">Lifetime Issued</p>
+                  <Gift className="w-4 h-4 text-green-600" />
+                </div>
+                <p className="text-2xl font-bold text-green-600">
+                  £{creditsSummary.aggregate_summary.total_credits_earned_lifetime_pounds.toFixed(2)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {creditsSummary.aggregate_summary.total_credit_records} total credits
+                </p>
+              </div>
+
+              {/* Redemption Rate */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-600">Redemption Rate</p>
+                  <ShoppingCart className="w-4 h-4 text-purple-600" />
+                </div>
+                <p className="text-2xl font-bold text-purple-600">
+                  {creditsSummary.liability_breakdown.redemption_rate_percent}%
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  £{creditsSummary.aggregate_summary.total_redeemed_lifetime_pounds.toFixed(2)} redeemed
+                </p>
+              </div>
+            </div>
+
+            {/* Top Customers with Credits */}
+            {creditsSummary.top_customers_by_balance && creditsSummary.top_customers_by_balance.length > 0 && (
+              <div className="mt-6 pt-6 border-t">
+                <h4 className="text-sm font-medium text-gray-700 mb-4">Top Customers by Credit Balance</h4>
+                <div className="space-y-2">
+                  {creditsSummary.top_customers_by_balance.slice(0, 5).map((customer: any) => (
+                    <div key={customer.id} className="flex items-center justify-between text-sm">
+                      <Link
+                        href={`/admin/customers/${customer.id}`}
+                        className="text-blue-600 hover:text-blue-800 hover:underline flex-1"
+                      >
+                        {customer.email}
+                      </Link>
+                      <span className="font-medium text-green-600">
+                        £{customer.credit_balance_pounds.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>

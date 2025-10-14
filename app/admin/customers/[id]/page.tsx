@@ -27,7 +27,9 @@ import {
   LogIn,
   Share2,
   Eye,
-  CreditCard
+  CreditCard,
+  Gift,
+  DollarSign
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { Customer, Pet, PetWithDetails } from '@/lib/types';
@@ -71,6 +73,8 @@ export default function CustomerDetailPage() {
     customers: Array<any>;
   } | null>(null);
   const [attributionLoading, setAttributionLoading] = useState(true);
+  const [creditsData, setCreditsData] = useState<any>(null);
+  const [creditsLoading, setCreditsLoading] = useState(true);
 
   useEffect(() => {
     if (params.id) {
@@ -79,6 +83,7 @@ export default function CustomerDetailPage() {
       loadCustomerOrders();
       loadCustomerActivity();
       loadAttributionData();
+      loadCreditsData();
     }
   }, [params.id]);
 
@@ -242,6 +247,26 @@ export default function CustomerDetailPage() {
       console.error('Error loading attribution data:', error);
     } finally {
       setAttributionLoading(false);
+    }
+  };
+
+  const loadCreditsData = async () => {
+    try {
+      console.log('Loading credits data for customer:', params.id);
+      const response = await fetch(`/api/admin/customers/${params.id}/credits`);
+      console.log('Credits API response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Credits data received:', data);
+        setCreditsData(data);
+      } else {
+        console.error('Credits API error:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Error loading credits data:', error);
+    } finally {
+      setCreditsLoading(false);
     }
   };
 
@@ -468,6 +493,7 @@ export default function CustomerDetailPage() {
           <TabsTrigger value="orders">Orders ({totalOrders})</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
           <TabsTrigger value="attribution">Attribution ({attributionData?.total_attributed_customers || 0})</TabsTrigger>
+          <TabsTrigger value="credits">Credits & Rewards</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -968,6 +994,209 @@ export default function CustomerDetailPage() {
                 <p className="text-sm text-gray-500 mt-2">
                   This customer has not referred anyone yet
                 </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Credits & Rewards Tab */}
+        <TabsContent value="credits" className="space-y-6">
+          {creditsLoading ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <div className="animate-spin w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading credits data...</p>
+              </CardContent>
+            </Card>
+          ) : creditsData ? (
+            <div className="space-y-6">
+              {/* Credit Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Current Balance</p>
+                        <p className="text-2xl font-bold text-blue-600">£{creditsData.summary.current_balance_pounds.toFixed(2)}</p>
+                      </div>
+                      <div className="p-3 bg-blue-100 rounded-lg">
+                        <DollarSign className="w-6 h-6 text-blue-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Total Earned</p>
+                        <p className="text-2xl font-bold text-green-600">£{creditsData.summary.total_earned_pounds.toFixed(2)}</p>
+                      </div>
+                      <div className="p-3 bg-green-100 rounded-lg">
+                        <Gift className="w-6 h-6 text-green-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Pending Credits</p>
+                        <p className="text-2xl font-bold text-orange-600">£{creditsData.summary.pending_credits_pounds.toFixed(2)}</p>
+                      </div>
+                      <div className="p-3 bg-orange-100 rounded-lg">
+                        <Clock className="w-6 h-6 text-orange-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Total Redeemed</p>
+                        <p className="text-2xl font-bold text-purple-600">£{creditsData.summary.total_redeemed_pounds.toFixed(2)}</p>
+                      </div>
+                      <div className="p-3 bg-purple-100 rounded-lg">
+                        <ShoppingCart className="w-6 h-6 text-purple-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Earned Credits Table */}
+              {creditsData.earned_credits && creditsData.earned_credits.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Earned Credits</CardTitle>
+                    <CardDescription>
+                      Credits earned from customer referrals (10% of referred customer orders)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-3 font-medium text-gray-700">Date Earned</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Order</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Referred Customer</th>
+                            <th className="text-right p-3 font-medium text-gray-700">Order Amount</th>
+                            <th className="text-right p-3 font-medium text-gray-700">Credit Earned</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {creditsData.earned_credits.map((credit: any) => (
+                            <tr key={credit.id} className="border-b hover:bg-gray-50">
+                              <td className="p-3 text-sm">
+                                {new Date(credit.earned_date).toLocaleDateString()}
+                              </td>
+                              <td className="p-3 text-sm">
+                                <Link
+                                  href={`/admin/financial/orders/${credit.order_id}`}
+                                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                                >
+                                  {credit.order_number}
+                                </Link>
+                              </td>
+                              <td className="p-3 text-sm">{credit.referred_customer_email}</td>
+                              <td className="p-3 text-sm text-right">£{credit.order_amount_pounds.toFixed(2)}</td>
+                              <td className="p-3 text-sm text-right font-medium text-green-600">
+                                £{credit.credit_amount_pounds.toFixed(2)}
+                              </td>
+                              <td className="p-3">
+                                <Badge variant={
+                                  credit.status === 'approved' || credit.status === 'paid' ? 'default' :
+                                  credit.status === 'pending' ? 'secondary' : 'outline'
+                                }>
+                                  {credit.status}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Redemption History Table */}
+              {creditsData.redemptions && creditsData.redemptions.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Redemption History</CardTitle>
+                    <CardDescription>
+                      Credits redeemed on orders
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-3 font-medium text-gray-700">Date Redeemed</th>
+                            <th className="text-left p-3 font-medium text-gray-700">Order</th>
+                            <th className="text-right p-3 font-medium text-gray-700">Order Total</th>
+                            <th className="text-right p-3 font-medium text-gray-700">Credits Used</th>
+                            <th className="text-right p-3 font-medium text-gray-700">Amount Paid</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {creditsData.redemptions.map((redemption: any) => (
+                            <tr key={redemption.id} className="border-b hover:bg-gray-50">
+                              <td className="p-3 text-sm">
+                                {new Date(redemption.redeemed_date).toLocaleDateString()}
+                              </td>
+                              <td className="p-3 text-sm">
+                                <Link
+                                  href={`/admin/financial/orders/${redemption.id}`}
+                                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                                >
+                                  {redemption.order_number}
+                                </Link>
+                              </td>
+                              <td className="p-3 text-sm text-right">£{redemption.order_total_pounds.toFixed(2)}</td>
+                              <td className="p-3 text-sm text-right font-medium text-orange-600">
+                                -£{redemption.credit_used_pounds.toFixed(2)}
+                              </td>
+                              <td className="p-3 text-sm text-right font-medium text-green-600">
+                                £{redemption.amount_paid_pounds.toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* No Activity State */}
+              {(!creditsData.earned_credits || creditsData.earned_credits.length === 0) &&
+               (!creditsData.redemptions || creditsData.redemptions.length === 0) && (
+                <Card>
+                  <CardContent className="p-12 text-center">
+                    <Gift className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-600">No credit activity yet</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Credits will appear here when this customer refers friends who make purchases
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <Gift className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-600">Unable to load credits data</p>
               </CardContent>
             </Card>
           )}

@@ -95,45 +95,74 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get customer_referrals records for reward tracking
-    const { data: customerReferrals, error: referralsError } = await supabase
-      .from('customer_referrals')
+    // Get customer credits from commissions table (correct source)
+    console.log('📊 Fetching customer credits from commissions table for customer:', customerId);
+
+    const { data: customerCredits, error: creditsError } = await supabase
+      .from('commissions')
       .select(`
         id,
-        customer_id,
-        referrer_customer_id,
-        referral_code,
+        order_id,
+        order_amount,
+        commission_amount,
+        commission_rate,
         status,
-        commission_earned,
-        created_at
+        created_at,
+        metadata,
+        orders!inner(
+          id,
+          order_number,
+          customer_email,
+          created_at
+        )
       `)
-      .eq('referrer_customer_id', customerId)
+      .eq('recipient_type', 'customer')
+      .eq('recipient_id', customerId)
+      .eq('commission_type', 'customer_credit')
       .order('created_at', { ascending: false });
 
-    if (referralsError) {
-      console.warn('Error fetching customer_referrals:', referralsError);
+    if (creditsError) {
+      console.error('❌ Error fetching customer credits from commissions:', creditsError);
     }
 
-    // Calculate reward totals from customer_referrals
-    const totalRewardsEarned = customerReferrals
-      ? customerReferrals.reduce((sum, ref) => sum + (ref.commission_earned || 0), 0)
-      : 0;
+    console.log('✅ Found', customerCredits?.length || 0, 'credit records in commissions table');
 
-    const pendingRewards = customerReferrals
-      ? customerReferrals
-          .filter(ref => ref.status === 'pending')
-          .reduce((sum, ref) => sum + (ref.commission_earned || 0), 0)
+    // Calculate reward totals from commissions table (amounts in pence)
+    const totalRewardsEarnedPence = customerCredits
+      ? customerCredits.reduce((sum, credit) => sum + (credit.commission_amount || 0), 0)
       : 0;
+    const totalRewardsEarned = totalRewardsEarnedPence / 100; // Convert to pounds
 
-    // Get customer's credit balance (rewards earned minus redeemed)
+    const pendingRewardsPence = customerCredits
+      ? customerCredits
+          .filter(credit => credit.status === 'pending')
+          .reduce((sum, credit) => sum + (credit.commission_amount || 0), 0)
+      : 0;
+    const pendingRewards = pendingRewardsPence / 100; // Convert to pounds
+
+    console.log('💰 Credit totals:', {
+      totalEarnedPence: totalRewardsEarnedPence,
+      totalEarnedPounds: totalRewardsEarned.toFixed(2),
+      pendingPence: pendingRewardsPence,
+      pendingPounds: pendingRewards.toFixed(2)
+    });
+
+    // Get customer's current credit balance (correct column name)
     const { data: creditBalance } = await supabase
       .from('customers')
-      .select('credit_balance')
+      .select('current_credit_balance')
       .eq('id', customerId)
       .single();
 
-    const availableBalance = creditBalance?.credit_balance || 0;
-    const totalRedeemed = totalRewardsEarned - availableBalance - pendingRewards;
+    const availableBalancePence = creditBalance?.current_credit_balance || 0;
+    const availableBalance = availableBalancePence / 100; // Convert to pounds
+
+    console.log('💳 Current credit balance:', {
+      balancePence: availableBalancePence,
+      balancePounds: availableBalance.toFixed(2)
+    });
+
+    const totalRedeemed = Math.max(0, totalRewardsEarned - availableBalance - pendingRewards);
 
     // Build recent activity from referredCustomers and their orders
     const recentActivity = [];
@@ -178,8 +207,10 @@ export async function GET(request: NextRequest) {
     // Sort by date descending
     recentActivity.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    // Build rewards array for detailed tracking
+    // Build rewards array from commissions table
     const rewards = [];
+
+    console.log('🎁 Building rewards array from', customerCredits?.length || 0, 'commission records');
 
     // First, add the customer's own referral discount if they signed up with a code
     if (customer.referral_type && customer.referral_type !== 'ORGANIC') {
@@ -215,38 +246,30 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Then add rewards from referring friends
-    if (referredCustomers) {
-      for (const refCustomer of referredCustomers) {
-        // No signup reward - customers only get rewards when referred friends make purchases
+    // Add rewards from commissions table (credits earned from referring friends)
+    if (customerCredits && customerCredits.length > 0) {
+      for (const credit of customerCredits) {
+        // Get referred customer email from metadata
+        const referredCustomerEmail = credit.metadata?.referred_customer_email;
+        const referredCustomerId = credit.metadata?.referred_customer_id;
 
-        // Purchase reward (if they purchased) - 10% of order subtotal
-        const { data: customerOrders } = await supabase
-          .from('orders')
-          .select('id, created_at, subtotal_amount')
-          .eq('customer_email', refCustomer.email)
-          .order('created_at', { ascending: true })
-          .limit(1);
-
-        if (customerOrders && customerOrders.length > 0) {
-          // Calculate 10% reward from subtotal (excluding tax and shipping)
-          const orderSubtotal = customerOrders[0].subtotal_amount || 0;
-          const rewardAmount = (orderSubtotal * 0.1) / 100; // Convert pence to pounds with 10%
-
-          rewards.push({
-            id: `reward-purchase-${refCustomer.id}`,
-            customer_id: customerId,
-            friend_customer_id: refCustomer.id,
-            order_id: customerOrders[0].id,
-            reward_amount: rewardAmount,
-            reward_type: 'purchase' as const,
-            status: 'earned' as const,
-            created_at: customerOrders[0].created_at,
-            redeemed_at: null
-          });
-        }
+        rewards.push({
+          id: credit.id,
+          customer_id: customerId,
+          friend_customer_id: referredCustomerId || null,
+          order_id: credit.order_id,
+          reward_amount: credit.commission_amount / 100, // Convert pence to pounds
+          reward_type: 'purchase' as const,
+          status: credit.status === 'approved' ? 'earned' as const :
+                  credit.status === 'paid' ? 'earned' as const :
+                  credit.status === 'pending' ? 'pending' as const : 'pending' as const,
+          created_at: credit.created_at,
+          redeemed_at: null // Redemptions tracked separately
+        });
       }
     }
+
+    console.log('✅ Built rewards array with', rewards.length, 'total rewards');
 
     const response = {
       user_type: 'customer',
