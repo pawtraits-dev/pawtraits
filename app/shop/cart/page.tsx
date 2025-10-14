@@ -249,24 +249,17 @@ function ShoppingCartPageContent() {
                   <span className="font-medium">£{subtotal.toFixed(2)}</span>
                 </div>
                 
-                {/* Referral Discount Section */}
-                {referralCode && (
+                {/* Referral Discount Section - Only show if discount is eligible */}
+                {referralCode && referralValidation?.valid && referralValidation?.discount?.eligible && (
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm text-purple-600">
                       <span>Referral Code Applied</span>
                       <span className="font-medium">{referralCode}</span>
                     </div>
-                    {referralValidation?.valid && referralValidation?.discount?.eligible && (
-                      <div className="flex justify-between text-green-600">
-                        <span>Referral Discount (10%)</span>
-                        <span className="font-medium">-£{discount.toFixed(2)}</span>
-                      </div>
-                    )}
-                    {referralValidation?.valid && !referralValidation?.discount?.eligible && (
-                      <div className="text-xs text-gray-500">
-                        {referralValidation.discount.description}
-                      </div>
-                    )}
+                    <div className="flex justify-between text-green-600">
+                      <span>Referral Discount (10%)</span>
+                      <span className="font-medium">-£{discount.toFixed(2)}</span>
+                    </div>
                   </div>
                 )}
                 
