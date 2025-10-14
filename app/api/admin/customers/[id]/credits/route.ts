@@ -19,53 +19,71 @@ export async function GET(
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    // Get customer basic info
-    const { data: customer, error: customerError } = await supabase
-      .from('customers')
-      .select('id, email, first_name, last_name, current_credit_balance, created_at')
+    // Get user profile first (admin pages use user_profiles.id)
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('id, email, first_name, last_name, created_at')
       .eq('id', id)
+      .eq('user_type', 'customer')
       .single();
 
-    if (customerError || !customer) {
-      console.error('❌ Error fetching customer:', customerError);
+    if (profileError || !userProfile) {
+      console.error('❌ Error fetching user profile:', profileError);
       return NextResponse.json(
         { error: 'Customer not found' },
         { status: 404 }
       );
     }
 
-    // Get all credits earned (from commissions table)
-    const { data: earnedCredits, error: creditsError } = await supabase
-      .from('commissions')
-      .select(`
-        id,
-        order_id,
-        order_amount,
-        commission_amount,
-        commission_rate,
-        status,
-        created_at,
-        metadata,
-        orders!inner (
-          id,
-          order_number,
-          customer_email,
-          subtotal_amount,
-          total_amount,
-          created_at
-        )
-      `)
-      .eq('recipient_type', 'customer')
-      .eq('recipient_id', id)
-      .eq('commission_type', 'customer_credit')
-      .order('created_at', { ascending: false });
+    // Get corresponding customer record (for credit balance)
+    const { data: customer, error: customerError } = await supabase
+      .from('customers')
+      .select('id, current_credit_balance')
+      .eq('email', userProfile.email)
+      .maybeSingle();
 
-    if (creditsError) {
-      console.error('❌ Error fetching earned credits:', creditsError);
-      return NextResponse.json(
-        { error: 'Failed to fetch credits' },
-        { status: 500 }
-      );
+    if (customerError) {
+      console.error('❌ Error fetching customer record:', customerError);
+    }
+
+    const customerId = customer?.id;
+    const currentCreditBalance = customer?.current_credit_balance || 0;
+
+    console.log('📊 Found user profile:', userProfile.email, 'customer ID:', customerId);
+
+    // Get all credits earned (from commissions table) - only if customer record exists
+    let earnedCredits = null;
+    if (customerId) {
+      const { data, error: creditsError } = await supabase
+        .from('commissions')
+        .select(`
+          id,
+          order_id,
+          order_amount,
+          commission_amount,
+          commission_rate,
+          status,
+          created_at,
+          metadata,
+          orders!inner (
+            id,
+            order_number,
+            customer_email,
+            subtotal_amount,
+            total_amount,
+            created_at
+          )
+        `)
+        .eq('recipient_type', 'customer')
+        .eq('recipient_id', customerId)
+        .eq('commission_type', 'customer_credit')
+        .order('created_at', { ascending: false });
+
+      if (creditsError) {
+        console.error('❌ Error fetching earned credits:', creditsError);
+      } else {
+        earnedCredits = data;
+      }
     }
 
     console.log('💰 Found', earnedCredits?.length || 0, 'earned credit records');
@@ -74,7 +92,7 @@ export async function GET(
     const { data: redemptions, error: redemptionsError } = await supabase
       .from('orders')
       .select('id, order_number, created_at, subtotal_amount, total_amount, credit_applied')
-      .eq('customer_email', customer.email)
+      .eq('customer_email', userProfile.email)
       .gt('credit_applied', 0)
       .order('created_at', { ascending: false });
 
@@ -96,8 +114,7 @@ export async function GET(
       .reduce((sum, credit) => sum + (credit.commission_amount || 0), 0) || 0;
     const approvedCredits = approvedCreditsPence / 100;
 
-    const currentBalancePence = customer.current_credit_balance || 0;
-    const currentBalance = currentBalancePence / 100;
+    const currentBalance = currentCreditBalance / 100;
 
     const totalRedeemedPence = redemptions?.reduce((sum, order) => sum + (order.credit_applied || 0), 0) || 0;
     const totalRedeemed = totalRedeemedPence / 100;
@@ -128,10 +145,10 @@ export async function GET(
 
     const response = {
       customer: {
-        id: customer.id,
-        email: customer.email,
-        name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || customer.email,
-        created_at: customer.created_at
+        id: customerId || id,
+        email: userProfile.email,
+        name: `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || userProfile.email,
+        created_at: userProfile.created_at
       },
       summary: {
         current_balance_pounds: currentBalance,
