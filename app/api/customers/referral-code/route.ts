@@ -26,10 +26,10 @@ export async function GET(request: NextRequest) {
     const normalizedEmail = customerEmail.toLowerCase().trim();
     console.log('[CUSTOMER REFERRAL CODE] Querying with normalized email:', normalizedEmail);
 
-    // Fetch customer's personal referral code for sharing (not the code they used to sign up)
+    // Fetch customer's referral codes (both personal and the one they used)
     const { data: customer, error } = await supabase
       .from('customers')
-      .select('id, email, personal_referral_code, qr_code_url, referral_code_used, referral_type, personal_qr_code_url')
+      .select('id, email, personal_referral_code, referral_code_used, referral_type')
       .eq('email', normalizedEmail)
       .single();
 
@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
         id: customer.id,
         email: customer.email,
         personal_referral_code: customer.personal_referral_code,
-        qr_code_url: customer.qr_code_url,
-        personal_qr_code_url: customer.personal_qr_code_url
+        referral_code_used: customer.referral_code_used,
+        referral_type: customer.referral_type
       } : null
     });
 
@@ -53,33 +53,19 @@ export async function GET(request: NextRequest) {
         errorDetails: error
       });
       return NextResponse.json({
-        code: null,
-        share_url: null,
-        qr_code_url: null
+        referral_code_used: null,
+        referral_type: null
       });
     }
 
-    // Use personal_qr_code_url if available, fallback to qr_code_url
-    const qrCodeUrl = customer.personal_qr_code_url || customer.qr_code_url;
-
-    // Build the share URL for the customer's personal referral code
-    const shareUrl = customer.personal_referral_code
-      ? `/c/${customer.personal_referral_code}`
-      : null;
-
-    console.log('[CUSTOMER REFERRAL CODE] Retrieved personal referral code:', {
+    console.log('[CUSTOMER REFERRAL CODE] Retrieved referral codes:', {
       email: normalizedEmail,
       customerId: customer.id,
-      personalReferralCode: customer.personal_referral_code,
-      qrCodeUrl: qrCodeUrl,
-      shareUrl: shareUrl
+      referralCodeUsed: customer.referral_code_used,
+      referralType: customer.referral_type
     });
 
     return NextResponse.json({
-      code: customer.personal_referral_code,
-      share_url: shareUrl,
-      qr_code_url: qrCodeUrl,
-      // Also include referral_code_used for checkout fallback use case
       referral_code_used: customer.referral_code_used,
       referral_type: customer.referral_type
     });

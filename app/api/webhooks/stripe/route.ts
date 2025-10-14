@@ -746,8 +746,14 @@ async function handleCustomerCreditFromMetadata(
       referral_type: 'customer'
     };
 
+    // Build base URL for API calls (webhook runs in production)
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_BASE_URL
+      || 'http://localhost:3000';
+
     // Use API endpoint for customer credit creation
-    const creditResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/commissions/customer`, {
+    const creditResponse = await fetch(`${baseUrl}/api/commissions/customer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -937,8 +943,14 @@ async function handleCustomerCredit(
       return;
     }
 
+    // Build base URL for API calls (webhook runs in production)
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_BASE_URL
+      || 'http://localhost:3000';
+
     // Use API endpoint for customer credit creation
-    const creditResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/commissions/customer`, {
+    const creditResponse = await fetch(`${baseUrl}/api/commissions/customer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
