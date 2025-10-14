@@ -1099,7 +1099,7 @@ export default function CustomerDetailPage() {
                               </td>
                               <td className="p-3 text-sm">
                                 <Link
-                                  href={`/admin/financial/orders/${credit.order_id}`}
+                                  href={`/admin/orders/${credit.order_id}`}
                                   className="text-blue-600 hover:text-blue-800 hover:underline"
                                 >
                                   {credit.order_number}
@@ -1156,7 +1156,7 @@ export default function CustomerDetailPage() {
                               </td>
                               <td className="p-3 text-sm">
                                 <Link
-                                  href={`/admin/financial/orders/${redemption.id}`}
+                                  href={`/admin/orders/${redemption.id}`}
                                   className="text-blue-600 hover:text-blue-800 hover:underline"
                                 >
                                   {redemption.order_number}

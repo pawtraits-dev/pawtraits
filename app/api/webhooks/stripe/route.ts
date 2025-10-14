@@ -109,9 +109,10 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       return;
     }
 
-    // Extract shipping cost and referral discount from metadata
+    // Extract shipping cost, referral discount, and credit redemption from metadata
     const shippingCost = parseInt(metadata.shippingCost || '0');
     const referralDiscount = parseInt(metadata.referralDiscount || '0');
+    const creditApplied = parseInt(metadata.rewardRedemption || '0');
 
     // Calculate pre-discount subtotal for accurate reward calculations
     // paymentIntent.amount is AFTER discount, so we add the discount back
@@ -164,6 +165,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       subtotal_amount: subtotalAmount, // Store post-discount amount (what customer actually paid for items)
       discount_amount: referralDiscount,
       referral_code: referralDiscount > 0 && metadata.referralCode ? metadata.referralCode : null, // Track referral code used
+      credit_applied: creditApplied, // Track customer credit redemption
       shipping_amount: shippingCost,
       total_amount: paymentIntent.amount,
       currency: paymentIntent.currency.toUpperCase(),
@@ -205,6 +207,11 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       status: order.status,
       user_type: orderingUserProfile?.user_type || 'customer'
     });
+
+    // Handle credit redemption if customer used credits
+    if (creditApplied > 0) {
+      await handleCreditRedemption(supabase, order, customerEmail, creditApplied);
+    }
 
     // Handle commissions and credits based on simplified logic
     // Pass pre-discount subtotal for commission calculations (partners earn on pre-discount amount)
@@ -1048,6 +1055,165 @@ async function handleCustomerCredit(
 
   } catch (error) {
     console.error('💥 Error handling customer credit:', error);
+  }
+}
+
+// Handle credit redemption when customer uses credits on an order
+async function handleCreditRedemption(
+  supabase: any,
+  order: any,
+  customerEmail: string,
+  creditAmount: number
+) {
+  try {
+    console.log('💳 Processing credit redemption:', {
+      orderId: order.id,
+      orderNumber: order.order_number,
+      customerEmail,
+      creditAmount,
+      creditAmountPounds: (creditAmount / 100).toFixed(2)
+    });
+
+    // Get customer record
+    const { data: customer, error: customerError } = await supabase
+      .from('customers')
+      .select('id, email, current_credit_balance')
+      .eq('email', customerEmail.toLowerCase().trim())
+      .single();
+
+    if (customerError || !customer) {
+      console.error('❌ Failed to find customer for credit redemption:', {
+        email: customerEmail,
+        error: customerError?.message
+      });
+      return;
+    }
+
+    console.log('📊 Customer credit status before redemption:', {
+      customerId: customer.id,
+      currentBalance: customer.current_credit_balance,
+      currentBalancePounds: (customer.current_credit_balance / 100).toFixed(2),
+      redemptionAmount: creditAmount,
+      redemptionAmountPounds: (creditAmount / 100).toFixed(2)
+    });
+
+    // Deduct credit from customer balance
+    const newBalance = (customer.current_credit_balance || 0) - creditAmount;
+
+    if (newBalance < 0) {
+      console.warn('⚠️  Credit redemption would result in negative balance:', {
+        currentBalance: customer.current_credit_balance,
+        creditAmount,
+        newBalance
+      });
+      // Still proceed but log the warning
+    }
+
+    const { error: updateError } = await supabase
+      .from('customers')
+      .update({ current_credit_balance: newBalance })
+      .eq('id', customer.id);
+
+    if (updateError) {
+      console.error('❌ Failed to deduct credit from customer balance:', {
+        error: updateError.message,
+        customerId: customer.id,
+        creditAmount,
+        newBalance
+      });
+      return;
+    }
+
+    console.log('✅ Deducted credit from customer balance:', {
+      customerId: customer.id,
+      customerEmail: customer.email,
+      previousBalance: customer.current_credit_balance,
+      previousBalancePounds: (customer.current_credit_balance / 100).toFixed(2),
+      creditRedeemed: creditAmount,
+      creditRedeemedPounds: (creditAmount / 100).toFixed(2),
+      newBalance,
+      newBalancePounds: (newBalance / 100).toFixed(2)
+    });
+
+    // Find approved/paid customer credit commissions to mark as redeemed
+    // We'll mark them proportionally based on oldest first (FIFO)
+    const { data: commissions, error: commissionsError } = await supabase
+      .from('commissions')
+      .select('id, commission_amount, status, created_at')
+      .eq('recipient_id', customer.id)
+      .eq('recipient_type', 'customer')
+      .eq('commission_type', 'customer_credit')
+      .in('status', ['approved', 'paid'])
+      .order('created_at', { ascending: true }); // Oldest first (FIFO)
+
+    if (commissionsError) {
+      console.error('❌ Failed to fetch commissions for redemption:', commissionsError);
+      return;
+    }
+
+    if (!commissions || commissions.length === 0) {
+      console.warn('⚠️  No approved/paid credits found to mark as redeemed for customer:', customer.id);
+      return;
+    }
+
+    console.log('📋 Found credits to mark as redeemed:', {
+      count: commissions.length,
+      totalAvailable: commissions.reduce((sum, c) => sum + c.commission_amount, 0),
+      creditToRedeem: creditAmount
+    });
+
+    // Mark commissions as redeemed (FIFO - oldest first)
+    let remainingToRedeem = creditAmount;
+    const commissionsToUpdate: string[] = [];
+
+    for (const commission of commissions) {
+      if (remainingToRedeem <= 0) break;
+
+      commissionsToUpdate.push(commission.id);
+      remainingToRedeem -= commission.commission_amount;
+
+      console.log('🔄 Marking commission as redeemed:', {
+        commissionId: commission.id,
+        commissionAmount: commission.commission_amount,
+        commissionAmountPounds: (commission.commission_amount / 100).toFixed(2),
+        remainingToRedeem: Math.max(0, remainingToRedeem)
+      });
+    }
+
+    // Update commission statuses to 'redeemed'
+    if (commissionsToUpdate.length > 0) {
+      const { error: commissionUpdateError } = await supabase
+        .from('commissions')
+        .update({
+          status: 'redeemed',
+          metadata: supabase.raw(`
+            COALESCE(metadata, '{}'::jsonb) ||
+            jsonb_build_object(
+              'redeemed_on_order_id', '${order.id}',
+              'redeemed_on_order_number', '${order.order_number}',
+              'redeemed_date', '${new Date().toISOString()}'
+            )
+          `)
+        })
+        .in('id', commissionsToUpdate);
+
+      if (commissionUpdateError) {
+        console.error('❌ Failed to update commission statuses:', {
+          error: commissionUpdateError.message,
+          commissionIds: commissionsToUpdate
+        });
+      } else {
+        console.log('✅ Marked commissions as redeemed:', {
+          count: commissionsToUpdate.length,
+          commissionIds: commissionsToUpdate,
+          orderId: order.id,
+          orderNumber: order.order_number
+        });
+      }
+    }
+
+  } catch (error) {
+    console.error('💥 Error handling credit redemption:', error);
   }
 }
 
