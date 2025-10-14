@@ -62,12 +62,10 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ API: Customer credit created:', credit.id, `£${creditAmount/100}`);
 
-    // Update the referring customer's credit_balance
-    const creditAmountPounds = creditAmount / 100;
-
-    const { data: referringCustomer, error: balanceError } = await supabase
+    // Update the referring customer's current_credit_balance (stored in pence)
+    const { data: referringCustomer, error: balanceError} = await supabase
       .from('customers')
-      .select('id, credit_balance, email')
+      .select('id, current_credit_balance, email')
       .eq('id', referringCustomerId)
       .single();
 
@@ -80,27 +78,31 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const newBalance = (referringCustomer.credit_balance || 0) + creditAmountPounds;
+    // Add credit amount in pence to existing balance (both are integers in pence)
+    const newBalance = (referringCustomer.current_credit_balance || 0) + creditAmount;
 
     const { error: updateError } = await supabase
       .from('customers')
-      .update({ credit_balance: newBalance })
+      .update({ current_credit_balance: newBalance })
       .eq('id', referringCustomerId);
 
     if (updateError) {
-      console.error('❌ API Error updating customer credit_balance:', updateError);
+      console.error('❌ API Error updating customer current_credit_balance:', updateError);
       return NextResponse.json({
         ...credit,
         balance_update_error: 'Failed to update credit balance'
       });
     }
 
-    console.log('✅ API: Customer credit_balance updated:', {
+    console.log('✅ API: Customer current_credit_balance updated:', {
       customerId: referringCustomerId,
       customerEmail: referringCustomer.email,
-      previousBalance: referringCustomer.credit_balance,
-      creditEarned: creditAmountPounds,
-      newBalance: newBalance
+      previousBalancePence: referringCustomer.current_credit_balance,
+      previousBalancePounds: ((referringCustomer.current_credit_balance || 0) / 100).toFixed(2),
+      creditEarnedPence: creditAmount,
+      creditEarnedPounds: (creditAmount / 100).toFixed(2),
+      newBalancePence: newBalance,
+      newBalancePounds: (newBalance / 100).toFixed(2)
     });
 
     return NextResponse.json(credit);
