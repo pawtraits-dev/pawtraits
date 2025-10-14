@@ -22,7 +22,7 @@ function ShoppingCartPageContent() {
   const [referralValidation, setReferralValidation] = useState<any>(null)
   const [userEmail, setUserEmail] = useState("")
 
-  // Load user data and referral code
+  // Load user data and referral code from database only
   useEffect(() => {
     const loadUserData = async () => {
       try {
@@ -38,17 +38,13 @@ function ShoppingCartPageContent() {
 
         setUserEmail(user.email)
 
-        // Get customer data to check for referral code
-        const response = await fetch(`/api/debug/check-user-no-auth?email=${encodeURIComponent(user.email)}`)
-        const result = await response.json()
-
-        if (result.customer?.referral_code) {
-          setReferralCode(result.customer.referral_code)
-        } else {
-          // Check localStorage as fallback
-          const storedReferralCode = localStorage.getItem('referralCode')
-          if (storedReferralCode) {
-            setReferralCode(storedReferralCode)
+        // Get customer's referral code from database via API
+        const response = await fetch(`/api/customers/referral-code?email=${encodeURIComponent(user.email)}`)
+        if (response.ok) {
+          const data = await response.json()
+          // Use referral_code_used (the code they used to sign up, for discount eligibility)
+          if (data.referral_code_used) {
+            setReferralCode(data.referral_code_used)
           }
         }
       } catch (error) {
