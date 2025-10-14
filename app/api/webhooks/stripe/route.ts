@@ -114,9 +114,9 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     const referralDiscount = parseInt(metadata.referralDiscount || '0');
     const creditApplied = parseInt(metadata.rewardRedemption || '0');
 
-    // Calculate pre-discount subtotal for accurate reward calculations
-    // paymentIntent.amount is AFTER discount, so we add the discount back
-    const preDiscountSubtotal = paymentIntent.amount + referralDiscount - shippingCost;
+    // Calculate pre-discount subtotal for accurate commission calculations
+    // paymentIntent.amount is AFTER discounts/credits, so we add them back
+    const preDiscountSubtotal = paymentIntent.amount + referralDiscount + creditApplied - shippingCost;
 
     // Store both pre-discount and post-discount amounts
     const subtotalAmount = paymentIntent.amount - shippingCost; // Post-discount (what customer actually paid)
