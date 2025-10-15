@@ -6,18 +6,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, Star, Heart, Share2, Tag, MapPin, QrCode, UserPlus } from 'lucide-react';
+import { ShoppingCart, Star, Heart, Share2, Tag, MapPin, QrCode, UserPlus, Wand2, Sparkles } from 'lucide-react';
 // Removed direct database service imports - using API endpoints instead
 import type { ImageCatalogWithDetails } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
+import CustomerImageCustomizationModal from '@/components/CustomerImageCustomizationModal';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ShareModal from '@/components/share-modal';
 import { getSupabaseClient } from '@/lib/supabase-client';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
+import { useUserRouting } from '@/hooks/use-user-routing';
 import ReactMarkdown from 'react-markdown';
 
 function QRLandingPageContent() {
@@ -26,6 +28,7 @@ function QRLandingPageContent() {
   const router = useRouter();
   const { addToCart } = useHybridCart();
   const { getCountryPricing } = useCountryPricing();
+  const { userProfile } = useUserRouting();
 
   const imageId = params.imageId as string;
   const partnerId = searchParams.get('partner');
@@ -43,6 +46,7 @@ function QRLandingPageContent() {
   const [trackingComplete, setTrackingComplete] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(10); // 10% default
 
   // Using API endpoints instead of direct database access
@@ -206,6 +210,10 @@ function QRLandingPageContent() {
     router.push('/shop/cart');
   };
 
+  const handleCustomize = () => {
+    setShowCustomizeModal(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 flex items-center justify-center">
@@ -301,6 +309,53 @@ function QRLandingPageContent() {
                 <ReactMarkdown className="prose prose-sm max-w-none">
                   {image.description}
                 </ReactMarkdown>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Customize Section - Customer Only */}
+          {userProfile?.user_type === 'customer' && (
+            <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
+              <CardContent className="pt-6">
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-purple-600 rounded-lg">
+                    <Wand2 className="w-8 h-8 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                      Want to Make This Portrait Uniquely Yours?
+                    </h3>
+                    <p className="text-gray-700 mb-4">
+                      Customize this portrait with AI! Change the breed, coat color, outfit, and more to create your perfect pet portrait.
+                    </p>
+                    <ul className="space-y-2 mb-4">
+                      <li className="flex items-center text-sm text-gray-600">
+                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                        Change breed and coat colors
+                      </li>
+                      <li className="flex items-center text-sm text-gray-600">
+                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                        Add or change outfits
+                      </li>
+                      <li className="flex items-center text-sm text-gray-600">
+                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                        Create portraits with two pets together
+                      </li>
+                      <li className="flex items-center text-sm text-gray-600">
+                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                        Generate multiple variations
+                      </li>
+                    </ul>
+                    <Button
+                      onClick={handleCustomize}
+                      className="bg-purple-600 hover:bg-purple-700"
+                      size="lg"
+                    >
+                      <Wand2 className="w-5 h-5 mr-2" />
+                      Customize This Portrait
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -441,6 +496,20 @@ function QRLandingPageContent() {
             public_url: image.public_url,
             prompt_text: image.prompt_text || '',
             description: image.description || ''
+          }}
+        />
+      )}
+
+      {/* Customer Customization Modal */}
+      {image && userProfile?.user_type === 'customer' && (
+        <CustomerImageCustomizationModal
+          image={image}
+          isOpen={showCustomizeModal}
+          onClose={() => setShowCustomizeModal(false)}
+          onGenerationComplete={(variations) => {
+            console.log('Generated variations:', variations);
+            setShowCustomizeModal(false);
+            // Could show success message or redirect to customer gallery
           }}
         />
       )}

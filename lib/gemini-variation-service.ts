@@ -301,6 +301,252 @@ export class GeminiVariationService {
   }
 
   /**
+   * Generate multi-animal variation with two different animals
+   */
+  async generateMultiAnimalVariation(
+    originalImageData: string,
+    originalPrompt: string,
+    primaryAnimal: {
+      breed: Breed;
+      coat: BreedCoatDetail;
+      outfit?: Outfit;
+      age?: string;
+    },
+    secondaryAnimal: {
+      breed: Breed;
+      coat: BreedCoatDetail;
+      outfit?: Outfit;
+      age?: string;
+    },
+    format?: Format,
+    currentTheme?: any,
+    currentStyle?: any
+  ): Promise<GeneratedVariation | null> {
+    const generationStartTime = Date.now();
+
+    try {
+      // Create multi-animal prompt
+      const variationPrompt = this.createMultiAnimalPrompt(
+        originalPrompt,
+        primaryAnimal,
+        secondaryAnimal,
+        currentTheme,
+        currentStyle
+      );
+
+      const prompt = [
+        { text: variationPrompt },
+        {
+          inlineData: {
+            mimeType: "image/png",
+            data: originalImageData,
+          },
+        },
+      ];
+
+      console.log(`🤖 GEMINI MULTI-ANIMAL START: ${primaryAnimal.breed.name} + ${secondaryAnimal.breed.name}`);
+      console.log(`📝 Prompt: ${variationPrompt.substring(0, 200)}...`);
+
+      const geminiCallStart = Date.now();
+      const response = await this.ai.models.generateContent({
+        model: "gemini-2.5-flash-image-preview",
+        contents: prompt,
+      });
+      const geminiCallEnd = Date.now();
+      const geminiDuration = geminiCallEnd - geminiCallStart;
+
+      console.log(`🤖 GEMINI MULTI-ANIMAL END: ${geminiDuration}ms`);
+
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData?.data) {
+            const generationEndTime = Date.now();
+            const totalDuration = generationEndTime - generationStartTime;
+
+            console.log(`✅ GEMINI MULTI-ANIMAL SUCCESS: ${primaryAnimal.breed.name} + ${secondaryAnimal.breed.name} (${totalDuration}ms)`);
+
+            // Generate Midjourney prompt for catalog storage
+            const midjourneyPrompt = this.createMidjourneyPromptForMultiAnimal(
+              originalPrompt,
+              primaryAnimal,
+              secondaryAnimal,
+              currentTheme,
+              currentStyle,
+              format
+            );
+
+            return {
+              imageData: part.inlineData.data,
+              prompt: midjourneyPrompt,
+              metadata: {
+                breed: primaryAnimal.breed,
+                coat: primaryAnimal.coat,
+                outfit: primaryAnimal.outfit,
+                theme: currentTheme,
+                style: currentStyle,
+                format: format,
+                variation_type: 'multi_animal',
+                gemini_prompt: variationPrompt,
+                multi_animal_config: {
+                  primary: {
+                    breed_id: primaryAnimal.breed.id,
+                    breed_name: primaryAnimal.breed.name,
+                    coat_id: primaryAnimal.coat.id,
+                    coat_name: primaryAnimal.coat.coat_name,
+                    outfit_id: primaryAnimal.outfit?.id,
+                    age: primaryAnimal.age
+                  },
+                  secondary: {
+                    breed_id: secondaryAnimal.breed.id,
+                    breed_name: secondaryAnimal.breed.name,
+                    coat_id: secondaryAnimal.coat.id,
+                    coat_name: secondaryAnimal.coat.coat_name,
+                    outfit_id: secondaryAnimal.outfit?.id,
+                    age: secondaryAnimal.age
+                  }
+                }
+              }
+            };
+          }
+        }
+      }
+
+      console.log(`❌ GEMINI MULTI-ANIMAL NO IMAGE: No image data in response`);
+      return null;
+
+    } catch (error) {
+      const generationEndTime = Date.now();
+      const totalDuration = generationEndTime - generationStartTime;
+
+      console.error(`🔥 GEMINI MULTI-ANIMAL ERROR (${totalDuration}ms):`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Create multi-animal variation prompt for Gemini
+   */
+  private createMultiAnimalPrompt(
+    originalPrompt: string,
+    primaryAnimal: {
+      breed: Breed;
+      coat: BreedCoatDetail;
+      outfit?: Outfit;
+      age?: string;
+    },
+    secondaryAnimal: {
+      breed: Breed;
+      coat: BreedCoatDetail;
+      outfit?: Outfit;
+      age?: string;
+    },
+    currentTheme?: any,
+    currentStyle?: any
+  ): string {
+    // Get age instructions for both animals
+    const primaryAgeInstruction = this.getAgeTransformationInstruction(
+      primaryAnimal.age,
+      primaryAnimal.breed.animal_type
+    );
+    const secondaryAgeInstruction = this.getAgeTransformationInstruction(
+      secondaryAnimal.age,
+      secondaryAnimal.breed.animal_type
+    );
+
+    // Get fur length instructions
+    const primaryBreedTraits = primaryAnimal.breed.physical_traits as any || {};
+    const primaryFurInstruction = this.getFurLengthInstruction(
+      primaryAnimal.breed.name,
+      primaryBreedTraits.coat
+    );
+
+    const secondaryBreedTraits = secondaryAnimal.breed.physical_traits as any || {};
+    const secondaryFurInstruction = this.getFurLengthInstruction(
+      secondaryAnimal.breed.name,
+      secondaryBreedTraits.coat
+    );
+
+    // Build outfit descriptions
+    const primaryOutfitText = primaryAnimal.outfit
+      ? (primaryAnimal.outfit.name === 'No Outfit'
+          ? 'wearing no outfit'
+          : `wearing ${primaryAnimal.outfit.clothing_description || primaryAnimal.outfit.name}`)
+      : 'wearing no outfit';
+
+    const secondaryOutfitText = secondaryAnimal.outfit
+      ? (secondaryAnimal.outfit.name === 'No Outfit'
+          ? 'wearing no outfit'
+          : `wearing ${secondaryAnimal.outfit.clothing_description || secondaryAnimal.outfit.name}`)
+      : 'wearing no outfit';
+
+    const themeDescription = currentTheme?.base_prompt_template || '';
+    const styleDescription = currentStyle?.prompt_suffix || '';
+
+    return `Create an image with TWO animals together in the same scene:
+
+PRIMARY ANIMAL:
+- Breed: ${primaryAnimal.breed.name} (${primaryAnimal.breed.animal_type})
+- Coat: ${primaryAnimal.coat.coat_name}
+- Outfit: ${primaryOutfitText}
+${primaryAgeInstruction ? `- Age: ${primaryAgeInstruction}` : ''}
+${primaryFurInstruction}
+
+SECONDARY ANIMAL:
+- Breed: ${secondaryAnimal.breed.name} (${secondaryAnimal.breed.animal_type})
+- Coat: ${secondaryAnimal.coat.coat_name}
+- Outfit: ${secondaryOutfitText}
+${secondaryAgeInstruction ? `- Age: ${secondaryAgeInstruction}` : ''}
+${secondaryFurInstruction}
+
+COMPOSITION REQUIREMENTS:
+- Both animals must be clearly visible and prominent in the scene
+- Position them naturally interacting or sitting together
+- Ensure both animals are similar in size and importance in the composition
+- Use natural, friendly poses that show both animals clearly
+- Maintain consistent lighting across both animals
+${themeDescription ? `- Theme: ${themeDescription}` : ''}
+${styleDescription ? `- Style: ${styleDescription}` : ''}
+
+Ensure the ${primaryAnimal.coat.coat_name} coloring is consistent across ALL body parts of the ${primaryAnimal.breed.name}, and the ${secondaryAnimal.coat.coat_name} coloring is consistent across ALL body parts of the ${secondaryAnimal.breed.name}.`;
+  }
+
+  /**
+   * Create Midjourney prompt for multi-animal variation (for catalog storage)
+   */
+  private createMidjourneyPromptForMultiAnimal(
+    originalPrompt: string,
+    primaryAnimal: {
+      breed: Breed;
+      coat: BreedCoatDetail;
+      outfit?: Outfit;
+      age?: string;
+    },
+    secondaryAnimal: {
+      breed: Breed;
+      coat: BreedCoatDetail;
+      outfit?: Outfit;
+      age?: string;
+    },
+    currentTheme?: any,
+    currentStyle?: any,
+    format?: Format
+  ): string {
+    const primaryOutfit = primaryAnimal.outfit?.name === 'No Outfit'
+      ? 'no outfit'
+      : (primaryAnimal.outfit?.clothing_description || primaryAnimal.outfit?.name || 'no outfit');
+
+    const secondaryOutfit = secondaryAnimal.outfit?.name === 'No Outfit'
+      ? 'no outfit'
+      : (secondaryAnimal.outfit?.clothing_description || secondaryAnimal.outfit?.name || 'no outfit');
+
+    const themePrompt = currentTheme?.base_prompt_template || '';
+    const stylePrompt = currentStyle?.prompt_suffix || '';
+    const aspectRatio = format?.aspect_ratio || '1:1';
+
+    return `A ${primaryAnimal.breed.name.toLowerCase()} with ${primaryAnimal.coat.coat_name.toLowerCase()} fur wearing ${primaryOutfit} together with a ${secondaryAnimal.breed.name.toLowerCase()} with ${secondaryAnimal.coat.coat_name.toLowerCase()} fur wearing ${secondaryOutfit}, ${themePrompt}, ${stylePrompt}, --ar ${aspectRatio}`.replace(/,\s*,/g, ',').trim();
+  }
+
+  /**
    * Generate all variations in batch mode for efficiency
    */
   async generateAllVariations(config: VariationConfig): Promise<GeneratedVariation[]> {

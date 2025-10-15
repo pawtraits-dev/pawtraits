@@ -54,23 +54,27 @@ export async function POST(request: NextRequest) {
       case 'payment_intent.succeeded':
         await handlePaymentSucceeded(event, supabase);
         break;
-      
+
       case 'payment_intent.payment_failed':
         await handlePaymentFailed(event, supabase);
         break;
-      
+
       case 'payment_intent.canceled':
         await handlePaymentCanceled(event, supabase);
         break;
-      
+
       case 'payment_intent.processing':
         await handlePaymentProcessing(event, supabase);
         break;
-      
+
       case 'charge.dispute.created':
         await handleChargeDispute(event, supabase);
         break;
-      
+
+      case 'checkout.session.completed':
+        await handleCheckoutSessionCompleted(event, supabase);
+        break;
+
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
@@ -1214,6 +1218,80 @@ async function handleCreditRedemption(
 
   } catch (error) {
     console.error('💥 Error handling credit redemption:', error);
+  }
+}
+
+// Handle Stripe Checkout Session completion (for credit pack purchases)
+async function handleCheckoutSessionCompleted(event: any, supabase: any) {
+  const session = event.data.object;
+
+  console.log('🎫 Checkout session completed:', {
+    id: session.id,
+    customerEmail: session.customer_email,
+    amountTotal: session.amount_total,
+    currency: session.currency,
+    metadata: session.metadata
+  });
+
+  try {
+    const metadata = session.metadata || {};
+
+    // Check if this is a credit pack purchase
+    if (metadata.purchaseType !== 'customization_credits') {
+      console.log('Not a credit pack purchase, skipping');
+      return;
+    }
+
+    const customerId = metadata.customerId;
+    const packId = metadata.packId;
+    const credits = parseInt(metadata.credits);
+
+    if (!customerId || !credits) {
+      console.error('❌ Missing required metadata for credit purchase:', metadata);
+      return;
+    }
+
+    console.log('💳 Processing credit pack purchase:', {
+      customerId,
+      packId,
+      credits,
+      amountPaid: session.amount_total
+    });
+
+    // Add credits to customer account using database function
+    const { data: addResult, error: addError } = await supabase
+      .rpc('add_customization_credits', {
+        p_customer_id: customerId,
+        p_credits_to_add: credits,
+        p_purchase_amount: session.amount_total
+      });
+
+    if (addError || !addResult) {
+      console.error('❌ Failed to add credits to customer account:', addError);
+      return;
+    }
+
+    // Get updated credit balance
+    const { data: balance } = await supabase
+      .from('customer_customization_credits')
+      .select('credits_remaining, credits_purchased')
+      .eq('customer_id', customerId)
+      .single();
+
+    console.log('✅ Credits added successfully:', {
+      customerId,
+      creditsAdded: credits,
+      packId,
+      amountPaid: session.amount_total,
+      amountFormatted: `£${(session.amount_total / 100).toFixed(2)}`,
+      newBalance: balance?.credits_remaining || 0,
+      totalPurchased: balance?.credits_purchased || 0
+    });
+
+    // TODO: Send confirmation email to customer about credit purchase
+
+  } catch (error) {
+    console.error('💥 Error handling checkout session completion:', error);
   }
 }
 

@@ -19,7 +19,8 @@ import {
   Dog,
   Cat,
   Palette,
-  QrCode
+  QrCode,
+  Wand2
 } from 'lucide-react';
 // Import SupabaseService for authentication checking
 import { SupabaseService } from '@/lib/supabase';
@@ -30,6 +31,7 @@ import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
 import ShareModal from '@/components/share-modal';
 import PartnerQRModal from '@/components/PartnerQRModal';
+import CustomerImageCustomizationModal from '@/components/CustomerImageCustomizationModal';
 import UserInteractionsService from '@/lib/user-interactions';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
@@ -83,8 +85,10 @@ function BrowsePageContent() {
   // Modal states
   const [showShareModal, setShowShareModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [imageToShare, setImageToShare] = useState<ImageCatalogWithDetails | null>(null);
   const [imageForQR, setImageForQR] = useState<ImageCatalogWithDetails | null>(null);
+  const [imageToCustomize, setImageToCustomize] = useState<ImageCatalogWithDetails | null>(null);
 
   // Authentication and user states
   const { userProfile, userLoading } = useUserRouting();
@@ -283,6 +287,11 @@ function BrowsePageContent() {
   const handleQRShare = (image: ImageCatalogWithDetails) => {
     setImageForQR(image);
     setShowQRModal(true);
+  };
+
+  const handleCustomize = (image: ImageCatalogWithDetails) => {
+    setImageToCustomize(image);
+    setShowCustomizeModal(true);
   };
 
   const getCarouselPageType = (): PageType => {
@@ -733,56 +742,72 @@ function BrowsePageContent() {
                             fallbackUrl={image.image_url || image.public_url}
                           />
 
-                          {/* Like, Share, and Purchase status overlay */}
-                          <div className="absolute top-2 right-2 flex gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleLike(image.id);
-                              }}
-                              className={`p-2 rounded-full transition-all ${
-                                isLiked
-                                  ? 'bg-red-500 text-white'
-                                  : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
-                              }`}
-                              title={isLiked ? 'Unlike' : 'Like'}
-                            >
-                              <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-                            </button>
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleShare(image);
-                              }}
-                              className={`p-2 rounded-full transition-all ${
-                                isShared
-                                  ? 'bg-blue-500 text-white'
-                                  : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
-                              }`}
-                              title={isShared ? 'Shared' : 'Share'}
-                            >
-                              <Share2 className="w-4 h-4" />
-                            </button>
-
-                            {/* Partner QR Code Sharing Button */}
-                            {userProfile?.user_type === 'partner' && (
+                          {/* Like, Share, Customize, and Purchase status overlay */}
+                          <div className="absolute top-2 right-2 flex flex-col gap-2">
+                            <div className="flex gap-2">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleQRShare(image);
+                                  handleLike(image.id);
                                 }}
-                                className="p-2 rounded-full transition-all bg-white bg-opacity-80 text-gray-700 hover:bg-green-500 hover:text-white"
-                                title="Generate QR Code for Client"
+                                className={`p-2 rounded-full transition-all ${
+                                  isLiked
+                                    ? 'bg-red-500 text-white'
+                                    : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
+                                }`}
+                                title={isLiked ? 'Unlike' : 'Like'}
                               >
-                                <QrCode className="w-4 h-4" />
+                                <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
                               </button>
-                            )}
 
-                            {isPurchased && (
-                              <div className="bg-green-500 text-white p-2 rounded-full" title="Purchased">
-                                <ShoppingCart className="w-4 h-4 fill-current" />
-                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleShare(image);
+                                }}
+                                className={`p-2 rounded-full transition-all ${
+                                  isShared
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
+                                }`}
+                                title={isShared ? 'Shared' : 'Share'}
+                              >
+                                <Share2 className="w-4 h-4" />
+                              </button>
+
+                              {/* Partner QR Code Sharing Button */}
+                              {userProfile?.user_type === 'partner' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleQRShare(image);
+                                  }}
+                                  className="p-2 rounded-full transition-all bg-white bg-opacity-80 text-gray-700 hover:bg-green-500 hover:text-white"
+                                  title="Generate QR Code for Client"
+                                >
+                                  <QrCode className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {isPurchased && (
+                                <div className="bg-green-500 text-white p-2 rounded-full" title="Purchased">
+                                  <ShoppingCart className="w-4 h-4 fill-current" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Customize Button - Customers only */}
+                            {userProfile?.user_type === 'customer' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCustomize(image);
+                                }}
+                                className="p-2 rounded-full transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-lg"
+                                title="Customize this image"
+                              >
+                                <Wand2 className="w-4 h-4" />
+                              </button>
                             )}
                           </div>
                         </div>
@@ -1198,6 +1223,23 @@ function BrowsePageContent() {
           image={imageForQR}
           partnerId={userProfile.id}
           partnerInfo={partnerInfo}
+        />
+      )}
+
+      {/* Customer Image Customization Modal */}
+      {imageToCustomize && userProfile?.user_type === 'customer' && (
+        <CustomerImageCustomizationModal
+          image={imageToCustomize}
+          isOpen={showCustomizeModal}
+          onClose={() => {
+            setShowCustomizeModal(false);
+            setImageToCustomize(null);
+          }}
+          onGenerationComplete={(variations) => {
+            console.log('Generated variations:', variations);
+            // Optionally redirect to view generated images
+            // or show success message
+          }}
         />
       )}
     </div>
