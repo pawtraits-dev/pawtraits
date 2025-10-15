@@ -25,11 +25,15 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
+# local env files (with actual secrets - NEVER commit)
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Note: .env.production, .env.staging, .env.preview are reference files
+# They contain placeholders and should be committed to version control
+# Actual secrets are set in Vercel Dashboard environment variables
 
 # vercel
 .vercel
