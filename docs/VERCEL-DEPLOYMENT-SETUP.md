@@ -47,13 +47,53 @@ This guide walks through setting up Production, Staging, and Preview environment
 2. Select your Pawtraits project
 3. Navigate to **Settings**
 
-### 1.2 Configure Git Integration
+### 1.2 Verify Git Integration
 
-Go to **Settings → Git**:
+**Go to Settings → Git:**
 
-1. **Production Branch**: Set to `main`
-2. **Enable Automatic Deployments**: ✅ Checked
-3. Click **Save**
+You'll see a card titled **"Connected Git Repository"** showing:
+- Your GitHub repository name
+- Branch: `main` (or your production branch)
+- Last deployed commit
+- "Disconnect" button (don't click this!)
+
+**What You WON'T See (These have moved or are automatic):**
+- ❌ "Production Branch" dropdown (moved to Settings → General)
+- ❌ "Enable Automatic Deployments" checkbox (always enabled)
+- ❌ Branch-specific settings (automatic for all branches)
+
+### 1.3 Check Production Branch Setting
+
+**Go to Settings → General:**
+
+Scroll down to find the **"Production Branch"** field:
+- Should show: `main`
+- This is the branch that deploys to your custom domain (pawtraits.pics)
+- All other branches automatically create preview deployments
+
+**You don't need to change anything here** - just verify `main` is set as production.
+
+### 1.4 How Vercel Deployment Works (Current Behavior)
+
+```
+Push to main branch
+    ↓
+Vercel automatically detects push
+    ↓
+Builds and deploys to Production
+    ↓
+Updates pawtraits.pics
+
+Push to any other branch (staging, feature/*)
+    ↓
+Vercel automatically detects push
+    ↓
+Builds and deploys as Preview
+    ↓
+Creates URL: <branch-name>-pawtraits.vercel.app
+```
+
+**Key Point:** Since you mentioned deployments are already triggered by git pushes, your setup is already correct! You don't need to change anything in Settings → Git.
 
 ## Step 2: Configure Environments
 
@@ -316,19 +356,30 @@ git push -u origin staging
 
 ### 6.2 Verify Deployment
 
-1. Vercel will automatically detect the new branch
-2. Go to **Deployments** tab in Vercel
+1. Vercel will automatically detect the new branch and create a preview deployment
+2. Go to **Deployments** tab in Vercel Dashboard
 3. You should see a deployment for the `staging` branch
-4. Click to view deployment URL
+4. Click to view the deployment URL (will be something like `staging-pawtraits.vercel.app`)
 5. Test the deployment
 
-### 6.3 Set Staging as Production Branch (Optional)
+### 6.3 Understanding Branch Deployments
 
-If you want staging to have a dedicated URL:
+**How Vercel Handles Branches:**
 
-1. Go to **Settings → Git**
-2. Under **Production Branch**, you can add `staging` as an additional branch
-3. Configure a custom domain for staging if desired
+- **Production Branch** (typically `main`):
+  - Deploys to your production domain (pawtraits.pics)
+  - Uses "Production" environment variables
+
+- **All Other Branches** (including `staging`):
+  - Create preview deployments
+  - Get automatic Vercel URLs: `<branch-name>-<project>.vercel.app`
+  - Use "Preview" environment variables
+
+- **Configuration Location**:
+  - View which branch is production: **Settings → General → Production Branch**
+  - Cannot be changed in Settings → Git (that just shows connection status)
+
+**Note:** The `staging` branch will automatically get preview deployments with the URL format `staging-pawtraits.vercel.app`. To assign a custom domain to staging, see Step 4.2.
 
 ## Step 7: Test the Setup
 
@@ -414,17 +465,34 @@ git push origin staging
 
 ## Troubleshooting
 
+### Git Settings Look Different
+
+**Current Vercel UI (2025):**
+- **Settings → Git** only shows "Connected Git Repository" card
+- No options to enable/disable automatic deployments (always enabled)
+- Production branch is set in **Settings → General** not in Git settings
+- All branches automatically create preview deployments when pushed
+
+**What You'll See:**
+- Settings → Git: Shows connection status only
+- Settings → General: Shows which branch is production
+- Deployments tab: Shows all deployment history by branch
+
 ### Environment Variable Not Working
 
-1. Ensure variable is added to correct environment
-2. Redeploy the project (Vercel caches env vars)
+1. Ensure variable is added to correct environment (Production/Preview/Development)
+2. Redeploy the project after adding variables (Vercel caches env vars)
 3. Check variable name matches exactly (case-sensitive)
+4. For changes to take effect, trigger a new deployment by pushing a commit
 
-### Staging Deployment Not Auto-Deploying
+### Branch Deployment Not Working
 
-1. Check **Settings → Git → Deployments**
-2. Ensure "Branch deployments" is enabled
-3. Check if there are build errors in deployment logs
+1. Go to **Deployments** tab to see if deployment was triggered
+2. If no deployment appears:
+   - Check Git connection in **Settings → Git**
+   - Ensure repository permissions allow Vercel access
+   - Check for build errors in deployment logs
+3. All branches automatically create preview deployments (no setting to enable/disable)
 
 ### Stripe Webhook Not Receiving Events
 
