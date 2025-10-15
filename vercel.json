@@ -3,7 +3,28 @@
     "app/api/admin/generate-variations/route.ts": {
       "maxDuration": 300,
       "memory": 512
+    },
+    "app/api/customers/generate-variations/route.ts": {
+      "maxDuration": 300,
+      "memory": 512
     }
   },
-  "regions": ["cle1"]
+  "regions": ["cle1"],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "X-Environment",
+          "value": "production"
+        }
+      ]
+    }
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "staging": true
+    }
+  }
 }

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter, Margarine, Life_Savers } from 'next/font/google';
 import './globals.css';
 import { HybridCartProvider } from '@/lib/hybrid-cart-context';
+import EnvironmentIndicator from '@/components/EnvironmentIndicator';
 
 const inter = Inter({ subsets: ['latin'] });
 const margarine = Margarine({ 
@@ -52,6 +53,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#7c3aed" />
       </head>
       <body className={`${inter.className} ${margarine.variable} ${lifeSavers.variable}`}>
+        <EnvironmentIndicator />
         <div id="root">
           <HybridCartProvider>
             {children}
