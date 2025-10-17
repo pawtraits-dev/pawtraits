@@ -829,6 +829,92 @@ export class GelatoService {
   }
 
   /**
+   * Sanitize address lines to fit Gelato's 35-character limit
+   * Intelligently splits long addresses between line 1 and line 2
+   */
+  private sanitizeAddressLines(line1: string, line2: string = ''): {
+    addressLine1: string;
+    addressLine2: string;
+  } {
+    const MAX_LENGTH = 35;
+
+    // Trim inputs
+    line1 = line1.trim();
+    line2 = line2.trim();
+
+    // If line1 is within limits, return as-is
+    if (line1.length <= MAX_LENGTH) {
+      return {
+        addressLine1: line1,
+        addressLine2: line2.substring(0, MAX_LENGTH) // Ensure line2 is also within limits
+      };
+    }
+
+    console.warn(`⚠️ Address line 1 exceeds 35 characters (${line1.length}). Attempting to split...`);
+
+    // Try to split at common delimiters (comma, apartment indicators, etc.)
+    const splitPoints = [
+      { regex: /,\s+/, priority: 1 }, // Split at comma
+      { regex: /\s+(Apt|Apartment|Unit|Suite|Ste|#)\s+/i, priority: 2 }, // Split at apartment indicators
+      { regex: /\s+Floor\s+/i, priority: 3 }, // Split at Floor
+      { regex: /\s+Building\s+/i, priority: 4 } // Split at Building
+    ];
+
+    let bestSplit: { part1: string; part2: string } | null = null;
+
+    // Try each split point
+    for (const { regex } of splitPoints) {
+      const match = line1.match(regex);
+      if (match && match.index !== undefined) {
+        const splitIndex = match.index + match[0].length;
+        const part1 = line1.substring(0, splitIndex).trim();
+        const part2 = line1.substring(splitIndex).trim();
+
+        // Check if part1 fits within the limit
+        if (part1.length <= MAX_LENGTH && part1.length > 0) {
+          bestSplit = { part1, part2 };
+          console.log(`✅ Split address at delimiter: "${part1}" | "${part2}"`);
+          break;
+        }
+      }
+    }
+
+    // If no good split point found, split at last space before 35 chars
+    if (!bestSplit) {
+      const lastSpaceIndex = line1.substring(0, MAX_LENGTH).lastIndexOf(' ');
+      if (lastSpaceIndex > 0) {
+        const part1 = line1.substring(0, lastSpaceIndex).trim();
+        const part2 = line1.substring(lastSpaceIndex).trim();
+        bestSplit = { part1, part2 };
+        console.log(`⚠️ Split address at space: "${part1}" | "${part2}"`);
+      } else {
+        // No space found - hard truncate (last resort)
+        const part1 = line1.substring(0, MAX_LENGTH).trim();
+        const part2 = line1.substring(MAX_LENGTH).trim();
+        bestSplit = { part1, part2 };
+        console.error(`❌ Hard truncated address: "${part1}" | "${part2}"`);
+      }
+    }
+
+    // Combine with existing line2 if present
+    let finalLine2 = bestSplit.part2;
+    if (line2) {
+      finalLine2 = `${bestSplit.part2}, ${line2}`;
+    }
+
+    // Ensure line2 also fits within limits
+    if (finalLine2.length > MAX_LENGTH) {
+      console.warn(`⚠️ Address line 2 exceeds 35 characters after split (${finalLine2.length}). Truncating...`);
+      finalLine2 = finalLine2.substring(0, MAX_LENGTH).trim();
+    }
+
+    return {
+      addressLine1: bestSplit.part1,
+      addressLine2: finalLine2
+    };
+  }
+
+  /**
    * Convert our order data to Gelato v4 API format
    */
   mapOrderToGelato(
@@ -866,12 +952,17 @@ export class GelatoService {
     });
 
     // Map shipping address to Gelato format using new address lines
+    // Handle Gelato's 35-character limit on address lines
+    const rawAddressLine1 = order.shipping_address_line_1 || order.shipping_address || '';
+    const rawAddressLine2 = order.shipping_address_line_2 || '';
+
+    const { addressLine1, addressLine2 } = this.sanitizeAddressLines(rawAddressLine1, rawAddressLine2);
+
     const shippingAddress = {
       firstName: order.shipping_first_name,
       lastName: order.shipping_last_name,
-      // Use new address lines if available, fallback to old single address field
-      addressLine1: order.shipping_address_line_1 || order.shipping_address,
-      ...(order.shipping_address_line_2 && { addressLine2: order.shipping_address_line_2 }),
+      addressLine1: addressLine1,
+      ...(addressLine2 && { addressLine2: addressLine2 }),
       city: order.shipping_city,
       postCode: order.shipping_postcode,
       country: this.mapCountryToGelatoCode(order.shipping_country),

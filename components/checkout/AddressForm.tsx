@@ -196,8 +196,21 @@ export default function AddressForm({
               }}
               className={errors.addressLine1 ? "border-red-500" : ""}
               placeholder="123 Main Street"
+              maxLength={35}
             />
-            {errors.addressLine1 && <p className="text-sm text-red-600">{errors.addressLine1}</p>}
+            <div className="flex justify-between items-center">
+              <div>
+                {errors.addressLine1 && <p className="text-sm text-red-600">{errors.addressLine1}</p>}
+              </div>
+              <p className={`text-xs ${data.addressLine1.length > 35 ? 'text-red-600 font-semibold' : data.addressLine1.length > 30 ? 'text-orange-600' : 'text-gray-500'}`}>
+                {data.addressLine1.length}/35 characters
+              </p>
+            </div>
+            {data.addressLine1.length > 30 && (
+              <p className="text-xs text-orange-600">
+                ⓘ Consider using Address Line 2 for long addresses
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -206,8 +219,12 @@ export default function AddressForm({
               id="addressLine2"
               value={data.addressLine2}
               onChange={(e) => onChange("addressLine2", e.target.value)}
-              placeholder="Apartment, suite, etc."
+              placeholder="Apartment, suite, unit, building, etc."
+              maxLength={35}
             />
+            <p className="text-xs text-gray-500">
+              {data.addressLine2.length}/35 characters
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

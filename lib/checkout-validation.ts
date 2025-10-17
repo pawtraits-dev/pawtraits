@@ -73,10 +73,17 @@ export class CheckoutValidationService {
     if (address.addressLine1) {
       if (!address.addressLine1.trim()) {
         errors.push("Address line 1 is required");
+      } else if (address.addressLine1.trim().length > 35) {
+        errors.push("Address line 1 must be 35 characters or less (Gelato requirement). Please use Address Line 2 for additional details.");
       }
-      // Address line 2 is optional, no validation needed
+      // Address line 2 validation
+      if (address.addressLine2 && address.addressLine2.trim().length > 35) {
+        errors.push("Address line 2 must be 35 characters or less");
+      }
     } else if (!address.address?.trim()) {
       errors.push("Address is required");
+    } else if (address.address.trim().length > 35) {
+      errors.push("Address must be 35 characters or less (Gelato requirement)");
     }
     if (!address.city?.trim()) errors.push("City is required");
     if (!address.postcode?.trim()) errors.push("Postcode is required");
