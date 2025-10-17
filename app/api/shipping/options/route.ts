@@ -22,9 +22,19 @@ export async function POST(request: NextRequest) {
     // Validate shipping address structure
     const requiredFields = ['firstName', 'lastName', 'address1', 'city', 'postalCode', 'country'];
     for (const field of requiredFields) {
-      if (!shippingAddress[field]) {
+      if (!shippingAddress[field] || shippingAddress[field].toString().trim() === '') {
+        console.error('🚚 [SHIPPING API] Missing required field:', {
+          field,
+          value: shippingAddress[field],
+          allFields: Object.keys(shippingAddress),
+          shippingAddress: JSON.stringify(shippingAddress, null, 2)
+        });
         return NextResponse.json(
-          { error: `Missing required shipping address field: ${field}` },
+          {
+            error: `Missing required shipping address field: ${field}`,
+            received: shippingAddress,
+            requiredFields: requiredFields
+          },
           { status: 400 }
         );
       }

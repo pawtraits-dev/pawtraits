@@ -70,20 +70,25 @@ export class CheckoutValidationService {
     }
     
     // Address validation - check for either old format or new address lines
-    if (address.addressLine1) {
-      if (!address.addressLine1.trim()) {
+    // Check if we're using new address lines format (addressLine1 exists as a property)
+    if (address.hasOwnProperty('addressLine1')) {
+      // Using new format - validate addressLine1
+      if (!address.addressLine1 || !address.addressLine1.trim()) {
         errors.push("Address line 1 is required");
       } else if (address.addressLine1.trim().length > 35) {
         errors.push("Address line 1 must be 35 characters or less (Gelato requirement). Please use Address Line 2 for additional details.");
       }
-      // Address line 2 validation
+      // Address line 2 validation (optional field)
       if (address.addressLine2 && address.addressLine2.trim().length > 35) {
         errors.push("Address line 2 must be 35 characters or less");
       }
-    } else if (!address.address?.trim()) {
-      errors.push("Address is required");
-    } else if (address.address.trim().length > 35) {
-      errors.push("Address must be 35 characters or less (Gelato requirement)");
+    } else {
+      // Using old format - validate single address field
+      if (!address.address?.trim()) {
+        errors.push("Address is required");
+      } else if (address.address.trim().length > 35) {
+        errors.push("Address must be 35 characters or less (Gelato requirement)");
+      }
     }
     if (!address.city?.trim()) errors.push("City is required");
     if (!address.postcode?.trim()) errors.push("Postcode is required");
@@ -339,15 +344,16 @@ export class CheckoutValidationService {
    * Handles both old single address field and new address lines
    */
   getAddressLinesForGelato(address: Address): { address1: string; address2?: string } {
-    if (address.addressLine1) {
+    // Check if we're using new address lines format (addressLine1 exists as a property)
+    if (address.hasOwnProperty('addressLine1')) {
       return {
-        address1: address.addressLine1.trim(),
+        address1: (address.addressLine1 || '').trim(),
         address2: address.addressLine2?.trim() || undefined
       };
     } else {
       // Fallback to old single address field
       return {
-        address1: address.address?.trim() || '',
+        address1: (address.address || '').trim(),
         address2: undefined
       };
     }
