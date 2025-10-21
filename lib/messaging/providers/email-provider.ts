@@ -8,8 +8,18 @@ import { Resend } from 'resend';
 import type { EmailSendParams, ProviderResponse } from './provider-types';
 import { ProviderError } from './provider-types';
 
-// Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization of Resend client to avoid build-time env var requirement
+let resendClient: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (!resendClient) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new ProviderError('RESEND_API_KEY environment variable not set', 'resend');
+    }
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendClient;
+}
 
 // Default email configuration
 const DEFAULT_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@pawtraits.pics';
@@ -48,10 +58,8 @@ export async function sendEmail(params: EmailSendParams): Promise<ProviderRespon
       throw new ProviderError('Missing required parameter: html', 'resend');
     }
 
-    // Validate API key
-    if (!process.env.RESEND_API_KEY) {
-      throw new ProviderError('RESEND_API_KEY environment variable not set', 'resend');
-    }
+    // Get Resend client (validates API key)
+    const resend = getResendClient();
 
     // Prepare email data
     const from = params.from
