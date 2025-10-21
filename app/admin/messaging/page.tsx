@@ -34,12 +34,7 @@ export default function MessagingPage() {
     try {
       setLoading(true);
       const adminService = new AdminSupabaseService();
-      const { data, error } = await adminService.getClient()
-        .from('message_templates')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await adminService.getTemplates();
       setTemplates(data || []);
     } catch (error) {
       console.error('Failed to load templates:', error);
@@ -51,12 +46,7 @@ export default function MessagingPage() {
   const toggleTemplateStatus = async (templateId: string, currentStatus: boolean) => {
     try {
       const adminService = new AdminSupabaseService();
-      const { error } = await adminService.getClient()
-        .from('message_templates')
-        .update({ is_active: !currentStatus })
-        .eq('id', templateId);
-
-      if (error) throw error;
+      await adminService.updateTemplate(templateId, { is_active: !currentStatus });
       await loadTemplates();
     } catch (error) {
       console.error('Failed to toggle template status:', error);

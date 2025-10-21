@@ -45,13 +45,7 @@ export default function TemplateDetailsPage() {
     try {
       setLoading(true);
       const adminService = new AdminSupabaseService();
-      const { data, error } = await adminService.getClient()
-        .from('message_templates')
-        .select('*')
-        .eq('template_key', templateKey)
-        .single();
-
-      if (error) throw error;
+      const data = await adminService.getTemplate(templateKey);
       setTemplate(data);
     } catch (error) {
       console.error('Failed to load template:', error);

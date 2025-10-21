@@ -42,14 +42,9 @@ export default function TestEmailPage() {
   const loadTemplates = async () => {
     try {
       const adminService = new AdminSupabaseService();
-      const { data, error } = await adminService.getClient()
-        .from('message_templates')
-        .select('id, template_key, name, description, variables, user_types')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      setTemplates(data || []);
+      const data = await adminService.getTemplates();
+      // Filter to only active templates
+      setTemplates((data || []).filter((t: any) => t.is_active));
     } catch (error) {
       console.error('Failed to load templates:', error);
     }

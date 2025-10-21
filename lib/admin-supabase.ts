@@ -340,5 +340,49 @@ export class AdminSupabaseService {
       throw error;
     }
   }
+
+  // ===== MESSAGE TEMPLATE METHODS =====
+  async getTemplates(): Promise<any[]> {
+    try {
+      const response = await fetch('/api/admin/templates');
+      if (!response.ok) {
+        return [];
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting templates:', error);
+      return [];
+    }
+  }
+
+  async getTemplate(templateKey: string): Promise<any | null> {
+    try {
+      const response = await fetch(`/api/admin/templates?templateKey=${encodeURIComponent(templateKey)}`);
+      if (!response.ok) {
+        return null;
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting template:', error);
+      return null;
+    }
+  }
+
+  async updateTemplate(id: string, updates: any): Promise<any | null> {
+    try {
+      const response = await fetch('/api/admin/templates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...updates })
+      });
+      if (!response.ok) {
+        return null;
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating template:', error);
+      return null;
+    }
+  }
 }
 
