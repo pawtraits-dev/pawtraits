@@ -44,14 +44,46 @@ export default function CustomerAccountView({ userProfile }: CustomerAccountView
     confirmPassword: '',
   });
 
-  // Notification preferences (simplified for customers)
+  // Notification preferences (from user_notification_preferences table)
   const [notifications, setNotifications] = useState({
-    emailOrders: true,
-    emailMarketing: false,
-    emailPromotions: true,
-    smsOrders: false,
-    pushNotifications: true,
+    email_enabled: true,
+    sms_enabled: true,
+    inbox_enabled: true,
+    operational_emails_enabled: true,
+    marketing_emails_enabled: false,
   });
+  const [templatesData, setTemplatesData] = useState<any[]>([]);
+
+  // Load notification preferences on component mount
+  useEffect(() => {
+    loadNotificationPreferences();
+  }, []);
+
+  const loadNotificationPreferences = async () => {
+    try {
+      const response = await fetch('/api/customers/notifications', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.preferences) {
+          setNotifications({
+            email_enabled: data.preferences.email_enabled ?? true,
+            sms_enabled: data.preferences.sms_enabled ?? true,
+            inbox_enabled: data.preferences.inbox_enabled ?? true,
+            operational_emails_enabled: data.preferences.operational_emails_enabled ?? true,
+            marketing_emails_enabled: data.preferences.marketing_emails_enabled ?? false,
+          });
+        }
+        if (data.templates) {
+          setTemplatesData(data.templates);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading notification preferences:', error);
+    }
+  };
 
   // ✅ ARCHITECTURAL PATTERN: Update data via API endpoint
   const saveProfile = async () => {
@@ -377,70 +409,88 @@ export default function CustomerAccountView({ userProfile }: CustomerAccountView
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label className="text-sm font-medium">Order Updates</Label>
-                        <p className="text-sm text-gray-500">
-                          Get notified about your order status and delivery updates
-                        </p>
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-sm font-semibold mb-3">Communication Channels</h3>
+                      <p className="text-xs text-gray-500 mb-4">
+                        Choose which channels you want to receive notifications through. Transactional emails (order confirmations, shipping updates) will always be sent.
+                      </p>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label className="text-sm font-medium">Email Notifications</Label>
+                            <p className="text-sm text-gray-500">
+                              Receive notifications via email
+                            </p>
+                          </div>
+                          <Switch
+                            checked={notifications.email_enabled}
+                            onCheckedChange={(checked) => handleNotificationChange('email_enabled', checked)}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label className="text-sm font-medium">In-App Notifications</Label>
+                            <p className="text-sm text-gray-500">
+                              Receive notifications in your account inbox
+                            </p>
+                          </div>
+                          <Switch
+                            checked={notifications.inbox_enabled}
+                            onCheckedChange={(checked) => handleNotificationChange('inbox_enabled', checked)}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label className="text-sm font-medium">SMS Notifications</Label>
+                            <p className="text-sm text-gray-500">
+                              Receive important updates via text message
+                            </p>
+                          </div>
+                          <Switch
+                            checked={notifications.sms_enabled}
+                            onCheckedChange={(checked) => handleNotificationChange('sms_enabled', checked)}
+                          />
+                        </div>
                       </div>
-                      <Switch
-                        checked={notifications.emailOrders}
-                        onCheckedChange={(checked) => handleNotificationChange('emailOrders', checked)}
-                      />
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label className="text-sm font-medium">Marketing Emails</Label>
-                        <p className="text-sm text-gray-500">
-                          Receive newsletters and product announcements
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notifications.emailMarketing}
-                        onCheckedChange={(checked) => handleNotificationChange('emailMarketing', checked)}
-                      />
-                    </div>
+                    <Separator />
 
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label className="text-sm font-medium">Promotions</Label>
-                        <p className="text-sm text-gray-500">
-                          Get notified about special offers and discounts
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notifications.emailPromotions}
-                        onCheckedChange={(checked) => handleNotificationChange('emailPromotions', checked)}
-                      />
-                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold mb-3">Email Categories</h3>
+                      <p className="text-xs text-gray-500 mb-4">
+                        Control what types of emails you receive. Transactional emails cannot be disabled.
+                      </p>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label className="text-sm font-medium">Operational Emails</Label>
+                            <p className="text-sm text-gray-500">
+                              Order updates, credit notifications, account changes
+                            </p>
+                          </div>
+                          <Switch
+                            checked={notifications.operational_emails_enabled}
+                            onCheckedChange={(checked) => handleNotificationChange('operational_emails_enabled', checked)}
+                          />
+                        </div>
 
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label className="text-sm font-medium">SMS Notifications</Label>
-                        <p className="text-sm text-gray-500">
-                          Receive important updates via text message
-                        </p>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label className="text-sm font-medium">Marketing Emails</Label>
+                            <p className="text-sm text-gray-500">
+                              Promotions, new features, special offers
+                            </p>
+                          </div>
+                          <Switch
+                            checked={notifications.marketing_emails_enabled}
+                            onCheckedChange={(checked) => handleNotificationChange('marketing_emails_enabled', checked)}
+                          />
+                        </div>
                       </div>
-                      <Switch
-                        checked={notifications.smsOrders}
-                        onCheckedChange={(checked) => handleNotificationChange('smsOrders', checked)}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label className="text-sm font-medium">Push Notifications</Label>
-                        <p className="text-sm text-gray-500">
-                          Receive notifications in your browser
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notifications.pushNotifications}
-                        onCheckedChange={(checked) => handleNotificationChange('pushNotifications', checked)}
-                      />
                     </div>
                   </div>
 
