@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { constructWebhookEvent } from '@/lib/stripe-server';
 import { createClient } from '@supabase/supabase-js';
 import { createGelatoService } from '@/lib/gelato-service';
+import { sendMessage } from '@/lib/messaging/message-service';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -224,7 +225,9 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     // Create Gelato order for fulfillment
     await createGelatoOrder(order, paymentIntent, supabase, metadata);
 
-    // TODO: Send confirmation email to customer
+    // Send order confirmation email to customer
+    await sendOrderConfirmationEmail(supabase, order, paymentIntent, metadata);
+
     // TODO: Notify admin of new order
     // TODO: Update inventory if applicable
 
@@ -920,6 +923,9 @@ async function handlePartnerCommission(
         orderAmountPounds: (subtotalAmount / 100).toFixed(2),
         rateUsed: `${commissionRate}%`
       });
+
+      // Send commission earned email to partner
+      await sendPartnerCommissionEmail(supabase, partner, commission, order, commissionRate, subtotalAmount);
     }
 
   } catch (error) {
@@ -1055,6 +1061,9 @@ async function handleCustomerCredit(
         newBalance,
         newBalancePounds: (newBalance / 100).toFixed(2)
       });
+
+      // Send credit earned email to referring customer
+      await sendCustomerCreditEmail(supabase, referringCustomer, credit, order, customer, newBalance);
     }
 
   } catch (error) {
@@ -1218,6 +1227,270 @@ async function handleCreditRedemption(
 
   } catch (error) {
     console.error('💥 Error handling credit redemption:', error);
+  }
+}
+
+// Send partner commission earned email
+async function sendPartnerCommissionEmail(
+  supabase: any,
+  partner: any,
+  commission: any,
+  order: any,
+  commissionRate: number,
+  subtotalAmount: number
+) {
+  try {
+    console.log('📧 Preparing partner commission email for:', partner.email);
+
+    // Get partner user profile for recipient ID
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('email', partner.email)
+      .single();
+
+    // Get partner statistics
+    const { data: partnerStats } = await supabase
+      .rpc('get_partner_analytics', { p_partner_id: partner.id });
+
+    const totalCommissions = partnerStats?.total_commissions
+      ? `£${(partnerStats.total_commissions / 100).toFixed(2)}`
+      : '£0.00';
+    const totalReferrals = partnerStats?.total_referrals || 0;
+
+    // Format values
+    const commissionAmount = `£${(commission.commission_amount / 100).toFixed(2)}`;
+    const orderAmount = `£${(subtotalAmount / 100).toFixed(2)}`;
+    const orderDate = new Date(order.created_at).toLocaleDateString('en-GB', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    // Build dashboard URL
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const dashboardUrl = `${baseUrl}/partners/dashboard`;
+
+    // Estimate payout date (end of next month)
+    const now = new Date();
+    const payoutDate = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+    const payoutDateStr = payoutDate.toLocaleDateString('en-GB', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    // Send email via messaging service
+    await sendMessage({
+      templateKey: 'partner_commission_earned',
+      recipientType: 'partner',
+      recipientId: userProfile?.id || null,
+      recipientEmail: partner.email,
+      variables: {
+        partner_name: partner.business_name || `${partner.first_name} ${partner.last_name}`,
+        partner_id: partner.id,
+        commission_id: commission.id,
+        commission_amount: commissionAmount,
+        commission_rate: commissionRate.toString(),
+        order_number: order.order_number,
+        order_amount: orderAmount,
+        order_date: orderDate,
+        customer_name: `${order.shipping_first_name} ${order.shipping_last_name}`,
+        total_commissions: totalCommissions,
+        total_referrals: totalReferrals.toString(),
+        payout_date: payoutDateStr,
+        payment_method: 'Bank Transfer',
+        dashboard_url: dashboardUrl,
+        unsubscribe_url: `${baseUrl}/preferences/unsubscribe`
+      },
+      priority: 'normal'
+    });
+
+    console.log('✅ Partner commission email queued successfully:', {
+      partnerId: partner.id,
+      partnerEmail: partner.email,
+      commissionAmount
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to send partner commission email:', error);
+    // Don't throw - we don't want email failures to break commission processing
+  }
+}
+
+// Send customer credit earned email
+async function sendCustomerCreditEmail(
+  supabase: any,
+  referringCustomer: any,
+  credit: any,
+  order: any,
+  referredCustomer: any,
+  newBalance: number
+) {
+  try {
+    console.log('📧 Preparing customer credit email for:', referringCustomer.email);
+
+    // Get customer user profile for recipient ID
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('email', referringCustomer.email)
+      .single();
+
+    // Format values
+    const creditAmount = `£${(credit.commission_amount / 100).toFixed(2)}`;
+    const totalCreditBalance = `£${(newBalance / 100).toFixed(2)}`;
+    const referredCustomerName = referredCustomer.email.split('@')[0]; // Use email prefix if no name
+
+    // Build URLs
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const shopUrl = `${baseUrl}/shop`;
+    const referralsUrl = `${baseUrl}/customer/referrals`;
+
+    // Send email via messaging service
+    await sendMessage({
+      templateKey: 'customer_credit_earned',
+      recipientType: 'customer',
+      recipientId: userProfile?.id || null,
+      recipientEmail: referringCustomer.email,
+      variables: {
+        customer_name: referringCustomer.first_name || referringCustomer.email.split('@')[0],
+        referred_customer_name: referredCustomerName,
+        credit_amount: creditAmount,
+        total_credit_balance: totalCreditBalance,
+        shop_url: shopUrl,
+        referrals_url: referralsUrl
+      },
+      priority: 'normal'
+    });
+
+    console.log('✅ Customer credit email queued successfully:', {
+      customerId: referringCustomer.id,
+      customerEmail: referringCustomer.email,
+      creditAmount
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to send customer credit email:', error);
+    // Don't throw - we don't want email failures to break credit processing
+  }
+}
+
+// Send order confirmation email to customer
+async function sendOrderConfirmationEmail(
+  supabase: any,
+  order: any,
+  paymentIntent: any,
+  metadata: any
+) {
+  try {
+    console.log('📧 Preparing order confirmation email for:', order.customer_email);
+
+    // Get customer profile for recipient ID
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('email', order.customer_email)
+      .single();
+
+    if (!userProfile) {
+      console.warn('⚠️  User profile not found for email confirmation:', order.customer_email);
+      // Continue anyway - email can still be sent without user profile
+    }
+
+    // Get order items for email
+    const { data: orderItems } = await supabase
+      .from('order_items')
+      .select('*')
+      .eq('order_id', order.id);
+
+    // Format items for email template
+    const items = orderItems?.map((item: any) => {
+      const productData = typeof item.product_data === 'string'
+        ? JSON.parse(item.product_data)
+        : item.product_data;
+
+      return {
+        title: item.image_title,
+        format: productData?.format?.name || 'Custom',
+        size: `${productData?.width_cm}x${productData?.height_cm}cm`,
+        quantity: item.quantity,
+        price: `£${(item.unit_price / 100).toFixed(2)}`
+      };
+    }) || [];
+
+    // Format monetary values
+    const subtotal = `£${(order.subtotal_amount / 100).toFixed(2)}`;
+    const discountAmount = order.discount_amount ? `£${(order.discount_amount / 100).toFixed(2)}` : null;
+    const creditApplied = order.credit_applied ? `£${(order.credit_applied / 100).toFixed(2)}` : null;
+    const shippingAmount = `£${(order.shipping_amount / 100).toFixed(2)}`;
+    const totalAmount = `£${(order.total_amount / 100).toFixed(2)}`;
+
+    // Format shipping address
+    const shippingName = `${order.shipping_first_name} ${order.shipping_last_name}`;
+    const shippingAddressLine1 = order.shipping_address_line_1 || order.shipping_address;
+    const shippingAddressLine2 = order.shipping_address_line_2 || null;
+
+    // Format estimated delivery
+    const estimatedDelivery = order.estimated_delivery
+      ? new Date(order.estimated_delivery).toLocaleDateString('en-GB', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
+      : 'Within 7-10 business days';
+
+    // Build order URL
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const orderUrl = `${baseUrl}/customer/orders/${order.id}`;
+
+    // Send email via messaging service
+    await sendMessage({
+      templateKey: 'order_confirmation',
+      recipientType: 'customer',
+      recipientId: userProfile?.id || null,
+      recipientEmail: order.customer_email,
+      variables: {
+        customer_name: order.shipping_first_name,
+        order_number: order.order_number,
+        order_id: order.id,
+        items,
+        subtotal,
+        discount_amount: discountAmount,
+        referral_code: order.referral_code || null,
+        credit_applied: creditApplied,
+        shipping_amount: shippingAmount,
+        total_amount: totalAmount,
+        shipping_name: shippingName,
+        shipping_address_line_1: shippingAddressLine1,
+        shipping_address_line_2: shippingAddressLine2,
+        shipping_city: order.shipping_city,
+        shipping_postcode: order.shipping_postcode,
+        shipping_country: order.shipping_country,
+        estimated_delivery: estimatedDelivery,
+        order_url: orderUrl,
+        payment_intent_id: order.payment_intent_id,
+        unsubscribe_url: `${baseUrl}/preferences/unsubscribe`
+      },
+      priority: 'high'
+    });
+
+    console.log('✅ Order confirmation email queued successfully:', {
+      orderId: order.id,
+      orderNumber: order.order_number,
+      customerEmail: order.customer_email
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to send order confirmation email:', error);
+    // Don't throw - we don't want email failures to break order processing
   }
 }
 
