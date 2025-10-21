@@ -36,6 +36,8 @@ export default function TemplateDetailsPage() {
   const [template, setTemplate] = useState<MessageTemplate | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'email' | 'sms' | 'inbox'>('email');
+  const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     loadTemplate();
@@ -47,11 +49,53 @@ export default function TemplateDetailsPage() {
       const adminService = new AdminSupabaseService();
       const data = await adminService.getTemplate(templateKey);
       setTemplate(data);
+
+      // Load HTML preview if available
+      const htmlFileMatch = data?.email_body_template?.match(/lib\/messaging\/templates\/([\w-]+\.html)/);
+      if (htmlFileMatch) {
+        const fileName = htmlFileMatch[1];
+        loadHtmlPreview(fileName, data.variables);
+      }
     } catch (error) {
       console.error('Failed to load template:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadHtmlPreview = async (fileName: string, variables: any) => {
+    try {
+      const response = await fetch(`/api/admin/templates/html?file=${encodeURIComponent(fileName)}`);
+      if (!response.ok) return;
+      const data = await response.json();
+
+      // Replace with sample data
+      let preview = data.content;
+      const sampleData = generateSampleData(variables);
+      Object.entries(sampleData).forEach(([key, value]) => {
+        if (typeof value === 'string') {
+          preview = preview.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), value);
+        }
+      });
+
+      setHtmlPreview(preview);
+    } catch (error) {
+      console.error('Failed to load HTML preview:', error);
+    }
+  };
+
+  const generateSampleData = (variables: any): Record<string, string> => {
+    const samples: Record<string, string> = {};
+    Object.keys(variables || {}).forEach(key => {
+      if (key.includes('email')) samples[key] = 'customer@example.com';
+      else if (key.includes('name')) samples[key] = 'John Doe';
+      else if (key.includes('amount') || key.includes('price')) samples[key] = '£49.99';
+      else if (key.includes('date')) samples[key] = new Date().toLocaleDateString('en-GB');
+      else if (key.includes('url')) samples[key] = 'https://pawtraits.pics/example';
+      else if (key.includes('number')) samples[key] = '12345';
+      else samples[key] = 'Sample Value';
+    });
+    return samples;
   };
 
   if (loading) {
@@ -102,6 +146,14 @@ export default function TemplateDetailsPage() {
             }`}>
               {template.is_active ? 'Active' : 'Inactive'}
             </span>
+            {template.email_body_template?.includes('lib/messaging/templates/') && (
+              <Link
+                href={`/admin/messaging/${template.template_key}/edit-html`}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+              >
+                Edit HTML
+              </Link>
+            )}
             <Link
               href={`/admin/messaging/test?template=${template.template_key}`}
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
@@ -183,6 +235,32 @@ export default function TemplateDetailsPage() {
                   <code className="text-sm text-gray-900">{template.email_subject_template}</code>
                 </div>
               </div>
+
+              {/* HTML Preview Toggle */}
+              {htmlPreview && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">HTML Preview (with sample data)</label>
+                    <button
+                      onClick={() => setShowPreview(!showPreview)}
+                      className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                    >
+                      {showPreview ? 'Hide Preview' : 'Show Preview'}
+                    </button>
+                  </div>
+                  {showPreview && (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                      <iframe
+                        srcDoc={htmlPreview}
+                        className="w-full h-[600px] border-0"
+                        title="Email Preview"
+                        sandbox="allow-same-origin"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Body Template</label>
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-auto">
