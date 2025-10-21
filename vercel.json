@@ -9,6 +9,12 @@
       "memory": 512
     }
   },
+  "crons": [
+    {
+      "path": "/api/messaging/process",
+      "schedule": "* * * * *"
+    }
+  ],
   "regions": ["cle1"],
   "headers": [
     {
