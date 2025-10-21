@@ -25,6 +25,8 @@ import type {
   UserType,
   MessageChannel,
 } from './types';
+import { readFile } from 'fs/promises';
+import path from 'path';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -35,6 +37,34 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
     persistSession: false,
   },
 });
+
+/**
+ * Load HTML template from file if the template content references an external file
+ *
+ * @param templateContent - Template content (may be HTML or file reference)
+ * @returns Actual HTML content
+ */
+async function loadTemplateContent(templateContent: string): Promise<string> {
+  // Check if content references an external file
+  const fileMatch = templateContent.match(/lib\/messaging\/templates\/([\w-]+\.html)/);
+
+  if (fileMatch) {
+    const fileName = fileMatch[1];
+    const filePath = path.join(process.cwd(), 'lib', 'messaging', 'templates', fileName);
+
+    try {
+      const htmlContent = await readFile(filePath, 'utf-8');
+      return htmlContent;
+    } catch (error) {
+      console.error(`Failed to load template file ${fileName}:`, error);
+      // Fall back to the original content
+      return templateContent;
+    }
+  }
+
+  // Return as-is if it's not a file reference
+  return templateContent;
+}
 
 /**
  * Send a message using a template
@@ -97,7 +127,9 @@ export async function sendMessage(params: EnqueueMessageParams): Promise<{
 
         // Render templates based on channel
         if (channel === 'email' && template.email_body_template) {
-          renderedBody = renderTemplate(template.email_body_template, params.variables);
+          // Load HTML file if referenced
+          const emailTemplate = await loadTemplateContent(template.email_body_template);
+          renderedBody = renderTemplate(emailTemplate, params.variables);
           if (template.email_subject_template) {
             renderedSubject = renderTemplate(template.email_subject_template, params.variables);
           }
