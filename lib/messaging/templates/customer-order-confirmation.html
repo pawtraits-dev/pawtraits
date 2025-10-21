@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Confirmation - Pawtraits</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f9fafb;
+      margin: 0;
+      padding: 0;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 40px auto;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px 30px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0 0 10px 0;
+      font-size: 32px;
+      font-weight: 700;
+    }
+    .header p {
+      margin: 0;
+      font-size: 16px;
+      opacity: 0.95;
+    }
+    .content {
+      padding: 40px 30px;
+    }
+    .order-number {
+      display: inline-block;
+      background: #f3f4f6;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      color: #7c3aed;
+      margin: 20px 0;
+      font-size: 18px;
+    }
+    .info-box {
+      background: #f9fafb;
+      border-left: 4px solid #7c3aed;
+      padding: 20px;
+      margin: 25px 0;
+      border-radius: 4px;
+    }
+    .info-box h3 {
+      margin: 0 0 15px 0;
+      font-size: 16px;
+      color: #7c3aed;
+    }
+    .info-box p {
+      margin: 5px 0;
+      font-size: 14px;
+    }
+    .order-summary {
+      background: #f9fafb;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 25px 0;
+    }
+    .order-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 15px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .order-item:last-child {
+      border-bottom: none;
+    }
+    .item-details {
+      flex: 1;
+    }
+    .item-title {
+      font-weight: 600;
+      color: #111827;
+      margin: 0 0 5px 0;
+    }
+    .item-meta {
+      font-size: 14px;
+      color: #6b7280;
+    }
+    .item-price {
+      font-weight: 600;
+      color: #111827;
+      text-align: right;
+    }
+    .totals {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 2px solid #e5e7eb;
+    }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 15px;
+    }
+    .total-row.final {
+      font-size: 20px;
+      font-weight: 700;
+      color: #7c3aed;
+      padding-top: 15px;
+      border-top: 1px solid #e5e7eb;
+      margin-top: 10px;
+    }
+    .button {
+      display: inline-block;
+      background: #7c3aed;
+      color: white !important;
+      padding: 16px 32px;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .button:hover {
+      background: #6d28d9;
+    }
+    .timeline {
+      margin: 30px 0;
+      padding: 25px;
+      background: linear-gradient(to right, #faf5ff, #f3f4f6);
+      border-radius: 8px;
+    }
+    .timeline h3 {
+      margin: 0 0 15px 0;
+      color: #7c3aed;
+      font-size: 18px;
+    }
+    .timeline-step {
+      display: flex;
+      align-items: flex-start;
+      margin: 15px 0;
+    }
+    .timeline-icon {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      background: #7c3aed;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      margin-right: 15px;
+    }
+    .timeline-content p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .timeline-content strong {
+      color: #111827;
+    }
+    .footer {
+      background: #f9fafb;
+      padding: 30px;
+      text-align: center;
+      color: #6b7280;
+      font-size: 14px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .footer p {
+      margin: 10px 0;
+    }
+    .footer a {
+      color: #7c3aed;
+      text-decoration: none;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+    .social-links {
+      margin: 20px 0;
+    }
+    .social-links a {
+      display: inline-block;
+      margin: 0 10px;
+      color: #7c3aed;
+      text-decoration: none;
+    }
+    @media only screen and (max-width: 600px) {
+      .email-container {
+        margin: 0;
+        border-radius: 0;
+      }
+      .header {
+        padding: 30px 20px;
+      }
+      .header h1 {
+        font-size: 24px;
+      }
+      .content {
+        padding: 30px 20px;
+      }
+      .button {
+        display: block;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🐾 Thank You for Your Order!</h1>
+      <p>Your custom pet portrait is being prepared</p>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <p>Hi {{customer_name}},</p>
+
+      <p>We're excited to confirm your order! Your beautiful custom pet portrait will be printed and shipped to you soon.</p>
+
+      <div class="order-number">
+        Order #{{order_number}}
+      </div>
+
+      <!-- Order Summary -->
+      <div class="order-summary">
+        <h2 style="margin-top: 0; font-size: 20px; color: #111827;">Order Summary</h2>
+
+        {{#each items}}
+        <div class="order-item">
+          <div class="item-details">
+            <p class="item-title">{{this.title}}</p>
+            <p class="item-meta">{{this.format}} • {{this.size}} • Qty: {{this.quantity}}</p>
+          </div>
+          <div class="item-price">
+            {{this.price}}
+          </div>
+        </div>
+        {{/each}}
+
+        <!-- Totals -->
+        <div class="totals">
+          <div class="total-row">
+            <span>Subtotal</span>
+            <span>{{subtotal}}</span>
+          </div>
+          {{#if discount_amount}}
+          <div class="total-row" style="color: #10b981;">
+            <span>Discount {{#if referral_code}}({{referral_code}}){{/if}}</span>
+            <span>-{{discount_amount}}</span>
+          </div>
+          {{/if}}
+          {{#if credit_applied}}
+          <div class="total-row" style="color: #10b981;">
+            <span>Credit Applied</span>
+            <span>-{{credit_applied}}</span>
+          </div>
+          {{/if}}
+          <div class="total-row">
+            <span>Shipping</span>
+            <span>{{shipping_amount}}</span>
+          </div>
+          <div class="total-row final">
+            <span>Total</span>
+            <span>{{total_amount}}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shipping Address -->
+      <div class="info-box">
+        <h3>📦 Shipping Address</h3>
+        <p><strong>{{shipping_name}}</strong></p>
+        <p>{{shipping_address_line_1}}</p>
+        {{#if shipping_address_line_2}}
+        <p>{{shipping_address_line_2}}</p>
+        {{/if}}
+        <p>{{shipping_city}}, {{shipping_postcode}}</p>
+        <p>{{shipping_country}}</p>
+      </div>
+
+      <!-- What Happens Next -->
+      <div class="timeline">
+        <h3>📅 What Happens Next</h3>
+
+        <div class="timeline-step">
+          <div class="timeline-icon">✓</div>
+          <div class="timeline-content">
+            <p><strong>Order Confirmed</strong><br>
+            Your order has been received and is being processed.</p>
+          </div>
+        </div>
+
+        <div class="timeline-step">
+          <div class="timeline-icon">2</div>
+          <div class="timeline-content">
+            <p><strong>Printing & Quality Check</strong><br>
+            Your portrait is being professionally printed on high-quality materials.</p>
+          </div>
+        </div>
+
+        <div class="timeline-step">
+          <div class="timeline-icon">3</div>
+          <div class="timeline-content">
+            <p><strong>Shipping</strong><br>
+            Your order will be carefully packaged and shipped within 2-3 business days.</p>
+          </div>
+        </div>
+
+        <div class="timeline-step">
+          <div class="timeline-icon">4</div>
+          <div class="timeline-content">
+            <p><strong>Delivered</strong><br>
+            Estimated delivery: {{estimated_delivery}}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA Button -->
+      <div style="text-align: center;">
+        <a href="{{order_url}}" class="button">Track Your Order</a>
+      </div>
+
+      <!-- Support Info -->
+      <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
+        <strong>Need help?</strong><br>
+        If you have any questions about your order, please don't hesitate to contact us at
+        <a href="mailto:support@pawtraits.pics" style="color: #7c3aed;">support@pawtraits.pics</a>
+      </p>
+
+      <p style="font-size: 14px; color: #6b7280;">
+        We typically respond within 24 hours.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p><strong>Pawtraits</strong></p>
+      <p>Transform your pet into a masterpiece</p>
+
+      <div class="social-links">
+        <a href="https://facebook.com/pawtraits">Facebook</a> •
+        <a href="https://instagram.com/pawtraits">Instagram</a> •
+        <a href="https://twitter.com/pawtraits">Twitter</a>
+      </div>
+
+      <p style="margin-top: 20px; font-size: 12px; color: #9ca3af;">
+        © 2025 Pawtraits. All rights reserved.<br>
+        <a href="https://pawtraits.pics">Visit our website</a> •
+        <a href="{{unsubscribe_url}}">Unsubscribe</a>
+      </p>
+
+      <p style="font-size: 11px; color: #d1d5db; margin-top: 15px;">
+        This is a transactional email confirming your order.<br>
+        Order ID: {{order_number}} • Payment ID: {{payment_intent_id}}
+      </p>
+    </div>
+  </div>
+</body>
+</html>

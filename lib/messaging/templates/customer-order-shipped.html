@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Order Has Shipped - Pawtraits</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f9fafb;
+      margin: 0;
+      padding: 0;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 40px auto;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      padding: 40px 30px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0 0 10px 0;
+      font-size: 32px;
+      font-weight: 700;
+    }
+    .header p {
+      margin: 0;
+      font-size: 16px;
+      opacity: 0.95;
+    }
+    .content {
+      padding: 40px 30px;
+    }
+    .success-badge {
+      display: inline-block;
+      background: #d1fae5;
+      color: #065f46;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-weight: 600;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+    .tracking-box {
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+      border: 2px solid #10b981;
+      border-radius: 12px;
+      padding: 30px;
+      margin: 25px 0;
+      text-align: center;
+    }
+    .tracking-box h3 {
+      margin: 0 0 15px 0;
+      color: #065f46;
+      font-size: 18px;
+    }
+    .tracking-number {
+      font-family: 'Courier New', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      color: #10b981;
+      background: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin: 15px 0;
+      display: inline-block;
+    }
+    .info-box {
+      background: #f9fafb;
+      border-left: 4px solid #10b981;
+      padding: 20px;
+      margin: 25px 0;
+      border-radius: 4px;
+    }
+    .info-box h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+      color: #065f46;
+    }
+    .info-box p {
+      margin: 5px 0;
+      font-size: 14px;
+    }
+    .button {
+      display: inline-block;
+      background: #10b981;
+      color: white !important;
+      padding: 16px 32px;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .button:hover {
+      background: #059669;
+    }
+    .delivery-estimate {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 20px;
+      margin: 25px 0;
+      border-radius: 4px;
+    }
+    .delivery-estimate h3 {
+      margin: 0 0 10px 0;
+      color: #92400e;
+      font-size: 16px;
+    }
+    .delivery-date {
+      font-size: 20px;
+      font-weight: 700;
+      color: #b45309;
+      margin: 10px 0;
+    }
+    .footer {
+      background: #f9fafb;
+      padding: 30px;
+      text-align: center;
+      color: #6b7280;
+      font-size: 14px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .footer p {
+      margin: 10px 0;
+    }
+    .footer a {
+      color: #10b981;
+      text-decoration: none;
+    }
+    @media only screen and (max-width: 600px) {
+      .email-container {
+        margin: 0;
+        border-radius: 0;
+      }
+      .header {
+        padding: 30px 20px;
+      }
+      .header h1 {
+        font-size: 24px;
+      }
+      .content {
+        padding: 30px 20px;
+      }
+      .button {
+        display: block;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <!-- Header -->
+    <div class="header">
+      <h1>📦 Your Order is On Its Way!</h1>
+      <p>Your pet portrait has shipped</p>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <p>Hi {{customer_name}},</p>
+
+      <p>Great news! Your custom pet portrait order has been shipped and is on its way to you.</p>
+
+      <div class="success-badge">
+        ✓ Shipped on {{shipped_date}}
+      </div>
+
+      <!-- Tracking Information -->
+      <div class="tracking-box">
+        <h3>📍 Track Your Package</h3>
+        <p style="color: #065f46; margin-bottom: 15px;">Your tracking number:</p>
+        <div class="tracking-number">{{tracking_number}}</div>
+        <a href="{{tracking_url}}" class="button" style="margin-top: 15px;">Track Your Shipment</a>
+      </div>
+
+      <!-- Delivery Estimate -->
+      <div class="delivery-estimate">
+        <h3>⏰ Estimated Delivery</h3>
+        <div class="delivery-date">{{estimated_delivery_date}}</div>
+        <p style="margin: 5px 0; color: #78350f; font-size: 14px;">
+          {{carrier_name}} • {{shipping_method}}
+        </p>
+      </div>
+
+      <!-- Order Details -->
+      <div class="info-box">
+        <h3>📦 Order Details</h3>
+        <p><strong>Order Number:</strong> {{order_number}}</p>
+        <p><strong>Items:</strong> {{item_count}} item(s)</p>
+        <p><strong>Shipping to:</strong> {{shipping_city}}, {{shipping_postcode}}, {{shipping_country}}</p>
+      </div>
+
+      <!-- What to Expect -->
+      <h3 style="color: #111827; margin-top: 30px;">📋 What to Expect</h3>
+      <ul style="color: #6b7280; font-size: 14px; line-height: 1.8;">
+        <li>Your package is carefully wrapped to ensure safe delivery</li>
+        <li>Tracking updates will be sent to your email automatically</li>
+        <li>Someone will need to be available to sign for the package (if required)</li>
+        <li>If you're not home, the carrier will leave a notice with pickup instructions</li>
+      </ul>
+
+      <!-- Support -->
+      <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
+        <strong>Questions about your delivery?</strong><br>
+        Contact us at <a href="mailto:support@pawtraits.pics" style="color: #10b981;">support@pawtraits.pics</a>
+        or use the tracking link above for the most up-to-date information.
+      </p>
+
+      <!-- CTA -->
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="{{order_url}}" style="color: #10b981; text-decoration: none; font-weight: 600;">
+          View Full Order Details →
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p><strong>Pawtraits</strong></p>
+      <p>Transform your pet into a masterpiece</p>
+
+      <p style="margin-top: 20px; font-size: 12px; color: #9ca3af;">
+        © 2025 Pawtraits. All rights reserved.<br>
+        <a href="https://pawtraits.pics">Visit our website</a>
+      </p>
+
+      <p style="font-size: 11px; color: #d1d5db; margin-top: 15px;">
+        Order #{{order_number}} • Tracking #{{tracking_number}}
+      </p>
+    </div>
+  </div>
+</body>
+</html>

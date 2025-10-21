@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to the Pawtraits Partner Program!</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f9fafb;
+      margin: 0;
+      padding: 0;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 40px auto;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: white;
+      padding: 40px 30px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0 0 10px 0;
+      font-size: 32px;
+      font-weight: 700;
+    }
+    .header p {
+      margin: 0;
+      font-size: 16px;
+      opacity: 0.95;
+    }
+    .content {
+      padding: 40px 30px;
+    }
+    .celebration-badge {
+      display: inline-block;
+      background: #fef3c7;
+      color: #92400e;
+      padding: 12px 24px;
+      border-radius: 20px;
+      font-weight: 600;
+      margin: 20px 0;
+      font-size: 16px;
+    }
+    .info-box {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 20px;
+      margin: 25px 0;
+      border-radius: 4px;
+    }
+    .info-box h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+      color: #92400e;
+    }
+    .info-box p {
+      margin: 5px 0;
+      font-size: 14px;
+      color: #78350f;
+    }
+    .commission-highlight {
+      background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+      border: 2px solid #f59e0b;
+      border-radius: 12px;
+      padding: 30px;
+      margin: 25px 0;
+      text-align: center;
+    }
+    .commission-rate {
+      font-size: 48px;
+      font-weight: 700;
+      color: #d97706;
+      margin: 15px 0;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin: 25px 0;
+    }
+    .feature-card {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+    }
+    .feature-icon {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+    .feature-card h4 {
+      margin: 10px 0 5px 0;
+      font-size: 16px;
+      color: #111827;
+    }
+    .feature-card p {
+      margin: 0;
+      font-size: 13px;
+      color: #6b7280;
+    }
+    .button {
+      display: inline-block;
+      background: #f59e0b;
+      color: white !important;
+      padding: 16px 32px;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+      margin: 10px 5px;
+      text-align: center;
+    }
+    .button:hover {
+      background: #d97706;
+    }
+    .button-secondary {
+      background: white;
+      color: #f59e0b !important;
+      border: 2px solid #f59e0b;
+    }
+    .button-secondary:hover {
+      background: #fffbeb;
+    }
+    .steps-list {
+      counter-reset: step-counter;
+      list-style: none;
+      padding: 0;
+      margin: 25px 0;
+    }
+    .steps-list li {
+      counter-increment: step-counter;
+      position: relative;
+      padding-left: 60px;
+      margin-bottom: 25px;
+      color: #4b5563;
+    }
+    .steps-list li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 36px;
+      height: 36px;
+      background: #f59e0b;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+    .steps-list li strong {
+      display: block;
+      color: #111827;
+      margin-bottom: 5px;
+      font-size: 16px;
+    }
+    .footer {
+      background: #f9fafb;
+      padding: 30px;
+      text-align: center;
+      color: #6b7280;
+      font-size: 14px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .footer p {
+      margin: 10px 0;
+    }
+    .footer a {
+      color: #f59e0b;
+      text-decoration: none;
+    }
+    @media only screen and (max-width: 600px) {
+      .email-container {
+        margin: 0;
+        border-radius: 0;
+      }
+      .header {
+        padding: 30px 20px;
+      }
+      .content {
+        padding: 30px 20px;
+      }
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+      .button {
+        display: block;
+        width: 100%;
+        margin: 10px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🎉 Welcome to the Pawtraits Partner Program!</h1>
+      <p>Your application has been approved</p>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <p>Hi {{partner_name}},</p>
+
+      <p>Congratulations! We're thrilled to welcome you to the Pawtraits Partner Program. Your application has been reviewed and approved.</p>
+
+      <div class="celebration-badge">
+        🎊 You're now an official Pawtraits Partner!
+      </div>
+
+      <!-- Commission Highlight -->
+      <div class="commission-highlight">
+        <h3 style="margin: 0 0 10px 0; color: #92400e; font-size: 18px;">Your Commission Rate</h3>
+        <div class="commission-rate">{{commission_rate}}%</div>
+        <p style="color: #78350f; margin: 0;">
+          Earn commission on every referral you send our way
+        </p>
+        {{#if lifetime_commission_rate}}
+        <p style="color: #92400e; margin: 15px 0 0 0; font-size: 14px;">
+          Plus {{lifetime_commission_rate}}% on all future orders from your referrals!
+        </p>
+        {{/if}}
+      </div>
+
+      <!-- What's Included -->
+      <h3 style="color: #111827; margin-top: 30px;">✨ What's Included</h3>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">💰</div>
+          <h4>Lifetime Commissions</h4>
+          <p>Earn on every order from your referrals</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h4>Partner Dashboard</h4>
+          <p>Track earnings and analytics</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🎯</div>
+          <h4>Custom QR Codes</h4>
+          <p>Share your unique referral link</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🎁</div>
+          <h4>Partner Discount</h4>
+          <p>20% off for your own orders</p>
+        </div>
+      </div>
+
+      <!-- Getting Started -->
+      <h3 style="color: #111827; margin-top: 30px;">🚀 Getting Started</h3>
+
+      <ol class="steps-list">
+        <li>
+          <strong>Access Your Dashboard</strong>
+          Log in to your partner portal to see your unique referral code and QR code.
+        </li>
+
+        <li>
+          <strong>Share Your Code</strong>
+          Display your QR code at your business or share your link with clients.
+        </li>
+
+        <li>
+          <strong>Earn Commissions</strong>
+          When customers use your code, you automatically earn {{commission_rate}}% commission.
+        </li>
+
+        <li>
+          <strong>Get Paid</strong>
+          Track your earnings in real-time and receive monthly payouts.
+        </li>
+      </ol>
+
+      <!-- Commission Info Box -->
+      <div class="info-box">
+        <h3>💡 How Commissions Work</h3>
+        <p><strong>First Purchase:</strong> {{commission_rate}}% commission</p>
+        {{#if lifetime_commission_rate}}
+        <p><strong>Repeat Purchases:</strong> {{lifetime_commission_rate}}% commission on all future orders</p>
+        {{/if}}
+        <p><strong>Payment:</strong> Monthly automatic payouts</p>
+        <p><strong>Tracking:</strong> Real-time updates in your dashboard</p>
+      </div>
+
+      <!-- CTA Buttons -->
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{dashboard_url}}" class="button">Access Partner Dashboard</a>
+        <a href="{{guide_url}}" class="button button-secondary">View Partner Guide</a>
+      </div>
+
+      <!-- Support -->
+      <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
+        <strong>Need help getting started?</strong><br>
+        Our partner success team is here to help. Contact us at
+        <a href="mailto:partners@pawtraits.pics" style="color: #f59e0b;">partners@pawtraits.pics</a>
+      </p>
+
+      <p style="font-size: 14px; color: #6b7280;">
+        We're excited to have you as part of the Pawtraits family!
+      </p>
+
+      <p style="font-size: 14px; color: #6b7280; margin-top: 20px;">
+        Best regards,<br>
+        <strong>The Pawtraits Team</strong>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p><strong>Pawtraits Partner Program</strong></p>
+      <p>Transform your pet into a masterpiece</p>
+
+      <p style="margin-top: 20px; font-size: 12px; color: #9ca3af;">
+        © 2025 Pawtraits. All rights reserved.<br>
+        <a href="{{terms_url}}">Partner Terms & Conditions</a> •
+        <a href="{{unsubscribe_url}}">Unsubscribe</a>
+      </p>
+
+      <p style="font-size: 11px; color: #d1d5db; margin-top: 15px;">
+        Partner ID: {{partner_id}}
+      </p>
+    </div>
+  </div>
+</body>
+</html>
