@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Order Confirmation - Pawtraits</title>
+  <title>Your Masterpiece is On Its Way! - Pawtraits</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -221,15 +221,18 @@
   <div class="email-container">
     <!-- Header -->
     <div class="header">
-      <h1>🐾 Thank You for Your Order!</h1>
-      <p>Your custom pet portrait is being prepared</p>
+      <div style="margin-bottom: 20px;">
+        <img src="{{base_url}}/assets/logos/pawrtraits-logo.svg" alt="Pawtraits" style="height: 60px; width: auto;" />
+      </div>
+      <h1>🎨 Your Masterpiece is On Its Way!</h1>
+      <p>We're turning your pet into art (the fancy kind, not the crayon-on-wall kind)</p>
     </div>
 
     <!-- Content -->
     <div class="content">
-      <p>Hi {{customer_name}},</p>
+      <p>Hey {{customer_name}}! 👋</p>
 
-      <p>We're excited to confirm your order! Your beautiful custom pet portrait will be printed and shipped to you soon.</p>
+      <p>Guess what just happened? You've officially commissioned a work of art that would make the Renaissance painters jealous. Your pet's about to get the portrait treatment they've always deserved (and probably demanded through strategic staring).</p>
 
       <div class="order-number">
         Order #{{order_number}}
@@ -237,7 +240,7 @@
 
       <!-- Order Summary -->
       <div class="order-summary">
-        <h2 style="margin-top: 0; font-size: 20px; color: #111827;">Order Summary</h2>
+        <h2 style="margin-top: 0; font-size: 20px; color: #111827;">Your Pet's Moment of Glory</h2>
 
         {{#each items}}
         <div class="order-item">
@@ -282,7 +285,7 @@
 
       <!-- Shipping Address -->
       <div class="info-box">
-        <h3>📦 Shipping Address</h3>
+        <h3>📦 Delivering Cuteness To</h3>
         <p><strong>{{shipping_name}}</strong></p>
         <p>{{shipping_address_line_1}}</p>
         {{#if shipping_address_line_2}}
@@ -290,66 +293,70 @@
         {{/if}}
         <p>{{shipping_city}}, {{shipping_postcode}}</p>
         <p>{{shipping_country}}</p>
+        <p style="margin-top: 10px; font-size: 13px; color: #6b7280; font-style: italic;">
+          (We promise to pack it so carefully, it'll arrive ready to make everyone jealous of your walls)
+        </p>
       </div>
 
       <!-- What Happens Next -->
       <div class="timeline">
-        <h3>📅 What Happens Next</h3>
+        <h3>🚀 Your Portrait's Journey to Greatness</h3>
 
         <div class="timeline-step">
           <div class="timeline-icon">✓</div>
           <div class="timeline-content">
-            <p><strong>Order Confirmed</strong><br>
-            Your order has been received and is being processed.</p>
+            <p><strong>Order Received!</strong><br>
+            We got it, we're excited about it, and our printers are already warming up.</p>
           </div>
         </div>
 
         <div class="timeline-step">
           <div class="timeline-icon">2</div>
           <div class="timeline-content">
-            <p><strong>Printing & Quality Check</strong><br>
-            Your portrait is being professionally printed on high-quality materials.</p>
+            <p><strong>Printing & Quality Control</strong><br>
+            Your Pawtrait is getting the VIP treatment on our fancy professional printers. We're checking every detail because your pet deserves perfection.</p>
           </div>
         </div>
 
         <div class="timeline-step">
           <div class="timeline-icon">3</div>
           <div class="timeline-content">
-            <p><strong>Shipping</strong><br>
-            Your order will be carefully packaged and shipped within 2-3 business days.</p>
+            <p><strong>Packing Time!</strong><br>
+            We wrap it like it's the crown jewels. Because basically, it is. Your order ships within 2-3 business days.</p>
           </div>
         </div>
 
         <div class="timeline-step">
           <div class="timeline-icon">4</div>
           <div class="timeline-content">
-            <p><strong>Delivered</strong><br>
-            Estimated delivery: {{estimated_delivery}}</p>
+            <p><strong>Doorstep Arrival!</strong><br>
+            Expected delivery: {{estimated_delivery}}<br>
+            <span style="font-size: 13px; color: #6b7280;">(Your walls are about to level up significantly)</span></p>
           </div>
         </div>
       </div>
 
       <!-- CTA Button -->
       <div style="text-align: center;">
-        <a href="{{order_url}}" class="button">Track Your Order</a>
+        <a href="{{order_url}}" class="button">Track Your Masterpiece</a>
       </div>
 
       <!-- Support Info -->
       <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
-        <strong>Need help?</strong><br>
-        If you have any questions about your order, please don't hesitate to contact us at
+        <strong>Questions? Concerns? Just want to chat about your pet?</strong><br>
+        We're here for all of it! Drop us a line at
         <a href="mailto:support@pawtraits.pics" style="color: #7c3aed;">support@pawtraits.pics</a>
       </p>
 
       <p style="font-size: 14px; color: #6b7280;">
-        We typically respond within 24 hours.
+        We usually respond within 24 hours (probably while also showing your portrait to everyone in the office because we can't help ourselves).
       </p>
     </div>
 
     <!-- Footer -->
     <div class="footer">
       <p><strong>Pawtraits</strong></p>
-      <p>Transform your pet into a masterpiece</p>
+      <p>Where every pet becomes a professional work of art<br>(and rightfully so)</p>
 
       <div class="social-links">
         <a href="https://facebook.com/pawtraits">Facebook</a> •

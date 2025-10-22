@@ -1289,6 +1289,7 @@ async function sendPartnerCommissionEmail(
       recipientId: userProfile?.id || null,
       recipientEmail: partner.email,
       variables: {
+        base_url: baseUrl,
         partner_name: partner.business_name || `${partner.first_name} ${partner.last_name}`,
         partner_id: partner.id,
         commission_id: commission.id,
@@ -1358,6 +1359,7 @@ async function sendCustomerCreditEmail(
       recipientId: userProfile?.id || null,
       recipientEmail: referringCustomer.email,
       variables: {
+        base_url: baseUrl,
         customer_name: referringCustomer.first_name || referringCustomer.email.split('@')[0],
         referred_customer_name: referredCustomerName,
         credit_amount: creditAmount,
@@ -1458,6 +1460,7 @@ async function sendOrderConfirmationEmail(
       recipientId: userProfile?.id || null,
       recipientEmail: order.customer_email,
       variables: {
+        base_url: baseUrl,
         customer_name: order.shipping_first_name,
         order_number: order.order_number,
         order_id: order.id,
