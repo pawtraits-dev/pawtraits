@@ -37,47 +37,70 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PUT - Update HTML template file
+// PUT - Update HTML template directly in database
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fileName, content } = body;
+    const { templateKey, content } = body;
 
-    console.log('📝 Attempting to save HTML template:', { fileName, contentLength: content?.length });
+    console.log('📝 Attempting to save HTML template:', { templateKey, contentLength: content?.length });
 
-    if (!fileName || !content) {
-      console.error('❌ Missing required fields:', { hasFileName: !!fileName, hasContent: !!content });
+    if (!templateKey || !content) {
+      console.error('❌ Missing required fields:', { hasTemplateKey: !!templateKey, hasContent: !!content });
       return NextResponse.json(
-        { error: 'File name and content are required' },
+        { error: 'Template key and content are required' },
         { status: 400 }
       );
     }
 
-    // Security: Only allow files in the templates directory
-    if (fileName.includes('..') || !fileName.endsWith('.html')) {
-      console.error('❌ Invalid file name:', fileName);
+    // Initialize Supabase client with service role
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('❌ Missing Supabase configuration');
       return NextResponse.json(
-        { error: 'Invalid file name' },
-        { status: 400 }
+        { error: 'Server configuration error' },
+        { status: 500 }
       );
     }
 
-    const filePath = path.join(process.cwd(), 'lib', 'messaging', 'templates', fileName);
-    console.log('📁 File path:', filePath);
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
 
-    // Check if running in production/serverless environment
-    if (process.env.VERCEL) {
-      console.warn('⚠️  Running on Vercel - file system is read-only. Templates should be stored in database instead.');
+    // Update template in database
+    console.log('💾 Updating template in database:', templateKey);
+
+    const { data, error } = await supabase
+      .from('message_templates')
+      .update({
+        email_body_template: content,
+        updated_at: new Date().toISOString()
+      })
+      .eq('template_key', templateKey)
+      .select();
+
+    if (error) {
+      console.error('❌ Database error:', error);
       return NextResponse.json(
-        { error: 'File system updates not supported in production. Please use database-backed templates.' },
-        { status: 501 }
+        { error: 'Failed to update template in database', details: error.message },
+        { status: 500 }
       );
     }
 
-    await writeFile(filePath, content, 'utf-8');
-    console.log('✅ Template saved successfully:', fileName);
+    if (!data || data.length === 0) {
+      console.error('❌ Template not found:', templateKey);
+      return NextResponse.json(
+        { error: 'Template not found' },
+        { status: 404 }
+      );
+    }
 
-    return NextResponse.json({ success: true });
+    console.log('✅ Template saved successfully in database:', templateKey);
+
+    return NextResponse.json({ success: true, template: data[0] });
 
   } catch (error) {
     console.error('❌ Failed to update HTML template:', error);
@@ -88,7 +111,7 @@ export async function PUT(request: NextRequest) {
     });
     return NextResponse.json(
       {
-        error: 'Failed to update template file',
+        error: 'Failed to update template',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }

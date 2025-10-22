@@ -133,25 +133,25 @@ export default function EditHtmlTemplatePage() {
       setSaving(true);
       setSaveMessage(null);
 
-      const htmlFileMatch = template.email_body_template?.match(/lib\/messaging\/templates\/([\w-]+\.html)/);
-      if (!htmlFileMatch) {
-        throw new Error('Could not determine HTML file name');
-      }
-
-      const fileName = htmlFileMatch[1];
       const response = await fetch('/api/admin/templates/html', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName, content: htmlContent })
+        body: JSON.stringify({ templateKey: template.template_key, content: htmlContent })
       });
 
-      if (!response.ok) throw new Error('Failed to save HTML file');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save template');
+      }
 
       setSaveMessage({ type: 'success', text: 'Template saved successfully!' });
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {
       console.error('Failed to save template:', error);
-      setSaveMessage({ type: 'error', text: 'Failed to save template. Please try again.' });
+      setSaveMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to save template. Please try again.'
+      });
     } finally {
       setSaving(false);
     }
