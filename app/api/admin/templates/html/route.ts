@@ -1,37 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFile, writeFile } from 'fs/promises';
-import path from 'path';
 
-// GET - Read HTML template file
+// GET - Read HTML template from database
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const fileName = searchParams.get('file');
+    const templateKey = searchParams.get('templateKey');
 
-    if (!fileName) {
+    if (!templateKey) {
       return NextResponse.json(
-        { error: 'File name is required' },
+        { error: 'Template key is required' },
         { status: 400 }
       );
     }
 
-    // Security: Only allow files in the templates directory
-    if (fileName.includes('..') || !fileName.endsWith('.html')) {
+    // Initialize Supabase client with service role
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('❌ Missing Supabase configuration');
       return NextResponse.json(
-        { error: 'Invalid file name' },
-        { status: 400 }
+        { error: 'Server configuration error' },
+        { status: 500 }
       );
     }
 
-    const filePath = path.join(process.cwd(), 'lib', 'messaging', 'templates', fileName);
-    const content = await readFile(filePath, 'utf-8');
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
 
-    return NextResponse.json({ content });
+    // Get template from database
+    const { data, error } = await supabase
+      .from('message_templates')
+      .select('email_body_template')
+      .eq('template_key', templateKey)
+      .single();
+
+    if (error) {
+      console.error('❌ Database error:', error);
+      return NextResponse.json(
+        { error: 'Failed to read template from database', details: error.message },
+        { status: 500 }
+      );
+    }
+
+    if (!data) {
+      return NextResponse.json(
+        { error: 'Template not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ content: data.email_body_template });
 
   } catch (error) {
     console.error('Failed to read HTML template:', error);
     return NextResponse.json(
-      { error: 'Failed to read template file' },
+      { error: 'Failed to read template', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

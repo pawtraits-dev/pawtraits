@@ -35,12 +35,8 @@ export default function EditHtmlTemplatePage() {
       const data = await adminService.getTemplate(templateKey);
       setTemplate(data);
 
-      // Extract HTML file name from email_body_template
-      const htmlFileMatch = data?.email_body_template?.match(/lib\/messaging\/templates\/([\w-]+\.html)/);
-      if (htmlFileMatch) {
-        const fileName = htmlFileMatch[1];
-        await loadHtmlFile(fileName);
-      }
+      // Load HTML content directly from database using templateKey
+      await loadHtmlTemplate(data.template_key);
 
       // Generate sample variables
       if (data?.variables) {
@@ -53,14 +49,14 @@ export default function EditHtmlTemplatePage() {
     }
   };
 
-  const loadHtmlFile = async (fileName: string) => {
+  const loadHtmlTemplate = async (templateKey: string) => {
     try {
-      const response = await fetch(`/api/admin/templates/html?file=${encodeURIComponent(fileName)}`);
-      if (!response.ok) throw new Error('Failed to load HTML file');
+      const response = await fetch(`/api/admin/templates/html?templateKey=${encodeURIComponent(templateKey)}`);
+      if (!response.ok) throw new Error('Failed to load HTML template');
       const data = await response.json();
       setHtmlContent(data.content);
     } catch (error) {
-      console.error('Failed to load HTML file:', error);
+      console.error('Failed to load HTML template:', error);
     }
   };
 
