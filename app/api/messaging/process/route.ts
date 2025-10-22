@@ -204,8 +204,11 @@ export async function GET(request: Request) {
     const authHeader = request.headers.get('authorization');
     const isVercelCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
 
+    // Allow processing if no CRON_SECRET is configured (development/testing)
+    const allowProcessing = isVercelCron || !process.env.CRON_SECRET;
+
     // If it's a cron call, process the queue
-    if (isVercelCron) {
+    if (allowProcessing) {
       console.log('🔄 Cron triggered - processing queue via GET...');
 
       // Get pending messages

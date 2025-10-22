@@ -23,7 +23,8 @@ import {
   Sparkles,
   Search,
   Grid3X3,
-  Share2
+  Share2,
+  Bell
 } from 'lucide-react';
 import Image from 'next/image';
 import { getSupabaseClient } from '@/lib/supabase-client';
@@ -46,6 +47,7 @@ const navigationItems = [
   { name: 'My Gallery', href: '/customer/gallery', icon: ImageIcon },
   { name: 'My Pets', href: '/customer/pets', icon: Heart },
   { name: 'My Orders', href: '/customer/orders', icon: Package },
+  { name: 'Inbox', href: '/customer/inbox', icon: Bell },
   { name: 'Cart', href: '/shop/cart', icon: ShoppingCart },
   { name: 'Share & Earn', href: '/referrals', icon: Share2 },
   { name: 'My Account', href: '/customer/account', icon: User },
@@ -59,12 +61,39 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   const [profile, setProfile] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const supabase = getSupabaseClient();
 
   useEffect(() => {
     checkCustomerAccess();
   }, []);
+
+  // Fetch unread message count
+  useEffect(() => {
+    if (user?.email) {
+      fetchUnreadCount();
+      // Refresh count every 30 seconds
+      const interval = setInterval(fetchUnreadCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  const fetchUnreadCount = async () => {
+    if (!user?.email) return;
+
+    try {
+      const response = await fetch(
+        `/api/customers/messages?email=${encodeURIComponent(user.email)}&unread_only=true`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadCount(data.unread_count || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  };
 
   const checkCustomerAccess = async () => {
     try {
@@ -296,6 +325,19 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
             
             <div className="flex items-center space-x-4">
               <CountrySelector compact={true} showLabel={false} />
+
+              {/* Inbox Icon */}
+              <Link href="/customer/inbox" className="relative">
+                <Button variant="ghost" size="sm" className="relative">
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </Button>
+              </Link>
+
               <CartIcon />
             </div>
           </div>

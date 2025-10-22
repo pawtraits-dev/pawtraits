@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import CartIcon from '@/components/cart-icon';
-import { 
-  Users, 
-  ShoppingBag, 
+import {
+  Users,
+  ShoppingBag,
   Target,
   Package,
   LogOut,
@@ -22,7 +22,8 @@ import {
   TrendingUp,
   DollarSign,
   Handshake,
-  Search
+  Search,
+  Bell
 } from 'lucide-react';
 import Image from 'next/image';
 import { getSupabaseClient } from '@/lib/supabase-client';
@@ -43,6 +44,7 @@ const navigationItems = [
   { name: 'Referrals', href: '/partners/referrals', icon: Target },
   { name: 'Commissions', href: '/partners/commissions', icon: DollarSign },
   { name: 'Orders', href: '/partners/orders', icon: Package },
+  { name: 'Inbox', href: '/partners/inbox', icon: Bell },
   { name: 'Cart', href: '/shop/cart', icon: ShoppingCart },
   { name: 'Account', href: '/partners/account', icon: User },
 ];
@@ -56,12 +58,39 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const supabase = getSupabaseClient();
 
   useEffect(() => {
     checkPartnerAccess();
   }, []);
+
+  // Fetch unread message count
+  useEffect(() => {
+    if (user?.email) {
+      fetchUnreadCount();
+      // Refresh count every 30 seconds
+      const interval = setInterval(fetchUnreadCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  const fetchUnreadCount = async () => {
+    if (!user?.email) return;
+
+    try {
+      const response = await fetch(
+        `/api/partners/messages?email=${encodeURIComponent(user.email)}&unread_only=true`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadCount(data.unread_count || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  };
 
   // Set green favicon for partner portal
   useEffect(() => {
@@ -335,6 +364,19 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
             
             <div className="flex items-center space-x-4">
               <CountrySelector compact={true} showLabel={false} />
+
+              {/* Inbox Icon */}
+              <Link href="/partners/inbox" className="relative">
+                <Button variant="ghost" size="sm" className="relative">
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </Button>
+              </Link>
+
               <Badge variant="secondary" className="bg-green-100 text-green-800">
                 Business Partner
               </Badge>
