@@ -6,6 +6,8 @@ import { MessageList } from '@/components/inbox/MessageList';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Inbox as InboxIcon } from 'lucide-react';
 import { useUserRouting } from '@/hooks/use-user-routing';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
+import { CountryProvider } from '@/lib/country-context';
 
 interface Message {
   id: string;
@@ -163,10 +165,14 @@ export default function UnifiedInboxPage() {
     : 'bg-blue-600 hover:bg-blue-700';
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200">
+    <CountryProvider>
+      <div className="min-h-screen bg-gray-50">
+        <UserAwareNavigation />
+
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center space-x-3">
@@ -228,6 +234,8 @@ export default function UnifiedInboxPage() {
           />
         </div>
       </div>
-    </div>
+        </div>
+      </div>
+    </CountryProvider>
   );
 }
