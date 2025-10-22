@@ -28,7 +28,8 @@ import {
   Palette,
   Images,
   PawPrint,
-  Share2
+  Share2,
+  Bell
 } from 'lucide-react'
 import { SupabaseService } from '@/lib/supabase'
 import { useHybridCart } from '@/lib/hybrid-cart-context'
@@ -52,6 +53,7 @@ export default function UserAwareNavigation({
 }: UserAwareNavigationProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const { userProfile, loading: userLoading } = useUserRouting()
   const { totalItems } = useHybridCart()
   const { selectedCountry, selectedCountryData, availableCountries, setSelectedCountry } = useCountryPricing()
@@ -64,6 +66,36 @@ export default function UserAwareNavigation({
   const isPartner = userType === 'partner'
   const isAdmin = userType === 'admin'
   const isInfluencer = userType === 'influencer'
+
+  // Fetch unread message count
+  React.useEffect(() => {
+    if (userProfile?.email && !isAdmin) {
+      fetchUnreadCount()
+      // Refresh count every 30 seconds
+      const interval = setInterval(fetchUnreadCount, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [userProfile, isAdmin])
+
+  const fetchUnreadCount = async () => {
+    if (!userProfile?.email || isAdmin) return
+
+    try {
+      const endpoint = isPartner
+        ? '/api/partners/messages'
+        : '/api/customers/messages'
+
+      const response = await fetch(
+        `${endpoint}?email=${encodeURIComponent(userProfile.email)}&unread_only=true`
+      )
+      if (response.ok) {
+        const data = await response.json()
+        setUnreadCount(data.unread_count || 0)
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error)
+    }
+  }
 
   // Theme colors based on user type
   const theme = {
@@ -96,6 +128,7 @@ export default function UserAwareNavigation({
       return [
         ...baseItems,
         { name: 'Orders', href: '/orders', icon: Package },
+        { name: 'Inbox', href: '/inbox', icon: Bell, badge: unreadCount > 0 ? String(unreadCount) : undefined },
         { name: 'Commissions', href: '/commissions', icon: DollarSign },
         { name: 'Referrals', href: '/referrals', icon: Share2 },
         { name: 'Account', href: '/account', icon: User }
@@ -106,6 +139,7 @@ export default function UserAwareNavigation({
       return [
         ...baseItems,
         { name: 'Orders', href: '/orders', icon: Package },
+        { name: 'Inbox', href: '/inbox', icon: Bell, badge: unreadCount > 0 ? String(unreadCount) : undefined },
         { name: 'Referrals', href: '/referrals', icon: Share2 },
         { name: 'Account', href: '/account', icon: User }
       ]
@@ -116,6 +150,7 @@ export default function UserAwareNavigation({
       return [
         ...baseItems,
         { name: 'Orders', href: '/orders', icon: Package },
+        { name: 'Inbox', href: '/inbox', icon: Bell, badge: unreadCount > 0 ? String(unreadCount) : undefined },
         { name: 'Referrals', href: '/referrals', icon: Share2 },
         { name: 'Account', href: '/account', icon: User }
       ]
@@ -319,6 +354,26 @@ export default function UserAwareNavigation({
             <div className="border-l border-gray-200 pl-6">
               <CountrySelector compact={true} showLabel={false} />
             </div>
+
+            {/* Inbox (only for logged in non-admin users) */}
+            {userProfile && !isAdmin && (
+              <Link
+                href="/inbox"
+                className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors relative ${
+                  isActivePath('/inbox')
+                    ? theme.primary
+                    : `text-gray-700 ${theme.primaryHover}`
+                }`}
+              >
+                <Bell className="w-4 h-4 mr-2" />
+                Inbox
+                {unreadCount > 0 && (
+                  <span className={`ml-2 px-2 py-1 text-xs rounded-full ${theme.primaryBg} text-white`}>
+                    {unreadCount}
+                  </span>
+                )}
+              </Link>
+            )}
 
             {/* Cart */}
             <Link
