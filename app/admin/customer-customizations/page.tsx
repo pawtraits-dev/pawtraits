@@ -20,7 +20,6 @@ import {
   X,
   RefreshCw
 } from 'lucide-react';
-import { AdminSupabaseService } from '@/lib/admin-supabase';
 
 interface CustomerCredit {
   id: string;
@@ -61,8 +60,6 @@ interface Stats {
 }
 
 export default function CustomerCustomizationsAdmin() {
-  const adminService = new AdminSupabaseService();
-
   const [stats, setStats] = useState<Stats>({
     totalCustomers: 0,
     totalCreditsIssued: 0,
@@ -98,27 +95,11 @@ export default function CustomerCustomizationsAdmin() {
 
   const loadStats = async () => {
     try {
-      const client = adminService.getClient();
+      const response = await fetch('/api/admin/customers/credits-summary');
 
-      // Get all customer credit records
-      const { data: credits } = await client
-        .from('customer_customization_credits')
-        .select('*');
-
-      if (credits) {
-        const totalCustomers = credits.length;
-        const totalCreditsIssued = credits.reduce((sum, c) => sum + (c.credits_purchased + c.free_trial_credits_granted), 0);
-        const totalCreditsUsed = credits.reduce((sum, c) => sum + c.credits_used, 0);
-        const totalGenerations = credits.reduce((sum, c) => sum + c.total_generations, 0);
-        const totalRevenue = credits.reduce((sum, c) => sum + (c.total_spent_amount || 0), 0);
-
-        setStats({
-          totalCustomers,
-          totalCreditsIssued,
-          totalCreditsUsed,
-          totalGenerations,
-          totalRevenue
-        });
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
       }
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -127,25 +108,20 @@ export default function CustomerCustomizationsAdmin() {
 
   const loadCustomerCredits = async () => {
     try {
-      const client = adminService.getClient();
+      const response = await fetch('/api/admin/customer-customization-credits');
 
-      // Get customer credits with user profile info
-      const { data: credits } = await client
-        .from('customer_customization_credits')
-        .select(`
-          *,
-          user_profiles!customer_customization_credits_customer_id_fkey (
-            email,
-            full_name
-          )
-        `)
-        .order('created_at', { ascending: false });
+      if (!response.ok) {
+        throw new Error('Failed to load customer credits');
+      }
+
+      const credits = await response.json();
 
       if (credits) {
         const enrichedCredits = credits.map((c: any) => ({
           ...c,
           customer_email: c.user_profiles?.email,
-          customer_name: c.user_profiles?.full_name
+          customer_name: c.user_profiles?.full_name ||
+            `${c.user_profiles?.first_name || ''} ${c.user_profiles?.last_name || ''}`.trim()
         }));
         setCustomerCredits(enrichedCredits);
       }
@@ -156,26 +132,20 @@ export default function CustomerCustomizationsAdmin() {
 
   const loadGeneratedImages = async () => {
     try {
-      const client = adminService.getClient();
+      const response = await fetch('/api/admin/customer-generated-images?limit=50');
 
-      // Get generated images with customer info
-      const { data: images } = await client
-        .from('customer_generated_images')
-        .select(`
-          *,
-          user_profiles!customer_generated_images_customer_id_fkey (
-            email,
-            full_name
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      if (!response.ok) {
+        throw new Error('Failed to load generated images');
+      }
+
+      const images = await response.json();
 
       if (images) {
         const enrichedImages = images.map((img: any) => ({
           ...img,
           customer_email: img.user_profiles?.email,
-          customer_name: img.user_profiles?.full_name
+          customer_name: img.user_profiles?.full_name ||
+            `${img.user_profiles?.first_name || ''} ${img.user_profiles?.last_name || ''}`.trim()
         }));
         setGeneratedImages(enrichedImages);
       }
@@ -187,26 +157,30 @@ export default function CustomerCustomizationsAdmin() {
   const adjustCredits = async (customerId: string, amount: number) => {
     try {
       setAdjustingCredits(customerId);
-      const client = adminService.getClient();
 
-      const { error } = await client
-        .from('customer_customization_credits')
-        .update({
-          credits_remaining: client.raw(`credits_remaining + ${amount}`),
-          updated_at: new Date().toISOString()
+      const response = await fetch(`/api/admin/customers/${customerId}/credits`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount,
+          reason: 'Admin manual adjustment'
         })
-        .eq('customer_id', customerId);
+      });
 
-      if (error) throw error;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to adjust credits');
+      }
 
       // Reload data
       await loadCustomerCredits();
       await loadStats();
 
-      alert(`Successfully ${amount > 0 ? 'added' : 'removed'} ${Math.abs(amount)} credits`);
+      alert(`Successfully ${amount > 0 ? 'added' : 'removed'} ${Math.abs(amount)} credits\nNew balance: ${data.newBalance} credits`);
     } catch (error) {
       console.error('Error adjusting credits:', error);
-      alert('Failed to adjust credits');
+      alert(error instanceof Error ? error.message : 'Failed to adjust credits');
     } finally {
       setAdjustingCredits(null);
     }

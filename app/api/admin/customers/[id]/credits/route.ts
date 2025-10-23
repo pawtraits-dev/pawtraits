@@ -175,3 +175,123 @@ export async function GET(
     );
   }
 }
+
+/**
+ * POST /api/admin/customers/[id]/credits
+ * Manually adjust customer customization credits (add or remove)
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // TODO: Add admin authentication check
+    const { id: customerId } = await params;
+    const { amount, reason } = await request.json();
+
+    if (!amount || typeof amount !== 'number') {
+      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
+    }
+
+    console.log(`🔧 Admin adjusting customization credits for customer ${customerId}: ${amount > 0 ? '+' : ''}${amount}`);
+
+    // Create service role client to bypass RLS
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // Get current credit balance from customer_customization_credits
+    const { data: currentCredits, error: fetchError } = await supabase
+      .from('customer_customization_credits')
+      .select('credits_remaining, customer_id')
+      .eq('customer_id', customerId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching customer credits:', fetchError);
+
+      // If no record exists, create one first
+      if (fetchError.code === 'PGRST116') {
+        console.log('⚠️  No credit record exists. Creating one...');
+
+        const { data: newRecord, error: insertError } = await supabase
+          .from('customer_customization_credits')
+          .insert({
+            customer_id: customerId,
+            credits_remaining: Math.max(0, amount), // Can't have negative on first create
+            free_trial_credits_granted: 0, // Not a trial, this is admin adjustment
+            credits_purchased: 0,
+            credits_used: 0,
+            total_generations: 0
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('❌ Failed to create credit record:', insertError);
+          return NextResponse.json({ error: 'Failed to create credit record' }, { status: 500 });
+        }
+
+        console.log('✅ Credit record created with balance:', newRecord.credits_remaining);
+
+        return NextResponse.json({
+          success: true,
+          previousBalance: 0,
+          adjustment: amount,
+          newBalance: newRecord.credits_remaining,
+          credits: newRecord
+        });
+      }
+
+      return NextResponse.json({ error: 'Customer credit record not found' }, { status: 404 });
+    }
+
+    const newBalance = currentCredits.credits_remaining + amount;
+
+    // Ensure balance doesn't go negative
+    if (newBalance < 0) {
+      return NextResponse.json({
+        error: `Cannot remove ${Math.abs(amount)} credits. Customer only has ${currentCredits.credits_remaining} credits.`
+      }, { status: 400 });
+    }
+
+    // Update credits
+    const { data: updatedCredits, error: updateError } = await supabase
+      .from('customer_customization_credits')
+      .update({
+        credits_remaining: newBalance,
+        updated_at: new Date().toISOString()
+      })
+      .eq('customer_id', customerId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Error updating credits:', updateError);
+      return NextResponse.json({ error: 'Failed to update credits' }, { status: 500 });
+    }
+
+    console.log('✅ Customization credits adjusted:', {
+      customerId,
+      previousBalance: currentCredits.credits_remaining,
+      adjustment: amount,
+      newBalance,
+      reason: reason || 'Admin manual adjustment'
+    });
+
+    return NextResponse.json({
+      success: true,
+      previousBalance: currentCredits.credits_remaining,
+      adjustment: amount,
+      newBalance,
+      credits: updatedCredits
+    });
+
+  } catch (error) {
+    console.error('Admin credit adjustment API error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to adjust credits' },
+      { status: 500 }
+    );
+  }
+}
