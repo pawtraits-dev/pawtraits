@@ -95,8 +95,12 @@ function CustomerCustomizePageContent() {
       const response = await fetch('/api/customers/credits');
       if (response.ok) {
         const data = await response.json();
+        console.log('Credit balance API response:', data);
         setCreditBalance(data.credits);
-        setCreditPacks(data.creditPacks || []);
+        // Ensure creditPacks is always an array
+        const packs = Array.isArray(data.creditPacks) ? data.creditPacks : [];
+        console.log('Setting credit packs:', packs);
+        setCreditPacks(packs);
       }
     } catch (error) {
       console.error('Error loading credit balance:', error);
@@ -108,7 +112,11 @@ function CustomerCustomizePageContent() {
       const response = await fetch('/api/customers/generated-images?limit=12');
       if (response.ok) {
         const data = await response.json();
-        setGeneratedImages(data.images || []);
+        console.log('Generated images API response:', data);
+        // Ensure images is always an array
+        const images = Array.isArray(data.images) ? data.images : [];
+        console.log('Setting generated images:', images);
+        setGeneratedImages(images);
       }
     } catch (error) {
       console.error('Error loading generated images:', error);
@@ -120,7 +128,11 @@ function CustomerCustomizePageContent() {
       const response = await fetch('/api/images?is_featured=true&limit=6');
       if (response.ok) {
         const data = await response.json();
-        setCatalogImages(data || []);
+        console.log('Catalog images API response:', data);
+        // Ensure data is always an array
+        const images = Array.isArray(data) ? data : [];
+        console.log('Setting catalog images:', images);
+        setCatalogImages(images);
       }
     } catch (error) {
       console.error('Error loading catalog images:', error);
@@ -310,7 +322,7 @@ function CustomerCustomizePageContent() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {creditPacks.map((pack) => (
+              {Array.isArray(creditPacks) && creditPacks.map((pack) => (
                 <Card
                   key={pack.id}
                   className={`relative ${
