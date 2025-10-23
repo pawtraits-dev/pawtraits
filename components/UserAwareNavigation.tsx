@@ -29,7 +29,8 @@ import {
   Images,
   PawPrint,
   Share2,
-  Bell
+  Bell,
+  Sparkles
 } from 'lucide-react'
 import { SupabaseService } from '@/lib/supabase'
 import { useHybridCart } from '@/lib/hybrid-cart-context'
@@ -149,6 +150,7 @@ export default function UserAwareNavigation({
     if (userProfile) {
       return [
         ...baseItems,
+        { name: 'Customize', href: '/customer/customize', icon: Sparkles },
         { name: 'Orders', href: '/orders', icon: Package },
         { name: 'Inbox', href: '/inbox', icon: Bell, badge: unreadCount > 0 ? String(unreadCount) : undefined },
         { name: 'Referrals', href: '/referrals', icon: Share2 },
