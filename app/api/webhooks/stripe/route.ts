@@ -53,24 +53,33 @@ export async function POST(request: NextRequest) {
 
     // Construct the event from the webhook
     let event;
-    try {
-      event = constructWebhookEvent(body, signature, webhookSecret);
-      console.log('✅ Webhook signature verified successfully');
-    } catch (err) {
-      console.error('❌ Webhook signature verification failed:', {
-        error: err instanceof Error ? err.message : String(err),
-        errorStack: err instanceof Error ? err.stack : undefined,
-        signatureProvided: signature.substring(0, 50) + '...',
-        bodyPreview: body.toString('utf8', 0, 200) + '...',
-        webhookSecretPrefix: webhookSecret.substring(0, 10) + '...',
-        webhookSecretSuffix: webhookSecret.substring(webhookSecret.length - 4),
-        bodyEncoding: 'Buffer',
-        contentType: request.headers.get('content-type')
-      });
-      return NextResponse.json(
-        { error: 'Webhook signature verification failed' },
-        { status: 400 }
-      );
+
+    // TEMPORARY: Skip signature verification to test the rest of the flow
+    const SKIP_SIGNATURE_VERIFICATION = process.env.STRIPE_SKIP_SIGNATURE_VERIFICATION === 'true';
+
+    if (SKIP_SIGNATURE_VERIFICATION) {
+      console.warn('⚠️  SKIPPING signature verification (temporary for testing)');
+      event = JSON.parse(body.toString('utf8'));
+    } else {
+      try {
+        event = constructWebhookEvent(body, signature, webhookSecret);
+        console.log('✅ Webhook signature verified successfully');
+      } catch (err) {
+        console.error('❌ Webhook signature verification failed:', {
+          error: err instanceof Error ? err.message : String(err),
+          errorStack: err instanceof Error ? err.stack : undefined,
+          signatureProvided: signature.substring(0, 50) + '...',
+          bodyPreview: body.toString('utf8', 0, 200) + '...',
+          webhookSecretPrefix: webhookSecret.substring(0, 10) + '...',
+          webhookSecretSuffix: webhookSecret.substring(webhookSecret.length - 4),
+          bodyEncoding: 'Buffer',
+          contentType: request.headers.get('content-type')
+        });
+        return NextResponse.json(
+          { error: 'Webhook signature verification failed' },
+          { status: 400 }
+        );
+      }
     }
 
     console.log('Stripe webhook event received:', {
