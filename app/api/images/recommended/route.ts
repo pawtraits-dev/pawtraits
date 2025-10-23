@@ -32,10 +32,11 @@ export async function POST(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    console.log('🎨 Fetching recommended images for', petCombinations.length, 'pet combinations');
+    console.log('🎨 Fetching recommended images for', petCombinations.length, 'pet combinations:', petCombinations);
 
-    // Build query to match any of the breed+coat combinations
-    // Using OR logic: (breed_id=A AND coat_id=B) OR (breed_id=C AND coat_id=D) ...
+    // Build query to match any of the breed combinations
+    // Strategy: Match by breed first (coat_id often null in catalog images)
+    // Build OR conditions: (breed_id=A AND (coat_id=B OR coat_id IS NULL)) OR (breed_id=C AND (coat_id=D OR coat_id IS NULL))
     let query = supabaseAdmin
       .from('image_catalog')
       .select(`
@@ -46,6 +47,7 @@ export async function POST(request: NextRequest) {
         description,
         tags,
         breed_id,
+        coat_id,
         theme_id,
         style_id,
         format_id,
@@ -67,14 +69,17 @@ export async function POST(request: NextRequest) {
       `)
       .eq('is_active', true);
 
-    // Apply OR filter for each pet combination
-    const orConditions = petCombinations
-      .filter((combo: any) => combo.breed_id && combo.coat_id)
-      .map((combo: any) => `breed_id.eq.${combo.breed_id},coat_id.eq.${combo.coat_id}`)
-      .join(',');
+    // Get unique breed IDs from pet combinations
+    const breedIds = [...new Set(petCombinations.map((combo: any) => combo.breed_id).filter(Boolean))];
 
-    if (orConditions) {
-      query = query.or(orConditions);
+    console.log('🔍 Matching breeds:', breedIds);
+
+    if (breedIds.length > 0) {
+      // Match any images with these breed IDs
+      query = query.in('breed_id', breedIds);
+    } else {
+      // No valid breed IDs, return empty
+      return NextResponse.json({ success: true, images: [] });
     }
 
     // Limit results and order by rating
