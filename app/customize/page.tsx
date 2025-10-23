@@ -34,6 +34,9 @@ interface CreditPack {
   credits: number;
   price: number;
   priceFormatted: string;
+  orderCredit?: number;
+  orderCreditFormatted?: string;
+  discount?: number;
   recommended?: boolean;
   bestValue?: boolean;
 }
@@ -338,13 +341,13 @@ function CustomerCustomizePageContent() {
                       <p className="text-sm text-gray-500">
                         £{(pack.price / pack.credits / 100).toFixed(2)} per credit
                       </p>
-                      {pack.discount > 0 && (
+                      {pack.discount && pack.discount > 0 && (
                         <Badge variant="secondary" className="mt-1">
                           {pack.discount}% Off
                         </Badge>
                       )}
                     </div>
-                    {pack.orderCredit > 0 && (
+                    {pack.orderCredit && pack.orderCredit > 0 && (
                       <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg">
                         <div className="flex items-center justify-center gap-2 text-green-700">
                           <Gift className="w-4 h-4" />
