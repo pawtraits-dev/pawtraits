@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
 
     // Build query to match any of the breed combinations
     // Strategy: Match by breed first (coat_id often null in catalog images)
-    // Build OR conditions: (breed_id=A AND (coat_id=B OR coat_id IS NULL)) OR (breed_id=C AND (coat_id=D OR coat_id IS NULL))
     let query = supabaseAdmin
       .from('image_catalog')
       .select(`
@@ -66,8 +65,7 @@ export async function POST(request: NextRequest) {
           id,
           name
         )
-      `)
-      .eq('is_active', true);
+      `);
 
     // Get unique breed IDs from pet combinations
     const breedIds = [...new Set(petCombinations.map((combo: any) => combo.breed_id).filter(Boolean))];
