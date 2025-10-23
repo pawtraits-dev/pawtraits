@@ -257,6 +257,21 @@ export async function GET(request: NextRequest) {
         const isCreditPackBonus = credit.metadata?.source === 'credit_pack_purchase';
         const rewardType = isCreditPackBonus ? 'credit_pack_bonus' as const : 'purchase' as const;
 
+        // Map commission status to reward display status
+        let rewardStatus: 'earned' | 'pending' | 'used' = 'pending';
+        if (credit.status === 'redeemed') {
+          rewardStatus = 'used';
+        } else if (credit.status === 'approved' || credit.status === 'paid') {
+          rewardStatus = 'earned';
+        } else {
+          rewardStatus = 'pending';
+        }
+
+        // Extract redemption date from metadata if available
+        const redeemedAt = credit.status === 'redeemed' && credit.metadata?.redeemed_date
+          ? credit.metadata.redeemed_date
+          : null;
+
         rewards.push({
           id: credit.id,
           customer_id: customerId,
@@ -264,11 +279,9 @@ export async function GET(request: NextRequest) {
           order_id: credit.order_id,
           reward_amount: credit.commission_amount / 100, // Convert pence to pounds
           reward_type: rewardType,
-          status: credit.status === 'approved' ? 'earned' as const :
-                  credit.status === 'paid' ? 'earned' as const :
-                  credit.status === 'pending' ? 'pending' as const : 'pending' as const,
+          status: rewardStatus,
           created_at: credit.created_at,
-          redeemed_at: null, // Redemptions tracked separately
+          redeemed_at: redeemedAt,
           metadata: credit.metadata // Include metadata for additional context
         });
       }

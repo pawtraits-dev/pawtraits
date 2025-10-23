@@ -40,12 +40,12 @@ export async function GET(request: NextRequest) {
 
     const customerId = customer.id;
 
-    // Get orders where customer used credits (credits_applied > 0)
+    // Get orders where customer used credits (credit_applied > 0)
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
-      .select('id, customer_email, total_amount, credits_applied, created_at')
+      .select('id, order_number, customer_email, total_amount, credit_applied, created_at')
       .eq('customer_email', customerEmail)
-      .gt('credits_applied', 0)
+      .gt('credit_applied', 0)
       .order('created_at', { ascending: false });
 
     if (ordersError) {
@@ -61,7 +61,8 @@ export async function GET(request: NextRequest) {
       id: order.id,
       customer_id: customerId,
       order_id: order.id,
-      credits_used: order.credits_applied || 0,
+      order_number: order.order_number,
+      credits_used: order.credit_applied || 0, // Fixed: was credits_applied (plural), now credit_applied (singular)
       order_total: order.total_amount || 0,
       redeemed_at: order.created_at
     })) : [];
