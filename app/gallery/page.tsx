@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Heart, Share2, ShoppingCart, Download, Star, Filter, Search } from 'lucide-react';
+import { Heart, Share2, ShoppingCart, Download, Star, Filter, Search, Wand2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -71,6 +71,12 @@ export default function MyPawtraitsGallery() {
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImage, setModalImage] = useState<GalleryImage | null>(null);
 
+  // New state for custom and recommended images
+  const [customImages, setCustomImages] = useState<GalleryImage[]>([]);
+  const [recommendedImages, setRecommendedImages] = useState<GalleryImage[]>([]);
+  const [userPets, setUserPets] = useState<any[]>([]);
+  const [loadingRecommended, setLoadingRecommended] = useState(false);
+
   const supabaseService = new SupabaseService();
   const { totalItems, items: cartItems } = useHybridCart();
 
@@ -80,8 +86,21 @@ export default function MyPawtraitsGallery() {
   }, []);
 
   useEffect(() => {
+    if (userProfile) {
+      loadUserPets();
+      loadCustomImages();
+    }
+  }, [userProfile]);
+
+  useEffect(() => {
     loadGalleryImages();
   }, [userProfile, cartItems]);
+
+  useEffect(() => {
+    if (userPets.length > 0) {
+      loadRecommendedImages();
+    }
+  }, [userPets]);
 
   useEffect(() => {
     filterImages();
@@ -104,11 +123,141 @@ export default function MyPawtraitsGallery() {
         supabaseService.getProducts(),
         supabaseService.getAllProductPricing()
       ]);
-      
+
       setProducts(productsData?.filter((p: any) => p.is_active) || []);
       setPricing(pricingData || []);
     } catch (error) {
       console.error('Error loading product data:', error);
+    }
+  };
+
+  const loadUserPets = async () => {
+    if (!userProfile) return;
+
+    try {
+      const { data: { session } } = await supabaseService.getClient().auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/customers/pets', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.ok) {
+        const pets = await response.json();
+        setUserPets(pets || []);
+        console.log('🐾 Loaded', pets?.length || 0, 'user pets');
+      }
+    } catch (error) {
+      console.error('Error loading user pets:', error);
+      setUserPets([]);
+    }
+  };
+
+  const loadCustomImages = async () => {
+    if (!userProfile) return;
+
+    try {
+      const response = await fetch('/api/customers/generated-images');
+
+      if (response.ok) {
+        const { images } = await response.json();
+
+        // Transform to GalleryImage format
+        const customGalleryImages: GalleryImage[] = (images || []).map((img: any) => ({
+          id: img.id,
+          filename: img.cloudinary_public_id || `custom-${img.id}.jpg`,
+          public_url: img.public_url,
+          prompt_text: img.prompt_text,
+          description: img.prompt_text,
+          tags: ['custom', 'generated'],
+          breed_id: img.breed_id,
+          theme_id: img.theme_id,
+          style_id: img.style_id,
+          format_id: img.format_id,
+          rating: undefined,
+          is_featured: false,
+          created_at: img.created_at,
+          interaction_types: [],
+          interaction_dates: [],
+          breed: img.breed_id ? { id: img.breed_id, name: '' } : undefined,
+          theme: img.theme_id ? { id: img.theme_id, name: '' } : undefined,
+          style: img.style_id ? { id: img.style_id, name: '' } : undefined,
+        }));
+
+        setCustomImages(customGalleryImages);
+        console.log('🎨 Loaded', customGalleryImages.length, 'custom images');
+      }
+    } catch (error) {
+      console.error('Error loading custom images:', error);
+      setCustomImages([]);
+    }
+  };
+
+  const loadRecommendedImages = async () => {
+    if (!userProfile || userPets.length === 0) {
+      setRecommendedImages([]);
+      return;
+    }
+
+    try {
+      setLoadingRecommended(true);
+
+      // Build pet combinations (breed_id + coat_id)
+      const petCombinations = userPets
+        .filter(pet => pet.breed_id && pet.coat_id)
+        .map(pet => ({
+          breed_id: pet.breed_id,
+          coat_id: pet.coat_id
+        }));
+
+      if (petCombinations.length === 0) {
+        setRecommendedImages([]);
+        return;
+      }
+
+      console.log('🔍 Fetching recommendations for', petCombinations.length, 'pet combinations');
+
+      const response = await fetch('/api/images/recommended', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ petCombinations })
+      });
+
+      if (response.ok) {
+        const { images } = await response.json();
+
+        // Transform to GalleryImage format
+        const recommendedGalleryImages: GalleryImage[] = (images || []).map((img: any) => ({
+          id: img.id,
+          filename: img.filename,
+          public_url: img.public_url,
+          prompt_text: img.prompt_text,
+          description: img.description,
+          tags: img.tags || [],
+          breed_id: img.breed_id,
+          theme_id: img.theme_id,
+          style_id: img.style_id,
+          format_id: img.format_id,
+          rating: img.rating,
+          is_featured: img.is_featured,
+          created_at: img.created_at,
+          interaction_types: [],
+          interaction_dates: [],
+          breed: img.breeds ? { id: img.breeds.id, name: img.breeds.name } : undefined,
+          theme: img.themes ? { id: img.themes.id, name: img.themes.name } : undefined,
+          style: img.styles ? { id: img.styles.id, name: img.styles.name } : undefined,
+        }));
+
+        setRecommendedImages(recommendedGalleryImages);
+        console.log('✨ Loaded', recommendedGalleryImages.length, 'recommended images');
+      }
+    } catch (error) {
+      console.error('Error loading recommended images:', error);
+      setRecommendedImages([]);
+    } finally {
+      setLoadingRecommended(false);
     }
   };
 
@@ -766,10 +915,13 @@ export default function MyPawtraitsGallery() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="all" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="all">
-              All ({filteredImages.length})
+        <Tabs defaultValue="recommended" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="recommended">
+              Recommended ({recommendedImages.length})
+            </TabsTrigger>
+            <TabsTrigger value="custom">
+              Custom ({customImages.length})
             </TabsTrigger>
             <TabsTrigger value="liked">
               Liked ({likedImages.length})
@@ -785,17 +937,80 @@ export default function MyPawtraitsGallery() {
             </TabsTrigger>
           </TabsList>
 
-            <TabsContent value="all" className="space-y-6">
-            {filteredImages.length === 0 ? (
-              <EmptyState type="all" />
+          <TabsContent value="recommended" className="space-y-6">
+            {userPets.length === 0 ? (
+              <Card className="p-8 text-center">
+                <CardContent>
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Star className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Add Your Pets for Personalized Recommendations
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Tell us about your pets to see Pawtraits that match their breed and coat
+                  </p>
+                  <Button onClick={() => window.location.href = '/customer/pets/add'}>
+                    Add Your First Pet
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : loadingRecommended ? (
+              <div className="flex justify-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+              </div>
+            ) : recommendedImages.length === 0 ? (
+              <Card className="p-8 text-center">
+                <CardContent>
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Star className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No Matching Recommendations Yet
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    We're working on creating more Pawtraits for your pets' breeds and coats
+                  </p>
+                  <Button variant="outline" onClick={() => window.location.href = '/browse'}>
+                    Browse All Pawtraits
+                  </Button>
+                </CardContent>
+              </Card>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {filteredImages.map((image) => (
+                {recommendedImages.map((image) => (
                   <ImageCard key={image.id} image={image} />
                 ))}
               </div>
             )}
-            </TabsContent>
+          </TabsContent>
+
+          <TabsContent value="custom" className="space-y-6">
+            {customImages.length === 0 ? (
+              <Card className="p-8 text-center">
+                <CardContent>
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Wand2 className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No Custom Pawtraits Yet
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Create custom variations of any Pawtrait from the Browse page
+                  </p>
+                  <Button variant="outline" onClick={() => window.location.href = '/browse'}>
+                    Browse & Customize
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {customImages.map((image) => (
+                  <ImageCard key={image.id} image={image} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
           <TabsContent value="in_basket" className="space-y-6">
           {basketImages.length === 0 ? (
