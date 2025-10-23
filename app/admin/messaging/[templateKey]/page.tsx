@@ -51,10 +51,17 @@ export default function TemplateDetailsPage() {
       setTemplate(data);
 
       // Load HTML preview if available
-      const htmlFileMatch = data?.email_body_template?.match(/lib\/messaging\/templates\/([\w-]+\.html)/);
-      if (htmlFileMatch) {
-        const fileName = htmlFileMatch[1];
-        loadHtmlPreview(fileName, data.variables);
+      if (data?.email_body_template) {
+        // Check if it's a file reference (old system) or direct HTML (new system)
+        const htmlFileMatch = data.email_body_template.match(/lib\/messaging\/templates\/([\w-]+\.html)/);
+        if (htmlFileMatch) {
+          // Old system: load from file
+          const fileName = htmlFileMatch[1];
+          loadHtmlPreview(fileName, data.variables);
+        } else if (data.email_body_template.includes('<!DOCTYPE') || data.email_body_template.includes('<html')) {
+          // New system: use HTML directly from database
+          loadHtmlPreviewFromContent(data.email_body_template, data.variables);
+        }
       }
     } catch (error) {
       console.error('Failed to load template:', error);
@@ -81,6 +88,23 @@ export default function TemplateDetailsPage() {
       setHtmlPreview(preview);
     } catch (error) {
       console.error('Failed to load HTML preview:', error);
+    }
+  };
+
+  const loadHtmlPreviewFromContent = (htmlContent: string, variables: any) => {
+    try {
+      // Replace with sample data
+      let preview = htmlContent;
+      const sampleData = generateSampleData(variables);
+      Object.entries(sampleData).forEach(([key, value]) => {
+        if (typeof value === 'string') {
+          preview = preview.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), value);
+        }
+      });
+
+      setHtmlPreview(preview);
+    } catch (error) {
+      console.error('Failed to load HTML preview from content:', error);
     }
   };
 
@@ -146,7 +170,7 @@ export default function TemplateDetailsPage() {
             }`}>
               {template.is_active ? 'Active' : 'Inactive'}
             </span>
-            {template.email_body_template?.includes('lib/messaging/templates/') && (
+            {template.email_body_template && !template.email_body_template.includes('lib/messaging/templates/') && (
               <Link
                 href={`/admin/messaging/${template.template_key}/edit-html`}
                 className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
