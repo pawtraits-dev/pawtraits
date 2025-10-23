@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -48,7 +48,7 @@ interface GeneratedImage {
   original_image_id: string;
 }
 
-export default function CustomerCustomizePage() {
+function CustomerCustomizePageContent() {
   const { userProfile } = useUserRouting();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -512,5 +512,13 @@ export default function CustomerCustomizePage() {
         />
       )}
     </div>
+  );
+}
+
+export default function CustomerCustomizePage() {
+  return (
+    <Suspense fallback={<div className="p-8">Loading...</div>}>
+      <CustomerCustomizePageContent />
+    </Suspense>
   );
 }

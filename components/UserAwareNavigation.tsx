@@ -150,7 +150,7 @@ export default function UserAwareNavigation({
     if (userProfile) {
       return [
         ...baseItems,
-        { name: 'Customize', href: '/customer/customize', icon: Sparkles },
+        { name: 'Customize', href: '/customize', icon: Sparkles },
         { name: 'Orders', href: '/orders', icon: Package },
         { name: 'Inbox', href: '/inbox', icon: Bell, badge: unreadCount > 0 ? String(unreadCount) : undefined },
         { name: 'Referrals', href: '/referrals', icon: Share2 },
