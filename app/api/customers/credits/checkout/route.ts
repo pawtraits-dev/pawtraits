@@ -70,9 +70,11 @@ export async function POST(request: NextRequest) {
     });
 
     // Determine base URL for redirects
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    // Use production URL for Stripe redirects, not preview deployments
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+      || (process.env.VERCEL_ENV === 'production' && process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'http://localhost:3000');
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
