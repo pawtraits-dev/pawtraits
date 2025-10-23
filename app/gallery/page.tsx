@@ -89,11 +89,8 @@ export default function MyPawtraitsGallery() {
     if (userProfile) {
       loadUserPets();
       loadCustomImages();
+      loadGalleryImages();
     }
-  }, [userProfile]);
-
-  useEffect(() => {
-    loadGalleryImages();
   }, [userProfile, cartItems]);
 
   useEffect(() => {

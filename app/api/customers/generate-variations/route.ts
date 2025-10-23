@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
+import { uploadImageBufferToCloudinary } from '@/lib/cloudinary-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -402,11 +403,29 @@ export async function POST(request: NextRequest) {
     const savedImages = [];
     for (const variation of processedVariations) {
       try {
+        // Upload to Cloudinary first
+        console.log(`☁️  Uploading customer variation to Cloudinary: ${variation.filename}`);
+        const cloudinaryResult = await uploadImageBufferToCloudinary(
+          variation.imageBuffer,
+          variation.filename,
+          {
+            folder: 'pawtraits/customer-variations',
+            tags: ['customer-variation', 'watermarked'],
+            breed: variation.metadata.breed_id?.toString(),
+            theme: variation.metadata.theme_id?.toString(),
+            style: variation.metadata.style_id?.toString()
+          }
+        );
+
+        console.log(`✅ Cloudinary upload successful: ${cloudinaryResult.public_id}`);
+
         const { data: savedImage, error: saveError } = await supabaseAdmin
           .from('customer_generated_images')
           .insert({
             customer_id: customerId,
             original_image_id: originalImageId,
+            cloudinary_public_id: cloudinaryResult.public_id,
+            public_url: cloudinaryResult.secure_url,
             prompt_text: variation.metadata.prompt,
             gemini_prompt: variation.metadata.gemini_prompt,
             breed_id: variation.metadata.breed_id,
@@ -421,7 +440,14 @@ export async function POST(request: NextRequest) {
             generation_metadata: {
               variation_type: variation.metadata.variation_type,
               generated_at: new Date().toISOString(),
-              api_version: 'gemini-2.5-flash-image-preview'
+              api_version: 'gemini-2.5-flash-image-preview',
+              cloudinary_upload: {
+                public_id: cloudinaryResult.public_id,
+                width: cloudinaryResult.width,
+                height: cloudinaryResult.height,
+                format: cloudinaryResult.format,
+                bytes: cloudinaryResult.bytes
+              }
             },
             image_variants: {
               preview_watermarked: {
@@ -441,7 +467,9 @@ export async function POST(request: NextRequest) {
             filename: variation.filename,
             prompt: variation.metadata.prompt,
             metadata: variation.metadata,
-            variation_type: variation.metadata.variation_type
+            variation_type: variation.metadata.variation_type,
+            cloudinary_public_id: cloudinaryResult.public_id,
+            public_url: cloudinaryResult.secure_url
           });
         }
       } catch (saveError) {

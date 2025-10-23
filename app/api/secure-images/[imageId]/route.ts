@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SupabaseService } from '@/lib/supabase';
 import { cloudinaryService } from '@/lib/cloudinary';
+import { createClient } from '@supabase/supabase-js';
 
 const supabaseService = new SupabaseService();
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
 
 interface RouteParams {
   params: Promise<{ imageId: string }>;
@@ -33,7 +40,45 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get image data from database
-    const image = await supabaseService.getImage(imageId);
+    let image = await supabaseService.getImage(imageId);
+
+    // If not found in image_catalog, check customer_generated_images
+    let isCustomerImage = false;
+    if (!image) {
+      console.log(`🔍 Image not found in catalog, checking customer_generated_images for ID: ${imageId}`);
+
+      const { data: customerImage, error: customerError } = await supabaseAdmin
+        .from('customer_generated_images')
+        .select('*')
+        .eq('id', imageId)
+        .single();
+
+      if (!customerError && customerImage) {
+        console.log(`✅ Found customer-generated image: ${customerImage.cloudinary_public_id || 'no cloudinary ID'}`);
+        isCustomerImage = true;
+
+        // Transform customer image to match image catalog structure
+        image = {
+          id: customerImage.id,
+          cloudinary_public_id: customerImage.cloudinary_public_id,
+          public_url: customerImage.public_url,
+          image_url: customerImage.public_url,
+          filename: customerImage.cloudinary_public_id || `customer-${customerImage.id}`,
+          breed_id: customerImage.breed_id,
+          theme_id: customerImage.theme_id,
+          style_id: customerImage.style_id,
+          format_id: customerImage.format_id,
+          // Add other required fields with defaults
+          prompt_text: customerImage.prompt_text,
+          description: customerImage.prompt_text,
+          is_active: true,
+          rating: null,
+          is_featured: false,
+          created_at: customerImage.created_at
+        } as any;
+      }
+    }
+
     if (!image) {
       return NextResponse.json(
         { error: 'Image not found' },
