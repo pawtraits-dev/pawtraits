@@ -22,6 +22,7 @@ import {
 import { useUserRouting } from '@/hooks/use-user-routing';
 import type { ImageCatalogWithDetails } from '@/lib/types';
 import CustomerImageCustomizationModal from '@/components/CustomerImageCustomizationModal';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
 
 interface CreditBalance {
   remaining: number;
@@ -176,17 +177,20 @@ function CustomerCustomizePageContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your customization dashboard...</p>
+      <UserAwareNavigation>
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading your customization dashboard...</p>
+          </div>
         </div>
-      </div>
+      </UserAwareNavigation>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+    <UserAwareNavigation>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
       <div className="container mx-auto px-4 py-8">
 
         {/* Success/Cancelled Messages */}
@@ -533,7 +537,8 @@ function CustomerCustomizePageContent() {
           }}
         />
       )}
-    </div>
+      </div>
+    </UserAwareNavigation>
   );
 }
 
