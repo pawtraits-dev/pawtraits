@@ -32,7 +32,10 @@ import {
   Target,
   Globe,
   QrCode,
-  UserPlus
+  UserPlus,
+  Mail,
+  MessageSquare,
+  Send
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -85,6 +88,14 @@ const navigationSections = [
       { name: 'Pre-Registration Codes', href: '/admin/partners/pre-registration', icon: QrCode },
       { name: 'Partner Referrals', href: '/admin/referrals', icon: Target },
       { name: 'Customer Referrals', href: '/admin/customer-referrals', icon: UserPlus },
+    ]
+  },
+  {
+    title: 'Communications',
+    items: [
+      { name: 'Message Templates', href: '/admin/messaging', icon: Mail },
+      { name: 'Message Queue', href: '/admin/messaging/queue', icon: Send },
+      { name: 'Test Email', href: '/admin/messaging/test', icon: MessageSquare },
     ]
   },
   {
