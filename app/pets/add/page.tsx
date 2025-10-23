@@ -454,8 +454,8 @@ export default function AddPetPage() {
         } else {
           alert(result.message || 'Pet added successfully!');
         }
-        
-        router.push('/customer/pets');
+
+        router.push('/pets');
       } else {
         const errorData = await response.json();
         console.error('🔧 Failed to add pet:', errorData);
