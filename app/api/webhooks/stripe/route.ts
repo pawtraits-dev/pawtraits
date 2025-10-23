@@ -24,7 +24,8 @@ export async function POST(request: NextRequest) {
   try {
     // Get the raw body as text
     const body = await request.text();
-    const signature = headers().get('stripe-signature');
+    const headersList = await headers();
+    const signature = headersList.get('stripe-signature');
 
     if (!signature) {
       console.error('❌ Missing stripe-signature header');
@@ -37,7 +38,12 @@ export async function POST(request: NextRequest) {
     console.log('🔐 Webhook signature verification:', {
       signatureHeader: signature.substring(0, 50) + '...',
       bodyLength: body.length,
-      secretConfigured: !!webhookSecret
+      bodyType: typeof body,
+      secretConfigured: !!webhookSecret,
+      secretLength: webhookSecret?.length,
+      // Log first and last chars to verify body integrity
+      bodyStart: body.substring(0, 20),
+      bodyEnd: body.substring(body.length - 20)
     });
 
     // Construct the event from the webhook
@@ -48,8 +54,12 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.error('❌ Webhook signature verification failed:', {
         error: err instanceof Error ? err.message : String(err),
-        signatureProvided: signature.substring(0, 20) + '...',
-        bodyPreview: body.substring(0, 100) + '...'
+        errorStack: err instanceof Error ? err.stack : undefined,
+        signatureProvided: signature.substring(0, 50) + '...',
+        bodyPreview: body.substring(0, 200) + '...',
+        webhookSecretPrefix: webhookSecret.substring(0, 10) + '...',
+        bodyEncoding: 'utf-8',
+        contentType: request.headers.get('content-type')
       });
       return NextResponse.json(
         { error: 'Webhook signature verification failed' },

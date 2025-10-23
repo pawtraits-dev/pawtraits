@@ -284,7 +284,7 @@ CREATE TABLE public.commissions (
   commission_type text NOT NULL CHECK (commission_type = ANY (ARRAY['partner_commission'::text, 'customer_credit'::text])),
   commission_rate numeric NOT NULL DEFAULT 10.00,
   commission_amount integer NOT NULL,
-  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'approved'::text, 'paid'::text, 'cancelled'::text])),
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'approved'::text, 'paid'::text, 'redeemed'::text, 'cancelled'::text])),
   payment_date timestamp with time zone,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -305,6 +305,27 @@ CREATE TABLE public.countries (
   display_order integer DEFAULT 0,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT countries_pkey PRIMARY KEY (code)
+);
+CREATE TABLE public.customer_credit_pack_config (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  pack_id text NOT NULL UNIQUE,
+  pack_name text NOT NULL,
+  credits_amount integer NOT NULL CHECK (credits_amount > 0),
+  price_pence integer NOT NULL CHECK (price_pence > 0),
+  price_currency text NOT NULL DEFAULT 'GBP'::text,
+  order_credit_pence integer NOT NULL DEFAULT 0 CHECK (order_credit_pence >= 0),
+  base_variation_cost integer NOT NULL DEFAULT 1 CHECK (base_variation_cost > 0),
+  multi_animal_cost integer NOT NULL DEFAULT 2 CHECK (multi_animal_cost > 0),
+  format_variation_cost integer NOT NULL DEFAULT 1 CHECK (format_variation_cost > 0),
+  outfit_variation_cost integer NOT NULL DEFAULT 1 CHECK (outfit_variation_cost > 0),
+  free_trial_credits integer NOT NULL DEFAULT 2 CHECK (free_trial_credits >= 0),
+  is_active boolean NOT NULL DEFAULT true,
+  is_recommended boolean NOT NULL DEFAULT false,
+  discount_percentage integer NOT NULL DEFAULT 0 CHECK (discount_percentage >= 0 AND discount_percentage <= 100),
+  display_order integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT customer_credit_pack_config_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.customer_credit_transactions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -839,6 +860,7 @@ CREATE TABLE public.orders (
   shipping_address_line_2 character varying,
   discount_amount integer DEFAULT 0,
   referral_code text,
+  credit_applied integer DEFAULT 0,
   CONSTRAINT orders_pkey PRIMARY KEY (id),
   CONSTRAINT orders_placed_by_partner_id_fkey FOREIGN KEY (placed_by_partner_id) REFERENCES public.partners(id)
 );
