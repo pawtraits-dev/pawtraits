@@ -60,6 +60,10 @@ export default function CustomerImageCustomizationModal({
   const [outfits, setOutfits] = useState<Outfit[]>([]);
   const [formats, setFormats] = useState<Format[]>([]);
 
+  // Breed-specific coats
+  const [primaryBreedCoats, setPrimaryBreedCoats] = useState<Coat[]>([]);
+  const [secondaryBreedCoats, setSecondaryBreedCoats] = useState<Coat[]>([]);
+
   const [primaryBreedSearch, setPrimaryBreedSearch] = useState('');
   const [secondaryBreedSearch, setSecondaryBreedSearch] = useState('');
   const [primaryOutfitSearch, setPrimaryOutfitSearch] = useState('');
@@ -88,6 +92,36 @@ export default function CustomerImageCustomizationModal({
     const variations = countSelectedVariations();
     setCreditsRequired(Math.max(1, variations));
   }, [primaryAnimal, secondaryAnimal, selectedFormats, isMultiAnimal]);
+
+  // Fetch breed-specific coats when primary breed is selected
+  useEffect(() => {
+    if (primaryAnimal.breed) {
+      fetchBreedCoats(primaryAnimal.breed.id).then((coats) => {
+        setPrimaryBreedCoats(coats);
+        // Clear selected coat if it's not available for this breed
+        if (primaryAnimal.coat && !coats.some(c => c.id === primaryAnimal.coat?.id)) {
+          setPrimaryAnimal({ ...primaryAnimal, coat: null });
+        }
+      });
+    } else {
+      setPrimaryBreedCoats([]);
+    }
+  }, [primaryAnimal.breed]);
+
+  // Fetch breed-specific coats when secondary breed is selected
+  useEffect(() => {
+    if (secondaryAnimal.breed) {
+      fetchBreedCoats(secondaryAnimal.breed.id).then((coats) => {
+        setSecondaryBreedCoats(coats);
+        // Clear selected coat if it's not available for this breed
+        if (secondaryAnimal.coat && !coats.some(c => c.id === secondaryAnimal.coat?.id)) {
+          setSecondaryAnimal({ ...secondaryAnimal, coat: null });
+        }
+      });
+    } else {
+      setSecondaryBreedCoats([]);
+    }
+  }, [secondaryAnimal.breed]);
 
   const fetchCreditBalance = async () => {
     try {
@@ -123,6 +157,21 @@ export default function CustomerImageCustomizationModal({
       setError('Failed to load customization options');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch breed-specific coats from API
+  const fetchBreedCoats = async (breedId: string): Promise<Coat[]> => {
+    try {
+      const response = await fetch(`/api/breed-coats?breed_id=${breedId}`);
+      if (!response.ok) return [];
+
+      const breedCoats = await response.json();
+      // Extract the coat objects from the breed_coats relationship
+      return breedCoats.map((bc: any) => bc.coats);
+    } catch (err) {
+      console.error('Error fetching breed coats:', err);
+      return [];
     }
   };
 
@@ -329,10 +378,9 @@ export default function CustomerImageCustomizationModal({
     o.name.toLowerCase().includes(secondaryOutfitSearch.toLowerCase())
   );
 
-  // Get available coats for selected breed
-  const getAvailableCoatsForBreed = (breed: Breed | null): Coat[] => {
-    if (!breed) return [];
-    return coats.filter(c => c.animal_type === breed.animal_type);
+  // Get available coats for selected breed (now using breed-specific state)
+  const getAvailableCoatsForBreed = (isPrimary: boolean): Coat[] => {
+    return isPrimary ? primaryBreedCoats : secondaryBreedCoats;
   };
 
   return (
@@ -465,7 +513,7 @@ export default function CustomerImageCustomizationModal({
                 <div>
                   <Label>Coat Color</Label>
                   <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto border rounded-lg p-2">
-                    {getAvailableCoatsForBreed(primaryAnimal.breed).map(coat => (
+                    {getAvailableCoatsForBreed(true).map(coat => (
                       <button
                         key={coat.id}
                         onClick={() => setPrimaryAnimal({ ...primaryAnimal, coat })}
@@ -528,7 +576,7 @@ export default function CustomerImageCustomizationModal({
                 <div>
                   <Label>Coat Color</Label>
                   <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto border rounded-lg p-2">
-                    {getAvailableCoatsForBreed(secondaryAnimal.breed).map(coat => (
+                    {getAvailableCoatsForBreed(false).map(coat => (
                       <button
                         key={coat.id}
                         onClick={() => setSecondaryAnimal({ ...secondaryAnimal, coat })}
