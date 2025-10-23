@@ -316,7 +316,7 @@ export default function PetsClient() {
         </div>
         <Button 
           className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-          onClick={() => window.location.href = '/customer/pets/add'}
+          onClick={() => window.location.href = '/pets/add'}
         >
           <Plus className="w-4 h-4 mr-2" />
           Add Pet
@@ -334,7 +334,7 @@ export default function PetsClient() {
             </p>
             <Button 
               className="bg-gradient-to-r from-purple-600 to-blue-600"
-              onClick={() => window.location.href = '/customer/pets/add'}
+              onClick={() => window.location.href = '/pets/add'}
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Pet
@@ -465,7 +465,7 @@ export default function PetsClient() {
               <div className="p-4 text-center">
                 <Button 
                   className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                  onClick={() => window.location.href = '/customer/pets/add'}
+                  onClick={() => window.location.href = '/pets/add'}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Pet
