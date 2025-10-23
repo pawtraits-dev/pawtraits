@@ -98,11 +98,16 @@ export async function POST(request: NextRequest) {
       cancel_url: `${baseUrl}/customize?credits_purchase_cancelled=true`,
       customer_email: userProfile.email,
       // Add metadata to payment intent for early detection
+      // Include ALL metadata needed for credit processing
       payment_intent_data: {
         metadata: {
           purchaseType: 'customization_credits',
           customerId: userProfile.id,
           customerEmail: userProfile.email,
+          packId: packConfig.pack_id,
+          credits: packConfig.credits_amount.toString(),
+          orderCreditAmount: packConfig.order_credit_pence.toString(),
+          pricePaid: packConfig.price_pence.toString(),
         }
       },
       // Session metadata (available in checkout.session.completed)

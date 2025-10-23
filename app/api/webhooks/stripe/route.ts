@@ -156,9 +156,11 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     const orderType = metadata.orderType;
     const purchaseType = metadata.purchaseType;
 
-    // Check if this is a credit pack purchase (will be handled by checkout.session.completed)
+    // Check if this is a credit pack purchase - handle it directly here
+    // (checkout.session.completed may not fire reliably for payment mode sessions)
     if (purchaseType === 'customization_credits') {
-      console.log('ℹ️  Credit pack purchase detected - will be handled by checkout.session.completed event');
+      console.log('💳 Credit pack purchase detected - processing credits from payment_intent.succeeded');
+      await handleCreditPackPurchase(event, supabase, paymentIntent, metadata);
       return;
     }
 
@@ -295,6 +297,160 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
 
   } catch (error) {
     console.error('Error handling successful payment:', error);
+  }
+}
+
+// Handle credit pack purchase from payment_intent.succeeded
+async function handleCreditPackPurchase(
+  event: any,
+  supabase: any,
+  paymentIntent: any,
+  metadata: any
+) {
+  try {
+    const customerId = metadata.customerId;
+    const customerEmail = metadata.customerEmail;
+    const packId = metadata.packId;
+    const credits = parseInt(metadata.credits);
+    const orderCreditAmount = parseInt(metadata.orderCreditAmount || '0');
+    const amountPaid = paymentIntent.amount;
+
+    if (!customerId || !credits || !packId) {
+      console.error('❌ Missing required metadata for credit purchase:', {
+        customerId,
+        credits,
+        packId,
+        availableKeys: Object.keys(metadata)
+      });
+      return;
+    }
+
+    console.log('💳 Processing credit pack purchase:', {
+      customerId,
+      customerEmail,
+      packId,
+      credits,
+      orderCreditAmount,
+      amountPaid
+    });
+
+    // Add customization credits to customer account using database function
+    const { data: addResult, error: addError } = await supabase
+      .rpc('add_customization_credits', {
+        p_customer_id: customerId,
+        p_credits_to_add: credits,
+        p_purchase_amount: amountPaid
+      });
+
+    if (addError || !addResult) {
+      console.error('❌ Failed to add customization credits to customer account:', addError);
+      return;
+    }
+
+    console.log('✅ Customization credits added successfully');
+
+    // Add order credit to commissions table (if applicable)
+    if (orderCreditAmount > 0) {
+      console.log('💰 Adding order credit to commissions table:', {
+        orderCreditAmount,
+        orderCreditFormatted: `£${(orderCreditAmount / 100).toFixed(2)}`
+      });
+
+      const { data: commissionData, error: commissionError } = await supabase
+        .from('commissions')
+        .insert({
+          order_id: null, // No order yet, this is prepaid credit
+          order_amount: 0,
+          recipient_type: 'customer',
+          recipient_id: customerId,
+          recipient_email: customerEmail,
+          referrer_type: 'customer',
+          referrer_id: customerId,
+          referral_code: null,
+          commission_type: 'customer_credit',
+          commission_rate: 0,
+          commission_amount: orderCreditAmount,
+          status: 'approved',
+          metadata: {
+            source: 'credit_pack_purchase',
+            pack_id: packId,
+            pack_price_paid: amountPaid,
+            customization_credits_granted: credits,
+            payment_intent_id: paymentIntent.id,
+            purchase_date: new Date().toISOString()
+          }
+        })
+        .select()
+        .single();
+
+      if (commissionError) {
+        console.error('❌ Failed to create commission record for order credit:', commissionError);
+      } else {
+        console.log('✅ Order credit commission record created:', commissionData.id);
+
+        // Update customer's current_credit_balance
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('id, current_credit_balance')
+          .eq('id', customerId)
+          .single();
+
+        if (customer) {
+          const newBalance = (customer.current_credit_balance || 0) + orderCreditAmount;
+
+          const { error: balanceError } = await supabase
+            .from('customers')
+            .update({ current_credit_balance: newBalance })
+            .eq('id', customerId);
+
+          if (balanceError) {
+            console.error('❌ Failed to update customer credit balance:', balanceError);
+          } else {
+            console.log('✅ Customer credit balance updated:', {
+              previousBalance: customer.current_credit_balance,
+              creditAdded: orderCreditAmount,
+              newBalance,
+              newBalanceFormatted: `£${(newBalance / 100).toFixed(2)}`
+            });
+          }
+        }
+      }
+    }
+
+    // Get updated customization credit balance
+    const { data: balance } = await supabase
+      .from('customer_customization_credits')
+      .select('credits_remaining, credits_purchased')
+      .eq('customer_id', customerId)
+      .single();
+
+    console.log('✅ Credit pack purchase complete:', {
+      customerId,
+      customerEmail,
+      customizationCreditsAdded: credits,
+      orderCreditAdded: orderCreditAmount,
+      orderCreditFormatted: `£${(orderCreditAmount / 100).toFixed(2)}`,
+      packId,
+      amountPaid,
+      amountFormatted: `£${(amountPaid / 100).toFixed(2)}`,
+      newCustomizationBalance: balance?.credits_remaining || 0,
+      totalPurchased: balance?.credits_purchased || 0
+    });
+
+    // Send confirmation email to customer about credit purchase
+    await sendCreditPackPurchaseEmail(supabase, {
+      customerId,
+      customerEmail,
+      packId,
+      credits,
+      orderCreditAmount,
+      amountPaid,
+      newCustomizationBalance: balance?.credits_remaining || 0,
+      totalPurchased: balance?.credits_purchased || 0
+    });
+
+  } catch (error) {
+    console.error('💥 Error handling credit pack purchase:', error);
   }
 }
 
