@@ -1497,6 +1497,84 @@ async function sendOrderConfirmationEmail(
   }
 }
 
+// Send credit pack purchase confirmation email
+async function sendCreditPackPurchaseEmail(
+  supabase: any,
+  data: {
+    customerId: string;
+    customerEmail: string;
+    packId: string;
+    credits: number;
+    orderCreditAmount: number;
+    amountPaid: number;
+    newCustomizationBalance: number;
+    totalPurchased: number;
+  }
+) {
+  try {
+    console.log('📧 Preparing credit pack purchase email for:', data.customerEmail);
+
+    // Get pack configuration for pack name
+    const { data: packConfig } = await supabase
+      .from('customer_credit_pack_config')
+      .select('pack_name')
+      .eq('pack_id', data.packId)
+      .single();
+
+    // Get customer name and credit balance
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('first_name, current_credit_balance')
+      .eq('id', data.customerId)
+      .single();
+
+    // Get user profile for recipient ID
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('email', data.customerEmail)
+      .single();
+
+    // Use production URL for emails
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+      || (process.env.VERCEL_ENV === 'production' && process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'http://localhost:3000');
+
+    await sendMessage({
+      templateKey: 'credit_pack_purchased',
+      recipientType: 'customer',
+      recipientId: userProfile?.id || null,
+      recipientEmail: data.customerEmail,
+      variables: {
+        base_url: baseUrl,
+        customer_name: customer?.first_name || data.customerEmail.split('@')[0],
+        pack_name: packConfig?.pack_name || 'Credit Pack',
+        credits_added: data.credits,
+        order_credit: `£${(data.orderCreditAmount / 100).toFixed(2)}`,
+        amount_paid: `£${(data.amountPaid / 100).toFixed(2)}`,
+        total_customization_credits: data.newCustomizationBalance,
+        total_order_credit: `£${((customer?.current_credit_balance || 0) / 100).toFixed(2)}`,
+        customize_url: `${baseUrl}/customize`,
+        browse_url: `${baseUrl}/browse`,
+        unsubscribe_url: `${baseUrl}/preferences/unsubscribe`
+      },
+      priority: 'high'
+    });
+
+    console.log('✅ Credit pack purchase email queued successfully:', {
+      customerId: data.customerId,
+      customerEmail: data.customerEmail,
+      creditsAdded: data.credits,
+      orderCreditAmount: `£${(data.orderCreditAmount / 100).toFixed(2)}`
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to send credit pack purchase email:', error);
+    // Don't throw - we don't want email failures to break credit processing
+  }
+}
+
 // Handle Stripe Checkout Session completion (for credit pack purchases)
 async function handleCheckoutSessionCompleted(event: any, supabase: any) {
   const session = event.data.object;
@@ -1641,7 +1719,17 @@ async function handleCheckoutSessionCompleted(event: any, supabase: any) {
       totalPurchased: balance?.credits_purchased || 0
     });
 
-    // TODO: Send confirmation email to customer about credit purchase
+    // Send confirmation email to customer about credit purchase
+    await sendCreditPackPurchaseEmail(supabase, {
+      customerId,
+      customerEmail,
+      packId,
+      credits,
+      orderCreditAmount,
+      amountPaid: session.amount_total,
+      newCustomizationBalance: balance?.credits_remaining || 0,
+      totalPurchased: balance?.credits_purchased || 0
+    });
 
   } catch (error) {
     console.error('💥 Error handling checkout session completion:', error);
