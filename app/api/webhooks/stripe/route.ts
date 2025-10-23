@@ -407,35 +407,41 @@ async function handleCreditPackPurchase(
 
       if (commissionError) {
         console.error('❌ Failed to create commission record for order credit:', commissionError);
+        // Continue to try balance update even if commission creation failed
       } else {
         console.log('✅ Order credit commission record created:', commissionData.id);
+      }
 
-        // Update customer's current_credit_balance
-        const { data: customer } = await supabase
+      // ALWAYS update customer's current_credit_balance, regardless of commission record success
+      // This ensures the balance is available even if there was a commission table issue
+      const { data: customer, error: customerFetchError } = await supabase
+        .from('customers')
+        .select('id, current_credit_balance')
+        .eq('id', customerId)
+        .single();
+
+      if (customerFetchError) {
+        console.error('❌ Failed to fetch customer for balance update:', customerFetchError);
+      } else if (customer) {
+        const newBalance = (customer.current_credit_balance || 0) + orderCreditAmount;
+
+        const { error: balanceError } = await supabase
           .from('customers')
-          .select('id, current_credit_balance')
-          .eq('id', customerId)
-          .single();
+          .update({ current_credit_balance: newBalance })
+          .eq('id', customerId);
 
-        if (customer) {
-          const newBalance = (customer.current_credit_balance || 0) + orderCreditAmount;
-
-          const { error: balanceError } = await supabase
-            .from('customers')
-            .update({ current_credit_balance: newBalance })
-            .eq('id', customerId);
-
-          if (balanceError) {
-            console.error('❌ Failed to update customer credit balance:', balanceError);
-          } else {
-            console.log('✅ Customer credit balance updated:', {
-              previousBalance: customer.current_credit_balance,
-              creditAdded: orderCreditAmount,
-              newBalance,
-              newBalanceFormatted: `£${(newBalance / 100).toFixed(2)}`
-            });
-          }
+        if (balanceError) {
+          console.error('❌ Failed to update customer credit balance:', balanceError);
+        } else {
+          console.log('✅ Customer credit balance updated:', {
+            previousBalance: customer.current_credit_balance,
+            creditAdded: orderCreditAmount,
+            newBalance,
+            newBalanceFormatted: `£${(newBalance / 100).toFixed(2)}`
+          });
         }
+      } else {
+        console.error('❌ Customer not found for balance update:', customerId);
       }
     }
 
