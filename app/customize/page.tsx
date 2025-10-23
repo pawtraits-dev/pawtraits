@@ -520,6 +520,7 @@ function CustomerCustomizePageContent() {
         </Card>
 
       </div>
+      </div>
 
       {/* Customization Modal */}
       {imageToCustomize && (
@@ -540,8 +541,6 @@ function CustomerCustomizePageContent() {
           }}
         />
       )}
-      </div>
-      </div>
     </>
   );
 }
