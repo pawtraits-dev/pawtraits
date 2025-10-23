@@ -39,6 +39,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Customer account required' }, { status: 403 });
     }
 
+    // Get customer record (needed for correct commission recipient_id)
+    const { data: customer, error: customerError } = await supabaseAdmin
+      .from('customers')
+      .select('id, email')
+      .eq('email', user.email)
+      .single();
+
+    if (customerError || !customer) {
+      console.error('Error fetching customer record:', customerError);
+      return NextResponse.json({ error: 'Customer record not found' }, { status: 404 });
+    }
+
     // Get pack ID from request
     const { packId } = await request.json();
 
@@ -65,8 +77,8 @@ export async function POST(request: NextRequest) {
       credits: packConfig.credits_amount,
       pricePence: packConfig.price_pence,
       orderCreditPence: packConfig.order_credit_pence,
-      customerId: userProfile.id,
-      customerEmail: userProfile.email
+      customerId: customer.id, // Use customers.id for commission records
+      customerEmail: customer.email
     });
 
     // Determine base URL for redirects
@@ -99,11 +111,13 @@ export async function POST(request: NextRequest) {
       customer_email: userProfile.email,
       // Add metadata to payment intent for early detection
       // Include ALL metadata needed for credit processing
+      // IMPORTANT: Use customer.id (from customers table) not userProfile.id (from user_profiles)
+      // This ensures commission records can be queried correctly in /referrals page
       payment_intent_data: {
         metadata: {
           purchaseType: 'customization_credits',
-          customerId: userProfile.id,
-          customerEmail: userProfile.email,
+          customerId: customer.id, // customers.id for commission recipient_id
+          customerEmail: customer.email,
           packId: packConfig.pack_id,
           credits: packConfig.credits_amount.toString(),
           orderCreditAmount: packConfig.order_credit_pence.toString(),
@@ -113,8 +127,8 @@ export async function POST(request: NextRequest) {
       // Session metadata (available in checkout.session.completed)
       metadata: {
         purchaseType: 'customization_credits',
-        customerId: userProfile.id,
-        customerEmail: userProfile.email,
+        customerId: customer.id, // customers.id for commission recipient_id
+        customerEmail: customer.email,
         packId: packConfig.pack_id,
         credits: packConfig.credits_amount.toString(),
         orderCreditAmount: packConfig.order_credit_pence.toString(),

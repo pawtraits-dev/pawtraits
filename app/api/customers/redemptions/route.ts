@@ -62,8 +62,8 @@ export async function GET(request: NextRequest) {
       customer_id: customerId,
       order_id: order.id,
       order_number: order.order_number,
-      credits_used: order.credit_applied || 0, // Fixed: was credits_applied (plural), now credit_applied (singular)
-      order_total: order.total_amount || 0,
+      credits_used: (order.credit_applied || 0) / 100, // Convert pence to pounds
+      order_total: (order.total_amount || 0) / 100, // Convert pence to pounds
       redeemed_at: order.created_at
     })) : [];
 
