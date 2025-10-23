@@ -88,6 +88,8 @@ const navigationSections = [
       { name: 'Pre-Registration Codes', href: '/admin/partners/pre-registration', icon: QrCode },
       { name: 'Partner Referrals', href: '/admin/referrals', icon: Target },
       { name: 'Customer Referrals', href: '/admin/customer-referrals', icon: UserPlus },
+      { name: 'Credit Pack Settings', href: '/admin/settings/credit-packs', icon: CreditCard },
+      { name: 'Customer Customizations', href: '/admin/customer-customizations', icon: ImageIcon },
     ]
   },
   {

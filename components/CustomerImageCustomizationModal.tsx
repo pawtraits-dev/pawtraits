@@ -133,8 +133,17 @@ export default function CustomerImageCustomizationModal({
 
     // Single animal: count breed-coat combinations + formats
     let count = 0;
-    if (primaryAnimal.breed && primaryAnimal.coat) count++;
-    if (selectedFormats.length > 0) count += selectedFormats.length;
+
+    // Base variation: breed + coat combination (always counts as 1 if both selected)
+    if (primaryAnimal.breed && primaryAnimal.coat) {
+      count = 1;
+    }
+
+    // Additional format variations beyond the base
+    if (selectedFormats.length > 0) {
+      count += selectedFormats.length;
+    }
+
     return count;
   };
 

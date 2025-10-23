@@ -1519,8 +1519,10 @@ async function handleCheckoutSessionCompleted(event: any, supabase: any) {
     }
 
     const customerId = metadata.customerId;
+    const customerEmail = metadata.customerEmail || session.customer_email;
     const packId = metadata.packId;
     const credits = parseInt(metadata.credits);
+    const orderCreditAmount = parseInt(metadata.orderCreditAmount || '0');
 
     if (!customerId || !credits) {
       console.error('❌ Missing required metadata for credit purchase:', metadata);
@@ -1529,12 +1531,14 @@ async function handleCheckoutSessionCompleted(event: any, supabase: any) {
 
     console.log('💳 Processing credit pack purchase:', {
       customerId,
+      customerEmail,
       packId,
       credits,
+      orderCreditAmount,
       amountPaid: session.amount_total
     });
 
-    // Add credits to customer account using database function
+    // Add customization credits to customer account using database function
     const { data: addResult, error: addError } = await supabase
       .rpc('add_customization_credits', {
         p_customer_id: customerId,
@@ -1543,24 +1547,97 @@ async function handleCheckoutSessionCompleted(event: any, supabase: any) {
       });
 
     if (addError || !addResult) {
-      console.error('❌ Failed to add credits to customer account:', addError);
+      console.error('❌ Failed to add customization credits to customer account:', addError);
       return;
     }
 
-    // Get updated credit balance
+    console.log('✅ Customization credits added successfully');
+
+    // Add order credit to commissions table (if applicable)
+    if (orderCreditAmount > 0) {
+      console.log('💰 Adding order credit to commissions table:', {
+        orderCreditAmount,
+        orderCreditFormatted: `£${(orderCreditAmount / 100).toFixed(2)}`
+      });
+
+      const { data: commissionData, error: commissionError } = await supabase
+        .from('commissions')
+        .insert({
+          order_id: null, // No order yet, this is prepaid credit
+          order_amount: 0,
+          recipient_type: 'customer',
+          recipient_id: customerId,
+          recipient_email: customerEmail,
+          referrer_type: 'customer',
+          referrer_id: customerId,
+          referral_code: null,
+          commission_type: 'customer_credit',
+          commission_rate: 0,
+          commission_amount: orderCreditAmount,
+          status: 'approved',
+          metadata: {
+            source: 'credit_pack_purchase',
+            pack_id: packId,
+            pack_price_paid: session.amount_total,
+            customization_credits_granted: credits,
+            stripe_session_id: session.id,
+            purchase_date: new Date().toISOString()
+          }
+        })
+        .select()
+        .single();
+
+      if (commissionError) {
+        console.error('❌ Failed to create commission record for order credit:', commissionError);
+      } else {
+        console.log('✅ Order credit commission record created:', commissionData.id);
+
+        // Update customer's current_credit_balance
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('id, current_credit_balance')
+          .eq('id', customerId)
+          .single();
+
+        if (customer) {
+          const newBalance = (customer.current_credit_balance || 0) + orderCreditAmount;
+
+          const { error: balanceError } = await supabase
+            .from('customers')
+            .update({ current_credit_balance: newBalance })
+            .eq('id', customerId);
+
+          if (balanceError) {
+            console.error('❌ Failed to update customer credit balance:', balanceError);
+          } else {
+            console.log('✅ Customer credit balance updated:', {
+              previousBalance: customer.current_credit_balance,
+              creditAdded: orderCreditAmount,
+              newBalance,
+              newBalanceFormatted: `£${(newBalance / 100).toFixed(2)}`
+            });
+          }
+        }
+      }
+    }
+
+    // Get updated customization credit balance
     const { data: balance } = await supabase
       .from('customer_customization_credits')
       .select('credits_remaining, credits_purchased')
       .eq('customer_id', customerId)
       .single();
 
-    console.log('✅ Credits added successfully:', {
+    console.log('✅ Credit pack purchase complete:', {
       customerId,
-      creditsAdded: credits,
+      customerEmail,
+      customizationCreditsAdded: credits,
+      orderCreditAdded: orderCreditAmount,
+      orderCreditFormatted: `£${(orderCreditAmount / 100).toFixed(2)}`,
       packId,
       amountPaid: session.amount_total,
       amountFormatted: `£${(session.amount_total / 100).toFixed(2)}`,
-      newBalance: balance?.credits_remaining || 0,
+      newCustomizationBalance: balance?.credits_remaining || 0,
       totalPurchased: balance?.credits_purchased || 0
     });
 

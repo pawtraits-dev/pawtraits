@@ -109,14 +109,54 @@ export async function POST(request: NextRequest) {
       }, { status: 413 });
     }
 
-    // Calculate required credits
-    const breedCoatsCount = variationConfig.breedCoats?.length || 0;
-    const outfitsCount = variationConfig.outfits?.length || 0;
-    const formatsCount = variationConfig.formats?.length || 0;
-    const totalVariations = breedCoatsCount + outfitsCount + formatsCount;
-    const requiredCredits = Math.max(1, totalVariations);
+    // Fetch feature credit costs from configuration
+    const { data: featureCosts } = await supabaseAdmin
+      .rpc('get_feature_credit_costs');
 
-    console.log(`💳 Required credits: ${requiredCredits} for ${totalVariations} variations`);
+    const costs = featureCosts && featureCosts.length > 0 ? featureCosts[0] : {
+      base_variation_cost: 1,
+      multi_animal_cost: 2,
+      format_variation_cost: 1,
+      outfit_variation_cost: 1
+    };
+
+    console.log('💳 Using feature costs:', costs);
+
+    // Calculate required credits based on configuration
+    let requiredCredits = 0;
+
+    if (isMultiAnimal) {
+      // Multi-animal generation
+      requiredCredits = costs.multi_animal_cost || 2;
+      console.log(`🐾 Multi-animal generation: ${requiredCredits} credits`);
+    } else {
+      // Single animal: count each type of variation
+      const breedCoatsCount = variationConfig.breedCoats?.length || 0;
+      const outfitsCount = variationConfig.outfits?.length || 0;
+      const formatsCount = variationConfig.formats?.length || 0;
+
+      if (breedCoatsCount > 0) {
+        requiredCredits += breedCoatsCount * (costs.base_variation_cost || 1);
+      }
+      if (outfitsCount > 0) {
+        requiredCredits += outfitsCount * (costs.outfit_variation_cost || 1);
+      }
+      if (formatsCount > 0) {
+        requiredCredits += formatsCount * (costs.format_variation_cost || 1);
+      }
+
+      // Ensure at least 1 credit if any variation selected
+      requiredCredits = Math.max(1, requiredCredits);
+
+      console.log(`💳 Single animal variations:`, {
+        breedCoats: breedCoatsCount,
+        outfits: outfitsCount,
+        formats: formatsCount,
+        totalCredits: requiredCredits
+      });
+    }
+
+    console.log(`💳 Total required credits: ${requiredCredits}`);
 
     // Check and deduct credits
     const { data: creditCheckResult, error: creditCheckError } = await supabaseAdmin

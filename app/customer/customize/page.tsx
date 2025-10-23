@@ -16,7 +16,8 @@ import {
   CreditCard,
   Zap,
   Heart,
-  AlertCircle
+  AlertCircle,
+  Gift
 } from 'lucide-react';
 import { useUserRouting } from '@/hooks/use-user-routing';
 import type { ImageCatalogWithDetails } from '@/lib/types';
@@ -328,16 +329,34 @@ export default function CustomerCustomizePage() {
                       <p className="text-4xl font-bold text-gray-900">
                         {pack.credits}
                       </p>
-                      <p className="text-sm text-gray-600">Credits</p>
+                      <p className="text-sm text-gray-600">Customization Credits</p>
                     </div>
-                    <div className="mb-6">
+                    <div className="mb-4">
                       <p className="text-3xl font-bold text-purple-600">
                         {pack.priceFormatted}
                       </p>
                       <p className="text-sm text-gray-500">
                         £{(pack.price / pack.credits / 100).toFixed(2)} per credit
                       </p>
+                      {pack.discount > 0 && (
+                        <Badge variant="secondary" className="mt-1">
+                          {pack.discount}% Off
+                        </Badge>
+                      )}
                     </div>
+                    {pack.orderCredit > 0 && (
+                      <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center justify-center gap-2 text-green-700">
+                          <Gift className="w-4 h-4" />
+                          <span className="text-sm font-medium">
+                            Bonus: {pack.orderCreditFormatted} order credit
+                          </span>
+                        </div>
+                        <p className="text-xs text-green-600 mt-1">
+                          Use towards your print orders!
+                        </p>
+                      </div>
+                    )}
                     <Button
                       onClick={() => handlePurchaseCredits(pack.id)}
                       disabled={purchasingPack === pack.id}

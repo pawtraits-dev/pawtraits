@@ -1,6 +1,6 @@
 # Database Schema Reference
 
-Generated: 2025-10-09T13:51:55.462Z
+Generated: 2025-10-23T10:36:49.579Z
 
 This document provides the actual database schema for the influencer system.
 **Use this as the source of truth when writing tests and implementing features.**
