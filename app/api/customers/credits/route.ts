@@ -120,28 +120,12 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/customers/credits
- * Redirects to the new checkout endpoint
- * This endpoint is deprecated but kept for backwards compatibility
- *
- * Body: { packId: 'starter' | 'popular' | 'pro' }
+ * Deprecated: Use /api/customers/credits/checkout instead
+ * Kept for backwards compatibility
  */
 export async function POST(request: NextRequest) {
-  // Forward the request to the new checkout endpoint
-  const body = await request.json();
-
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-
-  const checkoutResponse = await fetch(`${baseUrl}/api/customers/credits/checkout`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Cookie': request.headers.get('cookie') || ''
-    },
-    body: JSON.stringify(body)
-  });
-
-  const data = await checkoutResponse.json();
-  return NextResponse.json(data, { status: checkoutResponse.status });
+  return NextResponse.json(
+    { error: 'This endpoint is deprecated. Use /api/customers/credits/checkout instead.' },
+    { status: 410 }
+  );
 }

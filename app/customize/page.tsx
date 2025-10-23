@@ -144,7 +144,7 @@ function CustomerCustomizePageContent() {
     try {
       setPurchasingPack(packId);
 
-      const response = await fetch('/api/customers/credits', {
+      const response = await fetch('/api/customers/credits/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ packId })
