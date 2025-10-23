@@ -97,6 +97,15 @@ export async function POST(request: NextRequest) {
       success_url: `${baseUrl}/customize?credits_purchased=true&pack=${packId}`,
       cancel_url: `${baseUrl}/customize?credits_purchase_cancelled=true`,
       customer_email: userProfile.email,
+      // Add metadata to payment intent for early detection
+      payment_intent_data: {
+        metadata: {
+          purchaseType: 'customization_credits',
+          customerId: userProfile.id,
+          customerEmail: userProfile.email,
+        }
+      },
+      // Session metadata (available in checkout.session.completed)
       metadata: {
         purchaseType: 'customization_credits',
         customerId: userProfile.id,

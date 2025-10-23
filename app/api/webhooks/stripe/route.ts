@@ -94,23 +94,42 @@ export async function POST(request: NextRequest) {
 // Handle successful payment
 async function handlePaymentSucceeded(event: any, supabase: any) {
   const paymentIntent = event.data.object;
-  
-  console.log('Payment succeeded:', {
+
+  console.log('💳 Payment Intent Succeeded:', {
     id: paymentIntent.id,
     amount: paymentIntent.amount,
     currency: paymentIntent.currency,
     customerEmail: paymentIntent.metadata?.customerEmail,
     orderType: paymentIntent.metadata?.orderType,
+    purchaseType: paymentIntent.metadata?.purchaseType,
+    hasShippingData: !!(paymentIntent.metadata?.shippingAddress || paymentIntent.metadata?.shippingAddressLine1),
+    metadataKeys: Object.keys(paymentIntent.metadata || {})
   });
 
   try {
     // Extract order information from metadata
     const metadata = paymentIntent.metadata || {};
     const customerEmail = metadata.customerEmail;
-    const orderType = metadata.orderType || 'customer';
-    
+    const orderType = metadata.orderType;
+    const purchaseType = metadata.purchaseType;
+
+    // Check if this is a credit pack purchase (will be handled by checkout.session.completed)
+    if (purchaseType === 'customization_credits') {
+      console.log('ℹ️  Credit pack purchase detected - will be handled by checkout.session.completed event');
+      return;
+    }
+
+    // Check if this looks like a print order (has shipping data)
+    const hasShippingData = metadata.shippingAddress || metadata.shippingAddressLine1;
+
     if (!customerEmail) {
-      console.error('No customer email found in payment intent metadata');
+      console.error('❌ No customer email found in payment intent metadata');
+      return;
+    }
+
+    if (!hasShippingData && !orderType) {
+      console.warn('⚠️  Payment intent missing both shipping data and order type - skipping order creation');
+      console.warn('   This might be a credit purchase that should be handled by checkout.session.completed');
       return;
     }
 
@@ -1579,12 +1598,15 @@ async function sendCreditPackPurchaseEmail(
 async function handleCheckoutSessionCompleted(event: any, supabase: any) {
   const session = event.data.object;
 
-  console.log('🎫 Checkout session completed:', {
+  console.log('🎫 Checkout Session Completed:', {
     id: session.id,
-    customerEmail: session.customer_email,
-    amountTotal: session.amount_total,
+    amount: session.amount_total,
     currency: session.currency,
-    metadata: session.metadata
+    customerEmail: session.customer_email,
+    mode: session.mode,
+    paymentStatus: session.payment_status,
+    purchaseType: session.metadata?.purchaseType,
+    metadataKeys: Object.keys(session.metadata || {})
   });
 
   try {
