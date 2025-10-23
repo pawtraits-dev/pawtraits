@@ -23,6 +23,7 @@ import { useUserRouting } from '@/hooks/use-user-routing';
 import type { ImageCatalogWithDetails } from '@/lib/types';
 import CustomerImageCustomizationModal from '@/components/CustomerImageCustomizationModal';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
+import { CountryProvider } from '@/lib/country-context';
 
 interface CreditBalance {
   remaining: number;
@@ -544,8 +545,10 @@ function CustomerCustomizePageContent() {
 
 export default function CustomerCustomizePage() {
   return (
-    <Suspense fallback={<div className="p-8">Loading...</div>}>
-      <CustomerCustomizePageContent />
-    </Suspense>
+    <CountryProvider>
+      <Suspense fallback={<div className="p-8">Loading...</div>}>
+        <CustomerCustomizePageContent />
+      </Suspense>
+    </CountryProvider>
   );
 }
