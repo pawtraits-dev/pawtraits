@@ -13,6 +13,13 @@ if (!webhookSecret) {
   throw new Error('STRIPE_WEBHOOK_SECRET is required');
 }
 
+// Debug logging for webhook secret (only log prefix for security)
+console.log('Webhook secret configured:', {
+  hasSecret: !!webhookSecret,
+  secretPrefix: webhookSecret?.substring(0, 10) + '...',
+  secretLength: webhookSecret?.length
+});
+
 export async function POST(request: NextRequest) {
   try {
     // Get the raw body as text
@@ -20,19 +27,30 @@ export async function POST(request: NextRequest) {
     const signature = headers().get('stripe-signature');
 
     if (!signature) {
-      console.error('Missing stripe-signature header');
+      console.error('❌ Missing stripe-signature header');
       return NextResponse.json(
         { error: 'Missing stripe-signature header' },
         { status: 400 }
       );
     }
 
+    console.log('🔐 Webhook signature verification:', {
+      signatureHeader: signature.substring(0, 50) + '...',
+      bodyLength: body.length,
+      secretConfigured: !!webhookSecret
+    });
+
     // Construct the event from the webhook
     let event;
     try {
       event = constructWebhookEvent(body, signature, webhookSecret);
+      console.log('✅ Webhook signature verified successfully');
     } catch (err) {
-      console.error('Webhook signature verification failed:', err);
+      console.error('❌ Webhook signature verification failed:', {
+        error: err instanceof Error ? err.message : String(err),
+        signatureProvided: signature.substring(0, 20) + '...',
+        bodyPreview: body.substring(0, 100) + '...'
+      });
       return NextResponse.json(
         { error: 'Webhook signature verification failed' },
         { status: 400 }
