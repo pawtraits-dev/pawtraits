@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
         status,
         created_at,
         metadata,
-        orders!inner(
+        orders(
           id,
           order_number,
           customer_email,
@@ -246,12 +246,16 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Add rewards from commissions table (credits earned from referring friends)
+    // Add rewards from commissions table (credits earned from referring friends + credit pack bonuses)
     if (customerCredits && customerCredits.length > 0) {
       for (const credit of customerCredits) {
         // Get referred customer email from metadata
         const referredCustomerEmail = credit.metadata?.referred_customer_email;
         const referredCustomerId = credit.metadata?.referred_customer_id;
+
+        // Determine reward type based on source
+        const isCreditPackBonus = credit.metadata?.source === 'credit_pack_purchase';
+        const rewardType = isCreditPackBonus ? 'credit_pack_bonus' as const : 'purchase' as const;
 
         rewards.push({
           id: credit.id,
@@ -259,12 +263,13 @@ export async function GET(request: NextRequest) {
           friend_customer_id: referredCustomerId || null,
           order_id: credit.order_id,
           reward_amount: credit.commission_amount / 100, // Convert pence to pounds
-          reward_type: 'purchase' as const,
+          reward_type: rewardType,
           status: credit.status === 'approved' ? 'earned' as const :
                   credit.status === 'paid' ? 'earned' as const :
                   credit.status === 'pending' ? 'pending' as const : 'pending' as const,
           created_at: credit.created_at,
-          redeemed_at: null // Redemptions tracked separately
+          redeemed_at: null, // Redemptions tracked separately
+          metadata: credit.metadata // Include metadata for additional context
         });
       }
     }

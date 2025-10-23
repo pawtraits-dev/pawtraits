@@ -334,6 +334,28 @@ async function handleCreditPackPurchase(
       amountPaid
     });
 
+    // Get balances BEFORE purchase for email comparison
+    const { data: balancesBefore } = await supabase
+      .from('customer_customization_credits')
+      .select('credits_remaining')
+      .eq('customer_id', customerId)
+      .maybeSingle();
+
+    const { data: customerBefore } = await supabase
+      .from('customers')
+      .select('current_credit_balance')
+      .eq('id', customerId)
+      .maybeSingle();
+
+    const previousCustomizationBalance = balancesBefore?.credits_remaining || 0;
+    const previousOrderCredit = customerBefore?.current_credit_balance || 0;
+
+    console.log('📊 Balances before purchase:', {
+      previousCustomizationBalance,
+      previousOrderCreditPence: previousOrderCredit,
+      previousOrderCreditFormatted: `£${(previousOrderCredit / 100).toFixed(2)}`
+    });
+
     // Add customization credits to customer account using database function
     const { data: addResult, error: addError } = await supabase
       .rpc('add_customization_credits', {
@@ -445,6 +467,8 @@ async function handleCreditPackPurchase(
       credits,
       orderCreditAmount,
       amountPaid,
+      previousCustomizationBalance,
+      previousOrderCredit,
       newCustomizationBalance: balance?.credits_remaining || 0,
       totalPurchased: balance?.credits_purchased || 0
     });
@@ -1725,6 +1749,8 @@ async function sendCreditPackPurchaseEmail(
     credits: number;
     orderCreditAmount: number;
     amountPaid: number;
+    previousCustomizationBalance: number;
+    previousOrderCredit: number;
     newCustomizationBalance: number;
     totalPurchased: number;
   }
@@ -1771,10 +1797,13 @@ async function sendCreditPackPurchaseEmail(
         credits_added: data.credits,
         order_credit: `£${(data.orderCreditAmount / 100).toFixed(2)}`,
         amount_paid: `£${(data.amountPaid / 100).toFixed(2)}`,
+        previous_customization_credits: data.previousCustomizationBalance,
+        previous_order_credit: `£${(data.previousOrderCredit / 100).toFixed(2)}`,
         total_customization_credits: data.newCustomizationBalance,
         total_order_credit: `£${((customer?.current_credit_balance || 0) / 100).toFixed(2)}`,
         customize_url: `${baseUrl}/customize`,
         browse_url: `${baseUrl}/browse`,
+        referrals_url: `${baseUrl}/referrals`,
         unsubscribe_url: `${baseUrl}/preferences/unsubscribe`
       },
       priority: 'high'

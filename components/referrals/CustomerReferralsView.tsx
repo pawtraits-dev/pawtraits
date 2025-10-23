@@ -660,11 +660,11 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
                             <td className="px-4 py-3 text-sm">
                               <Badge variant="outline">
                                 {reward.reward_type === 'signup' ? 'Sign-up Bonus' :
+                                 reward.reward_type === 'credit_pack_bonus' ? 'Credit Pack Bonus' :
                                  reward.reward_type === 'referral_discount' ? 'Referral Discount (10%)' :
                                  'Purchase Bonus'}
                               </Badge>
-                            </td>
-                            <td className="px-4 py-3 text-sm">
+                            </td>                            <td className="px-4 py-3 text-sm">
                               <Badge variant={
                                 reward.status === 'earned' ? 'default' :
                                 reward.status === 'used' ? 'default' :

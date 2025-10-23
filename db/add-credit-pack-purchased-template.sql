@@ -31,7 +31,7 @@ INSERT INTO message_templates (
 ) VALUES (
   'credit_pack_purchased',
   'Credit Pack Purchase Confirmation',
-  'Sent when customer purchases customization credits',
+  'Sent when customer purchases customization credits including order credit bonus',
   'transactional',
   ARRAY['email', 'inbox'],
   ARRAY['customer'],
@@ -61,17 +61,34 @@ INSERT INTO message_templates (
   <div class="stats">
     <h2>✅ Purchase Summary</h2>
     <ul>
+      <li><strong>Pack Purchased:</strong> {{pack_name}}</li>
       <li><strong>Customization Credits Added:</strong> {{credits_added}} credits</li>
-      <li><strong>Order Credit Bonus:</strong> {{order_credit}}</li>
+      <li><strong>Order Credit Bonus:</strong> {{order_credit}} <span style="color: #10B981; font-size: 14px;">(use on physical prints!)</span></li>
       <li><strong>Amount Paid:</strong> {{amount_paid}}</li>
     </ul>
   </div>
 
   <div class="stats">
-    <h2>💰 Your Current Balances</h2>
+    <h2>💰 Your Updated Balances</h2>
     <ul>
-      <li><strong>Customization Credits Available:</strong> {{total_customization_credits}} credits</li>
-      <li><strong>Order Credit Balance:</strong> {{total_order_credit}}</li>
+      <li>
+        <strong>Customization Credits:</strong><br>
+        <span style="color: #6B7280;">Previous: {{previous_customization_credits}} → New: {{total_customization_credits}} credits</span>
+      </li>
+      <li>
+        <strong>Order Credit:</strong><br>
+        <span style="color: #6B7280;">Previous: {{previous_order_credit}} → New: {{total_order_credit}}</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="stats" style="background: #ECFDF5; border: 1px solid #10B981;">
+    <h2 style="color: #059669;">🎁 About Your Order Credit Bonus</h2>
+    <ul style="color: #047857;">
+      <li>Your {{order_credit}} bonus has been added to your account</li>
+      <li>Use it on any physical print order (canvas, paper, acrylic, etc.)</li>
+      <li>View and track your rewards in your <a href="{{referrals_url}}" style="color: #059669; text-decoration: underline;">Rewards Dashboard</a></li>
+      <li>Bonus never expires and can be combined with other discounts</li>
     </ul>
   </div>
 
@@ -107,10 +124,13 @@ INSERT INTO message_templates (
     "credits_added": "number",
     "order_credit": "string",
     "amount_paid": "string",
+    "previous_customization_credits": "number",
+    "previous_order_credit": "string",
     "total_customization_credits": "number",
     "total_order_credit": "string",
     "customize_url": "string",
     "browse_url": "string",
+    "referrals_url": "string",
     "base_url": "string",
     "unsubscribe_url": "string"
   }'::jsonb,
