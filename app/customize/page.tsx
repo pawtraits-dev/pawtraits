@@ -150,11 +150,18 @@ function CustomerCustomizePageContent() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create checkout session');
+        const errorData = await response.json();
+        console.error('Checkout error:', errorData);
+        throw new Error(errorData.error || 'Failed to create checkout session');
       }
 
-      const { sessionUrl } = await response.json();
-      window.location.href = sessionUrl;
+      const data = await response.json();
+      console.log('Checkout response:', data);
+      const checkoutUrl = data.checkoutUrl || data.sessionUrl;
+      if (!checkoutUrl) {
+        throw new Error('No checkout URL received');
+      }
+      window.location.href = checkoutUrl;
     } catch (error) {
       console.error('Error purchasing credits:', error);
       alert('Failed to initiate purchase. Please try again.');

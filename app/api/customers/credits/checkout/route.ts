@@ -92,8 +92,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'payment',
-      success_url: `${baseUrl}/customer/customize?credits_purchased=true&pack=${packId}`,
-      cancel_url: `${baseUrl}/customer/customize?credits_purchase_cancelled=true`,
+      success_url: `${baseUrl}/customize?credits_purchased=true&pack=${packId}`,
+      cancel_url: `${baseUrl}/customize?credits_purchase_cancelled=true`,
       customer_email: userProfile.email,
       metadata: {
         purchaseType: 'customization_credits',
