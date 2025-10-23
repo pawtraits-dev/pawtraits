@@ -20,10 +20,15 @@ console.log('Webhook secret configured:', {
   secretLength: webhookSecret?.length
 });
 
+// Disable body parsing for this route to preserve raw body
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
-    // Get the raw body as text
-    const body = await request.text();
+    // Get the raw body as Buffer to preserve exact bytes
+    const rawBody = await request.arrayBuffer();
+    const body = Buffer.from(rawBody);
     const headersList = await headers();
     const signature = headersList.get('stripe-signature');
 
@@ -38,12 +43,12 @@ export async function POST(request: NextRequest) {
     console.log('🔐 Webhook signature verification:', {
       signatureHeader: signature.substring(0, 50) + '...',
       bodyLength: body.length,
-      bodyType: typeof body,
+      bodyType: 'Buffer',
       secretConfigured: !!webhookSecret,
       secretLength: webhookSecret?.length,
       // Log first and last chars to verify body integrity
-      bodyStart: body.substring(0, 20),
-      bodyEnd: body.substring(body.length - 20)
+      bodyStart: body.toString('utf8', 0, 20),
+      bodyEnd: body.toString('utf8', body.length - 20, body.length)
     });
 
     // Construct the event from the webhook
@@ -56,9 +61,10 @@ export async function POST(request: NextRequest) {
         error: err instanceof Error ? err.message : String(err),
         errorStack: err instanceof Error ? err.stack : undefined,
         signatureProvided: signature.substring(0, 50) + '...',
-        bodyPreview: body.substring(0, 200) + '...',
+        bodyPreview: body.toString('utf8', 0, 200) + '...',
         webhookSecretPrefix: webhookSecret.substring(0, 10) + '...',
-        bodyEncoding: 'utf-8',
+        webhookSecretSuffix: webhookSecret.substring(webhookSecret.length - 4),
+        bodyEncoding: 'Buffer',
         contentType: request.headers.get('content-type')
       });
       return NextResponse.json(
