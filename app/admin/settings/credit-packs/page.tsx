@@ -19,7 +19,6 @@ import {
   Sparkles,
   AlertCircle
 } from 'lucide-react';
-import { AdminSupabaseService } from '@/lib/admin-supabase';
 
 interface CreditPackConfig {
   id: string;
@@ -41,8 +40,6 @@ interface CreditPackConfig {
 }
 
 export default function CreditPackSettingsPage() {
-  const adminService = new AdminSupabaseService();
-
   const [packs, setPacks] = useState<CreditPackConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -58,13 +55,13 @@ export default function CreditPackSettingsPage() {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await adminService.getClient()
-        .from('customer_credit_pack_config')
-        .select('*')
-        .order('display_order', { ascending: true });
+      const response = await fetch('/api/admin/credit-packs');
 
-      if (fetchError) throw fetchError;
+      if (!response.ok) {
+        throw new Error('Failed to fetch credit packs');
+      }
 
+      const data = await response.json();
       setPacks(data || []);
     } catch (err) {
       console.error('Error loading credit packs:', err);
@@ -80,9 +77,10 @@ export default function CreditPackSettingsPage() {
       setError(null);
       setSuccess(null);
 
-      const { error: updateError } = await adminService.getClient()
-        .from('customer_credit_pack_config')
-        .update({
+      const response = await fetch(`/api/admin/credit-packs/${pack.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           pack_name: pack.pack_name,
           credits_amount: pack.credits_amount,
           price_pence: pack.price_pence,
@@ -98,9 +96,11 @@ export default function CreditPackSettingsPage() {
           discount_percentage: pack.discount_percentage,
           display_order: pack.display_order
         })
-        .eq('id', pack.id);
+      });
 
-      if (updateError) throw updateError;
+      if (!response.ok) {
+        throw new Error('Failed to update credit pack');
+      }
 
       setSuccess(`${pack.pack_name} updated successfully`);
       setTimeout(() => setSuccess(null), 3000);
