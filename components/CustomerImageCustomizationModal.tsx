@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { X, Wand2, ChevronRight, ChevronLeft, Sparkles, CreditCard, Info, AlertCircle, Check } from 'lucide-react';
 import type { ImageCatalogWithDetails, Breed, Coat, Outfit, Format } from '@/lib/types';
+import { PawSpinner } from '@/components/ui/paw-spinner';
 
 interface CustomerImageCustomizationModalProps {
   image: ImageCatalogWithDetails;
@@ -68,6 +69,14 @@ export default function CustomerImageCustomizationModal({
   const [creditsRequired, setCreditsRequired] = useState<number>(1);
   const [loadingCredits, setLoadingCredits] = useState(false);
 
+  // Progress messages
+  const [progressMessages, setProgressMessages] = useState<string[]>([]);
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+
+  // AI-generated description
+  const [generatedDescription, setGeneratedDescription] = useState('');
+
   // Fetch credit balance and data on mount
   useEffect(() => {
     if (isOpen) {
@@ -108,6 +117,17 @@ export default function CustomerImageCustomizationModal({
 
     loadBreedSpecificCoats();
   }, [selectedBreed, keepCurrentBreed, image.breed_id]);
+
+  // Rotate progress messages every 18 seconds during generation
+  useEffect(() => {
+    if (generating && progressMessages.length > 0) {
+      const interval = setInterval(() => {
+        setCurrentMessageIndex((prev) => (prev + 1) % progressMessages.length);
+      }, 18000); // 18 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [generating, progressMessages]);
 
   const fetchCreditBalance = async () => {
     try {
@@ -185,6 +205,98 @@ export default function CustomerImageCustomizationModal({
     }
   };
 
+  // Generate progress messages using AI
+  const generateProgressMessages = async () => {
+    try {
+      setLoadingMessages(true);
+
+      // Get breed info
+      const breed = keepCurrentBreed ? currentBreed : selectedBreed;
+      const coat = keepCurrentCoat ? currentCoatInfo : selectedCoat;
+
+      if (!breed || !coat) {
+        console.warn('Missing breed or coat info for progress messages');
+        return;
+      }
+
+      // Fetch theme info from image
+      let themeName = 'studio portrait';
+      let themeDescription = '';
+      if (image.theme_id) {
+        try {
+          const themeRes = await fetch('/api/themes');
+          if (themeRes.ok) {
+            const themes = await themeRes.json();
+            const theme = themes.find((t: any) => t.id === image.theme_id);
+            if (theme) {
+              themeName = theme.name;
+              themeDescription = theme.description || '';
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch theme:', err);
+        }
+      }
+
+      const response = await fetch('/api/customers/generate-progress-messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          breedName: breed.name,
+          breedDescription: breed.personality_traits?.join(', ') || breed.description || '',
+          themeName,
+          themeDescription,
+          coatColor: coat.name
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProgressMessages(data.messages);
+        setCurrentMessageIndex(0);
+      }
+    } catch (err) {
+      console.error('Failed to generate progress messages:', err);
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
+  // Generate AI description for completed image
+  const generateImageDescription = async (imageData: string) => {
+    try {
+      const breed = keepCurrentBreed ? currentBreed : selectedBreed;
+      if (!breed) return;
+
+      // Convert base64 to blob
+      const byteString = atob(imageData);
+      const arrayBuffer = new ArrayBuffer(byteString.length);
+      const uint8Array = new Uint8Array(arrayBuffer);
+      for (let i = 0; i < byteString.length; i++) {
+        uint8Array[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([uint8Array], { type: 'image/png' });
+      const file = new File([blob], 'generated.png', { type: 'image/png' });
+
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('breed', breed.name);
+
+      const response = await fetch('/api/generate-description/file', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setGeneratedDescription(data.description);
+      }
+    } catch (err) {
+      console.error('Failed to generate description:', err);
+      // Gracefully degrade - don't show error to user
+    }
+  };
+
   const handleNext = () => {
     if (currentStep === 'breed-selection') {
       setCurrentStep('coat-selection');
@@ -244,6 +356,10 @@ export default function CustomerImageCustomizationModal({
     try {
       setGenerating(true);
       setError(null);
+      setGeneratedDescription(''); // Clear previous description
+
+      // Generate progress messages first
+      await generateProgressMessages();
 
       // Prepare variation config
       const variationConfig: any = {};
@@ -297,6 +413,14 @@ export default function CustomerImageCustomizationModal({
       if (result.success) {
         setGeneratedVariations(result.variations);
         setCreditBalance(result.creditsRemaining);
+
+        // Generate AI description for the first variation
+        if (result.variations && result.variations.length > 0) {
+          const firstVariation = result.variations[0];
+          if (firstVariation.imageData) {
+            await generateImageDescription(firstVariation.imageData);
+          }
+        }
 
         if (onGenerationComplete) {
           onGenerationComplete(result.variations);
@@ -658,6 +782,31 @@ export default function CustomerImageCustomizationModal({
                 </p>
               </div>
 
+              {/* Progress Messages with Paw Spinner */}
+              {generating && (
+                <div className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg">
+                  <div className="flex items-center space-x-4">
+                    {/* Rotating Paw Logo Spinner */}
+                    <PawSpinner size="xl" speed="normal" />
+
+                    {/* Progress Message */}
+                    <div className="flex-1">
+                      <p className="text-lg font-medium text-purple-900 leading-relaxed">
+                        {loadingMessages
+                          ? "Preparing your customization..."
+                          : progressMessages[currentMessageIndex] || "Pawcasso is working his magic... 🎨"
+                        }
+                      </p>
+                      {progressMessages.length > 0 && !loadingMessages && (
+                        <p className="text-sm text-purple-600 mt-1">
+                          Step {currentMessageIndex + 1} of {progressMessages.length}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Summary */}
               <div className="space-y-2 p-4 border rounded-lg bg-gray-50">
                 <h4 className="font-medium">Your Customization:</h4>
@@ -694,6 +843,19 @@ export default function CustomerImageCustomizationModal({
                       </div>
                     ))}
                   </div>
+
+                  {/* AI-Generated Description */}
+                  {generatedDescription && (
+                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h4 className="font-semibold mb-2 text-blue-900 flex items-center">
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Pawcasso's Description
+                      </h4>
+                      <div className="text-sm text-gray-800 prose prose-sm">
+                        {generatedDescription}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
