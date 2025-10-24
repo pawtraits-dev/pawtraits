@@ -8,10 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { X, Wand2, ChevronRight, ChevronLeft, Sparkles, CreditCard, Info, AlertCircle, Check } from 'lucide-react';
+import { X, Wand2, ChevronRight, ChevronLeft, Sparkles, CreditCard, Info, AlertCircle, Check, Heart, Share2, ShoppingCart, Star } from 'lucide-react';
 import type { ImageCatalogWithDetails, Breed, Coat, Outfit, Format } from '@/lib/types';
 import { PawSpinner } from '@/components/ui/paw-spinner';
 import Image from 'next/image';
+import ShareModal from '@/components/share-modal';
+import UserInteractionsService from '@/lib/user-interactions';
+import { useRouter } from 'next/navigation';
 
 interface CustomerImageCustomizationModalProps {
   image: ImageCatalogWithDetails;
@@ -77,6 +80,14 @@ export default function CustomerImageCustomizationModal({
 
   // AI-generated description
   const [generatedDescription, setGeneratedDescription] = useState('');
+
+  // Social features
+  const [likedVariations, setLikedVariations] = useState<Set<number>>(new Set());
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [variationToShare, setVariationToShare] = useState<any>(null);
+  const [variationRatings, setVariationRatings] = useState<Map<number, number>>(new Map());
+
+  const router = useRouter();
 
   // Fetch credit balance and data on mount
   useEffect(() => {
@@ -471,6 +482,38 @@ export default function CustomerImageCustomizationModal({
   const handlePurchaseCredits = () => {
     // Open credit purchase modal or redirect
     window.location.href = '/customer/customize?show_credit_purchase=true';
+  };
+
+  const handleLikeVariation = (index: number) => {
+    setLikedVariations(prev => {
+      const newLiked = new Set(prev);
+      if (newLiked.has(index)) {
+        newLiked.delete(index);
+      } else {
+        newLiked.add(index);
+      }
+      return newLiked;
+    });
+  };
+
+  const handleShareVariation = (variation: any) => {
+    setVariationToShare(variation);
+    setShowShareModal(true);
+  };
+
+  const handleRateVariation = (index: number, rating: number) => {
+    setVariationRatings(prev => {
+      const newRatings = new Map(prev);
+      newRatings.set(index, rating);
+      return newRatings;
+    });
+  };
+
+  const handleBuyNow = (variation: any) => {
+    // Navigate to shop page with the generated image
+    // For now, we'll navigate to the shop page of the original image
+    // In a real implementation, you'd want to save the variation first
+    router.push(`/shop/${image.id}`);
   };
 
   const filteredBreeds = breeds.filter(b =>
@@ -915,35 +958,120 @@ export default function CustomerImageCustomizationModal({
 
               {/* Generated Variations */}
               {generatedVariations.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-2">Generated Variations:</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    {generatedVariations.map((variation, index) => (
-                      <div key={index} className="border rounded-lg overflow-hidden">
-                        <img
-                          src={`data:image/png;base64,${variation.imageData}`}
-                          alt={variation.filename}
-                          className="w-full aspect-square object-cover"
-                        />
-                        <div className="p-2 bg-gray-50">
-                          <p className="text-xs font-medium truncate">{variation.filename}</p>
+                <div className="space-y-6">
+                  {generatedVariations.map((variation, index) => {
+                    const isLiked = likedVariations.has(index);
+                    const rating = variationRatings.get(index) || 0;
+
+                    return (
+                      <div key={index} className="border rounded-lg overflow-hidden bg-white">
+                        {/* Side-by-Side Comparison Layout */}
+                        <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50">
+                          {/* Original Pawtrait */}
+                          <div>
+                            <h3 className="text-lg font-bold mb-3">Original Pawtrait</h3>
+                            <div className="space-y-1 text-sm">
+                              <p><span className="font-medium">Breed</span> : <strong>{currentBreed?.name || 'Unknown'}</strong></p>
+                              <p><span className="font-medium">Coat</span> : <strong>{currentCoatInfo?.name || 'Unknown'}</strong></p>
+                              <p><span className="font-medium">Outfit</span> : <strong>{image.outfit_name || 'None'}</strong></p>
+                            </div>
+                          </div>
+
+                          {/* Custom Pawtrait */}
+                          <div>
+                            <h3 className="text-lg font-bold mb-3">Custom Pawtrait</h3>
+                            <div className="space-y-1 text-sm">
+                              <p><span className="font-medium">Breed</span> : <strong>{variation.metadata?.breed?.name || selectedBreed?.name || currentBreed?.name}</strong></p>
+                              <p><span className="font-medium">Coat</span> : <strong>{variation.metadata?.coat?.coat_name || selectedCoat?.name || currentCoatInfo?.name}</strong></p>
+                              <p><span className="font-medium">Outfit</span> : <strong>{selectedOutfit?.name || image.outfit_name || 'None'}</strong></p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Full Format Image */}
+                        <div className="relative bg-gray-100">
+                          <img
+                            src={`data:image/png;base64,${variation.imageData}`}
+                            alt="Generated variation"
+                            className="w-full h-auto object-contain max-h-[600px] mx-auto"
+                          />
+
+                          {/* Action Buttons Overlay */}
+                          <div className="absolute top-4 right-4 flex gap-2">
+                            <button
+                              onClick={() => handleLikeVariation(index)}
+                              className={`p-2 rounded-full transition-all ${
+                                isLiked
+                                  ? 'bg-red-500 text-white'
+                                  : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
+                              }`}
+                              title={isLiked ? 'Unlike' : 'Like'}
+                            >
+                              <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                            </button>
+
+                            <button
+                              onClick={() => handleShareVariation(variation)}
+                              className="p-2 rounded-full transition-all bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white"
+                              title="Share"
+                            >
+                              <Share2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* AI Description, Rating, and Actions */}
+                        <div className="p-4 space-y-4">
+                          {/* AI-Generated Description */}
+                          {generatedDescription && index === 0 && (
+                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                              <h4 className="font-semibold mb-2 text-blue-900 flex items-center">
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Pawcasso's Description
+                              </h4>
+                              <div className="text-sm text-gray-800">
+                                {generatedDescription}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Star Rating */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">Rate this image:</span>
+                              <div className="flex gap-1">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <button
+                                    key={star}
+                                    onClick={() => handleRateVariation(index, star)}
+                                    className="transition-colors"
+                                    title={`${star} star${star > 1 ? 's' : ''}`}
+                                  >
+                                    <Star
+                                      className={`w-5 h-5 ${
+                                        star <= rating
+                                          ? 'fill-yellow-400 text-yellow-400'
+                                          : 'text-gray-300'
+                                      }`}
+                                    />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Buy Now Button */}
+                            <Button
+                              onClick={() => handleBuyNow(variation)}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <ShoppingCart className="w-4 h-4 mr-2" />
+                              Buy Now
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-
-                  {/* AI-Generated Description */}
-                  {generatedDescription && (
-                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <h4 className="font-semibold mb-2 text-blue-900 flex items-center">
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Pawcasso's Description
-                      </h4>
-                      <div className="text-sm text-gray-800 prose prose-sm">
-                        {generatedDescription}
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -999,6 +1127,28 @@ export default function CustomerImageCustomizationModal({
           </div>
         </div>
       </DialogContent>
+
+      {/* Share Modal */}
+      {variationToShare && (
+        <ShareModal
+          isOpen={showShareModal}
+          onClose={() => {
+            setShowShareModal(false);
+            setVariationToShare(null);
+          }}
+          image={{
+            id: image.id,
+            public_url: `data:image/png;base64,${variationToShare.imageData}`,
+            prompt_text: variationToShare.prompt || '',
+            description: generatedDescription || image.description || ''
+          }}
+          onShare={(platform) => {
+            console.log(`Shared to ${platform}`);
+            setShowShareModal(false);
+            setVariationToShare(null);
+          }}
+        />
+      )}
     </Dialog>
   );
 }
