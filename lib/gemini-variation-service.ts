@@ -655,7 +655,8 @@ Ensure the ${primaryAnimal.coat.coat_name} coloring is consistent across ALL bod
     currentStyle?: any,
     originalFormat?: any,
     originalBreed?: Breed,
-    targetAge?: string
+    targetAge?: string,
+    targetOutfit?: any
   ): Promise<GeneratedVariation | null> {
     const generationStartTime = Date.now();
     const maxRetries = 2; // Retry up to 2 times for 500 errors
@@ -669,7 +670,7 @@ Ensure the ${primaryAnimal.coat.coat_name} coloring is consistent across ALL bod
           await new Promise(resolve => setTimeout(resolve, retryDelay));
         }
         
-        const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle, originalBreed, targetAge);
+        const variationPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, targetBreed, validCoat, currentTheme, currentStyle, originalBreed, targetAge, targetOutfit);
       
       const prompt = [
         { text: variationPrompt },
@@ -716,9 +717,10 @@ Ensure the ${primaryAnimal.coat.coat_name} coloring is consistent across ALL bod
                 theme: currentTheme,
                 style: currentStyle,
                 format: originalFormat, // Inherit original format for breed variations
-                variation_type: 'breed',
+                variation_type: targetOutfit ? 'breed_outfit' : 'breed',
                 breed_id: targetBreed.id,
                 coat_id: validCoat.id,
+                outfit_id: targetOutfit?.id || null,
                 theme_id: currentTheme?.id || null,
                 style_id: currentStyle?.id || null,
                 format_id: originalFormat?.id || null,
@@ -843,15 +845,18 @@ Ensure the ${primaryAnimal.coat.coat_name} coloring is consistent across ALL bod
    * Create breed variation prompt with valid coat color
    */
   private createBreedVariationPromptWithCoat(
-    originalPrompt: string, 
-    targetBreed: Breed, 
+    originalPrompt: string,
+    targetBreed: Breed,
     validCoat: any,
-    currentTheme?: any, 
+    currentTheme?: any,
     currentStyle?: any,
     originalBreed?: Breed,
-    targetAge?: string
+    targetAge?: string,
+    targetOutfit?: any
   ): string {
-    const { breed, outfit } = this.parseOriginalPrompt(originalPrompt);
+    const { breed, outfit: parsedOutfit } = this.parseOriginalPrompt(originalPrompt);
+    // Use target outfit if provided, otherwise use parsed outfit
+    const outfit = targetOutfit ? targetOutfit.name.toLowerCase() : parsedOutfit;
     
     // Detect cross-species transformation
     const isCrossSpecies = originalBreed && originalBreed.animal_type !== targetBreed.animal_type;

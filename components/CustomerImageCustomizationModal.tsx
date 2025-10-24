@@ -438,9 +438,10 @@ export default function CustomerImageCustomizationModal({
           }
         }
 
-        if (onGenerationComplete) {
-          onGenerationComplete(result.variations);
-        }
+        // Don't call onGenerationComplete - keep modal open to show results
+        // if (onGenerationComplete) {
+        //   onGenerationComplete(result.variations);
+        // }
       } else {
         throw new Error(result.error || 'Generation failed');
       }

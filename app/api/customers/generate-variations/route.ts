@@ -240,8 +240,73 @@ export async function POST(request: NextRequest) {
     let generationErrors = [];
 
     try {
-      // Generate breed-coat combinations
-      if (variationConfig.breedCoats?.length > 0) {
+      // Check if we have BOTH breed/coat AND outfit - generate combined variation
+      const hasBreedCoatChange = variationConfig.breedCoats?.length > 0;
+      const hasOutfitChange = variationConfig.outfits?.length > 0;
+
+      if (hasBreedCoatChange && hasOutfitChange) {
+        console.log(`🎨 Generating combined breed-coat + outfit variation`);
+
+        const breedCoat = variationConfig.breedCoats[0]; // Take first breed/coat
+        const targetOutfits = outfitsData.filter((outfit: any) =>
+          variationConfig.outfits.includes(outfit.id)
+        );
+        const targetOutfit = targetOutfits[0]; // Take first outfit
+
+        const targetBreed = breedsData.find((breed: any) => breed.id === breedCoat.breedId);
+        if (!targetBreed) {
+          throw new Error(`Breed not found: ${breedCoat.breedId}`);
+        }
+
+        const { data: breedCoatData, error: breedCoatError } = await supabaseAdmin
+          .from('breed_coats')
+          .select(`
+            id,
+            breeds!inner(id, name, slug, animal_type, physical_traits),
+            coats!inner(id, name, slug, hex_color, pattern_type, rarity)
+          `)
+          .eq('breeds.id', breedCoat.breedId)
+          .eq('coats.id', breedCoat.coatId)
+          .single();
+
+        if (breedCoatError || !breedCoatData) {
+          throw new Error(`Invalid breed-coat combination: ${breedCoat.breedId}-${breedCoat.coatId}`);
+        }
+
+        const validCoat = {
+          id: breedCoatData.coats.id,
+          breed_coat_id: breedCoatData.id,
+          coat_name: breedCoatData.coats.name,
+          coat_slug: breedCoatData.coats.slug,
+          hex_color: breedCoatData.coats.hex_color,
+          pattern_type: breedCoatData.coats.pattern_type,
+          rarity: breedCoatData.coats.rarity
+        };
+
+        console.log(`📝 Generating combined: ${targetBreed.name} (${validCoat.coat_name}) + ${targetOutfit.name}`);
+
+        const combinedVariation = await geminiService.generateSingleBreedVariationWithCoat(
+          originalImageData,
+          originalPrompt,
+          targetBreed,
+          validCoat,
+          currentThemeData,
+          currentStyleData,
+          originalFormatData,
+          originalBreedData,
+          targetAge,
+          targetOutfit // Pass the outfit for combined generation
+        );
+
+        if (combinedVariation) {
+          results.push(combinedVariation);
+          generationSuccessful = true;
+          console.log(`✅ Successfully generated combined variation`);
+        } else {
+          generationErrors.push(`Failed to generate combined variation`);
+        }
+      } else if (hasBreedCoatChange) {
+        // ONLY breed-coat change (no outfit)
         console.log(`🐕 Generating ${variationConfig.breedCoats.length} breed-coat variations`);
 
         for (let i = 0; i < variationConfig.breedCoats.length; i++) {
@@ -309,10 +374,8 @@ export async function POST(request: NextRequest) {
             generationErrors.push(error instanceof Error ? error.message : 'Unknown error');
           }
         }
-      }
-
-      // Generate outfit variations
-      if (variationConfig.outfits?.length > 0) {
+      } else if (hasOutfitChange) {
+        // ONLY outfit change (no breed/coat change)
         console.log(`👔 Generating ${variationConfig.outfits.length} outfit variations`);
 
         const targetOutfits = outfitsData.filter((outfit: any) =>
