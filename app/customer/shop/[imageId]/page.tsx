@@ -14,7 +14,6 @@ import { useServerCart } from '@/lib/server-cart-context';
 import { useCountryPricing } from '@/lib/country-context';
 import ReactMarkdown from 'react-markdown';
 import ShareModal from '@/components/share-modal';
-import { getSupabaseClient } from '@/lib/supabase-client';
 import type { ImageCatalogWithDetails } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
@@ -36,7 +35,6 @@ export default function CustomerImageDetailPage() {
   const [isPurchased, setIsPurchased] = useState(false);
 
   const supabaseService = new SupabaseService();
-  const supabase = getSupabaseClient();
   const { addToCart } = useServerCart();
   const { selectedCountry, selectedCountryData, getCountryPricing } = useCountryPricing();
 
@@ -50,69 +48,26 @@ export default function CustomerImageDetailPage() {
     try {
       setLoading(true);
 
-      // First try to load from customer_generated_images, fallback to image_catalog
-      let imageResult: ImageCatalogWithDetails | null = null;
+      // Get current user for authentication
+      const { data: { user } } = await supabaseService.getClient().auth.getUser();
 
-      // Try customer_generated_images first
-      const { data: generatedImage, error: genError } = await supabase
-        .from('customer_generated_images')
-        .select(`
-          *,
-          breed:breeds(id, name, slug, animal_type),
-          theme:themes(id, name, slug),
-          style:styles(id, name, slug),
-          coat:coats(id, name, slug),
-          format:formats(id, name, slug),
-          outfit:outfits(id, name, slug)
-        `)
-        .eq('id', imageId)
-        .single();
-
-      if (!genError && generatedImage) {
-        // Map customer_generated_images structure to ImageCatalogWithDetails
-        imageResult = {
-          id: generatedImage.id,
-          public_url: generatedImage.public_url,
-          cloudinary_public_id: generatedImage.cloudinary_public_id,
-          prompt_text: generatedImage.prompt_text,
-          description: generatedImage.generation_metadata?.ai_description || generatedImage.prompt_text,
-          breed_id: generatedImage.breed_id,
-          coat_id: generatedImage.coat_id,
-          theme_id: generatedImage.theme_id,
-          style_id: generatedImage.style_id,
-          format_id: generatedImage.format_id,
-          outfit_id: generatedImage.outfit_id,
-          breed_name: generatedImage.breed?.name,
-          theme_name: generatedImage.theme?.name,
-          style_name: generatedImage.style?.name,
-          coat_name: generatedImage.coat?.name,
-          format_name: generatedImage.format?.name,
-          outfit_name: generatedImage.outfit?.name,
-          breed: generatedImage.breed,
-          theme: generatedImage.theme,
-          style: generatedImage.style,
-          coat: generatedImage.coat,
-          format: generatedImage.format
-        } as ImageCatalogWithDetails;
-      } else {
-        // Fallback to image_catalog
-        const { data: catalogImage } = await supabase
-          .from('image_catalog')
-          .select(`
-            *,
-            breed:breeds(id, name, slug, animal_type),
-            theme:themes(id, name, slug),
-            style:styles(id, name, slug),
-            coat:coats(id, name, slug),
-            format:formats(id, name, slug)
-          `)
-          .eq('id', imageId)
-          .single();
-
-        if (catalogImage) {
-          imageResult = catalogImage as ImageCatalogWithDetails;
-        }
+      if (!user?.email) {
+        console.error('User not authenticated');
+        setLoading(false);
+        return;
       }
+
+      // Fetch image data via API endpoint
+      const imageResponse = await fetch(`/api/shop/images/${imageId}?email=${user.email}`);
+
+      if (!imageResponse.ok) {
+        console.error('Failed to load image data');
+        setLoading(false);
+        return;
+      }
+
+      const imageJson = await imageResponse.json();
+      const imageResult = imageJson.image;
 
       // Load products and pricing
       const [productsData, pricingData] = await Promise.all([
@@ -135,8 +90,7 @@ export default function CustomerImageDetailPage() {
       setIsLiked(likedImageIds.has(imageId));
       setIsShared(sharedImageIds.has(imageId));
 
-      // Check if user has purchased this image
-      const { data: { user } } = await supabase.auth.getUser();
+      // Check if user has purchased this image (reuse user from earlier)
       if (user?.email) {
         await checkIfPurchased(user.email);
       }
