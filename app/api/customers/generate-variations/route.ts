@@ -566,7 +566,8 @@ export async function POST(request: NextRequest) {
             metadata: variation.metadata,
             variation_type: variation.metadata.variation_type,
             cloudinary_public_id: cloudinaryResult.public_id,
-            public_url: cloudinaryResult.secure_url
+            public_url: cloudinaryResult.secure_url,
+            ai_description: aiDescription || null
           });
         }
       } catch (saveError) {
