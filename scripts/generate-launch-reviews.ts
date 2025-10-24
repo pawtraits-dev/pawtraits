@@ -50,22 +50,48 @@ const lastNames = [
   'Clark', 'Lewis', 'Robinson', 'Walker', 'Perez', 'Hall', 'Young',
 ];
 
-const ukCities = [
-  { city: 'London', country: 'United Kingdom' },
-  { city: 'Manchester', country: 'United Kingdom' },
-  { city: 'Birmingham', country: 'United Kingdom' },
-  { city: 'Leeds', country: 'United Kingdom' },
-  { city: 'Glasgow', country: 'United Kingdom' },
-  { city: 'Liverpool', country: 'United Kingdom' },
-  { city: 'Newcastle', country: 'United Kingdom' },
-  { city: 'Sheffield', country: 'United Kingdom' },
-  { city: 'Bristol', country: 'United Kingdom' },
-  { city: 'Edinburgh', country: 'United Kingdom' },
-  { city: 'Leicester', country: 'United Kingdom' },
-  { city: 'Coventry', country: 'United Kingdom' },
-  { city: 'Nottingham', country: 'United Kingdom' },
-  { city: 'Cardiff', country: 'Wales' },
-  { city: 'Belfast', country: 'Northern Ireland' },
+const locations = [
+  // UK
+  { city: 'London', country: 'United Kingdom', language: 'en' },
+  { city: 'Manchester', country: 'United Kingdom', language: 'en' },
+  { city: 'Birmingham', country: 'United Kingdom', language: 'en' },
+  { city: 'Edinburgh', country: 'United Kingdom', language: 'en' },
+  { city: 'Bristol', country: 'United Kingdom', language: 'en' },
+  { city: 'Liverpool', country: 'United Kingdom', language: 'en' },
+
+  // USA
+  { city: 'New York', country: 'United States', language: 'en' },
+  { city: 'Los Angeles', country: 'United States', language: 'en' },
+  { city: 'Chicago', country: 'United States', language: 'en' },
+  { city: 'San Francisco', country: 'United States', language: 'en' },
+  { city: 'Boston', country: 'United States', language: 'en' },
+  { city: 'Seattle', country: 'United States', language: 'en' },
+  { city: 'Austin', country: 'United States', language: 'en' },
+  { city: 'Miami', country: 'United States', language: 'en' },
+
+  // France
+  { city: 'Paris', country: 'France', language: 'fr' },
+  { city: 'Lyon', country: 'France', language: 'fr' },
+  { city: 'Marseille', country: 'France', language: 'fr' },
+  { city: 'Bordeaux', country: 'France', language: 'fr' },
+
+  // Spain
+  { city: 'Madrid', country: 'Spain', language: 'es' },
+  { city: 'Barcelona', country: 'Spain', language: 'es' },
+  { city: 'Valencia', country: 'Spain', language: 'es' },
+  { city: 'Seville', country: 'Spain', language: 'es' },
+
+  // Italy
+  { city: 'Rome', country: 'Italy', language: 'it' },
+  { city: 'Milan', country: 'Italy', language: 'it' },
+  { city: 'Florence', country: 'Italy', language: 'it' },
+  { city: 'Venice', country: 'Italy', language: 'it' },
+
+  // Germany
+  { city: 'Berlin', country: 'Germany', language: 'de' },
+  { city: 'Munich', country: 'Germany', language: 'de' },
+  { city: 'Hamburg', country: 'Germany', language: 'de' },
+  { city: 'Frankfurt', country: 'Germany', language: 'de' },
 ];
 
 function randomElement<T>(arr: T[]): T {
@@ -76,27 +102,50 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-async function generateReviewComment(breedName: string, themeName: string, rating: number): Promise<string> {
-  const prompt = `Generate a short, authentic customer review (50-150 characters) for a pet portrait.
+async function generateReviewComment(breedName: string, themeName: string, rating: number, language: string = 'en'): Promise<string> {
+  const languageInstructions = {
+    en: 'in English',
+    fr: 'in French (natural, conversational French)',
+    es: 'in Spanish (natural, conversational Spanish)',
+    it: 'in Italian (natural, conversational Italian)',
+    de: 'in German (natural, conversational German)'
+  };
+
+  const prompt = `Generate a short, authentic customer review (1-3 sentences, max 150 words) ${languageInstructions[language as keyof typeof languageInstructions]} for a pet portrait.
 
 Details:
 - Breed: ${breedName || 'dog'}
 - Theme/Style: ${themeName || 'artistic portrait'}
 - Rating: ${rating} stars
 
-The review should be:
-- Enthusiastic and positive
-- Natural and conversational
-- Mention specific details like quality, accuracy, or emotional response
-- Written by a pet owner
-- Include minor imperfections in grammar if realistic
+CRITICAL: Use VARIED structures. Avoid formulaic patterns. Mix these approaches:
+- Start with emotional reaction ("Tears of joy!", "Absolutely speechless", "Best purchase ever")
+- Focus on specific details ("The eyes are perfect", "Captured his cheeky personality", "Love the colors")
+- Tell a micro-story ("Surprised my wife with this", "Hangs above our fireplace now")
+- Use casual language ("Wow just wow", "Can't stop staring at it", "Everyone asks where I got it")
+- Mention reactions from others ("Visitors always comment", "Friends thought it was painted by hand")
+- Compare to expectations ("Better than I imagined", "Photos don't do it justice")
+- Be personal and authentic, like texting a friend
 
-Generate only the review text, no quotes or attribution.`;
+AVOID:
+- "The artist..." constructions (or equivalent in other languages)
+- Formulaic "quality/service/product" reviews
+- Corporate-sounding praise
+- Repetitive sentence structures
+- Overly formal language
+
+Rating context:
+- 5 stars: Thrilled, exceeded expectations, highly emotional
+- 4 stars: Very happy, one tiny minor thing could be better (but still loved it)
+
+${language !== 'en' ? 'Write naturally in the target language - use colloquialisms, natural word order, and authentic expressions that native speakers would use.' : ''}
+
+Generate ONLY the review text, no quotes, attribution, or explanations.`;
 
   try {
     const response = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 200,
+      max_tokens: 300,
       messages: [{
         role: 'user',
         content: prompt
@@ -127,6 +176,10 @@ Generate only the review text, no quotes or attribution.`;
 
 async function main() {
   console.log('🎨 GENERATING 100 LAUNCH REVIEWS\n');
+
+  // Generate unique timestamp suffix for this batch
+  const batchId = Date.now();
+  console.log(`📦 Batch ID: ${batchId}\n`);
 
   // 1. Fetch random images
   console.log('📸 Fetching random images...');
@@ -168,17 +221,17 @@ async function main() {
       // Random data
       const firstName = randomElement(firstNames);
       const lastName = randomElement(lastNames);
-      const location = randomElement(ukCities);
+      const location = randomElement(locations);
       const image = images[i % images.length];
       const breedName = (image.breeds as any)?.name || 'Dog';
       const themeName = (image.themes as any)?.name || 'Portrait';
       const rating = i < 80 ? 5 : 4; // 80% 5-star, 20% 4-star
 
-      // Create fake customer
+      // Create fake customer with unique email
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .insert({
-          email: `early-adopter-${i + 1}@pawtraits.test`,
+          email: `early-adopter-${batchId}-${i + 1}@pawtraits.test`,
           first_name: firstName,
           last_name: lastName,
           is_registered: false,
@@ -193,7 +246,7 @@ async function main() {
       }
 
       // Create fake order
-      const orderNumber = `PA-LAUNCH-${String(i + 1).padStart(4, '0')}`;
+      const orderNumber = `PA-LAUNCH-${batchId}-${String(i + 1).padStart(4, '0')}`;
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -244,8 +297,8 @@ async function main() {
       }
 
       // Generate review comment
-      console.log(`   🤖 Generating AI comment...`);
-      const comment = await generateReviewComment(breedName, themeName, rating);
+      console.log(`   🤖 Generating AI comment (${location.language})...`);
+      const comment = await generateReviewComment(breedName, themeName, rating, location.language);
 
       // Create review
       const daysAgo = randomInt(1, 90);
