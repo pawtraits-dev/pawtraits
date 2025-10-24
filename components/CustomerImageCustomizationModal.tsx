@@ -988,35 +988,47 @@ export default function CustomerImageCustomizationModal({
                           </div>
                         </div>
 
-                        {/* Full Format Image */}
-                        <div className="relative bg-gray-100">
-                          <img
-                            src={`data:image/png;base64,${variation.imageData}`}
-                            alt="Generated variation"
-                            className="w-full h-auto object-contain max-h-[600px] mx-auto"
-                          />
+                        {/* Side-by-Side Images */}
+                        <div className="grid grid-cols-2 gap-4 p-4 bg-gray-100">
+                          {/* Original Image */}
+                          <div className="relative bg-white rounded-lg overflow-hidden">
+                            <img
+                              src={image.public_url || image.image_url}
+                              alt="Original pawtrait"
+                              className="w-full h-auto object-contain max-h-[500px]"
+                            />
+                          </div>
 
-                          {/* Action Buttons Overlay */}
-                          <div className="absolute top-4 right-4 flex gap-2">
-                            <button
-                              onClick={() => handleLikeVariation(index)}
-                              className={`p-2 rounded-full transition-all ${
-                                isLiked
-                                  ? 'bg-red-500 text-white'
-                                  : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
-                              }`}
-                              title={isLiked ? 'Unlike' : 'Like'}
-                            >
-                              <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-                            </button>
+                          {/* Generated Image */}
+                          <div className="relative bg-white rounded-lg overflow-hidden">
+                            <img
+                              src={`data:image/png;base64,${variation.imageData}`}
+                              alt="Generated variation"
+                              className="w-full h-auto object-contain max-h-[500px]"
+                            />
 
-                            <button
-                              onClick={() => handleShareVariation(variation)}
-                              className="p-2 rounded-full transition-all bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white"
-                              title="Share"
-                            >
-                              <Share2 className="w-4 h-4" />
-                            </button>
+                            {/* Action Buttons Overlay */}
+                            <div className="absolute top-4 right-4 flex gap-2">
+                              <button
+                                onClick={() => handleLikeVariation(index)}
+                                className={`p-2 rounded-full transition-all ${
+                                  isLiked
+                                    ? 'bg-red-500 text-white'
+                                    : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
+                                }`}
+                                title={isLiked ? 'Unlike' : 'Like'}
+                              >
+                                <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                              </button>
+
+                              <button
+                                onClick={() => handleShareVariation(variation)}
+                                className="p-2 rounded-full transition-all bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white"
+                                title="Share"
+                              >
+                                <Share2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         </div>
 
