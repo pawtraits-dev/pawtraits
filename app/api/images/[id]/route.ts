@@ -102,20 +102,75 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const { searchParams } = new URL(request.url);
-    
+
     // Check if requesting specific variant
     const variant = searchParams.get('variant');
     const userId = searchParams.get('userId');
     const orderId = searchParams.get('orderId');
-    
+
     if (variant) {
       // Return Cloudinary variant with access control
       return handleVariantRequest(id, variant, userId, orderId);
     }
-    
+
     // Default behavior - return basic image data
+    // First check customer_generated_images table
+    const { data: generatedImage, error: genError } = await supabaseAdmin
+      .from('customer_generated_images')
+      .select(`
+        *,
+        breed:breeds(id, name, slug, animal_type),
+        theme:themes(id, name, slug),
+        style:styles(id, name, slug),
+        coat:coats(id, name, slug, hex_color),
+        format:formats(id, name, slug),
+        outfit:outfits(id, name, slug)
+      `)
+      .eq('id', id)
+      .single();
+
+    if (!genError && generatedImage) {
+      // Map customer_generated_images structure to unified format
+      const imageResult = {
+        id: generatedImage.id,
+        public_url: generatedImage.public_url,
+        cloudinary_public_id: generatedImage.cloudinary_public_id,
+        prompt_text: generatedImage.prompt_text,
+        description: generatedImage.generation_metadata?.ai_description || generatedImage.prompt_text,
+        tags: ['custom', 'generated'],
+        breed_id: generatedImage.breed_id,
+        coat_id: generatedImage.coat_id,
+        theme_id: generatedImage.theme_id,
+        style_id: generatedImage.style_id,
+        format_id: generatedImage.format_id,
+        outfit_id: generatedImage.outfit_id,
+        breed_name: generatedImage.breed?.name,
+        coat_name: generatedImage.coat?.name,
+        coat_hex_color: generatedImage.coat?.hex_color,
+        theme_name: generatedImage.theme?.name,
+        style_name: generatedImage.style?.name,
+        format_name: generatedImage.format?.name,
+        outfit_name: generatedImage.outfit?.name,
+        breed: generatedImage.breed,
+        theme: generatedImage.theme,
+        style: generatedImage.style,
+        coat: generatedImage.coat,
+        format: generatedImage.format,
+        outfit: generatedImage.outfit,
+        image_variants: generatedImage.image_variants,
+        created_at: generatedImage.created_at,
+        is_featured: generatedImage.is_featured || false,
+        is_public: generatedImage.is_public || false,
+        rating: null,
+        source: 'generated'
+      };
+
+      return NextResponse.json(imageResult);
+    }
+
+    // Fallback to image_catalog
     const image = await supabaseService.getImage(id);
-    
+
     if (!image) {
       return NextResponse.json(
         { error: 'Image not found' },
@@ -123,7 +178,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    return NextResponse.json(image);
+    return NextResponse.json({ ...image, source: 'catalog' });
   } catch (error) {
     console.error('Error fetching image:', error);
     return NextResponse.json(
