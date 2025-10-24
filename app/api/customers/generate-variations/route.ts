@@ -90,7 +90,8 @@ export async function POST(request: NextRequest) {
       targetAge,
       variationConfig,
       isMultiAnimal,
-      multiAnimalConfig
+      multiAnimalConfig,
+      aiDescription
     } = body;
 
     console.log('🚀 CUSTOMER VARIATION GENERATION START');
@@ -441,6 +442,7 @@ export async function POST(request: NextRequest) {
               variation_type: variation.metadata.variation_type,
               generated_at: new Date().toISOString(),
               api_version: 'gemini-2.5-flash-image-preview',
+              ai_description: aiDescription || null,
               cloudinary_upload: {
                 public_id: cloudinaryResult.public_id,
                 width: cloudinaryResult.width,

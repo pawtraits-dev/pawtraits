@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { X, Wand2, ChevronRight, ChevronLeft, Sparkles, CreditCard, Info, AlertCircle, Check } from 'lucide-react';
 import type { ImageCatalogWithDetails, Breed, Coat, Outfit, Format } from '@/lib/types';
 import { PawSpinner } from '@/components/ui/paw-spinner';
+import Image from 'next/image';
 
 interface CustomerImageCustomizationModalProps {
   image: ImageCatalogWithDetails;
@@ -88,9 +89,23 @@ export default function CustomerImageCustomizationModal({
 
   // Calculate credits required based on selections
   useEffect(() => {
-    // Base cost is always 1 credit for customization
-    setCreditsRequired(1);
-  }, [selectedBreed, selectedCoat, selectedOutfit]);
+    let cost = 0;
+
+    // Base customization: 1 credit if breed OR coat changes
+    const breedChanged = !keepCurrentBreed && selectedBreed !== null;
+    const coatChanged = !keepCurrentCoat && selectedCoat !== null;
+
+    if (breedChanged || coatChanged) {
+      cost = 1; // Base customization cost
+    }
+
+    // Outfit: +1 credit if selected
+    if (selectedOutfit) {
+      cost += 1;
+    }
+
+    setCreditsRequired(cost);
+  }, [selectedBreed, selectedCoat, selectedOutfit, keepCurrentBreed, keepCurrentCoat]);
 
   // Fetch breed-specific coats when breed is selected or when keeping current breed
   useEffect(() => {
@@ -118,12 +133,12 @@ export default function CustomerImageCustomizationModal({
     loadBreedSpecificCoats();
   }, [selectedBreed, keepCurrentBreed, image.breed_id]);
 
-  // Rotate progress messages every 18 seconds during generation
+  // Rotate progress messages every 6 seconds during generation
   useEffect(() => {
     if (generating && progressMessages.length > 0) {
       const interval = setInterval(() => {
         setCurrentMessageIndex((prev) => (prev + 1) % progressMessages.length);
-      }, 18000); // 18 seconds
+      }, 6000); // 6 seconds
 
       return () => clearInterval(interval);
     }
@@ -399,7 +414,8 @@ export default function CustomerImageCustomizationModal({
           targetAge: 'same',
           variationConfig,
           isMultiAnimal: false,
-          multiAnimalConfig: null
+          multiAnimalConfig: null,
+          aiDescription: generatedDescription || null
         })
       });
 
@@ -483,14 +499,26 @@ export default function CustomerImageCustomizationModal({
             <Sparkles className="w-5 h-5 text-purple-600" />
             <div>
               <p className="text-sm font-medium text-gray-900">Your Credit Balance</p>
-              <p className="text-xs text-gray-600">Credits are used to generate custom variations</p>
+              <p className="text-xs text-gray-600">
+                {creditsRequired > 0 ? (
+                  <>This generation will cost <span className="font-semibold text-purple-700">{creditsRequired}</span> credit{creditsRequired > 1 ? 's' : ''}</>
+                ) : (
+                  'Credits are used to generate custom variations'
+                )}
+              </p>
             </div>
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-purple-600">
               {loadingCredits ? '...' : creditBalance}
             </p>
-            <p className="text-xs text-gray-600">credits available</p>
+            <p className="text-xs text-gray-600">
+              {creditsRequired > 0 && creditBalance >= creditsRequired ? (
+                <>{creditBalance - creditsRequired} after generation</>
+              ) : (
+                'credits available'
+              )}
+            </p>
           </div>
         </div>
 
@@ -553,17 +581,15 @@ export default function CustomerImageCustomizationModal({
             return (
               <div key={step} className="flex items-center flex-1">
                 <div className="flex flex-col items-center flex-1">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-                      isCompleted
-                        ? 'bg-green-500 text-white'
-                        : isActive
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-gray-200 text-gray-600'
-                    }`}
-                  >
-                    {isCompleted ? <Check className="w-5 h-5" /> : stepNum}
-                  </div>
+                  <Image
+                    src={`/assets/logos/paw-svgrepo-200x200-${
+                      isCompleted ? 'green' : isActive ? 'purple' : 'gold'
+                    }.svg`}
+                    alt={stepLabels[step]}
+                    width={40}
+                    height={40}
+                    className="filter drop-shadow-sm"
+                  />
                   <span className={`text-xs mt-1 ${isActive ? 'font-semibold text-purple-600' : 'text-gray-600'}`}>
                     {stepLabels[step]}
                   </span>
@@ -593,34 +619,47 @@ export default function CustomerImageCustomizationModal({
                 </p>
               </div>
 
-              {/* Current Breed Info */}
+              {/* Unified Breed Selection Box */}
               {currentBreed && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Current Breed</p>
-                      <p className="text-lg font-semibold text-blue-700">{currentBreed.name}</p>
-                      <p className="text-xs text-gray-600 capitalize">{currentBreed.animal_type}</p>
-                    </div>
-                    <Button
-                      variant={keepCurrentBreed ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setKeepCurrentBreed(!keepCurrentBreed);
-                        if (!keepCurrentBreed) {
-                          setSelectedBreed(null);
-                        }
-                      }}
-                    >
-                      {keepCurrentBreed ? <Check className="w-4 h-4 mr-2" /> : null}
-                      Keep Current
-                    </Button>
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                  {/* Current Breed */}
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Current Breed</p>
+                    <p className="text-lg font-semibold text-blue-700">{currentBreed.name}</p>
+                    <p className="text-xs text-gray-600 capitalize">{currentBreed.animal_type}</p>
                   </div>
+
+                  {/* New Breed (if selected) */}
+                  {selectedBreed && !keepCurrentBreed && (
+                    <div className="border-t border-blue-300 pt-3">
+                      <p className="text-sm font-medium text-gray-900">New Breed</p>
+                      <p className="text-lg font-semibold text-purple-700">{selectedBreed.name}</p>
+                      <p className="text-xs text-gray-600 capitalize">{selectedBreed.animal_type}</p>
+                    </div>
+                  )}
+
+                  {/* Change Breed Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => {
+                      if (selectedBreed) {
+                        // Navigate to next step
+                        setCurrentStep('coat-selection');
+                      } else {
+                        // Toggle breed selection visibility
+                        setKeepCurrentBreed(!keepCurrentBreed);
+                      }
+                    }}
+                  >
+                    {selectedBreed ? 'Continue to Coat Selection' : 'Change Breed'}
+                  </Button>
                 </div>
               )}
 
-              {/* Breed Selection */}
-              {!keepCurrentBreed && (
+              {/* Breed Selection Grid (shown when changing breed) */}
+              {!keepCurrentBreed && !selectedBreed && (
                 <div>
                   <Label>Select New Breed</Label>
                   <Input
@@ -658,39 +697,59 @@ export default function CustomerImageCustomizationModal({
                 </p>
               </div>
 
-              {/* Current Coat Info */}
+              {/* Unified Coat Selection Box */}
               {currentCoatInfo && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div
-                        className="w-12 h-12 rounded-full border-2 border-white shadow"
-                        style={{ backgroundColor: currentCoatInfo.hex_color || '#ccc' }}
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Current Coat</p>
-                        <p className="text-lg font-semibold text-blue-700">{currentCoatInfo.name}</p>
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                  {/* Current Coat */}
+                  <div className="flex items-center space-x-3">
+                    <div
+                      className="w-12 h-12 rounded-full border-2 border-white shadow"
+                      style={{ backgroundColor: currentCoatInfo.hex_color || '#ccc' }}
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Current Coat</p>
+                      <p className="text-lg font-semibold text-blue-700">{currentCoatInfo.name}</p>
+                    </div>
+                  </div>
+
+                  {/* New Coat (if selected) */}
+                  {selectedCoat && !keepCurrentCoat && (
+                    <div className="border-t border-blue-300 pt-3">
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className="w-12 h-12 rounded-full border-2 border-white shadow"
+                          style={{ backgroundColor: selectedCoat.hex_color || '#ccc' }}
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">New Coat</p>
+                          <p className="text-lg font-semibold text-purple-700">{selectedCoat.name}</p>
+                        </div>
                       </div>
                     </div>
-                    <Button
-                      variant={keepCurrentCoat ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
+                  )}
+
+                  {/* Change Coat Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => {
+                      if (selectedCoat) {
+                        // Navigate to next step
+                        setCurrentStep('outfit-selection');
+                      } else {
+                        // Toggle coat selection visibility
                         setKeepCurrentCoat(!keepCurrentCoat);
-                        if (!keepCurrentCoat) {
-                          setSelectedCoat(null);
-                        }
-                      }}
-                    >
-                      {keepCurrentCoat ? <Check className="w-4 h-4 mr-2" /> : null}
-                      Keep Current
-                    </Button>
-                  </div>
+                      }
+                    }}
+                  >
+                    {selectedCoat ? 'Continue to Outfit Selection' : 'Change Coat'}
+                  </Button>
                 </div>
               )}
 
-              {/* Coat Selection */}
-              {!keepCurrentCoat && (
+              {/* Coat Selection Grid (shown when changing coat) */}
+              {!keepCurrentCoat && !selectedCoat && (
                 <div>
                   <Label>Select New Coat Color</Label>
                   {breedCoats.length > 0 ? (
@@ -731,44 +790,77 @@ export default function CustomerImageCustomizationModal({
                 </p>
               </div>
 
-              {/* Outfit Selection */}
-              <div>
-                <Label>Available Outfits</Label>
-                <Input
-                  placeholder="Search outfits..."
-                  value={outfitSearch}
-                  onChange={(e) => setOutfitSearch(e.target.value)}
-                  className="mb-2 mt-2"
-                />
-                <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto border rounded-lg p-2">
-                  {filteredOutfits.map(outfit => (
-                    <button
-                      key={outfit.id}
-                      onClick={() => setSelectedOutfit(selectedOutfit?.id === outfit.id ? null : outfit)}
-                      className={`p-3 text-center border rounded-lg hover:border-purple-300 transition-colors ${
-                        selectedOutfit?.id === outfit.id ? 'border-purple-500 bg-purple-50' : ''
-                      }`}
+              {/* Unified Outfit Selection Box */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                {/* Selected Outfit Display */}
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Outfit</p>
+                  {selectedOutfit ? (
+                    <div>
+                      <p className="text-lg font-semibold text-purple-700">{selectedOutfit.name}</p>
+                      <p className="text-xs text-gray-600 capitalize">{selectedOutfit.category}</p>
+                    </div>
+                  ) : (
+                    <p className="text-lg font-semibold text-gray-500 italic">No outfit selected</p>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      if (selectedOutfit) {
+                        // If outfit selected, navigate to preview
+                        setCurrentStep('preview');
+                      } else {
+                        // Show outfit selection grid
+                        // We'll use a state flag for this
+                      }
+                    }}
+                  >
+                    {selectedOutfit ? 'Continue to Preview' : 'Add Outfit (+1 credit)'}
+                  </Button>
+                  {!selectedOutfit && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCurrentStep('preview')}
                     >
-                      <p className="font-medium text-sm">{outfit.name}</p>
-                      <p className="text-xs text-gray-600 capitalize">{outfit.category}</p>
-                    </button>
-                  ))}
+                      Skip
+                    </Button>
+                  )}
                 </div>
               </div>
 
-              {/* Cost Summary */}
-              <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900">Estimated Cost</p>
-                    <p className="text-sm text-gray-600">1 variation</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-purple-600">{creditsRequired}</p>
-                    <p className="text-xs text-gray-600">credit{creditsRequired > 1 ? 's' : ''}</p>
+              {/* Outfit Selection Grid (shown when adding outfit) */}
+              {!selectedOutfit && (
+                <div>
+                  <Label>Available Outfits</Label>
+                  <Input
+                    placeholder="Search outfits..."
+                    value={outfitSearch}
+                    onChange={(e) => setOutfitSearch(e.target.value)}
+                    className="mb-2 mt-2"
+                  />
+                  <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto border rounded-lg p-2">
+                    {filteredOutfits.map(outfit => (
+                      <button
+                        key={outfit.id}
+                        onClick={() => setSelectedOutfit(outfit)}
+                        className={`p-3 text-center border rounded-lg hover:border-purple-300 transition-colors ${
+                          selectedOutfit?.id === outfit.id ? 'border-purple-500 bg-purple-50' : ''
+                        }`}
+                      >
+                        <p className="font-medium text-sm">{outfit.name}</p>
+                        <p className="text-xs text-gray-600 capitalize">{outfit.category}</p>
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -797,11 +889,6 @@ export default function CustomerImageCustomizationModal({
                           : progressMessages[currentMessageIndex] || "Pawcasso is working his magic... 🎨"
                         }
                       </p>
-                      {progressMessages.length > 0 && !loadingMessages && (
-                        <p className="text-sm text-purple-600 mt-1">
-                          Step {currentMessageIndex + 1} of {progressMessages.length}
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -875,15 +962,7 @@ export default function CustomerImageCustomizationModal({
           </div>
 
           <div className="flex items-center space-x-2">
-            {currentStep !== 'preview' ? (
-              <Button
-                onClick={handleNext}
-                disabled={!canProceedFromStep() || loading}
-              >
-                Next
-                <ChevronRight className="w-4 h-4 ml-2" />
-              </Button>
-            ) : (
+            {currentStep === 'preview' && (
               <>
                 {generatedVariations.length === 0 ? (
                   <Button
