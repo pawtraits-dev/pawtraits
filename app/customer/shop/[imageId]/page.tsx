@@ -76,7 +76,7 @@ export default function CustomerImageDetailPage() {
       ]);
 
       if (!imageResult) {
-        router.push('/customer/shop');
+        router.push('/shop');
         return;
       }
 
@@ -97,7 +97,7 @@ export default function CustomerImageDetailPage() {
 
     } catch (error) {
       console.error('Error loading image data:', error);
-      router.push('/customer/shop');
+      router.push('/shop');
     } finally {
       setLoading(false);
     }
@@ -229,7 +229,7 @@ export default function CustomerImageDetailPage() {
         <div className="max-w-4xl mx-auto text-center py-12">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Image Not Found</h1>
           <p className="text-gray-600 mb-6">The image you're looking for could not be found.</p>
-          <Button onClick={() => router.push('/customer/shop')} variant="outline">
+          <Button onClick={() => router.push('/shop')} variant="outline">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Shop
           </Button>
@@ -246,7 +246,7 @@ export default function CustomerImageDetailPage() {
         {/* Back Button */}
         <div className="mb-6">
           <Button
-            onClick={() => router.push('/customer/shop')}
+            onClick={() => router.push('/shop')}
             variant="outline"
             className="bg-white/80 backdrop-blur-sm"
           >

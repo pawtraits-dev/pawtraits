@@ -528,7 +528,7 @@ export default function CustomerImageCustomizationModal({
   const handleBuyNow = (variation: any) => {
     // Navigate to shop page with the generated image
     if (variation.id) {
-      router.push(`/customer/shop/${variation.id}`);
+      router.push(`/shop/${variation.id}`);
     } else {
       console.error('Variation ID not available');
     }
@@ -1146,7 +1146,7 @@ export default function CustomerImageCustomizationModal({
                     onClick={() => {
                       // Navigate to first generated variation for purchase
                       if (generatedVariations.length > 0 && generatedVariations[0].id) {
-                        router.push(`/customer/shop/${generatedVariations[0].id}`);
+                        router.push(`/shop/${generatedVariations[0].id}`);
                       } else {
                         onClose();
                       }

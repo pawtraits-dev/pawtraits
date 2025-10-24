@@ -467,7 +467,7 @@ export default function CustomerShopPage() {
   };
 
   const handleImageClick = (image: ImageCatalogWithDetails) => {
-    router.push(`/customer/shop/${image.id}`);
+    router.push(`/shop/${image.id}`);
   };
 
   const handleShareComplete = (platform: string) => {

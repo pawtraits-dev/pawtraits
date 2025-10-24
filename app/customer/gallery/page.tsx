@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
 import StickyFilterHeader from '@/components/StickyFilterHeader';
+import { PawSpinner } from '@/components/ui/paw-spinner';
 
 interface GalleryImage {
   id: string;
@@ -77,8 +78,10 @@ export default function MyPawtraitsGallery() {
   }, []);
 
   useEffect(() => {
-    loadGalleryImages();
-  }, [userProfile, cart.items]);
+    if (userProfile) {
+      loadGalleryImages();
+    }
+  }, [userProfile]);
 
   useEffect(() => {
     filterImages();
@@ -162,34 +165,18 @@ export default function MyPawtraitsGallery() {
       let purchasedTempImages: TempGalleryImage[] = [];
       if (userProfile?.email) {
         try {
-          console.log('Customer Gallery: Loading purchased images for email:', userProfile.email);
           const ordersResponse = await fetch(`/api/shop/orders?email=${encodeURIComponent(userProfile.email)}`);
-          console.log('Customer Gallery: Orders API response status:', ordersResponse.status);
-          
+
           if (ordersResponse.ok) {
             const orders = await ordersResponse.json();
-            console.log('Customer Gallery: Found orders:', orders?.length || 0);
-            
+
             // Convert order items to temporary gallery images
             if (Array.isArray(orders) && orders.length > 0) {
-              console.log('Customer Gallery: Processing orders:', orders.map(o => ({ 
-                id: o.id, 
-                order_number: o.order_number, 
-                items_count: o.order_items?.length || 0 
-              })));
-              
               purchasedTempImages = orders.flatMap((order: any) => {
                 if (!order.order_items || !Array.isArray(order.order_items)) {
-                  console.log('Customer Gallery: Order missing items:', order.id);
                   return [];
                 }
-                
-                console.log('Customer Gallery: Processing order items:', order.order_items.map((item: any) => ({
-                  image_id: item.image_id,
-                  image_title: item.image_title,
-                  image_url: item.image_url
-                })));
-                
+
                 return order.order_items.map((item: any) => ({
                   id: item.image_id,
                   filename: item.image_title?.replace(/[^a-zA-Z0-9]/g, '_') + '.jpg' || 'purchase.jpg',
@@ -211,17 +198,11 @@ export default function MyPawtraitsGallery() {
                   style: undefined
                 }));
               }).filter(Boolean); // Remove any null/undefined items
-              
-              console.log('Customer Gallery: Created purchased temp images:', purchasedTempImages.length);
             }
-          } else {
-            console.error('Customer Gallery: Orders API failed:', ordersResponse.status, ordersResponse.statusText);
           }
         } catch (error) {
           console.error('Error loading purchased images from orders:', error);
         }
-      } else {
-        console.log('Customer Gallery: No user profile email available');
       }
 
       // Load basket items from cart
@@ -579,8 +560,32 @@ export default function MyPawtraitsGallery() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col items-center justify-center py-12 mb-8">
+            <PawSpinner size="lg" />
+            <p className="mt-4 text-gray-600">Loading your pawtraits gallery...</p>
+          </div>
+
+          {/* Skeleton Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="p-0">
+                  <div className="aspect-square bg-gray-200 rounded-t-lg" />
+                  <div className="p-4 space-y-3">
+                    <div className="h-4 bg-gray-200 rounded w-3/4" />
+                    <div className="h-3 bg-gray-200 rounded w-1/2" />
+                    <div className="flex gap-2">
+                      <div className="h-6 bg-gray-200 rounded w-16" />
+                      <div className="h-6 bg-gray-200 rounded w-16" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
