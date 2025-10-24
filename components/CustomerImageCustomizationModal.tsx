@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { X, Wand2, ChevronRight, ChevronLeft, Sparkles, CreditCard, Info, AlertCircle } from 'lucide-react';
+import { X, Wand2, ChevronRight, ChevronLeft, Sparkles, CreditCard, Info, AlertCircle, Check } from 'lucide-react';
 import type { ImageCatalogWithDetails, Breed, Coat, Outfit, Format } from '@/lib/types';
 
 interface CustomerImageCustomizationModalProps {
@@ -18,7 +18,7 @@ interface CustomerImageCustomizationModalProps {
   onGenerationComplete?: (variations: any[]) => void;
 }
 
-type WizardStep = 'animal-count' | 'primary-animal' | 'secondary-animal' | 'options' | 'preview';
+type WizardStep = 'breed-selection' | 'coat-selection' | 'outfit-selection' | 'preview';
 
 interface AnimalSelection {
   breed: Breed | null;
@@ -33,26 +33,14 @@ export default function CustomerImageCustomizationModal({
   onClose,
   onGenerationComplete
 }: CustomerImageCustomizationModalProps) {
-  const [currentStep, setCurrentStep] = useState<WizardStep>('animal-count');
-  const [isMultiAnimal, setIsMultiAnimal] = useState(false);
+  const [currentStep, setCurrentStep] = useState<WizardStep>('breed-selection');
 
   // Animal selections
-  const [primaryAnimal, setPrimaryAnimal] = useState<AnimalSelection>({
-    breed: null,
-    coat: null,
-    outfit: null,
-    age: 'same'
-  });
-
-  const [secondaryAnimal, setSecondaryAnimal] = useState<AnimalSelection>({
-    breed: null,
-    coat: null,
-    outfit: null,
-    age: 'same'
-  });
-
-  // Options
-  const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
+  const [selectedBreed, setSelectedBreed] = useState<Breed | null>(null);
+  const [selectedCoat, setSelectedCoat] = useState<Coat | null>(null);
+  const [selectedOutfit, setSelectedOutfit] = useState<Outfit | null>(null);
+  const [keepCurrentBreed, setKeepCurrentBreed] = useState(false);
+  const [keepCurrentCoat, setKeepCurrentCoat] = useState(false);
 
   // Data loading
   const [breeds, setBreeds] = useState<Breed[]>([]);
@@ -61,13 +49,14 @@ export default function CustomerImageCustomizationModal({
   const [formats, setFormats] = useState<Format[]>([]);
 
   // Breed-specific coats
-  const [primaryBreedCoats, setPrimaryBreedCoats] = useState<Coat[]>([]);
-  const [secondaryBreedCoats, setSecondaryBreedCoats] = useState<Coat[]>([]);
+  const [breedCoats, setBreedCoats] = useState<Coat[]>([]);
 
-  const [primaryBreedSearch, setPrimaryBreedSearch] = useState('');
-  const [secondaryBreedSearch, setSecondaryBreedSearch] = useState('');
-  const [primaryOutfitSearch, setPrimaryOutfitSearch] = useState('');
-  const [secondaryOutfitSearch, setSecondaryOutfitSearch] = useState('');
+  const [breedSearch, setBreedSearch] = useState('');
+  const [outfitSearch, setOutfitSearch] = useState('');
+
+  // Store current image metadata
+  const [currentBreed, setCurrentBreed] = useState<Breed | null>(null);
+  const [currentCoatInfo, setCurrentCoatInfo] = useState<Coat | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -79,49 +68,35 @@ export default function CustomerImageCustomizationModal({
   const [creditsRequired, setCreditsRequired] = useState<number>(1);
   const [loadingCredits, setLoadingCredits] = useState(false);
 
-  // Fetch credit balance on mount
+  // Fetch credit balance and data on mount
   useEffect(() => {
     if (isOpen) {
       fetchCreditBalance();
       loadData();
+      loadCurrentImageMetadata();
     }
   }, [isOpen]);
 
   // Calculate credits required based on selections
   useEffect(() => {
-    const variations = countSelectedVariations();
-    setCreditsRequired(Math.max(1, variations));
-  }, [primaryAnimal, secondaryAnimal, selectedFormats, isMultiAnimal]);
+    // Base cost is always 1 credit for customization
+    setCreditsRequired(1);
+  }, [selectedBreed, selectedCoat, selectedOutfit]);
 
-  // Fetch breed-specific coats when primary breed is selected
+  // Fetch breed-specific coats when breed is selected
   useEffect(() => {
-    if (primaryAnimal.breed) {
-      fetchBreedCoats(primaryAnimal.breed.id).then((coats) => {
-        setPrimaryBreedCoats(coats);
+    if (selectedBreed && !keepCurrentBreed) {
+      fetchBreedCoats(selectedBreed.id).then((coats) => {
+        setBreedCoats(coats);
         // Clear selected coat if it's not available for this breed
-        if (primaryAnimal.coat && !coats.some(c => c.id === primaryAnimal.coat?.id)) {
-          setPrimaryAnimal({ ...primaryAnimal, coat: null });
+        if (selectedCoat && !coats.some(c => c.id === selectedCoat?.id)) {
+          setSelectedCoat(null);
         }
       });
     } else {
-      setPrimaryBreedCoats([]);
+      setBreedCoats([]);
     }
-  }, [primaryAnimal.breed]);
-
-  // Fetch breed-specific coats when secondary breed is selected
-  useEffect(() => {
-    if (secondaryAnimal.breed) {
-      fetchBreedCoats(secondaryAnimal.breed.id).then((coats) => {
-        setSecondaryBreedCoats(coats);
-        // Clear selected coat if it's not available for this breed
-        if (secondaryAnimal.coat && !coats.some(c => c.id === secondaryAnimal.coat?.id)) {
-          setSecondaryAnimal({ ...secondaryAnimal, coat: null });
-        }
-      });
-    } else {
-      setSecondaryBreedCoats([]);
-    }
-  }, [secondaryAnimal.breed]);
+  }, [selectedBreed, keepCurrentBreed]);
 
   const fetchCreditBalance = async () => {
     try {
@@ -141,22 +116,46 @@ export default function CustomerImageCustomizationModal({
   const loadData = async () => {
     try {
       setLoading(true);
-      const [breedsRes, coatsRes, outfitsRes, formatsRes] = await Promise.all([
+      const [breedsRes, coatsRes, outfitsRes] = await Promise.all([
         fetch('/api/breeds'),
         fetch('/api/coats'),
-        fetch('/api/outfits'),
-        fetch('/api/formats')
+        fetch('/api/outfits')
       ]);
 
       if (breedsRes.ok) setBreeds(await breedsRes.json());
       if (coatsRes.ok) setCoats(await coatsRes.json());
       if (outfitsRes.ok) setOutfits(await outfitsRes.json());
-      if (formatsRes.ok) setFormats(await formatsRes.json());
     } catch (err) {
       console.error('Error loading data:', err);
       setError('Failed to load customization options');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCurrentImageMetadata = async () => {
+    try {
+      // Fetch current breed if available
+      if (image.breed_id) {
+        const breedRes = await fetch(`/api/breeds`);
+        if (breedRes.ok) {
+          const allBreeds = await breedRes.json();
+          const breed = allBreeds.find((b: Breed) => b.id === image.breed_id);
+          if (breed) setCurrentBreed(breed);
+        }
+      }
+
+      // Fetch current coat if available
+      if (image.coat_id) {
+        const coatRes = await fetch(`/api/coats`);
+        if (coatRes.ok) {
+          const allCoats = await coatRes.json();
+          const coat = allCoats.find((c: Coat) => c.id === image.coat_id);
+          if (coat) setCurrentCoatInfo(coat);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading current image metadata:', err);
     }
   };
 
@@ -175,74 +174,54 @@ export default function CustomerImageCustomizationModal({
     }
   };
 
-  const countSelectedVariations = (): number => {
-    if (isMultiAnimal) {
-      return 1; // Multi-animal is one complex generation
-    }
-
-    // Single animal: count breed-coat combinations + formats
-    let count = 0;
-
-    // Base variation: breed + coat combination (always counts as 1 if both selected)
-    if (primaryAnimal.breed && primaryAnimal.coat) {
-      count = 1;
-    }
-
-    // Additional format variations beyond the base
-    if (selectedFormats.length > 0) {
-      count += selectedFormats.length;
-    }
-
-    return count;
-  };
-
   const handleNext = () => {
-    if (currentStep === 'animal-count') {
-      setCurrentStep(isMultiAnimal ? 'primary-animal' : 'primary-animal');
-    } else if (currentStep === 'primary-animal') {
-      if (isMultiAnimal) {
-        setCurrentStep('secondary-animal');
-      } else {
-        setCurrentStep('options');
-      }
-    } else if (currentStep === 'secondary-animal') {
-      setCurrentStep('options');
-    } else if (currentStep === 'options') {
+    if (currentStep === 'breed-selection') {
+      setCurrentStep('coat-selection');
+    } else if (currentStep === 'coat-selection') {
+      setCurrentStep('outfit-selection');
+    } else if (currentStep === 'outfit-selection') {
       setCurrentStep('preview');
     }
   };
 
   const handleBack = () => {
-    if (currentStep === 'secondary-animal') {
-      setCurrentStep('primary-animal');
-    } else if (currentStep === 'primary-animal') {
-      setCurrentStep('animal-count');
-    } else if (currentStep === 'options') {
-      if (isMultiAnimal) {
-        setCurrentStep('secondary-animal');
-      } else {
-        setCurrentStep('primary-animal');
-      }
+    if (currentStep === 'coat-selection') {
+      setCurrentStep('breed-selection');
+    } else if (currentStep === 'outfit-selection') {
+      setCurrentStep('coat-selection');
     } else if (currentStep === 'preview') {
-      setCurrentStep('options');
+      setCurrentStep('outfit-selection');
     }
   };
 
   const canProceedFromStep = (): boolean => {
     switch (currentStep) {
-      case 'animal-count':
-        return true;
-      case 'primary-animal':
-        return primaryAnimal.breed !== null && primaryAnimal.coat !== null;
-      case 'secondary-animal':
-        return secondaryAnimal.breed !== null && secondaryAnimal.coat !== null;
-      case 'options':
-        return true; // Options are optional
+      case 'breed-selection':
+        return keepCurrentBreed || selectedBreed !== null;
+      case 'coat-selection':
+        return keepCurrentCoat || selectedCoat !== null;
+      case 'outfit-selection':
+        return true; // Outfit is optional
       case 'preview':
         return generatedVariations.length > 0;
       default:
         return false;
     }
+  };
+
+  const getStepNumber = (step: WizardStep): number => {
+    const steps: WizardStep[] = ['breed-selection', 'coat-selection', 'outfit-selection', 'preview'];
+    return steps.indexOf(step) + 1;
+  };
+
+  const isStepCompleted = (step: WizardStep): boolean => {
+    const currentStepNumber = getStepNumber(currentStep);
+    const stepNumber = getStepNumber(step);
+
+    if (stepNumber < currentStepNumber) return true;
+    if (stepNumber > currentStepNumber) return false;
+
+    return false; // Current step is not completed yet
   };
 
   const handleGenerate = async () => {
@@ -258,40 +237,20 @@ export default function CustomerImageCustomizationModal({
       // Prepare variation config
       const variationConfig: any = {};
 
-      if (isMultiAnimal) {
-        // Multi-animal configuration
-        variationConfig.multiAnimal = {
-          primary: {
-            breedId: primaryAnimal.breed?.id,
-            coatId: primaryAnimal.coat?.id,
-            outfitId: primaryAnimal.outfit?.id,
-            age: primaryAnimal.age
-          },
-          secondary: {
-            breedId: secondaryAnimal.breed?.id,
-            coatId: secondaryAnimal.coat?.id,
-            outfitId: secondaryAnimal.outfit?.id,
-            age: secondaryAnimal.age
-          }
-        };
-      } else {
-        // Single animal: breed-coat combination
-        if (primaryAnimal.breed && primaryAnimal.coat) {
-          variationConfig.breedCoats = [{
-            breedId: primaryAnimal.breed.id,
-            coatId: primaryAnimal.coat.id
-          }];
-        }
+      // Determine breed and coat to use
+      const targetBreed = keepCurrentBreed ? image.breed_id : selectedBreed?.id;
+      const targetCoat = keepCurrentCoat ? image.coat_id : selectedCoat?.id;
 
-        // Add outfit variations
-        if (primaryAnimal.outfit) {
-          variationConfig.outfits = [primaryAnimal.outfit.id];
-        }
+      if (targetBreed && targetCoat) {
+        variationConfig.breedCoats = [{
+          breedId: targetBreed,
+          coatId: targetCoat
+        }];
+      }
 
-        // Add format variations
-        if (selectedFormats.length > 0) {
-          variationConfig.formats = selectedFormats;
-        }
+      // Add outfit if selected
+      if (selectedOutfit) {
+        variationConfig.outfits = [selectedOutfit.id];
       }
 
       // Get image data as base64
@@ -310,10 +269,10 @@ export default function CustomerImageCustomizationModal({
           currentTheme: image.theme_id,
           currentStyle: image.style_id,
           currentFormat: image.format_id,
-          targetAge: primaryAnimal.age,
+          targetAge: 'same',
           variationConfig,
-          isMultiAnimal,
-          multiAnimalConfig: isMultiAnimal ? variationConfig.multiAnimal : null
+          isMultiAnimal: false,
+          multiAnimalConfig: null
         })
       });
 
@@ -362,26 +321,13 @@ export default function CustomerImageCustomizationModal({
     window.location.href = '/customer/customize?show_credit_purchase=true';
   };
 
-  const filteredPrimaryBreeds = breeds.filter(b =>
-    b.name.toLowerCase().includes(primaryBreedSearch.toLowerCase())
+  const filteredBreeds = breeds.filter(b =>
+    b.name.toLowerCase().includes(breedSearch.toLowerCase())
   );
 
-  const filteredSecondaryBreeds = breeds.filter(b =>
-    b.name.toLowerCase().includes(secondaryBreedSearch.toLowerCase())
+  const filteredOutfits = outfits.filter(o =>
+    o.name.toLowerCase().includes(outfitSearch.toLowerCase())
   );
-
-  const filteredPrimaryOutfits = outfits.filter(o =>
-    o.name.toLowerCase().includes(primaryOutfitSearch.toLowerCase())
-  );
-
-  const filteredSecondaryOutfits = outfits.filter(o =>
-    o.name.toLowerCase().includes(secondaryOutfitSearch.toLowerCase())
-  );
-
-  // Get available coats for selected breed (now using breed-specific state)
-  const getAvailableCoatsForBreed = (isPrimary: boolean): Coat[] => {
-    return isPrimary ? primaryBreedCoats : secondaryBreedCoats;
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -433,203 +379,209 @@ export default function CustomerImageCustomizationModal({
           </div>
         )}
 
+        {/* Progress Indicator */}
+        <div className="flex items-center justify-between mb-6">
+          {(['breed-selection', 'coat-selection', 'outfit-selection', 'preview'] as WizardStep[]).map((step, index) => {
+            const stepNum = index + 1;
+            const isActive = currentStep === step;
+            const isCompleted = isStepCompleted(step);
+            const stepLabels = {
+              'breed-selection': 'Breed',
+              'coat-selection': 'Coat',
+              'outfit-selection': 'Outfit',
+              'preview': 'Preview'
+            };
+
+            return (
+              <div key={step} className="flex items-center flex-1">
+                <div className="flex flex-col items-center flex-1">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
+                      isCompleted
+                        ? 'bg-green-500 text-white'
+                        : isActive
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-200 text-gray-600'
+                    }`}
+                  >
+                    {isCompleted ? <Check className="w-5 h-5" /> : stepNum}
+                  </div>
+                  <span className={`text-xs mt-1 ${isActive ? 'font-semibold text-purple-600' : 'text-gray-600'}`}>
+                    {stepLabels[step]}
+                  </span>
+                </div>
+                {index < 3 && (
+                  <div className={`h-0.5 flex-1 ${isCompleted ? 'bg-green-500' : 'bg-gray-200'}`} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
         {/* Wizard Steps */}
         <div className="space-y-6">
-          {/* Step 1: Animal Count */}
-          {currentStep === 'animal-count' && (
+          {/* Step 1: Breed Selection */}
+          {currentStep === 'breed-selection' && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-lg font-semibold mb-2">How many animals?</h3>
+                <h3 className="text-lg font-semibold mb-2">Select Breed</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Choose whether you want one animal or two animals together in your portrait
+                  Choose the breed for your customized portrait
                 </p>
               </div>
 
-              <RadioGroup
-                value={isMultiAnimal ? 'multi' : 'single'}
-                onValueChange={(value) => setIsMultiAnimal(value === 'multi')}
-              >
-                <div className="flex items-center space-x-2 p-4 border rounded-lg hover:border-purple-300 cursor-pointer">
-                  <RadioGroupItem value="single" id="single" />
-                  <Label htmlFor="single" className="flex-1 cursor-pointer">
-                    <p className="font-medium">Single Animal</p>
-                    <p className="text-sm text-gray-600">Customize one pet with different breeds, coats, and outfits</p>
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-2 p-4 border rounded-lg hover:border-purple-300 cursor-pointer">
-                  <RadioGroupItem value="multi" id="multi" />
-                  <Label htmlFor="multi" className="flex-1 cursor-pointer">
-                    <p className="font-medium">Two Animals Together</p>
-                    <p className="text-sm text-gray-600">Create a portrait with two different animals in the same scene</p>
-                    <Badge variant="secondary" className="mt-1">Premium Feature</Badge>
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-          )}
-
-          {/* Step 2: Primary Animal Selection */}
-          {currentStep === 'primary-animal' && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">
-                  {isMultiAnimal ? 'Primary Animal' : 'Customize Your Pet'}
-                </h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Select the breed and coat color for your customized portrait
-                </p>
-              </div>
-
-              {/* Breed Selection */}
-              <div>
-                <Label>Breed</Label>
-                <Input
-                  placeholder="Search breeds..."
-                  value={primaryBreedSearch}
-                  onChange={(e) => setPrimaryBreedSearch(e.target.value)}
-                  className="mb-2"
-                />
-                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded-lg p-2">
-                  {filteredPrimaryBreeds.map(breed => (
-                    <button
-                      key={breed.id}
+              {/* Current Breed Info */}
+              {currentBreed && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Current Breed</p>
+                      <p className="text-lg font-semibold text-blue-700">{currentBreed.name}</p>
+                      <p className="text-xs text-gray-600 capitalize">{currentBreed.animal_type}</p>
+                    </div>
+                    <Button
+                      variant={keepCurrentBreed ? "default" : "outline"}
+                      size="sm"
                       onClick={() => {
-                        setPrimaryAnimal({ ...primaryAnimal, breed, coat: null });
-                      }}
-                      className={`p-3 text-left border rounded-lg hover:border-purple-300 transition-colors ${
-                        primaryAnimal.breed?.id === breed.id ? 'border-purple-500 bg-purple-50' : ''
-                      }`}
-                    >
-                      <p className="font-medium text-sm">{breed.name}</p>
-                      <p className="text-xs text-gray-600 capitalize">{breed.animal_type}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Coat Selection */}
-              {primaryAnimal.breed && (
-                <div>
-                  <Label>Coat Color</Label>
-                  <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto border rounded-lg p-2">
-                    {getAvailableCoatsForBreed(true).map(coat => (
-                      <button
-                        key={coat.id}
-                        onClick={() => setPrimaryAnimal({ ...primaryAnimal, coat })}
-                        className={`p-3 text-left border rounded-lg hover:border-purple-300 transition-colors ${
-                          primaryAnimal.coat?.id === coat.id ? 'border-purple-500 bg-purple-50' : ''
-                        }`}
-                      >
-                        <div
-                          className="w-8 h-8 rounded-full mb-2 border"
-                          style={{ backgroundColor: coat.hex_color || '#ccc' }}
-                        />
-                        <p className="font-medium text-xs">{coat.name}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 3: Secondary Animal Selection (Multi-animal only) */}
-          {currentStep === 'secondary-animal' && isMultiAnimal && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Secondary Animal</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Select the breed and coat color for the second animal
-                </p>
-              </div>
-
-              {/* Breed Selection */}
-              <div>
-                <Label>Breed</Label>
-                <Input
-                  placeholder="Search breeds..."
-                  value={secondaryBreedSearch}
-                  onChange={(e) => setSecondaryBreedSearch(e.target.value)}
-                  className="mb-2"
-                />
-                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded-lg p-2">
-                  {filteredSecondaryBreeds.map(breed => (
-                    <button
-                      key={breed.id}
-                      onClick={() => {
-                        setSecondaryAnimal({ ...secondaryAnimal, breed, coat: null });
-                      }}
-                      className={`p-3 text-left border rounded-lg hover:border-purple-300 transition-colors ${
-                        secondaryAnimal.breed?.id === breed.id ? 'border-purple-500 bg-purple-50' : ''
-                      }`}
-                    >
-                      <p className="font-medium text-sm">{breed.name}</p>
-                      <p className="text-xs text-gray-600 capitalize">{breed.animal_type}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Coat Selection */}
-              {secondaryAnimal.breed && (
-                <div>
-                  <Label>Coat Color</Label>
-                  <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto border rounded-lg p-2">
-                    {getAvailableCoatsForBreed(false).map(coat => (
-                      <button
-                        key={coat.id}
-                        onClick={() => setSecondaryAnimal({ ...secondaryAnimal, coat })}
-                        className={`p-3 text-left border rounded-lg hover:border-purple-300 transition-colors ${
-                          secondaryAnimal.coat?.id === coat.id ? 'border-purple-500 bg-purple-50' : ''
-                        }`}
-                      >
-                        <div
-                          className="w-8 h-8 rounded-full mb-2 border"
-                          style={{ backgroundColor: coat.hex_color || '#ccc' }}
-                        />
-                        <p className="font-medium text-xs">{coat.name}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 4: Additional Options */}
-          {currentStep === 'options' && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Additional Options</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Customize outfit and format (optional)
-                </p>
-              </div>
-
-              {/* Format Selection */}
-              <div>
-                <Label>Format Variations (Optional)</Label>
-                <p className="text-xs text-gray-600 mb-2">
-                  Select additional aspect ratios to generate
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {formats.map(format => (
-                    <button
-                      key={format.id}
-                      onClick={() => {
-                        if (selectedFormats.includes(format.id)) {
-                          setSelectedFormats(selectedFormats.filter(id => id !== format.id));
-                        } else {
-                          setSelectedFormats([...selectedFormats, format.id]);
+                        setKeepCurrentBreed(!keepCurrentBreed);
+                        if (!keepCurrentBreed) {
+                          setSelectedBreed(null);
                         }
                       }}
+                    >
+                      {keepCurrentBreed ? <Check className="w-4 h-4 mr-2" /> : null}
+                      Keep Current
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Breed Selection */}
+              {!keepCurrentBreed && (
+                <div>
+                  <Label>Select New Breed</Label>
+                  <Input
+                    placeholder="Search breeds..."
+                    value={breedSearch}
+                    onChange={(e) => setBreedSearch(e.target.value)}
+                    className="mb-2"
+                  />
+                  <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto border rounded-lg p-2">
+                    {filteredBreeds.map(breed => (
+                      <button
+                        key={breed.id}
+                        onClick={() => setSelectedBreed(breed)}
+                        className={`p-3 text-left border rounded-lg hover:border-purple-300 transition-colors ${
+                          selectedBreed?.id === breed.id ? 'border-purple-500 bg-purple-50' : ''
+                        }`}
+                      >
+                        <p className="font-medium text-sm">{breed.name}</p>
+                        <p className="text-xs text-gray-600 capitalize">{breed.animal_type}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 2: Coat Selection */}
+          {currentStep === 'coat-selection' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Select Coat Color</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Choose the coat color for your customized portrait
+                </p>
+              </div>
+
+              {/* Current Coat Info */}
+              {currentCoatInfo && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className="w-12 h-12 rounded-full border-2 border-white shadow"
+                        style={{ backgroundColor: currentCoatInfo.hex_color || '#ccc' }}
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Current Coat</p>
+                        <p className="text-lg font-semibold text-blue-700">{currentCoatInfo.name}</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant={keepCurrentCoat ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setKeepCurrentCoat(!keepCurrentCoat);
+                        if (!keepCurrentCoat) {
+                          setSelectedCoat(null);
+                        }
+                      }}
+                    >
+                      {keepCurrentCoat ? <Check className="w-4 h-4 mr-2" /> : null}
+                      Keep Current
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Coat Selection */}
+              {!keepCurrentCoat && (
+                <div>
+                  <Label>Select New Coat Color</Label>
+                  <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto border rounded-lg p-2 mt-2">
+                    {(breedCoats.length > 0 ? breedCoats : coats).map(coat => (
+                      <button
+                        key={coat.id}
+                        onClick={() => setSelectedCoat(coat)}
+                        className={`p-3 text-left border rounded-lg hover:border-purple-300 transition-colors ${
+                          selectedCoat?.id === coat.id ? 'border-purple-500 bg-purple-50' : ''
+                        }`}
+                      >
+                        <div
+                          className="w-10 h-10 rounded-full mb-2 border-2 border-white shadow"
+                          style={{ backgroundColor: coat.hex_color || '#ccc' }}
+                        />
+                        <p className="font-medium text-xs">{coat.name}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Outfit Selection */}
+          {currentStep === 'outfit-selection' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Select Outfit (Optional)</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Add an outfit to your pet's portrait
+                </p>
+              </div>
+
+              {/* Outfit Selection */}
+              <div>
+                <Label>Available Outfits</Label>
+                <Input
+                  placeholder="Search outfits..."
+                  value={outfitSearch}
+                  onChange={(e) => setOutfitSearch(e.target.value)}
+                  className="mb-2 mt-2"
+                />
+                <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto border rounded-lg p-2">
+                  {filteredOutfits.map(outfit => (
+                    <button
+                      key={outfit.id}
+                      onClick={() => setSelectedOutfit(selectedOutfit?.id === outfit.id ? null : outfit)}
                       className={`p-3 text-center border rounded-lg hover:border-purple-300 transition-colors ${
-                        selectedFormats.includes(format.id) ? 'border-purple-500 bg-purple-50' : ''
+                        selectedOutfit?.id === outfit.id ? 'border-purple-500 bg-purple-50' : ''
                       }`}
                     >
-                      <p className="font-medium text-sm">{format.name}</p>
-                      <p className="text-xs text-gray-600">{format.aspect_ratio}</p>
+                      <p className="font-medium text-sm">{outfit.name}</p>
+                      <p className="text-xs text-gray-600 capitalize">{outfit.category}</p>
                     </button>
                   ))}
                 </div>
@@ -640,18 +592,18 @@ export default function CustomerImageCustomizationModal({
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-gray-900">Estimated Cost</p>
-                    <p className="text-sm text-gray-600">{countSelectedVariations()} variation(s)</p>
+                    <p className="text-sm text-gray-600">1 variation</p>
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-purple-600">{creditsRequired}</p>
-                    <p className="text-xs text-gray-600">credits</p>
+                    <p className="text-xs text-gray-600">credit{creditsRequired > 1 ? 's' : ''}</p>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 5: Preview */}
+          {/* Step 4: Preview */}
           {currentStep === 'preview' && (
             <div className="space-y-4">
               <div>
@@ -662,27 +614,21 @@ export default function CustomerImageCustomizationModal({
               </div>
 
               {/* Summary */}
-              <div className="space-y-2 p-4 border rounded-lg">
+              <div className="space-y-2 p-4 border rounded-lg bg-gray-50">
                 <h4 className="font-medium">Your Customization:</h4>
-                {isMultiAnimal ? (
-                  <>
-                    <p className="text-sm">
-                      <strong>Primary:</strong> {primaryAnimal.breed?.name} with {primaryAnimal.coat?.name} coat
-                    </p>
-                    <p className="text-sm">
-                      <strong>Secondary:</strong> {secondaryAnimal.breed?.name} with {secondaryAnimal.coat?.name} coat
-                    </p>
-                  </>
-                ) : (
+                <div className="space-y-1">
                   <p className="text-sm">
-                    {primaryAnimal.breed?.name} with {primaryAnimal.coat?.name} coat
+                    <strong>Breed:</strong> {keepCurrentBreed ? `${currentBreed?.name} (Current)` : selectedBreed?.name}
                   </p>
-                )}
-                {selectedFormats.length > 0 && (
                   <p className="text-sm">
-                    <strong>Formats:</strong> {selectedFormats.length} variations
+                    <strong>Coat:</strong> {keepCurrentCoat ? `${currentCoatInfo?.name} (Current)` : selectedCoat?.name}
                   </p>
-                )}
+                  {selectedOutfit && (
+                    <p className="text-sm">
+                      <strong>Outfit:</strong> {selectedOutfit.name}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Generated Variations */}
@@ -713,7 +659,7 @@ export default function CustomerImageCustomizationModal({
         <Separator className="my-4" />
         <div className="flex items-center justify-between">
           <div>
-            {currentStep !== 'animal-count' && (
+            {currentStep !== 'breed-selection' && (
               <Button variant="outline" onClick={handleBack}>
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 Back
