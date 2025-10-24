@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Heart, Share2, ShoppingCart, Download, Star, Filter, Search, Wand2 } from 'lucide-react';
+import { Heart, Share2, ShoppingCart, Download, Star, Filter, Search, Wand2, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -76,6 +76,7 @@ export default function MyPawtraitsGallery() {
   const [recommendedImages, setRecommendedImages] = useState<GalleryImage[]>([]);
   const [userPets, setUserPets] = useState<any[]>([]);
   const [loadingRecommended, setLoadingRecommended] = useState(false);
+  const [loadingCustomImages, setLoadingCustomImages] = useState(false);
 
   const supabaseService = new SupabaseService();
   const { totalItems, items: cartItems } = useHybridCart();
@@ -87,9 +88,12 @@ export default function MyPawtraitsGallery() {
 
   useEffect(() => {
     if (userProfile) {
-      loadUserPets();
-      loadCustomImages();
-      loadGalleryImages();
+      // Load all data in parallel for better performance
+      Promise.all([
+        loadUserPets(),
+        loadCustomImages(),
+        loadGalleryImages()
+      ]);
     }
   }, [userProfile, cartItems]);
 
@@ -156,6 +160,7 @@ export default function MyPawtraitsGallery() {
     if (!userProfile) return;
 
     try {
+      setLoadingCustomImages(true);
       const response = await fetch('/api/customers/generated-images');
 
       if (response.ok) {
@@ -184,11 +189,12 @@ export default function MyPawtraitsGallery() {
         }));
 
         setCustomImages(customGalleryImages);
-        console.log('🎨 Loaded', customGalleryImages.length, 'custom images');
       }
     } catch (error) {
       console.error('Error loading custom images:', error);
       setCustomImages([]);
+    } finally {
+      setLoadingCustomImages(false);
     }
   };
 
@@ -213,8 +219,6 @@ export default function MyPawtraitsGallery() {
         setRecommendedImages([]);
         return;
       }
-
-      console.log('🔍 Fetching recommendations for', petCombinations.length, 'pet combinations');
 
       const response = await fetch('/api/images/recommended', {
         method: 'POST',
@@ -248,7 +252,6 @@ export default function MyPawtraitsGallery() {
         }));
 
         setRecommendedImages(recommendedGalleryImages);
-        console.log('✨ Loaded', recommendedGalleryImages.length, 'recommended images');
       }
     } catch (error) {
       console.error('Error loading recommended images:', error);
@@ -914,22 +917,28 @@ export default function MyPawtraitsGallery() {
         {/* Tabs */}
         <Tabs defaultValue="recommended" className="space-y-6">
           <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="recommended">
+            <TabsTrigger value="recommended" className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
               Recommended ({recommendedImages.length})
             </TabsTrigger>
-            <TabsTrigger value="custom">
+            <TabsTrigger value="custom" className="flex items-center gap-2">
+              <Wand2 className="w-4 h-4" />
               Custom ({customImages.length})
             </TabsTrigger>
-            <TabsTrigger value="liked">
+            <TabsTrigger value="liked" className="flex items-center gap-2">
+              <Heart className="w-4 h-4" />
               Liked ({likedImages.length})
             </TabsTrigger>
-            <TabsTrigger value="shared">
+            <TabsTrigger value="shared" className="flex items-center gap-2">
+              <Share2 className="w-4 h-4" />
               Shared ({sharedImages.length})
             </TabsTrigger>
-            <TabsTrigger value="in_basket">
+            <TabsTrigger value="in_basket" className="flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4" />
               In Basket ({basketImages.length})
             </TabsTrigger>
-            <TabsTrigger value="purchased">
+            <TabsTrigger value="purchased" className="flex items-center gap-2">
+              <Download className="w-4 h-4" />
               Purchased ({purchasedImages.length})
             </TabsTrigger>
           </TabsList>

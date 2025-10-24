@@ -32,10 +32,8 @@ export async function POST(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    console.log('🎨 Fetching recommended images for', petCombinations.length, 'pet combinations:', petCombinations);
-
     // Build query to match any of the breed combinations
-    // Strategy: Match by breed first (coat_id often null in catalog images)
+    // Strategy: Match by breed AND coat for precise recommendations
     let query = supabaseAdmin
       .from('image_catalog')
       .select(`
@@ -67,24 +65,33 @@ export async function POST(request: NextRequest) {
         )
       `);
 
-    // Get unique breed IDs from pet combinations
-    const breedIds = [...new Set(petCombinations.map((combo: any) => combo.breed_id).filter(Boolean))];
+    // Build OR conditions for breed+coat combinations
+    const validCombinations = petCombinations.filter((combo: any) => combo.breed_id && combo.coat_id);
 
-    console.log('🔍 Matching breeds:', breedIds);
+    if (validCombinations.length > 0) {
+      // Match images where BOTH breed AND coat match any pet combination
+      const orConditions = validCombinations.map((combo: any) =>
+        `and(breed_id.eq.${combo.breed_id},coat_id.eq.${combo.coat_id})`
+      ).join(',');
 
-    if (breedIds.length > 0) {
-      // Match any images with these breed IDs
-      query = query.in('breed_id', breedIds);
+      query = query.or(orConditions);
     } else {
-      // No valid breed IDs, return empty
-      return NextResponse.json({ success: true, images: [] });
+      // Fallback to breed-only if no coat data available
+      const breedIds = [...new Set(petCombinations.map((combo: any) => combo.breed_id).filter(Boolean))];
+
+      if (breedIds.length > 0) {
+        query = query.in('breed_id', breedIds);
+      } else {
+        // No valid combinations, return empty
+        return NextResponse.json({ success: true, images: [] });
+      }
     }
 
     // Limit results and order by rating
     query = query
       .order('rating', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(20);
 
     const { data: images, error } = await query;
 
@@ -97,8 +104,6 @@ export async function POST(request: NextRequest) {
     const uniqueImages = Array.from(
       new Map(images?.map(img => [img.id, img]) || []).values()
     );
-
-    console.log('✅ Found', uniqueImages.length, 'recommended images');
 
     return NextResponse.json({
       success: true,

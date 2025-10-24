@@ -35,12 +35,12 @@ export async function GET(request: NextRequest) {
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const limit = parseInt(searchParams.get('limit') || '50');
 
-    // Fetch customer generated images
+    // Fetch customer generated images with optimized field selection
     const { data: generatedImages, error } = await supabaseAdmin
       .from('customer_generated_images')
-      .select('*')
+      .select('id, cloudinary_public_id, public_url, prompt_text, breed_id, theme_id, style_id, format_id, created_at')
       .eq('customer_id', userProfile.id)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -50,10 +50,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch generated images' }, { status: 500 });
     }
 
-    return NextResponse.json({
-      success: true,
-      images: generatedImages || []
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        images: generatedImages || []
+      },
+      {
+        headers: {
+          'Cache-Control': 'private, max-age=60, stale-while-revalidate=30'
+        }
+      }
+    );
 
   } catch (error) {
     console.error('Unexpected error fetching generated images:', error);
