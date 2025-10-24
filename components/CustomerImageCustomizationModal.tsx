@@ -83,20 +83,31 @@ export default function CustomerImageCustomizationModal({
     setCreditsRequired(1);
   }, [selectedBreed, selectedCoat, selectedOutfit]);
 
-  // Fetch breed-specific coats when breed is selected
+  // Fetch breed-specific coats when breed is selected or when keeping current breed
   useEffect(() => {
-    if (selectedBreed && !keepCurrentBreed) {
-      fetchBreedCoats(selectedBreed.id).then((coats) => {
+    const loadBreedSpecificCoats = async () => {
+      let breedId: string | null = null;
+
+      if (keepCurrentBreed && image.breed_id) {
+        breedId = image.breed_id;
+      } else if (selectedBreed) {
+        breedId = selectedBreed.id;
+      }
+
+      if (breedId) {
+        const coats = await fetchBreedCoats(breedId);
         setBreedCoats(coats);
         // Clear selected coat if it's not available for this breed
         if (selectedCoat && !coats.some(c => c.id === selectedCoat?.id)) {
           setSelectedCoat(null);
         }
-      });
-    } else {
-      setBreedCoats([]);
-    }
-  }, [selectedBreed, keepCurrentBreed]);
+      } else {
+        setBreedCoats([]);
+      }
+    };
+
+    loadBreedSpecificCoats();
+  }, [selectedBreed, keepCurrentBreed, image.breed_id]);
 
   const fetchCreditBalance = async () => {
     try {
@@ -392,6 +403,29 @@ export default function CustomerImageCustomizationModal({
               'preview': 'Preview'
             };
 
+            // Get selected value for each step
+            const getSelectedValue = (step: WizardStep): string | null => {
+              switch (step) {
+                case 'breed-selection':
+                  if (keepCurrentBreed && currentBreed) return currentBreed.name;
+                  if (selectedBreed) return selectedBreed.name;
+                  return null;
+                case 'coat-selection':
+                  if (keepCurrentCoat && currentCoatInfo) return currentCoatInfo.name;
+                  if (selectedCoat) return selectedCoat.name;
+                  return null;
+                case 'outfit-selection':
+                  return selectedOutfit?.name || null;
+                case 'preview':
+                  return null;
+                default:
+                  return null;
+              }
+            };
+
+            const selectedValue = getSelectedValue(step);
+            const shouldShowValue = (isCompleted || (isActive && selectedValue)) && selectedValue;
+
             return (
               <div key={step} className="flex items-center flex-1">
                 <div className="flex flex-col items-center flex-1">
@@ -409,6 +443,11 @@ export default function CustomerImageCustomizationModal({
                   <span className={`text-xs mt-1 ${isActive ? 'font-semibold text-purple-600' : 'text-gray-600'}`}>
                     {stepLabels[step]}
                   </span>
+                  {shouldShowValue && (
+                    <span className="text-xs mt-0.5 text-green-600 font-medium text-center max-w-[80px] truncate">
+                      {selectedValue}
+                    </span>
+                  )}
                 </div>
                 {index < 3 && (
                   <div className={`h-0.5 flex-1 ${isCompleted ? 'bg-green-500' : 'bg-gray-200'}`} />
@@ -530,23 +569,29 @@ export default function CustomerImageCustomizationModal({
               {!keepCurrentCoat && (
                 <div>
                   <Label>Select New Coat Color</Label>
-                  <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto border rounded-lg p-2 mt-2">
-                    {(breedCoats.length > 0 ? breedCoats : coats).map(coat => (
-                      <button
-                        key={coat.id}
-                        onClick={() => setSelectedCoat(coat)}
-                        className={`p-3 text-left border rounded-lg hover:border-purple-300 transition-colors ${
-                          selectedCoat?.id === coat.id ? 'border-purple-500 bg-purple-50' : ''
-                        }`}
-                      >
-                        <div
-                          className="w-10 h-10 rounded-full mb-2 border-2 border-white shadow"
-                          style={{ backgroundColor: coat.hex_color || '#ccc' }}
-                        />
-                        <p className="font-medium text-xs">{coat.name}</p>
-                      </button>
-                    ))}
-                  </div>
+                  {breedCoats.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto border rounded-lg p-2 mt-2">
+                      {breedCoats.map(coat => (
+                        <button
+                          key={coat.id}
+                          onClick={() => setSelectedCoat(coat)}
+                          className={`p-3 text-left border rounded-lg hover:border-purple-300 transition-colors ${
+                            selectedCoat?.id === coat.id ? 'border-purple-500 bg-purple-50' : ''
+                          }`}
+                        >
+                          <div
+                            className="w-10 h-10 rounded-full mb-2 border-2 border-white shadow"
+                            style={{ backgroundColor: coat.hex_color || '#ccc' }}
+                          />
+                          <p className="font-medium text-xs">{coat.name}</p>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 border rounded-lg text-center text-gray-500 mt-2">
+                      <p className="text-sm">Loading coat colors for selected breed...</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
