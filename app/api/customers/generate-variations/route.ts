@@ -483,6 +483,12 @@ export async function POST(request: NextRequest) {
 
         console.log(`✅ Cloudinary upload successful: ${cloudinaryResult.public_id}`);
 
+        // Generate Cloudinary transformation URLs for thumbnails
+        const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+        const thumbnailUrl = `https://res.cloudinary.com/${cloudName}/image/upload/c_fill,w_150,h_150/${cloudinaryResult.public_id}`;
+        const midSizeUrl = `https://res.cloudinary.com/${cloudName}/image/upload/c_fill,w_600,h_600/${cloudinaryResult.public_id}`;
+        const fullSizeUrl = cloudinaryResult.secure_url;
+
         // Generate AI description for the variation
         console.log(`📝 Generating AI description for variation...`);
         let aiDescription = null;
@@ -551,6 +557,21 @@ export async function POST(request: NextRequest) {
                 data: variation.imageBuffer.toString('base64'),
                 format: 'png',
                 hasWatermark: true
+              },
+              thumbnail: {
+                url: thumbnailUrl,
+                width: 150,
+                height: 150
+              },
+              mid_size: {
+                url: midSizeUrl,
+                width: 600,
+                height: 600
+              },
+              full_size: {
+                url: fullSizeUrl,
+                width: cloudinaryResult.width,
+                height: cloudinaryResult.height
               }
             }
           })
