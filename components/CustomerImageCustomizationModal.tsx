@@ -315,7 +315,23 @@ export default function CustomerImageCustomizationModal({
 
       if (response.ok) {
         const data = await response.json();
-        setGeneratedDescription(data.description);
+        const description = data.description;
+        setGeneratedDescription(description);
+
+        // Save description to all generated variations
+        for (const variation of generatedVariations) {
+          if (variation.id) {
+            try {
+              await fetch(`/api/customers/generated-images/${variation.id}/description`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ aiDescription: description })
+              });
+            } catch (saveErr) {
+              console.error(`Failed to save description for variation ${variation.id}:`, saveErr);
+            }
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to generate description:', err);
@@ -511,9 +527,11 @@ export default function CustomerImageCustomizationModal({
 
   const handleBuyNow = (variation: any) => {
     // Navigate to shop page with the generated image
-    // For now, we'll navigate to the shop page of the original image
-    // In a real implementation, you'd want to save the variation first
-    router.push(`/shop/${image.id}`);
+    if (variation.id) {
+      router.push(`/customer/shop/${variation.id}`);
+    } else {
+      console.error('Variation ID not available');
+    }
   };
 
   const filteredBreeds = breeds.filter(b =>
@@ -1126,12 +1144,16 @@ export default function CustomerImageCustomizationModal({
                 ) : (
                   <Button
                     onClick={() => {
-                      // Handle saving/purchasing generated variations
-                      onClose();
+                      // Navigate to first generated variation for purchase
+                      if (generatedVariations.length > 0 && generatedVariations[0].id) {
+                        router.push(`/customer/shop/${generatedVariations[0].id}`);
+                      } else {
+                        onClose();
+                      }
                     }}
                     className="bg-green-600 hover:bg-green-700"
                   >
-                    Save & Continue
+                    View in Shop
                   </Button>
                 )}
               </>

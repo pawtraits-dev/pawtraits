@@ -50,9 +50,72 @@ export default function CustomerImageDetailPage() {
     try {
       setLoading(true);
 
-      // Load image data and other required data in parallel
-      const [imageResult, productsData, pricingData] = await Promise.all([
-        supabaseService.getImageById(imageId),
+      // First try to load from customer_generated_images, fallback to image_catalog
+      let imageResult: ImageCatalogWithDetails | null = null;
+
+      // Try customer_generated_images first
+      const { data: generatedImage, error: genError } = await supabase
+        .from('customer_generated_images')
+        .select(`
+          *,
+          breed:breeds(id, name, slug, animal_type),
+          theme:themes(id, name, slug),
+          style:styles(id, name, slug),
+          coat:coats(id, name, slug),
+          format:formats(id, name, slug),
+          outfit:outfits(id, name, slug)
+        `)
+        .eq('id', imageId)
+        .single();
+
+      if (!genError && generatedImage) {
+        // Map customer_generated_images structure to ImageCatalogWithDetails
+        imageResult = {
+          id: generatedImage.id,
+          public_url: generatedImage.public_url,
+          cloudinary_public_id: generatedImage.cloudinary_public_id,
+          prompt_text: generatedImage.prompt_text,
+          description: generatedImage.generation_metadata?.ai_description || generatedImage.prompt_text,
+          breed_id: generatedImage.breed_id,
+          coat_id: generatedImage.coat_id,
+          theme_id: generatedImage.theme_id,
+          style_id: generatedImage.style_id,
+          format_id: generatedImage.format_id,
+          outfit_id: generatedImage.outfit_id,
+          breed_name: generatedImage.breed?.name,
+          theme_name: generatedImage.theme?.name,
+          style_name: generatedImage.style?.name,
+          coat_name: generatedImage.coat?.name,
+          format_name: generatedImage.format?.name,
+          outfit_name: generatedImage.outfit?.name,
+          breed: generatedImage.breed,
+          theme: generatedImage.theme,
+          style: generatedImage.style,
+          coat: generatedImage.coat,
+          format: generatedImage.format
+        } as ImageCatalogWithDetails;
+      } else {
+        // Fallback to image_catalog
+        const { data: catalogImage } = await supabase
+          .from('image_catalog')
+          .select(`
+            *,
+            breed:breeds(id, name, slug, animal_type),
+            theme:themes(id, name, slug),
+            style:styles(id, name, slug),
+            coat:coats(id, name, slug),
+            format:formats(id, name, slug)
+          `)
+          .eq('id', imageId)
+          .single();
+
+        if (catalogImage) {
+          imageResult = catalogImage as ImageCatalogWithDetails;
+        }
+      }
+
+      // Load products and pricing
+      const [productsData, pricingData] = await Promise.all([
         supabaseService.getPublicProducts(),
         supabaseService.getPublicProductPricing()
       ]);

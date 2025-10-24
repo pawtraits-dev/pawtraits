@@ -163,7 +163,7 @@ export default function ProductSelectionModal({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
-            <span>Select Products for This Image</span>
+            <span>Pawsome Products for this Awesome {image.breed_name || image.breed?.name || 'Pet'}</span>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="w-4 h-4" />
             </Button>
@@ -173,11 +173,11 @@ export default function ProductSelectionModal({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left side - Image */}
           <div className="space-y-4 min-h-0">
-            <div className="aspect-square overflow-hidden rounded-lg bg-gray-100 flex-shrink-0">
+            <div className="overflow-hidden rounded-lg bg-gray-100 flex-shrink-0">
               <CatalogImage
                 imageId={image.id}
                 alt={image.description || 'Generated image'}
-                className="w-full h-full object-cover"
+                className="w-full h-auto object-contain max-h-[500px]"
               />
             </div>
             
