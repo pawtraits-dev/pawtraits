@@ -483,6 +483,38 @@ export async function POST(request: NextRequest) {
 
         console.log(`✅ Cloudinary upload successful: ${cloudinaryResult.public_id}`);
 
+        // Generate AI description for the variation
+        console.log(`📝 Generating AI description for variation...`);
+        let aiDescription = null;
+        try {
+          const targetBreed = variation.metadata.breed_id
+            ? breedsData.find((b: any) => b.id === variation.metadata.breed_id)
+            : originalBreedData;
+
+          if (targetBreed) {
+            const descriptionResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/generate-description/base64`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                imageData: variation.imageBuffer.toString('base64'),
+                breedName: targetBreed.name,
+                breedSlug: targetBreed.slug
+              })
+            });
+
+            if (descriptionResponse.ok) {
+              const descData = await descriptionResponse.json();
+              aiDescription = descData.description;
+              console.log(`✅ AI description generated successfully (${aiDescription.length} chars)`);
+            } else {
+              console.warn(`⚠️  Description generation failed: ${descriptionResponse.status}`);
+            }
+          }
+        } catch (descError) {
+          console.error('Error generating AI description:', descError);
+          // Don't fail the whole operation if description generation fails
+        }
+
         const { data: savedImage, error: saveError } = await supabaseAdmin
           .from('customer_generated_images')
           .insert({

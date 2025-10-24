@@ -457,13 +457,8 @@ export default function CustomerImageCustomizationModal({
         setGeneratedVariations(result.variations);
         setCreditBalance(result.creditsRemaining);
 
-        // Generate AI description for the first variation
-        if (result.variations && result.variations.length > 0) {
-          const firstVariation = result.variations[0];
-          if (firstVariation.imageData) {
-            await generateImageDescription(firstVariation.imageData);
-          }
-        }
+        // AI description is now generated on the backend during image creation
+        // No need to generate it here anymore
 
         // Don't call onGenerationComplete - keep modal open to show results
         // if (onGenerationComplete) {

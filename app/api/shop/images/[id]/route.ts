@@ -66,6 +66,7 @@ export async function GET(
         coat: generatedImage.coat,
         format: generatedImage.format,
         outfit: generatedImage.outfit,
+        image_variants: generatedImage.image_variants,
         created_at: generatedImage.created_at,
         is_active: true
       };
