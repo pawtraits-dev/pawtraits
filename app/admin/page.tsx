@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Users, 
-  ShoppingBag, 
-  Image, 
-  DollarSign, 
-  TrendingUp, 
+import {
+  Users,
+  ShoppingBag,
+  Image,
+  DollarSign,
+  TrendingUp,
   Eye,
   Heart,
   Share2,
@@ -19,7 +19,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Activity,
-  Clock
+  Clock,
+  Star
 } from 'lucide-react';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
@@ -33,6 +34,9 @@ interface DashboardStats {
   totalBreeds: number;
   totalThemes: number;
   totalProducts: number;
+  totalReviews: number;
+  pendingReviews: number;
+  averageRating: number;
   recentActivity: any[];
 }
 
@@ -46,6 +50,9 @@ export default function AdminDashboard() {
     totalBreeds: 0,
     totalThemes: 0,
     totalProducts: 0,
+    totalReviews: 0,
+    pendingReviews: 0,
+    averageRating: 0,
     recentActivity: []
   });
   const [loading, setLoading] = useState(true);
@@ -64,17 +71,26 @@ export default function AdminDashboard() {
       // You'll need to implement these methods in SupabaseService or use direct queries
       const [
         customers,
-        partners, 
+        partners,
         breeds,
         themes,
-        images
+        images,
+        reviews,
+        pendingReviews
       ] = await Promise.all([
         supabaseService.getClient().from('customers').select('id', { count: 'exact', head: true }),
         supabaseService.getClient().from('partners').select('id', { count: 'exact', head: true }),
         supabaseService.getClient().from('breeds').select('id', { count: 'exact', head: true }),
         supabaseService.getClient().from('themes').select('id', { count: 'exact', head: true }),
-        supabaseService.getClient().from('image_catalog').select('id', { count: 'exact', head: true })
+        supabaseService.getClient().from('image_catalog').select('id', { count: 'exact', head: true }),
+        supabaseService.getClient().from('reviews').select('rating', { count: 'exact' }),
+        supabaseService.getClient().from('reviews').select('id', { count: 'exact', head: true }).eq('status', 'pending')
       ]);
+
+      // Calculate average rating
+      const avgRating = reviews.data && reviews.data.length > 0
+        ? reviews.data.reduce((acc, r) => acc + (r.rating || 0), 0) / reviews.data.length
+        : 0;
 
       setStats({
         totalCustomers: customers.count || 0,
@@ -85,6 +101,9 @@ export default function AdminDashboard() {
         totalBreeds: breeds.count || 0,
         totalThemes: themes.count || 0,
         totalProducts: 0, // Implement when products data is available
+        totalReviews: reviews.count || 0,
+        pendingReviews: pendingReviews.count || 0,
+        averageRating: Math.round(avgRating * 10) / 10,
         recentActivity: []
       });
 
@@ -151,6 +170,13 @@ export default function AdminDashboard() {
       icon: Package,
       color: 'bg-teal-500',
       href: '/admin/products'
+    },
+    {
+      title: 'Customer Reviews',
+      value: stats.totalReviews,
+      icon: Star,
+      color: 'bg-amber-500',
+      href: '/admin/reviews'
     }
   ];
 
@@ -228,9 +254,21 @@ export default function AdminDashboard() {
               <Card className="hover:shadow-lg transition-shadow cursor-pointer">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-medium text-gray-600">{stat.title}</p>
                       <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                      {stat.title === 'Customer Reviews' && stats.totalReviews > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-sm text-amber-600 font-medium">
+                            ⭐ {stats.averageRating.toFixed(1)} average
+                          </p>
+                          {stats.pendingReviews > 0 && (
+                            <p className="text-xs text-red-600 font-medium">
+                              {stats.pendingReviews} pending approval
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className={`p-3 rounded-full ${stat.color} text-white`}>
                       <Icon className="w-6 h-6" />

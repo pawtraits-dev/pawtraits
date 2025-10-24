@@ -861,6 +861,81 @@ export interface PrintMaterial {
   created_at: string;
 }
 
+// =====================================================
+// REVIEW SYSTEM TYPES
+// =====================================================
+
+export interface Review {
+  id: string;
+  order_item_id: string;
+  order_id: string;
+  customer_id: string;
+  rating: number; // 1-5
+  comment: string;
+  customer_first_name: string;
+  customer_city: string;
+  customer_country: string;
+  image_id: string;
+  image_url: string;
+  image_thumbnail_url?: string;
+  breed_name?: string;
+  status: 'pending' | 'approved' | 'rejected' | 'hidden';
+  is_auto_approved: boolean;
+  is_published: boolean;
+  is_early_adopter: boolean;
+  admin_response?: string;
+  admin_responder_id?: string;
+  admin_responded_at?: string;
+  created_at: string;
+  updated_at: string;
+  published_at?: string;
+}
+
+export interface CreateReviewRequest {
+  order_item_id: string;
+  rating: number;
+  comment: string;
+}
+
+export interface CreateReviewResponse {
+  success: boolean;
+  review?: Review;
+  error?: string;
+  message?: string;
+}
+
+export interface ReviewableOrderItem {
+  order_item_id: string;
+  order_id: string;
+  order_number: string;
+  product_name: string;
+  image_id: string;
+  image_url: string;
+  image_thumbnail_url?: string;
+  breed_name?: string;
+  delivered_at?: string;
+  has_review: boolean;
+}
+
+export interface AdminReviewResponse {
+  review_id: string;
+  response: string;
+}
+
+export interface ReviewStatistics {
+  total_reviews: number;
+  pending_reviews: number;
+  approved_reviews: number;
+  rejected_reviews: number;
+  published_reviews: number;
+  average_rating: number;
+  five_star_count: number;
+  four_star_count: number;
+  three_star_count: number;
+  two_star_count: number;
+  one_star_count: number;
+}
+
 // Form types
 export type CustomerCreate = Omit<Customer, 'id' | 'created_at' | 'updated_at'>;
 export type CustomerUpdate = Partial<CustomerCreate>;

@@ -37,17 +37,7 @@ import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import ContentBasedCarousel from '@/components/ContentBasedCarousel';
-
-
-interface Review {
-  id: string;
-  customer_name: string;
-  rating: number;
-  comment: string;
-  date: string;
-  pet_name?: string;
-  image_url?: string;
-}
+import ReviewsCarousel from '@/components/reviews/ReviewsCarousel';
 
 function HomePageContent() {
   const router = useRouter();
@@ -66,45 +56,6 @@ function HomePageContent() {
   const [likedImages, setLikedImages] = useState<Set<string>>(new Set());
   const [sharedImages, setSharedImages] = useState<Set<string>>(new Set());
   const [purchasedImages, setPurchasedImages] = useState<Set<string>>(new Set());
-  const [reviews] = useState<Review[]>([
-    {
-      id: '1',
-      customer_name: 'Sarah M.',
-      rating: 5,
-      comment: 'Absolutely stunning! The AI captured my golden retriever Max perfectly. The quality is incredible and it now hangs proudly in our living room.',
-      date: '2024-03-15',
-      pet_name: 'Max',
-      image_url: '/api/placeholder/200/200'
-    },
-    {
-      id: '2', 
-      customer_name: 'James L.',
-      rating: 5,
-      comment: 'I was skeptical at first, but this exceeded all expectations. My cat Luna looks majestic in the Renaissance style portrait!',
-      date: '2024-03-10',
-      pet_name: 'Luna',
-      image_url: '/api/placeholder/200/200'
-    },
-    {
-      id: '3',
-      customer_name: 'Maria G.',
-      rating: 5,
-      comment: 'Perfect memorial piece for our beloved rescue dog Charlie. The team was incredibly thoughtful and the result brought tears to our eyes.',
-      date: '2024-03-08',
-      pet_name: 'Charlie',
-      image_url: '/api/placeholder/200/200'
-    },
-    {
-      id: '4',
-      customer_name: 'David R.',
-      rating: 5,
-      comment: 'Amazing quality and fast delivery! My German Shepherd looks like royalty in the portrait. Highly recommend!',
-      date: '2024-03-05',
-      pet_name: 'Rex',
-      image_url: '/api/placeholder/200/200'
-    }
-  ]);
-  const [currentReview, setCurrentReview] = useState(0);
   
   const supabase = getSupabaseClient();
   const supabaseService = new SupabaseService();
@@ -310,13 +261,6 @@ function HomePageContent() {
     return <div className="flex items-center space-x-0.5">{stars}</div>;
   };
 
-  const nextReview = () => {
-    setCurrentReview((prev) => (prev + 1) % reviews.length);
-  };
-
-  const prevReview = () => {
-    setCurrentReview((prev) => (prev - 1 + reviews.length) % reviews.length);
-  };
 
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
@@ -562,79 +506,18 @@ function HomePageContent() {
       </section>
 
       {/* Reviews Section */}
-      <section id="reviews" className="py-20 bg-gray-50">
+      <section id="reviews" className="py-20 bg-gradient-to-br from-gray-50 to-purple-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
               What Our Customers Say
             </h2>
             <p className="text-xl text-gray-600">
-              Real reviews from pet parents who love their AI portraits
+              Join thousands of happy pet parents
             </p>
           </div>
 
-          <div className="relative max-w-4xl mx-auto">
-            <div className="bg-white rounded-lg shadow-lg p-8">
-              <div className="flex items-center justify-center mb-6">
-                <Quote className="w-12 h-12 text-purple-600" />
-              </div>
-              
-              <div className="text-center">
-                <div className="flex items-center justify-center mb-4">
-                  {[...Array(reviews[currentReview].rating)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                  ))}
-                </div>
-                
-                <p className="text-lg text-gray-700 mb-6 italic">
-                  "{reviews[currentReview].comment}"
-                </p>
-                
-                <div className="flex items-center justify-center space-x-4">
-                  <div className="text-center">
-                    <p className="font-semibold text-gray-900">{reviews[currentReview].customer_name}</p>
-                    <p className="text-sm text-gray-600">
-                      Pet parent to {reviews[currentReview].pet_name}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {new Date(reviews[currentReview].date).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Carousel Controls */}
-            <button
-              onClick={prevReview}
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-shadow"
-            >
-              <ChevronLeft className="w-6 h-6 text-gray-600" />
-            </button>
-            <button
-              onClick={nextReview}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-shadow"
-            >
-              <ChevronRight className="w-6 h-6 text-gray-600" />
-            </button>
-
-            {/* Dots Indicator */}
-            <div className="flex items-center justify-center space-x-2 mt-6">
-              {reviews.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentReview(index)}
-                  className={`w-3 h-3 rounded-full transition-colors ${
-                    index === currentReview ? 'bg-purple-600' : 'bg-gray-300'
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
+          <ReviewsCarousel />
         </div>
       </section>
 

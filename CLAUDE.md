@@ -16,14 +16,16 @@ Before starting ANY implementation:
 ### Step 2: Schema Validation & Implementation Planning 📋
 **🚨 CRITICAL**: Schema validation prevents false assumptions about database structure.
 Before writing ANY code:
-- [ ] **VALIDATE DATABASE SCHEMA**: Run `npm run validate:schema` to generate current schema documentation
-- [ ] **REVIEW SCHEMA REFERENCE**: Check `docs/database-schema-reference.md` for actual table structure
-- [ ] **NO ASSUMPTIONS**: Use actual column names and types from schema documentation
+- [ ] **VALIDATE DATABASE SCHEMA**: Review the authoritative schema at `/db/current-db/current-schema`
+- [ ] **UPDATE SCHEMA IF NEEDED**: Run `tsx scripts/update-schema-file.ts` to refresh schema from database
+- [ ] **NO ASSUMPTIONS**: Use actual column names and types from schema file
 - [ ] Document the planned approach in detail
 - [ ] Identify which files will be modified/created
 - [ ] Plan the data flow: Frontend → API → Database
 - [ ] Map out authentication and authorization requirements
 - [ ] Consider error handling and edge cases
+
+**Schema File Location**: The complete database DDL is maintained at `/db/current-db/current-schema`. This file contains all table definitions, constraints, and indexes. Update it after database migrations using `tsx scripts/update-schema-file.ts`.
 
 ### Step 3: Architectural Compliance Validation ⚖️
 **MANDATORY CHECKPOINT** - Validate against established patterns:
@@ -93,8 +95,8 @@ Every implementation MUST pass these checks:
 
 **Database Schema Validation**:
 ```
-✅ CORRECT: Run npm run validate:schema → Check docs/database-schema-reference.md → Use actual column names
-❌ WRONG:   Assume database structure → Write tests based on assumptions → Debug schema mismatches
+✅ CORRECT: Check /db/current-db/current-schema → Use actual column names → Update schema after migrations
+❌ WRONG:   Assume database structure → Write code based on assumptions → Debug schema mismatches
 ```
 
 ## 📋 PROCESS EXAMPLE

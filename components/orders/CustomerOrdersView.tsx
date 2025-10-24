@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Loader2, X } from 'lucide-react';
+import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Loader2, X, Star } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { productDescriptionService } from '@/lib/product-utils';
@@ -13,6 +13,7 @@ import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
 import type { UserProfile } from '@/lib/user-types';
 import { extractDescriptionTitle } from '@/lib/utils';
+import ReviewModal from '@/components/reviews/ReviewModal';
 
 // 🏗️ CUSTOMER ORDERS VIEW COMPONENT
 // Following architectural patterns from docs/patterns/
@@ -67,6 +68,13 @@ export default function CustomerOrdersView({ userProfile }: CustomerOrdersViewPr
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [selectedImageTitle, setSelectedImageTitle] = useState<string>('');
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedReviewItem, setSelectedReviewItem] = useState<{
+    orderItemId: string;
+    imageUrl: string;
+    imageTitle: string;
+    productName: string;
+  } | null>(null);
 
   useEffect(() => {
     loadOrders();
@@ -119,6 +127,21 @@ export default function CustomerOrdersView({ userProfile }: CustomerOrdersViewPr
     setSelectedImageUrl(imageUrl);
     setSelectedImageTitle(imageTitle);
     setShowImageModal(true);
+  };
+
+  const handleReviewClick = (item: OrderItem, order: Order) => {
+    setSelectedReviewItem({
+      orderItemId: item.id,
+      imageUrl: item.image_url,
+      imageTitle: item.image_title,
+      productName: getProductDescription(item.product_id),
+    });
+    setShowReviewModal(true);
+  };
+
+  const handleReviewSubmitted = () => {
+    // Refresh orders to update review status
+    loadOrders();
   };
 
   const formatPrice = (priceInPence: number, currency: string = 'GBP') => {
@@ -313,6 +336,17 @@ export default function CustomerOrdersView({ userProfile }: CustomerOrdersViewPr
                           <h3 className="text-sm font-medium text-gray-900">{extractDescriptionTitle(item.image_title) || item.image_title}</h3>
                           <p className="text-sm font-medium text-purple-700">{getProductDescription(item.product_id)}</p>
                           <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                          {order.status === 'delivered' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleReviewClick(item, order)}
+                              className="mt-2 text-purple-600 border-purple-600 hover:bg-purple-50"
+                            >
+                              <Star className="w-4 h-4 mr-1" />
+                              Leave Review
+                            </Button>
+                          )}
                         </div>
 
                         <div className="text-right">
@@ -484,6 +518,22 @@ export default function CustomerOrdersView({ userProfile }: CustomerOrdersViewPr
               )}
             </DialogContent>
           </Dialog>
+
+          {/* Review Modal */}
+          {selectedReviewItem && (
+            <ReviewModal
+              isOpen={showReviewModal}
+              onClose={() => {
+                setShowReviewModal(false);
+                setSelectedReviewItem(null);
+              }}
+              orderItemId={selectedReviewItem.orderItemId}
+              imageUrl={selectedReviewItem.imageUrl}
+              imageTitle={selectedReviewItem.imageTitle}
+              productName={selectedReviewItem.productName}
+              onReviewSubmitted={handleReviewSubmitted}
+            />
+          )}
         </div>
       </div>
     </CountryProvider>
