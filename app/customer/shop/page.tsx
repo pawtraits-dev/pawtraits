@@ -780,7 +780,7 @@ export default function CustomerShopPage() {
                               {productInfo.productCount} product{productInfo.productCount > 1 ? 's' : ''} from{' '}
                               {productInfo.lowestPrice && productInfo.currencySymbol ? 
                                 formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol) : 
-                                'Price TBC'
+                                'Worth the Wait! Pricing TBA'
                               }
                             </>
                           ) : (
@@ -888,7 +888,7 @@ export default function CustomerShopPage() {
                       <div className="text-xs text-white/90 font-medium">
                         {productInfo.productCount > 0 && productInfo.lowestPrice && productInfo.currencySymbol ? 
                           `from ${formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol)}` : 
-                          'Price TBC'
+                          'Worth the Wait! Pricing TBA'
                         }
                       </div>
                       <Button 
@@ -997,7 +997,7 @@ export default function CustomerShopPage() {
                               {productInfo.productCount} product{productInfo.productCount > 1 ? 's' : ''} from{' '}
                               {productInfo.lowestPrice && productInfo.currencySymbol ? 
                                 formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol) : 
-                                'Price TBC'
+                                'Worth the Wait! Pricing TBA'
                               }
                             </>
                           ) : (

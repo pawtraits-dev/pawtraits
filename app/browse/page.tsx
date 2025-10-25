@@ -681,8 +681,8 @@ function BrowsePageContent() {
                           type="text"
                           placeholder={
                             selectedThemeId
-                              ? "Search for specific breeds..."
-                              : "Search by color (e.g., golden, black, white)..."
+                              ? "What breed are we looking for?"
+                              : "Search by color or coat (e.g., golden, fluffy, spotted)..."
                           }
                           value={selectedThemeId ? themeBreedSearch : searchTerm}
                           onChange={(e) => selectedThemeId ? setThemeBreedSearch(e.target.value) : setSearchTerm(e.target.value)}
@@ -717,9 +717,9 @@ function BrowsePageContent() {
                 <div className="text-center py-12">
                   <div className="w-16 h-16 text-gray-300 mx-auto mb-4">🖼️</div>
                   <p className="text-gray-600">
-                    {selectedBreedId ? 'No portraits available for this breed yet.' : 'No portraits available for this theme yet.'}
+                    {selectedBreedId ? 'This breed is still in the art studio! Try another one or check back soon.' : 'This theme is still being perfected! Try another style or check back soon.'}
                   </p>
-                  <p className="text-gray-500 text-sm mt-2">Check back soon - new portraits are added regularly!</p>
+                  <p className="text-gray-500 text-sm mt-2">Fresh pawtraits are added regularly - your perfect match is coming!</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">

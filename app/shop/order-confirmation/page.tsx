@@ -171,9 +171,9 @@ function OrderConfirmationContent() {
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-12 h-12 text-green-600" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Order Confirmed!</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Pawfection Achieved! 🎉</h1>
           <p className="text-xl text-gray-600 mb-4">
-            Thank you for your purchase! Your beautiful pet portraits are being prepared.
+            We're so excited to bring your pet's portrait to life! Your order is confirmed and we're getting started right away.
           </p>
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 inline-block">
             <p className="text-green-800 font-medium">Order #{order.order_number}</p>

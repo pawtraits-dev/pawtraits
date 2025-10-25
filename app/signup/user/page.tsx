@@ -718,7 +718,7 @@ function UserSignupContent() {
                       disabled={loading}
                       className="bg-gradient-to-r from-purple-600 to-blue-600"
                     >
-                      {loading ? 'Creating Account...' : 'Create Account & Add Pet'}
+                      {loading ? 'Creating Your Account...' : 'Create My Account!'}
                     </Button>
                   </div>
                 )}

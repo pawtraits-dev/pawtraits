@@ -116,9 +116,9 @@ function ShoppingCartPageContent() {
           <div className="mb-8">
             <Link href={continueShoppingRoute} className="flex items-center text-gray-600 hover:text-purple-600 mb-4">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Continue Shopping
+              Keep Exploring
             </Link>
-            <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Your Basket</h1>
           </div>
 
           {/* Empty State */}
@@ -127,11 +127,11 @@ function ShoppingCartPageContent() {
               <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <ShoppingCart className="w-12 h-12 text-gray-400" />
               </div>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">Your cart is empty</h2>
-              <p className="text-gray-600 mb-8">Add some beautiful pet portraits to get started!</p>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-2">Your basket is looking a bit lonely!</h2>
+              <p className="text-gray-600 mb-8">Let's fill it with some pawsome portraits that your pet will love.</p>
               <Link href={continueShoppingRoute}>
                 <Button className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 text-lg">
-                  Browse Portraits
+                  Explore the Gallery
                 </Button>
               </Link>
             </CardContent>
@@ -151,11 +151,11 @@ function ShoppingCartPageContent() {
         <div className="mb-8">
           <Link href={continueShoppingRoute} className="flex items-center text-gray-600 hover:text-purple-600 mb-4">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Continue Shopping
+            Keep Exploring
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Your Basket</h1>
           <p className="text-gray-600 mt-2">
-            {items.length} item{items.length !== 1 ? "s" : ""} in your cart
+            {items.length} gorgeous item{items.length !== 1 ? "s" : ""} ready for checkout
           </p>
         </div>
 
@@ -224,7 +224,7 @@ function ShoppingCartPageContent() {
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="w-4 h-4 mr-1" />
-                        Remove
+                        Remove from Basket
                       </Button>
                     </div>
                   </div>
@@ -271,7 +271,7 @@ function ShoppingCartPageContent() {
 
                 <Link href="/shop/checkout" className="block">
                   <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 text-lg font-semibold">
-                    Proceed to Checkout
+                    Complete Your Order
                   </Button>
                 </Link>
 

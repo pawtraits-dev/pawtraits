@@ -359,7 +359,7 @@ export default function CustomerImageDetailPage() {
                       {productInfo.productCount} product{productInfo.productCount > 1 ? 's' : ''} available from{' '}
                       {productInfo.lowestPrice && productInfo.currencySymbol ?
                         formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol) :
-                        'Price TBC'
+                        'Worth the Wait! Pricing TBA'
                       }
                     </div>
                   </div>

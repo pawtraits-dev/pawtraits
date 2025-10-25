@@ -330,7 +330,7 @@ function SharedImagePageClient({ id }: { id: string }) {
                         {productInfo.productCount} option{productInfo.productCount > 1 ? 's' : ''} from{' '}
                         {productInfo.lowestPrice && productInfo.currencySymbol ? 
                           formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol) : 
-                          'Price TBC'
+                          'Worth the Wait! Pricing TBA'
                         }
                       </>
                     ) : (

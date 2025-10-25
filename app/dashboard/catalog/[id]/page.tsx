@@ -209,7 +209,7 @@ function ProductDetailPageClient({ id }: { id: string }) {
 
             <Separator />
 
-            {/* Price and Add to Cart */}
+            {/* Price and Add to Basket */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-2xl font-bold text-gray-900">${finalPrice}</span>
@@ -226,12 +226,12 @@ function ProductDetailPageClient({ id }: { id: string }) {
                 {isAddedToCart ? (
                   <>
                     <Check className="w-4 h-4 mr-2" />
-                    Added to Cart!
+                    Added to Basket!
                   </>
                 ) : (
                   <>
                     <ShoppingCart className="w-4 h-4 mr-2" />
-                    Add to Cart
+                    Add to Basket
                   </>
                 )}
               </Button>

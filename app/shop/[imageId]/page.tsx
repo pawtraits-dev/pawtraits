@@ -452,7 +452,7 @@ function QRLandingPageContent() {
                           className="bg-purple-600 hover:bg-purple-700"
                         >
                           <ShoppingCart className="w-4 h-4 mr-2" />
-                          Add to Cart
+                          Add to Basket
                         </Button>
                       </div>
                     );
