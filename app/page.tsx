@@ -317,32 +317,32 @@ function HomePageContent() {
                 handleLike(image.id);
               }}
               className={`p-2 rounded-full transition-all ${
-                isLiked 
-                  ? 'bg-red-500 text-white' 
+                isLiked
+                  ? 'bg-red-500 text-white'
                   : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
               }`}
-              title={isLiked ? 'Unlike' : 'Like'}
+              title={isLiked ? 'Already Loved!' : 'Love This!'}
             >
               <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
             </button>
-            
+
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handleShare(image);
               }}
               className={`p-2 rounded-full transition-all ${
-                isShared 
-                  ? 'bg-blue-500 text-white' 
+                isShared
+                  ? 'bg-blue-500 text-white'
                   : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
               }`}
-              title={isShared ? 'Shared' : 'Share'}
+              title={isShared ? 'Shared!' : 'Share the Love'}
             >
               <Share2 className="w-4 h-4" />
             </button>
-            
+
             {isPurchased && (
-              <div className="bg-green-500 text-white p-2 rounded-full" title="Purchased">
+              <div className="bg-green-500 text-white p-2 rounded-full" title="In Your Collection!">
                 <ShoppingCart className="w-4 h-4 fill-current" />
               </div>
             )}
@@ -382,18 +382,18 @@ function HomePageContent() {
               <div className="text-sm text-gray-600">
                 {productInfo.productCount > 0 ? (
                   <>
-                    {productInfo.productCount} product{productInfo.productCount > 1 ? 's' : ''} from{' '}
-                    {productInfo.lowestPrice && productInfo.currencySymbol ? 
-                      formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol) : 
-                      'Price TBC'
+                    Available in {productInfo.productCount} gorgeous option{productInfo.productCount > 1 ? 's' : ''} from{' '}
+                    {productInfo.lowestPrice && productInfo.currencySymbol ?
+                      formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol) :
+                      'pricing TBA'
                     }
                   </>
                 ) : (
-                  'Price TBC'
+                  'Worth the Wait! Pricing TBA'
                 )}
               </div>
             </div>
-            <Button 
+            <Button
               size="sm"
               className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
               disabled={productInfo.productCount === 0}
@@ -403,7 +403,7 @@ function HomePageContent() {
               }}
             >
               <ShoppingCart className="w-4 h-4 mr-2" />
-              {productInfo.productCount === 0 ? 'Coming Soon' : 'Add to Cart'}
+              {productInfo.productCount === 0 ? 'Almost There!' : 'Add to Basket'}
             </Button>
           </div>
         </CardContent>
@@ -437,35 +437,35 @@ function HomePageContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-center">
             <div className="flex space-x-4">
-              <button 
+              <button
                 onClick={() => setActiveFilter('new')}
                 className={`px-6 py-2 rounded-full border transition-all ${
-                  activeFilter === 'new' 
-                    ? 'border-primary bg-primary text-primary-foreground' 
+                  activeFilter === 'new'
+                    ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-gray-300 text-gray-700 hover:border-primary hover:text-primary'
                 }`}
               >
-                new
+                Just Dropped! ✨
               </button>
-              <button 
+              <button
                 onClick={() => setActiveFilter('featured')}
                 className={`px-6 py-2 rounded-full border transition-all ${
-                  activeFilter === 'featured' 
-                    ? 'border-primary bg-primary text-primary-foreground' 
+                  activeFilter === 'featured'
+                    ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-gray-300 text-gray-700 hover:border-primary hover:text-primary'
                 }`}
               >
-                featured
+                Staff Picks 🌟
               </button>
-              <button 
+              <button
                 onClick={() => setActiveFilter('popular')}
                 className={`px-6 py-2 rounded-full border transition-all ${
-                  activeFilter === 'popular' 
-                    ? 'border-primary bg-primary text-primary-foreground' 
+                  activeFilter === 'popular'
+                    ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-gray-300 text-gray-700 hover:border-primary hover:text-primary'
                 }`}
               >
-                popular
+                Crowd Favorites 🔥
               </button>
             </div>
           </div>
@@ -483,7 +483,13 @@ function HomePageContent() {
             return currentImages.length === 0 ? (
               <div className="text-center py-12">
                 <Star className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-600">{activeFilter} images coming soon...</p>
+                <p className="text-gray-600">
+                  {activeFilter === 'new'
+                    ? 'Fresh pawtraits are being created as we speak! Check back soon for the latest masterpieces.'
+                    : activeFilter === 'featured'
+                    ? 'Our curators are handpicking the most pawsome portraits right now! Stay tuned!'
+                    : 'The crowd favorites are warming up! Come back soon to see what everyone\'s loving.'}
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -499,7 +505,7 @@ function HomePageContent() {
               onClick={() => router.push('/browse')}
               className="rounded-full px-8"
             >
-              see all
+              Explore the Full Gallery
             </Button>
           </div>
         </div>
@@ -510,10 +516,10 @@ function HomePageContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
-              What Our Customers Say
+              Tail-Wagging Testimonials
             </h2>
             <p className="text-xl text-gray-600">
-              Join thousands of happy pet parents
+              Real reviews from real pet parents (and their very photogenic pets)
             </p>
           </div>
 
@@ -526,27 +532,27 @@ function HomePageContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center text-white">
             <h2 className="text-4xl font-bold mb-6 font-[family-name:var(--font-life-savers)]">
-              Ready to Create Your Pet's Portrait?
+              Time to Unleash Your Pet's Inner Supermodel!
             </h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90">
-              Join thousands of happy pet parents
+              Your pet is already camera-ready. We'll handle the artistic magic!
             </p>
             <div className="flex items-center justify-center space-x-4">
-              <Button 
+              <Button
                 size="lg"
                 variant="secondary"
                 onClick={() => router.push('/signup/user')}
                 className="bg-white text-purple-600 hover:bg-gray-100"
               >
-                Sign Up as Pet Owner
+                Create My Pet's Pawtrait!
               </Button>
-              <Button 
+              <Button
                 size="lg"
                 variant="outline"
                 onClick={() => router.push('/signup/partner')}
                 className="border-white text-white hover:bg-white hover:text-purple-600"
               >
-                Join as Partner
+                Join Our Partner Pack
               </Button>
             </div>
           </div>
@@ -570,7 +576,7 @@ function HomePageContent() {
                 <span className="text-xl font-bold font-[family-name:var(--font-life-savers)]">Pawtraits</span>
               </div>
               <p className="text-gray-400">
-                Perfect Pet Pawtrits
+                Where Every Pet Becomes a Masterpiece
               </p>
             </div>
             
