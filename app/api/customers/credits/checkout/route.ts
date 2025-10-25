@@ -111,12 +111,14 @@ export async function POST(request: NextRequest) {
       customer_email: userProfile.email,
       // Add metadata to payment intent for early detection
       // Include ALL metadata needed for credit processing
-      // IMPORTANT: Use customer.id (from customers table) not userProfile.id (from user_profiles)
-      // This ensures commission records can be queried correctly in /referrals page
+      // IMPORTANT: Pass both IDs:
+      // - customerId (from customers table) for commission records
+      // - userProfileId (from user_profiles table) for credit operations
       payment_intent_data: {
         metadata: {
           purchaseType: 'customization_credits',
           customerId: customer.id, // customers.id for commission recipient_id
+          userProfileId: userProfile.id, // user_profiles.id for credit operations
           customerEmail: customer.email,
           packId: packConfig.pack_id,
           credits: packConfig.credits_amount.toString(),
@@ -128,6 +130,7 @@ export async function POST(request: NextRequest) {
       metadata: {
         purchaseType: 'customization_credits',
         customerId: customer.id, // customers.id for commission recipient_id
+        userProfileId: userProfile.id, // user_profiles.id for credit operations
         customerEmail: customer.email,
         packId: packConfig.pack_id,
         credits: packConfig.credits_amount.toString(),

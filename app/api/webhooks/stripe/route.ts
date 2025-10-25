@@ -308,16 +308,18 @@ async function handleCreditPackPurchase(
   metadata: any
 ) {
   try {
-    const customerId = metadata.customerId;
+    const customerId = metadata.customerId; // customers.id for commission records
+    const userProfileId = metadata.userProfileId; // user_profiles.id for credit operations
     const customerEmail = metadata.customerEmail;
     const packId = metadata.packId;
     const credits = parseInt(metadata.credits);
     const orderCreditAmount = parseInt(metadata.orderCreditAmount || '0');
     const amountPaid = paymentIntent.amount;
 
-    if (!customerId || !credits || !packId) {
+    if (!customerId || !userProfileId || !credits || !packId) {
       console.error('❌ Missing required metadata for credit purchase:', {
         customerId,
+        userProfileId,
         credits,
         packId,
         availableKeys: Object.keys(metadata)
@@ -327,6 +329,7 @@ async function handleCreditPackPurchase(
 
     console.log('💳 Processing credit pack purchase:', {
       customerId,
+      userProfileId,
       customerEmail,
       packId,
       credits,
@@ -335,12 +338,14 @@ async function handleCreditPackPurchase(
     });
 
     // Get balances BEFORE purchase for email comparison
+    // Use userProfileId for credit operations (references user_profiles.id)
     const { data: balancesBefore } = await supabase
       .from('customer_customization_credits')
       .select('credits_remaining')
-      .eq('customer_id', customerId)
+      .eq('customer_id', userProfileId)
       .maybeSingle();
 
+    // Use customerId for customer table operations (references customers.id)
     const { data: customerBefore } = await supabase
       .from('customers')
       .select('current_credit_balance')
@@ -357,9 +362,10 @@ async function handleCreditPackPurchase(
     });
 
     // Add customization credits to customer account using database function
+    // Use userProfileId (user_profiles.id) for credit operations
     const { data: addResult, error: addError } = await supabase
       .rpc('add_customization_credits', {
-        p_customer_id: customerId,
+        p_customer_id: userProfileId,
         p_credits_to_add: credits,
         p_purchase_amount: amountPaid
       });
@@ -449,7 +455,7 @@ async function handleCreditPackPurchase(
     const { data: balance } = await supabase
       .from('customer_customization_credits')
       .select('credits_remaining, credits_purchased')
-      .eq('customer_id', customerId)
+      .eq('customer_id', userProfileId)
       .single();
 
     console.log('✅ Credit pack purchase complete:', {
@@ -1852,19 +1858,21 @@ async function handleCheckoutSessionCompleted(event: any, supabase: any) {
       return;
     }
 
-    const customerId = metadata.customerId;
+    const customerId = metadata.customerId; // customers.id for commission records
+    const userProfileId = metadata.userProfileId; // user_profiles.id for credit operations
     const customerEmail = metadata.customerEmail || session.customer_email;
     const packId = metadata.packId;
     const credits = parseInt(metadata.credits);
     const orderCreditAmount = parseInt(metadata.orderCreditAmount || '0');
 
-    if (!customerId || !credits) {
+    if (!customerId || !userProfileId || !credits) {
       console.error('❌ Missing required metadata for credit purchase:', metadata);
       return;
     }
 
     console.log('💳 Processing credit pack purchase:', {
       customerId,
+      userProfileId,
       customerEmail,
       packId,
       credits,
@@ -1873,9 +1881,10 @@ async function handleCheckoutSessionCompleted(event: any, supabase: any) {
     });
 
     // Add customization credits to customer account using database function
+    // Use userProfileId (user_profiles.id) for credit operations
     const { data: addResult, error: addError } = await supabase
       .rpc('add_customization_credits', {
-        p_customer_id: customerId,
+        p_customer_id: userProfileId,
         p_credits_to_add: credits,
         p_purchase_amount: session.amount_total
       });
@@ -1959,7 +1968,7 @@ async function handleCheckoutSessionCompleted(event: any, supabase: any) {
     const { data: balance } = await supabase
       .from('customer_customization_credits')
       .select('credits_remaining, credits_purchased')
-      .eq('customer_id', customerId)
+      .eq('customer_id', userProfileId)
       .single();
 
     console.log('✅ Credit pack purchase complete:', {
