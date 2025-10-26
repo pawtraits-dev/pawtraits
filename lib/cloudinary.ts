@@ -534,18 +534,39 @@ export class CloudinaryImageService {
       const printTransform: any = {
         quality: 100,
         format: 'png',
-        dpi: 300,
         secure: true, // Use HTTPS
         sign_url: false // No signature - Gelato needs stable public URLs
+        // Note: dpi parameter not used here - it's set at upload time, not in URL
       };
 
       if (requiresUpscaling) {
         // Low-res image (e.g., Gemini 1024x1024) - apply upscaling
-        // Max 5315px covers: 45×30cm landscape, 30×45cm portrait, 40×40cm square @300dpi
-        printTransform.width = 5315;
-        printTransform.height = 5315;
+        // Calculate aspect-ratio appropriate dimensions
+        // Max: 45×30cm landscape, 30×45cm portrait, 40×40cm square @300dpi
+
+        const aspectRatio = dimensions.width / dimensions.height;
+        const isPortrait = dimensions.height > dimensions.width;
+        const isSquare = Math.abs(aspectRatio - 1) < 0.1;
+
+        if (isPortrait) {
+          // Portrait: 30×45cm = 3543×5315px
+          printTransform.width = 3543;
+          printTransform.height = 5315;
+        } else if (isSquare) {
+          // Square: 40×40cm = 4724×4724px
+          printTransform.width = 4724;
+          printTransform.height = 4724;
+        } else {
+          // Landscape: 45×30cm = 5315×3543px
+          printTransform.width = 5315;
+          printTransform.height = 3543;
+        }
+
         printTransform.crop = 'fit';
-        console.log(`🔼 Applying upscaling for Gelato order: ${orderId} (max 5315px = 45cm @300dpi)`);
+        console.log(`🔼 Applying upscaling for Gelato order: ${orderId}`, {
+          orientation: isPortrait ? 'portrait' : (isSquare ? 'square' : 'landscape'),
+          targetSize: `${printTransform.width}×${printTransform.height}px`
+        });
       } else {
         console.log(`✅ Using original high-res quality for Gelato order: ${orderId}`);
       }
