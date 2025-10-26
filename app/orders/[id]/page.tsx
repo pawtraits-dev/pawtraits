@@ -46,6 +46,7 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
+  const [productDetails, setProductDetails] = useState<{[key: string]: any}>({});
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -77,7 +78,8 @@ export default function OrderDetailPage() {
 
         // Load product descriptions
         if (orderData.order_items) {
-          await productDescriptionService.loadProductDetails([orderData]);
+          const details = await productDescriptionService.loadProductDetails([orderData]);
+          setProductDetails(details);
         }
       } catch (err) {
         console.error('Error loading order:', err);
@@ -233,7 +235,7 @@ export default function OrderDetailPage() {
                       {extractDescriptionTitle(item.image_title) || item.image_title}
                     </h3>
                     <p className="text-sm font-medium text-purple-700">
-                      {productDescriptionService.getDescription(item.product_id)}
+                      {productDescriptionService.getProductDescription(item.product_id, productDetails)}
                     </p>
                     <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                   </div>
