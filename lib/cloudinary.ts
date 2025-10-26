@@ -535,7 +535,9 @@ export class CloudinaryImageService {
         quality: 100,
         format: 'png',
         secure: true, // Use HTTPS
-        sign_url: false // No signature - Gelato needs stable public URLs
+        sign_url: false, // No signature - Gelato needs stable public URLs
+        type: 'upload', // Force public URL generation (works for authenticated resources too)
+        resource_type: 'image' // Explicitly set resource type
         // Note: dpi parameter not used here - it's set at upload time, not in URL
       };
 
