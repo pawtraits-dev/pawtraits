@@ -54,7 +54,21 @@ export async function POST(request: NextRequest) {
             width: cloudinaryResult.width,
             height: cloudinaryResult.height
           });
-          
+
+          // Generate all image variants including print-quality original with smart upscaling
+          const { cloudinaryService } = await import('@/lib/cloudinary');
+          const imageVariants = await cloudinaryService.generateImageVariants(
+            cloudinaryResult.public_id,
+            cloudinaryResult.version.toString(),
+            {
+              breed: variation.metadata.breed_id?.toString() || '',
+              theme: variation.theme_id?.toString() || '',
+              style: variation.style_id?.toString() || ''
+            }
+          );
+
+          console.log('✅ Generated image variants with smart upscaling for print quality');
+
           // Save directly to database using the service (same as original admin generate flow)
           try {
             console.log('Attempting to save variation to database:', {
@@ -73,6 +87,7 @@ export async function POST(request: NextRequest) {
                 cloudinary_public_id: cloudinaryResult.public_id,
                 cloudinary_secure_url: cloudinaryResult.secure_url,
                 cloudinary_signature: cloudinaryResult.signature,
+                cloudinary_version: cloudinaryResult.version.toString(),
                 original_filename: variation.filename,
                 public_url: cloudinaryResult.secure_url, // Required field!
                 storage_path: `cloudinary:${cloudinaryResult.public_id}`,
@@ -90,7 +105,8 @@ export async function POST(request: NextRequest) {
                 coat_id: variation.metadata.coat_id || null,
                 rating: variation.rating || 4,
                 is_featured: variation.is_featured || false,
-                is_public: variation.is_public !== false
+                is_public: variation.is_public !== false,
+                image_variants: imageVariants // Store all variants including print-quality original
               })
               .select()
               .single();

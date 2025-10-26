@@ -178,8 +178,9 @@ export class CloudinaryImageService {
 
   /**
    * Generate all image variants according to business requirements
+   * Made public so it can be called after Cloudinary uploads in variation generation
    */
-  private async generateImageVariants(
+  async generateImageVariants(
     publicId: string,
     version: string,
     metadata: UploadMetadata
