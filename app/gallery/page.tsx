@@ -756,7 +756,7 @@ export default function MyPawtraitsGallery() {
                     <a
                       href={userProfile?.user_type === 'partner'
                         ? `/partners/orders/${image.order_id}`
-                        : `/customer/orders/${image.order_id}`}
+                        : `/orders/${image.order_id}`}
                       className="text-purple-600 hover:text-purple-800 hover:underline"
                     >
                       Purchased on {new Date(interaction.date).toLocaleDateString()}

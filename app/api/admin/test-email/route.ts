@@ -308,7 +308,7 @@ export async function POST(request: NextRequest) {
                   <p><strong>What's Next?</strong></p>
                   <p>We'll send you another email when your order ships with tracking information.</p>
 
-                  <a href="https://pawtraits.pics/customer/orders/test-12345" class="button">View Order Status</a>
+                  <a href="https://pawtraits.pics/orders/test-12345" class="button">View Order Status</a>
 
                   <p style="margin-top: 30px; font-size: 14px; color: #666;">
                     Questions? Reply to this email or contact us at support@pawtraits.pics
@@ -326,7 +326,7 @@ export async function POST(request: NextRequest) {
             </body>
             </html>
           `,
-          text: `Thank You for Your Order!\n\nOrder #TEST-12345\n\nThis is a test email showing what your customers will receive when they place an order.\n\nOrder Details:\nOrder Number: TEST-12345\nOrder Date: ${new Date().toLocaleDateString()}\nStatus: Confirmed\n\nItems:\n- Canvas Print (16"x20") - Golden Retriever - Renaissance Style - £29.99\n\nSubtotal: £29.99\nShipping: £9.99\nTotal: £39.98\n\nWhat's Next?\nWe'll send you another email when your order ships with tracking information.\n\nView Order Status: https://pawtraits.pics/customer/orders/test-12345\n\nQuestions? Reply to this email or contact us at support@pawtraits.pics`,
+          text: `Thank You for Your Order!\n\nOrder #TEST-12345\n\nThis is a test email showing what your customers will receive when they place an order.\n\nOrder Details:\nOrder Number: TEST-12345\nOrder Date: ${new Date().toLocaleDateString()}\nStatus: Confirmed\n\nItems:\n- Canvas Print (16"x20") - Golden Retriever - Renaissance Style - £29.99\n\nSubtotal: £29.99\nShipping: £9.99\nTotal: £39.98\n\nWhat's Next?\nWe'll send you another email when your order ships with tracking information.\n\nView Order Status: https://pawtraits.pics/orders/test-12345\n\nQuestions? Reply to this email or contact us at support@pawtraits.pics`,
           tags: [
             { name: 'type', value: 'test_email' },
             { name: 'test_type', value: 'order_confirmation' }
