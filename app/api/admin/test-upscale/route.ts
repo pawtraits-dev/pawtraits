@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       quality: 100,
       format: 'png',
       width: 8500,
-      crop: 'limit',
+      crop: 'fit', // 'fit' allows upscaling, 'limit' prevents it
       flags: 'progressive.lossy'
     });
 
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
         applied: needsUpscaling,
         parameters: needsUpscaling ? {
           width: 8500,
-          crop: 'limit',
+          crop: 'fit',
           flags: 'progressive.lossy'
         } : 'none (image already high-res)'
       },

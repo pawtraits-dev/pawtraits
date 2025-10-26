@@ -221,7 +221,7 @@ export class CloudinaryImageService {
       if (requiresUpscaling) {
         // Low-res image (e.g., Gemini 1024x1024) - apply upscaling
         originalTransform.width = 8500; // Covers largest print size (70cm at 300 DPI)
-        originalTransform.crop = 'limit'; // Maintains aspect ratio
+        originalTransform.crop = 'fit'; // Fit within dimensions, allows upscaling
         originalTransform.flags = 'progressive.lossy'; // Optimized delivery
         console.log(`🔼 Applying upscaling to low-res image: ${publicId}`);
       } else {
@@ -505,7 +505,7 @@ export class CloudinaryImageService {
       if (requiresUpscaling) {
         // Low-res image (e.g., Gemini 1024x1024) - apply upscaling
         printTransform.width = 8500; // Covers largest print size (70cm at 300 DPI)
-        printTransform.crop = 'limit'; // Maintains aspect ratio
+        printTransform.crop = 'fit'; // Fit within dimensions, allows upscaling
         printTransform.flags = 'progressive.lossy'; // Optimized delivery
         console.log(`🔼 Applying upscaling for low-res print order: ${orderId}`);
       } else {
