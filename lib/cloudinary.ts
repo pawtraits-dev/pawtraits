@@ -94,8 +94,28 @@ export interface UploadResult {
   cloudinary_signature: string;
 }
 
+/**
+ * CloudinaryImageService - Manages image storage and transformations with security
+ *
+ * URL Expiry Strategy:
+ * - Stored variants (DB): 30-day expiry for reference/preview
+ * - Print fulfillment: 48-hour expiry (regenerate via getOriginalPrintUrl())
+ * - Customer downloads: 7-day expiry (regenerate via getDownloadUrl())
+ *
+ * Security Model:
+ * - All sensitive URLs (original, download) use signed URLs with expiry
+ * - Public variants (thumbnails, watermarked) can be unsigned
+ * - Gelato receives fresh 48hr URLs when orders are placed
+ * - Customers receive fresh 7-day URLs when downloading
+ *
+ * Image Upscaling:
+ * - Max 5315px (45cm @300dpi) covers all print sizes
+ * - Portrait: 30×45cm (3543×5315px)
+ * - Landscape: 45×30cm (5315×3543px)
+ * - Square: 40×40cm (4724×4724px)
+ */
 export class CloudinaryImageService {
-  
+
   /**
    * Upload original image and generate all variants
    */
@@ -209,13 +229,17 @@ export class CloudinaryImageService {
 
       // 1. ORIGINAL - 300 DPI, no overlay, secured for print fulfillment only
       // Apply upscaling ONLY if image is low-resolution (< 3000px)
+      // Note: These URLs are stored in DB for reference, but actual print orders
+      // should call getOriginalPrintUrl() to generate fresh URLs with shorter expiry
+      const originalExpiresAt = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60); // 30 days
+
       const originalTransform: any = {
         ...baseTransform,
         quality: 100,
         format: 'png',
         dpi: 300,
-        sign_url: true
-        // Note: Removed type: 'authenticated' - simple signed URLs work better for external services
+        sign_url: true,
+        expires_at: originalExpiresAt // 30-day expiry for stored URLs
       };
 
       if (requiresUpscaling) {
@@ -233,6 +257,9 @@ export class CloudinaryImageService {
       const originalUrl = cloudinary.url(publicId, originalTransform);
 
       // 2. DOWNLOAD - 300 DPI, brand overlay bottom right, signed for purchase verification
+      // Note: Stored URLs for reference, actual downloads should call getDownloadUrl()
+      const downloadExpiresAt = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60); // 30 days
+
       const downloadUrl = cloudinary.url(publicId, {
         ...baseTransform,
         quality: 100,
@@ -245,8 +272,8 @@ export class CloudinaryImageService {
         width_overlay: 120,
         height_overlay: 40,
         opacity: 80,
-        sign_url: true
-        // Note: Using simple signed URLs for better compatibility
+        sign_url: true,
+        expires_at: downloadExpiresAt // 30-day expiry for stored URLs
       });
 
       // Security configuration for signed URLs (simple signature)
@@ -475,6 +502,7 @@ export class CloudinaryImageService {
   /**
    * Get original print-quality URL (for print fulfillment only)
    * Applies smart upscaling for low-resolution images
+   * URLs expire after 48 hours for security (regenerate if fulfillment delayed)
    */
   async getOriginalPrintUrl(publicId: string, orderId: string): Promise<string> {
     try {
@@ -493,14 +521,18 @@ export class CloudinaryImageService {
         requiresUpscaling
       });
 
+      // Generate signed URL with 48-hour expiry for Gelato fulfillment
+      // This provides security while giving plenty of time for print processing
+      const expiresAt = Math.floor(Date.now() / 1000) + (48 * 60 * 60); // 48 hours from now
+
       const printTransform: any = {
         quality: 100,
         format: 'png',
         dpi: 300,
-        sign_url: true
-        // Note: Removed type: 'authenticated' and auth_token
-        // Simple signed URLs work with external services like Gelato
-        // while authenticated URLs with tokens may not be supported
+        sign_url: true,
+        expires_at: expiresAt // Time-based expiry for security
+        // Note: Simple signed URLs work with external services like Gelato
+        // URLs expire after 48 hours and must be regenerated if needed
       };
 
       if (requiresUpscaling) {
@@ -528,15 +560,20 @@ export class CloudinaryImageService {
 
   /**
    * Get download URL with brand overlay (after purchase verification)
+   * URLs expire after 7 days for security (customer can request new URL)
    */
   async getDownloadUrl(publicId: string, userId: string, orderId: string): Promise<string> {
     try {
       ensureCloudinaryConfig();
       // TODO: Verify user has purchased this image
       console.log(`🔄 Generating download URL for user: ${userId}, order: ${orderId}`);
-      
+
       const brandLogoId = process.env.CLOUDINARY_BRAND_LOGO_PUBLIC_ID || 'brand_assets/pawtraits_brand_logo';
-      
+
+      // Generate signed URL with 7-day expiry for customer downloads
+      // Customers can request a new URL if expired
+      const expiresAt = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 days from now
+
       const signedUrl = cloudinary.url(publicId, {
         quality: 100,
         format: 'png',
@@ -548,11 +585,11 @@ export class CloudinaryImageService {
         width_overlay: 120,
         height_overlay: 40,
         opacity: 80,
-        sign_url: true
-        // Note: Using simple signed URLs for better compatibility
+        sign_url: true,
+        expires_at: expiresAt // 7-day expiry for security
       });
 
-      console.log(`✅ Download URL generated for user: ${userId}`);
+      console.log(`✅ Download URL generated for user: ${userId} (expires in 7 days)`);
       return signedUrl;
 
     } catch (error) {
@@ -779,6 +816,49 @@ export class CloudinaryImageService {
     } catch (error) {
       console.error('❌ Watermark upload failed:', error);
       return false;
+    }
+  }
+
+  /**
+   * Regenerate image variants with fresh expiry times
+   * Call this method when stored URLs have expired (after 30 days)
+   */
+  async regenerateImageVariants(
+    publicId: string,
+    version: string,
+    metadata: UploadMetadata
+  ): Promise<ImageVariants> {
+    console.log(`🔄 Regenerating image variants with fresh expiry for: ${publicId}`);
+    return this.generateImageVariants(publicId, version, metadata);
+  }
+
+  /**
+   * Check if a Cloudinary signed URL has expired or will expire soon
+   * @param url The Cloudinary URL to check
+   * @param bufferMinutes Minutes before expiry to consider "expiring soon" (default: 60)
+   * @returns true if expired or expiring soon, false otherwise
+   */
+  isUrlExpired(url: string, bufferMinutes: number = 60): boolean {
+    try {
+      // Extract expires_at parameter from URL
+      const urlObj = new URL(url);
+      const expiresAtParam = urlObj.searchParams.get('expires_at');
+
+      if (!expiresAtParam) {
+        // No expiry parameter means either unsigned URL or no expiry
+        return false;
+      }
+
+      const expiresAt = parseInt(expiresAtParam);
+      const now = Math.floor(Date.now() / 1000);
+      const buffer = bufferMinutes * 60;
+
+      // Check if expired or will expire within buffer time
+      return (expiresAt - now) <= buffer;
+    } catch (error) {
+      console.error('❌ Error checking URL expiry:', error);
+      // Assume expired if we can't parse the URL
+      return true;
     }
   }
 }
