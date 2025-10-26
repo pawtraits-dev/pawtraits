@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Filter, Star, Eye, Download, Tag, Calendar, User, Trash2, X, EyeOff, Wand2, Copy } from 'lucide-react';
+import { Search, Filter, Star, Eye, Download, Tag, Calendar, User, Trash2, X, EyeOff, Wand2, Copy, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
@@ -44,6 +44,8 @@ export default function AdminCatalogPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedImageForVariation, setSelectedImageForVariation] = useState<ImageCatalogWithDetails | null>(null);
   const [showVariationModal, setShowVariationModal] = useState(false);
+  const [fixingGelatoUrls, setFixingGelatoUrls] = useState(false);
+  const [fixResults, setFixResults] = useState<any>(null);
 
   const supabaseService = new SupabaseService();
   const adminSupabaseService = new AdminSupabaseService();
@@ -249,7 +251,7 @@ export default function AdminCatalogPage() {
   const handleCardClick = async (image: ImageCatalogWithDetails) => {
     setSelectedImageForDetail(image);
     setShowDetailModal(true);
-    
+
     // Load coats for the image's breed
     if (image.breed_id) {
       try {
@@ -258,6 +260,39 @@ export default function AdminCatalogPage() {
       } catch (error) {
         console.error('Error loading breed coats:', error);
       }
+    }
+  };
+
+  const handleFixGelatoUrls = async () => {
+    if (!confirm('This will populate missing cloudinary_public_id fields for images. Continue?')) {
+      return;
+    }
+
+    setFixingGelatoUrls(true);
+    setFixResults(null);
+
+    try {
+      const response = await fetch('/api/admin/fix-gelato-urls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setFixResults(result);
+        alert(`Successfully fixed ${result.summary?.succeeded || 0} of ${result.summary?.total || 0} images!`);
+
+        // Reload images to reflect changes
+        loadImages();
+      } else {
+        alert(`Fix failed: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error fixing Gelato URLs:', error);
+      alert('Failed to run fix. Please try again.');
+    } finally {
+      setFixingGelatoUrls(false);
     }
   };
 
@@ -302,7 +337,46 @@ export default function AdminCatalogPage() {
               Manage and review all generated pet portraits
             </p>
           </div>
+          <div className="flex gap-3">
+            <Button
+              onClick={handleFixGelatoUrls}
+              disabled={fixingGelatoUrls}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Wrench className="w-4 h-4" />
+              {fixingGelatoUrls ? 'Fixing...' : 'Fix Gelato URLs'}
+            </Button>
+          </div>
         </div>
+
+        {/* Fix Results Banner */}
+        {fixResults && (
+          <Card className="border-green-200 bg-green-50">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold text-green-900 mb-2">Fix Results</h3>
+                  <p className="text-sm text-green-700">
+                    ✅ Successfully fixed {fixResults.summary?.succeeded || 0} of {fixResults.summary?.total || 0} images
+                  </p>
+                  {fixResults.summary?.failed > 0 && (
+                    <p className="text-sm text-orange-700 mt-1">
+                      ⚠️ {fixResults.summary.failed} images could not be fixed
+                    </p>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFixResults(null)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Filters */}
         <Card>
