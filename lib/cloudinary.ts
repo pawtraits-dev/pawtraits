@@ -99,20 +99,26 @@ export interface UploadResult {
  *
  * URL Expiry Strategy:
  * - Stored variants (DB): 30-day expiry for reference/preview
- * - Print fulfillment: 48-hour expiry (regenerate via getOriginalPrintUrl())
+ * - Print fulfillment (internal): 48-hour expiry (regenerate via getOriginalPrintUrl())
+ * - Print fulfillment (Gelato): unsigned public URLs via getGelatoPrintUrl()
  * - Customer downloads: 7-day expiry (regenerate via getDownloadUrl())
  *
  * Security Model:
- * - All sensitive URLs (original, download) use signed URLs with expiry
+ * - Sensitive URLs (original, download) use signed URLs with expiry
+ * - Gelato URLs are unsigned public (external service compatibility)
  * - Public variants (thumbnails, watermarked) can be unsigned
- * - Gelato receives fresh 48hr URLs when orders are placed
- * - Customers receive fresh 7-day URLs when downloading
+ * - Customers receive fresh 7-day signed URLs when downloading
  *
  * Image Upscaling:
  * - Max 5315px (45cm @300dpi) covers all print sizes
  * - Portrait: 30×45cm (3543×5315px)
  * - Landscape: 45×30cm (5315×3543px)
  * - Square: 40×40cm (4724×4724px)
+ *
+ * Gelato Integration:
+ * - External print services need unsigned, stable public URLs
+ * - Use getGelatoPrintUrl() for Gelato orders (not getOriginalPrintUrl())
+ * - Gelato URLs have no expiry or authentication parameters
  */
 export class CloudinaryImageService {
 
@@ -500,9 +506,64 @@ export class CloudinaryImageService {
   }
 
   /**
+   * Get Gelato-compatible print URL (unsigned, no expiry)
+   * External print services like Gelato need stable, unsigned URLs
+   * Images are already protected by not being easily discoverable
+   */
+  async getGelatoPrintUrl(publicId: string, orderId: string): Promise<string> {
+    try {
+      ensureCloudinaryConfig();
+      console.log(`🔄 Generating Gelato print URL for order: ${orderId}`);
+
+      // Get image dimensions to determine if upscaling is needed
+      const dimensions = await this.getImageDimensions(publicId);
+      const requiresUpscaling = this.needsUpscaling(dimensions.width, dimensions.height);
+
+      console.log(`📐 Image dimensions for Gelato order ${orderId}:`, {
+        publicId,
+        width: dimensions.width,
+        height: dimensions.height,
+        longestSide: Math.max(dimensions.width, dimensions.height),
+        requiresUpscaling
+      });
+
+      // Generate UNSIGNED public URL for Gelato compatibility
+      // Gelato systems may not support Cloudinary's signed URL format
+      const printTransform: any = {
+        quality: 100,
+        format: 'png',
+        dpi: 300,
+        secure: true, // Use HTTPS
+        sign_url: false // No signature - Gelato needs stable public URLs
+      };
+
+      if (requiresUpscaling) {
+        // Low-res image (e.g., Gemini 1024x1024) - apply upscaling
+        // Max 5315px covers: 45×30cm landscape, 30×45cm portrait, 40×40cm square @300dpi
+        printTransform.width = 5315;
+        printTransform.height = 5315;
+        printTransform.crop = 'fit';
+        console.log(`🔼 Applying upscaling for Gelato order: ${orderId} (max 5315px = 45cm @300dpi)`);
+      } else {
+        console.log(`✅ Using original high-res quality for Gelato order: ${orderId}`);
+      }
+
+      const gelatoUrl = cloudinary.url(publicId, printTransform);
+
+      console.log(`✅ Gelato print URL generated for order: ${orderId} (unsigned public URL)`);
+      return gelatoUrl;
+
+    } catch (error) {
+      console.error('❌ Gelato print URL generation failed:', error);
+      throw new Error(`Gelato print URL generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Get original print-quality URL (for print fulfillment only)
    * Applies smart upscaling for low-resolution images
    * URLs expire after 48 hours for security (regenerate if fulfillment delayed)
+   * NOTE: For Gelato orders, use getGelatoPrintUrl() instead
    */
   async getOriginalPrintUrl(publicId: string, orderId: string): Promise<string> {
     try {

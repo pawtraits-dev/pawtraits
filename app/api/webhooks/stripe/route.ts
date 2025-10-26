@@ -820,20 +820,23 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, 
 
         let printUrl = '';
 
-        // First try to use the existing original variant URL from database
-        if (imageData.image_variants && imageData.image_variants.original && imageData.image_variants.original.url) {
-          printUrl = imageData.image_variants.original.url;
-          console.log(`✅ Using stored original variant URL for ${item.image_id}`);
-        } else if (imageData.cloudinary_public_id) {
-          // Fallback: Generate new Cloudinary original URL
+        // ALWAYS generate fresh Gelato-compatible URLs for print orders
+        // Stored URLs may have signatures/expiry that Gelato can't handle
+        if (imageData.cloudinary_public_id) {
+          // Generate Gelato-compatible URL (unsigned, no expiry)
+          // Gelato needs stable public URLs without authentication parameters
           const { cloudinaryService } = await import('@/lib/cloudinary');
-          
-          printUrl = await cloudinaryService.getOriginalPrintUrl(
-            imageData.cloudinary_public_id, 
+
+          printUrl = await cloudinaryService.getGelatoPrintUrl(
+            imageData.cloudinary_public_id,
             order.id
           );
-          
-          console.log(`✅ Generated new Cloudinary original print URL for ${item.image_id}`);
+
+          console.log(`✅ Generated fresh Gelato-compatible print URL for ${item.image_id}`);
+        } else if (imageData.image_variants && imageData.image_variants.original && imageData.image_variants.original.url) {
+          // Fallback to stored URL if no Cloudinary public ID
+          printUrl = imageData.image_variants.original.url;
+          console.log(`⚠️ Using stored original variant URL for ${item.image_id} (may not work if signed)`);
         } else if (imageData.public_url) {
           // Final fallback to public URL
           printUrl = imageData.public_url;
