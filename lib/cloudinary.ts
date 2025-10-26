@@ -136,13 +136,15 @@ export class CloudinaryImageService {
       ensureCloudinaryConfig();
       console.log(`🔄 Starting Cloudinary upload for: ${filename}`);
       
-      // 1. Upload original high-quality image
+      // 1. Upload original high-quality image as public resource (not authenticated)
+      // Public uploads required for Gelato print fulfillment compatibility
       const uploadResult = await cloudinary.uploader.upload(
         `data:image/png;base64,${imageBuffer.toString('base64')}`,
         {
           public_id: `pawtraits/${metadata.breed}/${metadata.theme}/${filename.replace(/\.[^/.]+$/, '')}`,
           folder: 'pawtraits/originals',
           resource_type: 'image',
+          type: 'upload', // Explicitly set as public upload (not authenticated)
           quality: 'auto:best',
           context: `breed=${metadata.breed}|theme=${metadata.theme}|style=${metadata.style}`,
           tags: [metadata.breed, metadata.theme, metadata.style, 'original'],

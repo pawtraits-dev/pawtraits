@@ -58,13 +58,15 @@ export async function uploadImageBufferToCloudinary(
     if (options.theme) tags.push(`theme-${options.theme.toLowerCase().replace(/\s+/g, '-')}`);
     if (options.style) tags.push(`style-${options.style.toLowerCase().replace(/\s+/g, '-')}`);
     
-    // Upload to Cloudinary
+    // Upload to Cloudinary as public resource (not authenticated)
+    // This is required for Gelato print fulfillment compatibility
     const result = await cloudinary.uploader.upload(
       `data:image/png;base64,${buffer.toString('base64')}`,
       {
         folder,
         tags,
         resource_type: 'image',
+        type: 'upload', // Explicitly set as public upload (not authenticated)
         public_id: `batch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         overwrite: false,
         invalidate: true,
