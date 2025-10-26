@@ -85,8 +85,8 @@ export async function POST(request: NextRequest) {
       quality: 100,
       format: 'png',
       width: 8500,
-      crop: 'fit', // 'fit' allows upscaling, 'limit' prevents it
-      flags: 'progressive.lossy'
+      height: 8500,
+      crop: 'fit' // 'fit' allows upscaling, 'limit' prevents it
     });
 
     return NextResponse.json({
@@ -111,8 +111,10 @@ export async function POST(request: NextRequest) {
         applied: needsUpscaling,
         parameters: needsUpscaling ? {
           width: 8500,
+          height: 8500,
           crop: 'fit',
-          flags: 'progressive.lossy'
+          quality: 100,
+          format: 'png'
         } : 'none (image already high-res)'
       },
       expectedUpscaledSize: needsUpscaling ? {
