@@ -819,11 +819,12 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, 
         });
 
         let printUrl = '';
+        let urlSource = 'unknown';
 
         // ALWAYS generate fresh Gelato-compatible URLs for print orders
         // Stored URLs may have signatures/expiry that Gelato can't handle
         if (imageData.cloudinary_public_id) {
-          // Generate Gelato-compatible URL (unsigned, no expiry)
+          // PATH 1: Generate Gelato-compatible URL (unsigned, no expiry)
           // Gelato needs stable public URLs without authentication parameters
           const { cloudinaryService } = await import('@/lib/cloudinary');
 
@@ -831,22 +832,66 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, 
             imageData.cloudinary_public_id,
             order.id
           );
+          urlSource = 'fresh_generated';
 
-          console.log(`✅ Generated fresh Gelato-compatible print URL for ${item.image_id}`);
+          console.log(`✅ [PATH 1] Generated fresh Gelato-compatible URL for ${item.image_id}`);
+          console.log(`   Source: cloudinary_public_id = "${imageData.cloudinary_public_id}"`);
         } else if (imageData.image_variants && imageData.image_variants.original && imageData.image_variants.original.url) {
-          // Fallback to stored URL if no Cloudinary public ID
+          // PATH 2: Fallback to stored URL if no Cloudinary public ID
           printUrl = imageData.image_variants.original.url;
-          console.log(`⚠️ Using stored original variant URL for ${item.image_id} (may not work if signed)`);
+          urlSource = 'stored_variants';
+
+          console.warn(`⚠️  [PATH 2] Using stored original variant URL for ${item.image_id}`);
+          console.warn(`   Warning: Stored URLs may have auth parameters that Gelato cannot access`);
+          console.warn(`   Consider running /api/admin/fix-gelato-urls to populate cloudinary_public_id`);
         } else if (imageData.public_url) {
-          // Final fallback to public URL
+          // PATH 3: Final fallback to public URL
           printUrl = imageData.public_url;
-          console.log(`⚠️ Using fallback public URL for ${item.image_id}`);
+          urlSource = 'public_url';
+
+          console.warn(`⚠️  [PATH 3] Using fallback public URL for ${item.image_id}`);
         } else {
+          console.error(`❌ No valid URL source for image ${item.image_id}`);
           throw new Error('No image URL available');
         }
 
+        // VALIDATION: Check for authentication parameters that Gelato cannot handle
+        const hasAuthParam = printUrl.includes('?_a=') || printUrl.includes('auth_token=') || printUrl.includes('__cld_token__');
+
+        if (hasAuthParam) {
+          console.error(`🚨 CRITICAL: Authentication parameter detected in URL for ${item.image_id}!`);
+          console.error(`   URL Source: ${urlSource}`);
+          console.error(`   URL: ${printUrl.substring(0, 150)}...`);
+          console.error(`   This URL will FAIL with Gelato (400 error)`);
+
+          // Attempt to extract public_id and generate fresh URL
+          const urlMatch = printUrl.match(/cloudinary\.com\/[^\/]+\/image\/upload\/(?:v\d+\/)?([^?]+?)(?:\.\w+)?(?:\?|$)/);
+          if (urlMatch && urlMatch[1]) {
+            const extractedId = urlMatch[1].replace(/\.\w+$/, ''); // Remove extension
+            console.log(`   🔄 Attempting recovery: Extracted public_id = "${extractedId}"`);
+
+            try {
+              const { cloudinaryService } = await import('@/lib/cloudinary');
+              const freshUrl = await cloudinaryService.getGelatoPrintUrl(extractedId, order.id);
+
+              console.log(`   ✅ Recovery successful! Generated fresh URL without auth params`);
+              printUrl = freshUrl;
+              urlSource = 'recovered_from_stored';
+            } catch (recoveryError) {
+              console.error(`   ❌ Recovery failed:`, recoveryError);
+              console.error(`   Gelato order will likely fail for this item`);
+            }
+          } else {
+            console.error(`   ❌ Cannot extract public_id for recovery`);
+            console.error(`   Gelato order will likely fail for this item`);
+          }
+        }
+
         imageUrls[item.image_id] = printUrl;
-        console.log(`🖼️ Image URL for ${item.image_id}: ${printUrl.substring(0, 100)}...`);
+        console.log(`🖼️ Final URL for ${item.image_id}:`);
+        console.log(`   Source: ${urlSource}`);
+        console.log(`   Has Auth: ${hasAuthParam ? '❌ YES (BAD)' : '✅ NO (GOOD)'}`);
+        console.log(`   URL: ${printUrl.substring(0, 120)}...`);
 
       } catch (error) {
         console.error(`❌ Failed to resolve image URL for ${item.image_id}:`, error);
