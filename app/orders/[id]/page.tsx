@@ -77,9 +77,7 @@ export default function OrderDetailPage() {
 
         // Load product descriptions
         if (orderData.order_items) {
-          await productDescriptionService.preloadDescriptions(
-            orderData.order_items.map((item: OrderItem) => item.product_id)
-          );
+          await productDescriptionService.loadProductDetails([orderData]);
         }
       } catch (err) {
         console.error('Error loading order:', err);
