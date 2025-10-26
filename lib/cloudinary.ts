@@ -214,8 +214,8 @@ export class CloudinaryImageService {
         quality: 100,
         format: 'png',
         dpi: 300,
-        sign_url: true,
-        type: 'authenticated' // Requires authentication for access
+        sign_url: true
+        // Note: Removed type: 'authenticated' - simple signed URLs work better for external services
       };
 
       if (requiresUpscaling) {
@@ -244,8 +244,8 @@ export class CloudinaryImageService {
         width_overlay: 120,
         height_overlay: 40,
         opacity: 80,
-        sign_url: true,
-        type: 'authenticated'
+        sign_url: true
+        // Note: Using simple signed URLs for better compatibility
       });
 
       // Security configuration for signed URLs (simple signature)
@@ -496,12 +496,10 @@ export class CloudinaryImageService {
         quality: 100,
         format: 'png',
         dpi: 300,
-        sign_url: true,
-        type: 'authenticated',
-        auth_token: {
-          duration: 3600, // 1 hour access
-          start_time: Math.floor(Date.now() / 1000)
-        }
+        sign_url: true
+        // Note: Removed type: 'authenticated' and auth_token
+        // Simple signed URLs work with external services like Gelato
+        // while authenticated URLs with tokens may not be supported
       };
 
       if (requiresUpscaling) {
@@ -548,12 +546,8 @@ export class CloudinaryImageService {
         width_overlay: 120,
         height_overlay: 40,
         opacity: 80,
-        sign_url: true,
-        type: 'authenticated',
-        auth_token: {
-          duration: 3600, // 1 hour access
-          start_time: Math.floor(Date.now() / 1000)
-        }
+        sign_url: true
+        // Note: Using simple signed URLs for better compatibility
       });
 
       console.log(`✅ Download URL generated for user: ${userId}`);
