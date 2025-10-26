@@ -24,7 +24,8 @@ export async function POST(request: NextRequest) {
     // Build upload parameters that will be signed (only params Cloudinary validates)
     const uploadParams = {
       timestamp,
-      folder: uploadFolder
+      folder: uploadFolder,
+      type: 'upload' // CRITICAL: Must be 'upload' (public) not 'authenticated' for Gelato compatibility
       // resource_type is NOT included in Cloudinary's signature validation
       // Only include parameters that Cloudinary actually validates in signatures
     };
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
       api_key: process.env.CLOUDINARY_API_KEY!,
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
       folder: uploadFolder,
+      type: 'upload', // CRITICAL: Client must use type='upload' for public URLs (Gelato compatibility)
       resource_type: 'image' // Client needs this but it's NOT part of signature
     });
     
