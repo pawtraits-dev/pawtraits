@@ -121,7 +121,7 @@ INSERT INTO message_templates (
   'Order Delivered! 🎉',
   'Your order {{order_number}} was delivered on {{delivery_date}}. Enjoy your custom pet portrait!',
   'check-circle',
-  '/customer/orders/{{order_id}}',
+  '/orders/{{order_id}}',
   'View Order',
   '{
     "customer_name": "string",
