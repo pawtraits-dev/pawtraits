@@ -220,11 +220,11 @@ export class CloudinaryImageService {
 
       if (requiresUpscaling) {
         // Low-res image (e.g., Gemini 1024x1024) - apply upscaling
-        originalTransform.width = 8500; // Covers largest print size (70cm at 300 DPI)
-        originalTransform.height = 8500; // Max height
+        // Max 5315px covers: 45×30cm landscape, 30×45cm portrait, 40×40cm square @300dpi
+        originalTransform.width = 5315; // Covers largest print size (45cm at 300 DPI)
+        originalTransform.height = 5315; // Max height (45cm at 300 DPI)
         originalTransform.crop = 'fit'; // Fit within dimensions, allows upscaling
-        // Note: Removed fl_progressive.lossy - not compatible with all formats
-        console.log(`🔼 Applying upscaling to low-res image: ${publicId}`);
+        console.log(`🔼 Applying upscaling to low-res image: ${publicId} (max 5315px = 45cm @300dpi)`);
       } else {
         // High-res image (e.g., Midjourney 4096x4096+) - use original quality
         console.log(`✅ Using original high-res quality for: ${publicId}`);
@@ -505,11 +505,11 @@ export class CloudinaryImageService {
 
       if (requiresUpscaling) {
         // Low-res image (e.g., Gemini 1024x1024) - apply upscaling
-        printTransform.width = 8500; // Covers largest print size (70cm at 300 DPI)
-        printTransform.height = 8500; // Max height
+        // Max 5315px covers: 45×30cm landscape, 30×45cm portrait, 40×40cm square @300dpi
+        printTransform.width = 5315; // Covers largest print size (45cm at 300 DPI)
+        printTransform.height = 5315; // Max height (45cm at 300 DPI)
         printTransform.crop = 'fit'; // Fit within dimensions, allows upscaling
-        // Note: Removed fl_progressive.lossy - not compatible with all formats
-        console.log(`🔼 Applying upscaling for low-res print order: ${orderId}`);
+        console.log(`🔼 Applying upscaling for low-res print order: ${orderId} (max 5315px = 45cm @300dpi)`);
       } else {
         // High-res image (e.g., Midjourney 4096x4096+) - use original quality
         console.log(`✅ Using original high-res quality for print order: ${orderId}`);

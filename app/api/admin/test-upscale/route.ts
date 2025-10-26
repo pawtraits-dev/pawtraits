@@ -187,11 +187,16 @@ export async function POST(request: NextRequest) {
       transformation: {
         needsUpscaling,
         originalSize: `${dimensions.width}x${dimensions.height}`,
-        upscalingRatio: Math.round(8500 / Math.max(dimensions.width, dimensions.height) * 10) / 10,
-        targetSize: '8500x8500 (fit)',
+        upscalingRatio: Math.round(5315 / Math.max(dimensions.width, dimensions.height) * 10) / 10,
+        targetSize: '5315x5315 (fit) - 45cm @300dpi',
         estimatedResult: dimensions.width > dimensions.height
-          ? `8500 x ${Math.round(8500 * dimensions.height / dimensions.width)}`
-          : `${Math.round(8500 * dimensions.width / dimensions.height)} x 8500`
+          ? `5315 x ${Math.round(5315 * dimensions.height / dimensions.width)}`
+          : `${Math.round(5315 * dimensions.width / dimensions.height)} x 5315`,
+        maxPrintSizes: {
+          portrait: '30×45cm (3543×5315px)',
+          landscape: '45×30cm (5315×3543px)',
+          square: '40×40cm (4724×4724px)'
+        }
       },
       testing: {
         instructions: 'Test each URL in browser to see which work',
