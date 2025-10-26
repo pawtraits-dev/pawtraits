@@ -550,6 +550,16 @@ export class CloudinaryImageService {
         const isPortrait = dimensions.height > dimensions.width;
         const isSquare = Math.abs(aspectRatio - 1) < 0.1;
 
+        console.log(`🔍 Aspect ratio detection for ${publicId}:`, {
+          width: dimensions.width,
+          height: dimensions.height,
+          aspectRatio: aspectRatio.toFixed(2),
+          isPortrait,
+          isSquare,
+          heightGreaterThanWidth: dimensions.height > dimensions.width,
+          differenceFrom1: Math.abs(aspectRatio - 1).toFixed(3)
+        });
+
         if (isPortrait) {
           // Portrait: 30×45cm = 3543×5315px
           printTransform.width = 3543;
@@ -567,7 +577,8 @@ export class CloudinaryImageService {
         printTransform.crop = 'fit';
         console.log(`🔼 Applying upscaling for Gelato order: ${orderId}`, {
           orientation: isPortrait ? 'portrait' : (isSquare ? 'square' : 'landscape'),
-          targetSize: `${printTransform.width}×${printTransform.height}px`
+          targetSize: `${printTransform.width}×${printTransform.height}px`,
+          reason: isPortrait ? 'height > width' : (isSquare ? 'aspectRatio ≈ 1' : 'width > height')
         });
       } else {
         console.log(`✅ Using original high-res quality for Gelato order: ${orderId}`);

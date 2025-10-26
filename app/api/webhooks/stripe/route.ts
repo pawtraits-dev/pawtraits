@@ -865,9 +865,16 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, 
           console.error(`   This URL will FAIL with Gelato (400 error)`);
 
           // Attempt to extract public_id and generate fresh URL
-          const urlMatch = printUrl.match(/cloudinary\.com\/[^\/]+\/image\/upload\/(?:v\d+\/)?([^?]+?)(?:\.\w+)?(?:\?|$)/);
+          // Need to extract ONLY the public_id, skipping all transformations
+          // Cloudinary URL: .../upload/{transformations}/{version}/{public_id}.{ext}
+          // Public IDs in our system start with: pawtraits/originals/, pawtraits/customer-variations/, pawtraits/batch-generated/
+          const urlMatch = printUrl.match(/cloudinary\.com\/[^\/]+\/image\/upload\/.*?\/(pawtraits\/[^?]+?)(?:\.\w+)?(?:\?|$)/);
           if (urlMatch && urlMatch[1]) {
-            const extractedId = urlMatch[1].replace(/\.\w+$/, ''); // Remove extension
+            let extractedId = urlMatch[1];
+            // Remove any remaining transformation parameters or version prefixes that snuck through
+            extractedId = extractedId.replace(/^(v\d+\/)+/, ''); // Remove v1/, v123456/, etc.
+            extractedId = extractedId.replace(/\.\w+$/, ''); // Remove extension
+
             console.log(`   🔄 Attempting recovery: Extracted public_id = "${extractedId}"`);
 
             try {

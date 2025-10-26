@@ -23,26 +23,35 @@ interface FixResult {
 
 /**
  * Extract Cloudinary public_id from a URL
- * Example: https://res.cloudinary.com/dnhzfz8xv/image/upload/v1761480789065/pawtraits/customer-variations/batch-123.png?_a=...
+ * Example: https://res.cloudinary.com/dnhzfz8xv/image/upload/c_fit,h_100/v1761480789065/pawtraits/customer-variations/batch-123.png?_a=...
  * Extract: pawtraits/customer-variations/batch-123
+ *
+ * IMPORTANT: Must handle URLs with existing transformations correctly
+ * URL structure: .../upload/{transformations}/{version}/{public_id}.{format}?{params}
  */
 function extractPublicIdFromUrl(url: string): string | null {
   if (!url) return null;
 
   try {
-    // Match Cloudinary URL pattern
-    // Format: https://res.cloudinary.com/{cloud}/image/upload/{transformations}/{version}/{public_id}.{format}
-    const regex = /cloudinary\.com\/[^\/]+\/image\/upload\/(?:v\d+\/)?([^?]+?)(?:\.\w+)?(?:\?|$)/;
+    // Match Cloudinary URL pattern, looking specifically for our folder structure
+    // Public IDs in our system start with: pawtraits/originals/, pawtraits/customer-variations/, pawtraits/batch-generated/
+    // Format: https://res.cloudinary.com/{cloud}/image/upload/{anything}/(pawtraits/...){.format}{?params}
+    const regex = /cloudinary\.com\/[^\/]+\/image\/upload\/.*?\/(pawtraits\/[^?]+?)(?:\.\w+)?(?:\?|$)/;
     const match = url.match(regex);
 
     if (match && match[1]) {
-      // Remove file extension if present
       let publicId = match[1];
+
+      // Remove any remaining transformation parameters or version prefixes that snuck through
+      publicId = publicId.replace(/^(v\d+\/)+/, ''); // Remove v1/, v123456/, etc.
+
+      // Remove file extension if present
       const lastDot = publicId.lastIndexOf('.');
       if (lastDot > publicId.lastIndexOf('/')) {
         // Only remove extension if it comes after the last folder separator
         publicId = publicId.substring(0, lastDot);
       }
+
       return publicId;
     }
 
