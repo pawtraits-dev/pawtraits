@@ -281,7 +281,19 @@ export default function AdminCatalogPage() {
 
       if (response.ok) {
         setFixResults(result);
-        alert(`Successfully fixed ${result.summary?.succeeded || 0} of ${result.summary?.total || 0} images!`);
+
+        const stats = result.database_stats;
+        const summary = result.summary;
+
+        let message = `Fix Complete!\n\n`;
+        message += `Database: ${stats.missing_cloudinary_id} of ${stats.total_images} images missing cloudinary_public_id (${stats.percentage_missing})\n\n`;
+        message += `Results: Fixed ${summary.succeeded} of ${summary.total} images\n`;
+
+        if (summary.failed > 0) {
+          message += `\n⚠️ ${summary.failed} images could not be fixed (may be Supabase Storage URLs)`;
+        }
+
+        alert(message);
 
         // Reload images to reflect changes
         loadImages();
@@ -355,14 +367,22 @@ export default function AdminCatalogPage() {
           <Card className="border-green-200 bg-green-50">
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold text-green-900 mb-2">Fix Results</h3>
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-green-900">Fix Results</h3>
+
+                  {fixResults.database_stats && (
+                    <div className="text-sm text-gray-700">
+                      <strong>Database:</strong> {fixResults.database_stats.missing_cloudinary_id} of {fixResults.database_stats.total_images} images missing cloudinary_public_id ({fixResults.database_stats.percentage_missing})
+                    </div>
+                  )}
+
                   <p className="text-sm text-green-700">
                     ✅ Successfully fixed {fixResults.summary?.succeeded || 0} of {fixResults.summary?.total || 0} images
                   </p>
+
                   {fixResults.summary?.failed > 0 && (
-                    <p className="text-sm text-orange-700 mt-1">
-                      ⚠️ {fixResults.summary.failed} images could not be fixed
+                    <p className="text-sm text-orange-700">
+                      ⚠️ {fixResults.summary.failed} images could not be fixed (may be legacy Supabase Storage URLs)
                     </p>
                   )}
                 </div>

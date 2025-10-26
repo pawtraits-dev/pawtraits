@@ -18,6 +18,7 @@ interface FixResult {
   extractedFrom: 'public_url' | 'image_variants' | 'failed';
   success: boolean;
   error?: string;
+  sample_url?: string;
 }
 
 /**
@@ -67,10 +68,22 @@ export async function POST() {
 
     console.log('🔍 Finding images with missing cloudinary_public_id...');
 
+    // Get total counts first for context
+    const { count: totalCount } = await supabase
+      .from('image_catalog')
+      .select('*', { count: 'exact', head: true });
+
+    const { count: missingCount } = await supabase
+      .from('image_catalog')
+      .select('*', { count: 'exact', head: true })
+      .or('cloudinary_public_id.is.null,cloudinary_public_id.eq.');
+
+    console.log(`📊 Database stats: ${missingCount} of ${totalCount} images missing cloudinary_public_id (${totalCount ? ((missingCount || 0) / totalCount * 100).toFixed(1) : 0}%)`);
+
     // Find images missing cloudinary_public_id
     const { data: images, error: fetchError } = await supabase
       .from('image_catalog')
-      .select('id, cloudinary_public_id, public_url, image_variants')
+      .select('id, cloudinary_public_id, public_url, image_variants, created_at')
       .or('cloudinary_public_id.is.null,cloudinary_public_id.eq.')
       .order('created_at', { ascending: false })
       .limit(100);
@@ -92,30 +105,38 @@ export async function POST() {
     const results: FixResult[] = [];
 
     for (const img of images) {
-      console.log(`\n🔧 Processing image: ${img.id}`);
+      console.log(`\n🔧 Processing image: ${img.id} (created: ${img.created_at})`);
+
+      const variants = img.image_variants as any;
+      const originalUrl = variants?.original?.url || '';
+      const publicUrl = img.public_url || '';
+
+      console.log(`  📋 Available URLs:`);
+      console.log(`     public_url: ${publicUrl ? publicUrl.substring(0, 100) + '...' : 'NONE'}`);
+      console.log(`     original_url: ${originalUrl ? originalUrl.substring(0, 100) + '...' : 'NONE'}`);
 
       let extractedId: string | null = null;
       let extractedFrom: 'public_url' | 'image_variants' | 'failed' = 'failed';
 
       // Try extracting from public_url first
-      if (img.public_url) {
-        extractedId = extractPublicIdFromUrl(img.public_url);
+      if (publicUrl) {
+        extractedId = extractPublicIdFromUrl(publicUrl);
         if (extractedId) {
           extractedFrom = 'public_url';
           console.log(`  ✅ Extracted from public_url: ${extractedId}`);
+        } else {
+          console.log(`  ❌ Failed to extract from public_url (not Cloudinary format?)`);
         }
       }
 
       // If not found, try image_variants.original.url
-      if (!extractedId && img.image_variants) {
-        const variants = img.image_variants as any;
-        const originalUrl = variants?.original?.url;
-        if (originalUrl) {
-          extractedId = extractPublicIdFromUrl(originalUrl);
-          if (extractedId) {
-            extractedFrom = 'image_variants';
-            console.log(`  ✅ Extracted from image_variants: ${extractedId}`);
-          }
+      if (!extractedId && originalUrl) {
+        extractedId = extractPublicIdFromUrl(originalUrl);
+        if (extractedId) {
+          extractedFrom = 'image_variants';
+          console.log(`  ✅ Extracted from image_variants: ${extractedId}`);
+        } else {
+          console.log(`  ❌ Failed to extract from image_variants (not Cloudinary format?)`);
         }
       }
 
@@ -148,13 +169,16 @@ export async function POST() {
         }
       } else {
         console.error(`  ❌ Could not extract public_id from any URL`);
+        console.error(`     This image may use Supabase Storage URLs or other non-Cloudinary URLs`);
+        console.error(`     Webhook will handle these with recovery logic if auth params detected`);
         results.push({
           imageId: img.id,
           oldCloudinaryId: img.cloudinary_public_id,
           newCloudinaryId: '',
           extractedFrom: 'failed',
           success: false,
-          error: 'No valid Cloudinary URL found to extract public_id from'
+          error: 'No valid Cloudinary URL found - may be Supabase Storage or legacy format',
+          sample_url: publicUrl || originalUrl || 'no urls available'
         });
       }
     }
@@ -169,6 +193,11 @@ export async function POST() {
     return NextResponse.json({
       success: true,
       message: `Fixed ${successCount} of ${images.length} images`,
+      database_stats: {
+        total_images: totalCount,
+        missing_cloudinary_id: missingCount,
+        percentage_missing: totalCount ? ((missingCount || 0) / totalCount * 100).toFixed(1) + '%' : '0%'
+      },
       summary: {
         total: images.length,
         succeeded: successCount,
