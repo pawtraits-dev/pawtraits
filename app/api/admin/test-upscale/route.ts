@@ -72,12 +72,7 @@ export async function POST(request: NextRequest) {
     const regularUrl = cloudinary.url(imageData.cloudinary_public_id, {
       quality: 100,
       format: 'png',
-      sign_url: true,
-      type: 'authenticated',
-      auth_token: {
-        duration: 3600,
-        start_time: Math.floor(Date.now() / 1000)
-      }
+      sign_url: true
     });
 
     // Also generate a public unsigned URL for easy viewing
