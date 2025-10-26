@@ -150,6 +150,33 @@ export class CloudinaryImageService {
   }
 
   /**
+   * Get image dimensions from Cloudinary
+   */
+  private async getImageDimensions(publicId: string): Promise<{ width: number; height: number }> {
+    try {
+      const result = await cloudinary.api.resource(publicId);
+      return {
+        width: result.width,
+        height: result.height
+      };
+    } catch (error) {
+      console.error(`❌ Failed to get image dimensions for ${publicId}:`, error);
+      // Return safe default that will trigger upscaling
+      return { width: 1024, height: 1024 };
+    }
+  }
+
+  /**
+   * Determine if image needs upscaling for print quality
+   * Images below 3000px on longest side are considered low-resolution
+   */
+  private needsUpscaling(width: number, height: number): boolean {
+    const longestSide = Math.max(width, height);
+    const threshold = 3000;
+    return longestSide < threshold;
+  }
+
+  /**
    * Generate all image variants according to business requirements
    */
   private async generateImageVariants(
@@ -157,26 +184,51 @@ export class CloudinaryImageService {
     version: string,
     metadata: UploadMetadata
   ): Promise<ImageVariants> {
-    
+
     const baseTransform = {
       version: parseInt(version),
     };
 
     try {
+      // Get actual image dimensions to determine if upscaling is needed
+      const dimensions = await this.getImageDimensions(publicId);
+      const requiresUpscaling = this.needsUpscaling(dimensions.width, dimensions.height);
+
+      console.log(`📐 Image dimensions for ${publicId}:`, {
+        width: dimensions.width,
+        height: dimensions.height,
+        longestSide: Math.max(dimensions.width, dimensions.height),
+        requiresUpscaling
+      });
+
       // Environment variables for overlays
       const watermarkId = process.env.CLOUDINARY_WATERMARK_PUBLIC_ID || 'pawtraits_watermark_logo';
       const brandLogoId = process.env.CLOUDINARY_BRAND_LOGO_PUBLIC_ID || 'brand_assets/pawtraits_brand_logo';
       const watermarkOpacity = parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '20');
 
       // 1. ORIGINAL - 300 DPI, no overlay, secured for print fulfillment only
-      const originalUrl = cloudinary.url(publicId, {
+      // Apply upscaling ONLY if image is low-resolution (< 3000px)
+      const originalTransform: any = {
         ...baseTransform,
         quality: 100,
         format: 'png',
         dpi: 300,
         sign_url: true,
         type: 'authenticated' // Requires authentication for access
-      });
+      };
+
+      if (requiresUpscaling) {
+        // Low-res image (e.g., Gemini 1024x1024) - apply upscaling
+        originalTransform.width = 8500; // Covers largest print size (70cm at 300 DPI)
+        originalTransform.crop = 'limit'; // Maintains aspect ratio
+        originalTransform.flags = 'progressive.lossy'; // Optimized delivery
+        console.log(`🔼 Applying upscaling to low-res image: ${publicId}`);
+      } else {
+        // High-res image (e.g., Midjourney 4096x4096+) - use original quality
+        console.log(`✅ Using original high-res quality for: ${publicId}`);
+      }
+
+      const originalUrl = cloudinary.url(publicId, originalTransform);
 
       // 2. DOWNLOAD - 300 DPI, brand overlay bottom right, signed for purchase verification
       const downloadUrl = cloudinary.url(publicId, {
@@ -420,14 +472,26 @@ export class CloudinaryImageService {
 
   /**
    * Get original print-quality URL (for print fulfillment only)
+   * Applies smart upscaling for low-resolution images
    */
   async getOriginalPrintUrl(publicId: string, orderId: string): Promise<string> {
     try {
       ensureCloudinaryConfig();
-      // TODO: Verify this is being called by print fulfillment service only
       console.log(`🔄 Generating original print URL for order: ${orderId}`);
-      
-      const signedUrl = cloudinary.url(publicId, {
+
+      // Get image dimensions to determine if upscaling is needed
+      const dimensions = await this.getImageDimensions(publicId);
+      const requiresUpscaling = this.needsUpscaling(dimensions.width, dimensions.height);
+
+      console.log(`📐 Image dimensions for print order ${orderId}:`, {
+        publicId,
+        width: dimensions.width,
+        height: dimensions.height,
+        longestSide: Math.max(dimensions.width, dimensions.height),
+        requiresUpscaling
+      });
+
+      const printTransform: any = {
         quality: 100,
         format: 'png',
         dpi: 300,
@@ -437,7 +501,20 @@ export class CloudinaryImageService {
           duration: 3600, // 1 hour access
           start_time: Math.floor(Date.now() / 1000)
         }
-      });
+      };
+
+      if (requiresUpscaling) {
+        // Low-res image (e.g., Gemini 1024x1024) - apply upscaling
+        printTransform.width = 8500; // Covers largest print size (70cm at 300 DPI)
+        printTransform.crop = 'limit'; // Maintains aspect ratio
+        printTransform.flags = 'progressive.lossy'; // Optimized delivery
+        console.log(`🔼 Applying upscaling for low-res print order: ${orderId}`);
+      } else {
+        // High-res image (e.g., Midjourney 4096x4096+) - use original quality
+        console.log(`✅ Using original high-res quality for print order: ${orderId}`);
+      }
+
+      const signedUrl = cloudinary.url(publicId, printTransform);
 
       console.log(`✅ Original print URL generated for order: ${orderId}`);
       return signedUrl;
