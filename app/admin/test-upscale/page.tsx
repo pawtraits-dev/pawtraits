@@ -111,110 +111,143 @@ export default function TestUpscalePage() {
 
           {/* Transformation Info */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">Upscaling Transformation</h2>
-            <div className="space-y-2 text-sm">
+            <h2 className="text-xl font-bold mb-4">Upscaling Transformation Details</h2>
+            <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="font-semibold">Applied:</span>{' '}
-                {result.transformation.applied ? 'YES' : 'NO'}
+                <span className="font-semibold">Needs Upscaling:</span>{' '}
+                <span className={result.transformation.needsUpscaling ? 'text-orange-600' : 'text-green-600'}>
+                  {result.transformation.needsUpscaling ? 'YES' : 'NO'}
+                </span>
               </div>
-              {result.transformation.applied && (
-                <>
-                  <div>
-                    <span className="font-semibold">Parameters:</span>
-                    <pre className="mt-2 p-3 bg-gray-50 rounded border overflow-x-auto">
-{JSON.stringify(result.transformation.parameters, null, 2)}
-                    </pre>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Expected Upscaled Size:</span>
-                    <div className="ml-4 mt-1">
-                      <div>{result.expectedUpscaledSize.calculation}</div>
-                      <div className="font-mono text-blue-600">
-                        {result.expectedUpscaledSize.estimatedDimensions}
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
+              <div>
+                <span className="font-semibold">Original Size:</span> {result.transformation.originalSize}
+              </div>
+              <div>
+                <span className="font-semibold">Target Size:</span> {result.transformation.targetSize}
+              </div>
+              <div>
+                <span className="font-semibold">Upscaling Ratio:</span> {result.transformation.upscalingRatio}x
+              </div>
+              <div className="col-span-2">
+                <span className="font-semibold">Estimated Result:</span>{' '}
+                <span className="font-mono text-blue-600">{result.transformation.estimatedResult}</span>
+              </div>
             </div>
+
+            {result.testing && (
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                <p className="text-sm font-semibold mb-2">{result.testing.instructions}</p>
+                <div className="text-xs space-y-1">
+                  <div><strong>fit:</strong> {result.testing.cropModes.fit}</div>
+                  <div><strong>scale:</strong> {result.testing.cropModes.scale}</div>
+                  <div><strong>limit:</strong> {result.testing.cropModes.limit}</div>
+                </div>
+                <p className="text-xs mt-2 text-blue-700">{result.testing.expectedBehavior}</p>
+              </div>
+            )}
           </div>
 
-          {/* Image Comparison */}
+          {/* URL Testing */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">Image Comparison</h2>
+            <h2 className="text-xl font-bold mb-4">URL Testing Results</h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Original */}
-              <div className="border rounded-lg p-4">
-                <h3 className="font-semibold mb-2 text-center">Original (Stored)</h3>
-                <p className="text-xs text-gray-600 text-center mb-3">
-                  {result.originalDimensions.width} x {result.originalDimensions.height}
-                </p>
-                <div className="relative bg-gray-100 rounded overflow-hidden">
-                  <img
-                    src={result.urls.publicOriginal}
-                    alt="Original"
-                    className="w-full h-auto"
-                    onLoad={(e) => {
-                      const img = e.target as HTMLImageElement;
-                      console.log('Original loaded:', img.naturalWidth, 'x', img.naturalHeight);
-                    }}
-                  />
-                </div>
-                <div className="mt-2">
-                  <a
-                    href={result.urls.publicOriginal}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:underline break-all"
-                  >
-                    Open original URL →
-                  </a>
-                </div>
-              </div>
-
-              {/* Upscaled */}
-              <div className="border rounded-lg p-4 bg-blue-50">
-                <h3 className="font-semibold mb-2 text-center">
-                  {result.needsUpscaling ? 'Upscaled (Print Quality)' : 'High-Res (No Upscaling Needed)'}
-                </h3>
-                <p className="text-xs text-gray-600 text-center mb-3">
-                  {result.needsUpscaling
-                    ? result.expectedUpscaledSize.estimatedDimensions
-                    : `${result.originalDimensions.width} x ${result.originalDimensions.height}`}
-                </p>
-                <div className="relative bg-gray-100 rounded overflow-hidden">
-                  <img
-                    src={result.urls.publicUpscaled}
-                    alt="Upscaled"
-                    className="w-full h-auto"
-                    onLoad={(e) => {
-                      const img = e.target as HTMLImageElement;
-                      console.log('Upscaled loaded:', img.naturalWidth, 'x', img.naturalHeight);
-                      // Show alert with actual dimensions
-                      const info = `Upscaled image loaded!\n\nActual dimensions: ${img.naturalWidth} x ${img.naturalHeight}px\n\nExpected: ${result.expectedUpscaledSize.estimatedDimensions}`;
-                      console.log(info);
-                    }}
-                  />
-                </div>
-                <div className="mt-2">
-                  <a
-                    href={result.urls.publicUpscaled}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:underline break-all"
-                  >
-                    Open upscaled URL →
-                  </a>
-                </div>
+            {/* Original Image */}
+            <div className="mb-6">
+              <h3 className="font-semibold mb-2">Original Image (No Transformation)</h3>
+              <div className="border rounded p-3 bg-gray-50">
+                <img src={result.urls.original} alt="Original" className="max-w-xs mb-2" />
+                <a
+                  href={result.urls.original}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:underline break-all block"
+                >
+                  {result.urls.original}
+                </a>
               </div>
             </div>
 
-            <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            {/* Service Print URL */}
+            <div className="mb-6">
+              <h3 className="font-semibold mb-2">Current Service Implementation</h3>
+              <div className="border rounded p-3 bg-purple-50">
+                <a
+                  href={result.urls.servicePrintUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:underline break-all block"
+                >
+                  {result.urls.servicePrintUrl}
+                </a>
+                <p className="text-xs text-gray-600 mt-1">
+                  Uses: cloudinaryService.getOriginalPrintUrl()
+                </p>
+              </div>
+            </div>
+
+            {/* Upscaled with 'fit' */}
+            <div className="mb-6">
+              <h3 className="font-semibold mb-2">Test URLs: crop=&apos;fit&apos; (maintains aspect ratio, allows upscaling)</h3>
+              <div className="space-y-3">
+                {result.urls.upscaledWithFit?.map((item: any, index: number) => (
+                  <div key={index} className="border rounded p-3 bg-green-50">
+                    <div className="flex items-center justify-between mb-1">
+                      <div>
+                        <span className="font-mono text-sm font-semibold">{item.size}</span>
+                        <span className="text-xs text-gray-600 ml-2">
+                          {item.dimensions} ({item.upscaleRatio})
+                        </span>
+                      </div>
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline whitespace-nowrap"
+                      >
+                        Test URL →
+                      </a>
+                    </div>
+                    <div className="text-xs text-gray-700 mb-1">{item.printSize}</div>
+                    <code className="text-xs break-all block text-gray-500">{item.url}</code>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Upscaled with 'scale' */}
+            <div className="mb-6">
+              <h3 className="font-semibold mb-2">Test URLs: crop=&apos;scale&apos; (scales to exact size, may distort)</h3>
+              <div className="space-y-3">
+                {result.urls.upscaledWithScale?.map((item: any, index: number) => (
+                  <div key={index} className="border rounded p-3 bg-blue-50">
+                    <div className="flex items-center justify-between mb-1">
+                      <div>
+                        <span className="font-mono text-sm font-semibold">{item.size}</span>
+                        <span className="text-xs text-gray-600 ml-2">
+                          {item.dimensions} ({item.upscaleRatio})
+                        </span>
+                      </div>
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline whitespace-nowrap"
+                      >
+                        Test URL →
+                      </a>
+                    </div>
+                    <div className="text-xs text-gray-700 mb-1">{item.printSize}</div>
+                    <code className="text-xs break-all block text-gray-500">{item.url}</code>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm">
-                <strong>Tip:</strong> Right-click on the upscaled image and "Open in new tab" or download it
-                to verify the actual dimensions. The browser may scale it for display, but the actual file
-                should be {result.needsUpscaling ? 'upscaled' : 'at original resolution'}.
+                <strong>Testing Instructions:</strong> Click each "Test this URL" link to open in a new tab.
+                If you get a 400 error, that transformation is not supported.
+                Right-click working images and select "Open image in new tab" to verify actual dimensions.
               </p>
             </div>
           </div>
