@@ -13,8 +13,10 @@ import {
   ExternalLink,
   Archive,
   Check,
+  ArrowRight,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import Link from 'next/link';
 
 interface MessageCardProps {
   message: {
@@ -120,24 +122,45 @@ export function MessageCard({
           {/* Actions */}
           <div className="mt-3 flex items-center space-x-2">
             {message.action_url && (
-              <a
-                href={message.action_url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button
-                  size="sm"
-                  className={`${colors.button} text-white`}
-                  onClick={() => {
-                    if (isUnread) {
-                      onMarkRead(message.id);
-                    }
-                  }}
-                >
-                  {message.action_label || 'View'}
-                  <ExternalLink className="w-3 h-3 ml-1" />
-                </Button>
-              </a>
+              <>
+                {message.action_url.startsWith('/') ? (
+                  // Internal link - use Next.js Link for client-side navigation
+                  <Link href={message.action_url}>
+                    <Button
+                      size="sm"
+                      className={`${colors.button} text-white`}
+                      onClick={() => {
+                        if (isUnread) {
+                          onMarkRead(message.id);
+                        }
+                      }}
+                    >
+                      {message.action_label || 'View'}
+                      <ArrowRight className="w-3 h-3 ml-1" />
+                    </Button>
+                  </Link>
+                ) : (
+                  // External link - use anchor tag with target="_blank"
+                  <a
+                    href={message.action_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button
+                      size="sm"
+                      className={`${colors.button} text-white`}
+                      onClick={() => {
+                        if (isUnread) {
+                          onMarkRead(message.id);
+                        }
+                      }}
+                    >
+                      {message.action_label || 'View'}
+                      <ExternalLink className="w-3 h-3 ml-1" />
+                    </Button>
+                  </a>
+                )}
+              </>
             )}
 
             {isUnread && (

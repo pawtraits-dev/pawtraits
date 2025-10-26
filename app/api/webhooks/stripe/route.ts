@@ -1760,7 +1760,7 @@ async function sendOrderConfirmationEmail(
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const orderUrl = `${baseUrl}/customer/orders/${order.id}`;
+    const orderUrl = `${baseUrl}/orders/${order.id}`;
 
     // Send email via messaging service
     await sendMessage({

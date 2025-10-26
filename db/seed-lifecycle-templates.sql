@@ -36,7 +36,7 @@ INSERT INTO message_templates (
   'Order Confirmed! 🎉',
   'Your order {{order_number}} has been confirmed and is being prepared. Total: {{total_amount}}',
   'package',
-  '/customer/orders/{{order_id}}',
+  '/orders/{{order_id}}',
   'View Order',
   '{
     "customer_name": "string",
