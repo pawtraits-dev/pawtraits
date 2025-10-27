@@ -36,6 +36,7 @@ interface FormData {
   businessWebsite: string;
   address: {
     street: string;
+    street2: string;
     city: string;
     state: string;
     zip: string;
@@ -61,10 +62,11 @@ function PartnerSignupForm() {
     businessWebsite: '',
     address: {
       street: '',
+      street2: '',
       city: '',
       state: '',
       zip: '',
-      country: 'US'
+      country: 'GB'
     }
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -225,10 +227,11 @@ function PartnerSignupForm() {
               preRegCode: referralCode || formData.manualReferralCode || null,
               businessAddress: {
                 street: formData.address.street || null,
+                street2: formData.address.street2 || null,
                 city: formData.address.city || null,
                 state: formData.address.state || null,
                 zip: formData.address.zip || null,
-                country: formData.address.country || 'US'
+                country: formData.address.country || 'GB'
               }
             })
           });
@@ -548,7 +551,12 @@ function PartnerSignupForm() {
                       <Input
                         value={formData.address.street}
                         onChange={(e) => handleInputChange('address.street', e.target.value)}
-                        placeholder="Street Address"
+                        placeholder="Address Line 1"
+                      />
+                      <Input
+                        value={formData.address.street2}
+                        onChange={(e) => handleInputChange('address.street2', e.target.value)}
+                        placeholder="Address Line 2"
                       />
                       <div className="grid md:grid-cols-4 gap-3">
                         <Input
@@ -559,21 +567,21 @@ function PartnerSignupForm() {
                         <Input
                           value={formData.address.state}
                           onChange={(e) => handleInputChange('address.state', e.target.value)}
-                          placeholder="State"
+                          placeholder="County"
                         />
                         <Input
                           value={formData.address.zip}
                           onChange={(e) => handleInputChange('address.zip', e.target.value)}
-                          placeholder="ZIP"
+                          placeholder="Post Code"
                         />
                         <select
                           value={formData.address.country}
                           onChange={(e) => handleInputChange('address.country', e.target.value)}
                           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         >
+                          <option value="GB">United Kingdom</option>
                           <option value="US">United States</option>
                           <option value="CA">Canada</option>
-                          <option value="GB">United Kingdom</option>
                           <option value="AU">Australia</option>
                           <option value="DE">Germany</option>
                           <option value="FR">France</option>
