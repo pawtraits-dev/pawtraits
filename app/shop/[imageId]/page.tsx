@@ -318,27 +318,23 @@ function QRLandingPageContent() {
                     </div>
                     <div className="flex-1">
                       <h3 className="text-xl font-bold text-gray-900 mb-2">
-                        Want to Make This Portrait Uniquely Yours?
+                        Not quite right?
                       </h3>
                       <p className="text-gray-700 mb-4">
-                        Customize this portrait with AI! Change the breed, coat color, outfit, and more to create your perfect pet portrait.
+                        If this beautiful {image.breed_name || 'portrait'} isn't perfect in every way (hard to believe, but who are we to judge), why not let Pawcasso get creative:
                       </p>
                       <ul className="space-y-2 mb-4">
                         <li className="flex items-center text-sm text-gray-600">
                           <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                          Change breed and coat colors
+                          Choose another breed
                         </li>
                         <li className="flex items-center text-sm text-gray-600">
                           <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                          Add or change outfits
+                          Try another colour coat
                         </li>
                         <li className="flex items-center text-sm text-gray-600">
                           <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                          Create portraits with two pets together
-                        </li>
-                        <li className="flex items-center text-sm text-gray-600">
-                          <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                          Generate multiple variations
+                          Pull another outfit from our extensive wardrobe
                         </li>
                       </ul>
                       <Button
@@ -359,7 +355,7 @@ function QRLandingPageContent() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>Custom Pet Portrait</span>
+                  <span>Pawsome Products</span>
                   <div className="flex space-x-2 ml-4">
                     <Button
                       variant="outline"
@@ -372,21 +368,6 @@ function QRLandingPageContent() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                
-                {/* Metadata */}
-                <div className="flex flex-wrap gap-2">
-                  {image.breed_name && (
-                    <Badge variant="secondary">{image.breed_name}</Badge>
-                  )}
-                  {image.theme_name && (
-                    <Badge variant="secondary">{image.theme_name}</Badge>
-                  )}
-                  {image.style_name && (
-                    <Badge variant="secondary">{image.style_name}</Badge>
-                  )}
-                </div>
-
-                <Separator />
 
                 {/* Partner discount info */}
                 {partner && (
