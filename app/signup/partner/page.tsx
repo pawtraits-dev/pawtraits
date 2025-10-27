@@ -315,7 +315,7 @@ function PartnerSignupForm() {
             🎨 Partner with Pawtraits
           </h1>
           <p className="text-xl md:text-2xl text-purple-100 mb-8">
-            Earn 20% commission on every client you refer, plus 5% for life!
+            Earn 10% commission for life on every sale from clients you refer!
           </p>
           
           {/* Benefits */}
@@ -324,8 +324,8 @@ function PartnerSignupForm() {
               <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <DollarSign className="w-8 h-8" />
               </div>
-              <h3 className="font-semibold mb-2">High Commissions</h3>
-              <p className="text-purple-100 text-sm">20% initial + 5% lifetime earnings</p>
+              <h3 className="font-semibold mb-2">Lifetime Commissions</h3>
+              <p className="text-purple-100 text-sm">10% on all sales from your referrals</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
