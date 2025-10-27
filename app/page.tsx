@@ -599,10 +599,8 @@ function HomePageContent() {
             </div>
             
             <div>
-              <h3 className="font-semibold mb-4">Support</h3>
+              <h3 className="font-semibold mb-4">Legal</h3>
               <div className="space-y-2">
-                <a href="mailto:support@pawtraits.com" className="block text-gray-400 hover:text-white transition-colors">Contact Us</a>
-                <Link href="/help" className="block text-gray-400 hover:text-white transition-colors">Help Center</Link>
                 <Link href="/privacy" className="block text-gray-400 hover:text-white transition-colors">Privacy Policy</Link>
                 <Link href="/terms" className="block text-gray-400 hover:text-white transition-colors">Terms of Service</Link>
               </div>
