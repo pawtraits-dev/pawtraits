@@ -97,8 +97,7 @@ export default function MyPawtraitsGallery() {
   useEffect(() => {
     // Load liked images from local storage
     if (userProfile?.email) {
-      const userInteractions = new UserInteractionsService(userProfile.email);
-      const likedImages = userInteractions.getInteractionsByType('liked');
+      const likedImages = UserInteractionsService.getInteractionsByType('liked');
       setLikedImageIds(new Set(likedImages.map(img => img.imageId)));
     }
   }, [userProfile]);
@@ -620,12 +619,11 @@ export default function MyPawtraitsGallery() {
   const handleLike = (image: GalleryImage) => {
     if (!userProfile?.email) return;
 
-    const userInteractions = new UserInteractionsService(userProfile.email);
     const isLiked = likedImageIds.has(image.id);
 
     if (isLiked) {
       // Unlike
-      userInteractions.removeInteraction(image.id, 'liked');
+      UserInteractionsService.removeInteraction(image.id, 'liked');
       setLikedImageIds(prev => {
         const newSet = new Set(prev);
         newSet.delete(image.id);
@@ -633,12 +631,9 @@ export default function MyPawtraitsGallery() {
       });
     } else {
       // Like
-      userInteractions.addInteraction({
+      UserInteractionsService.addInteraction({
         imageId: image.id,
-        imageUrl: image.public_url,
-        imageTitle: image.prompt_text,
-        type: 'liked',
-        timestamp: new Date().toISOString()
+        type: 'liked'
       });
       setLikedImageIds(prev => new Set(prev).add(image.id));
     }
