@@ -62,7 +62,7 @@ interface GalleryImage {
   order_id?: string;
 }
 
-export default function MyPawtraitsGallery() {
+function GalleryContent() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [images, setImages] = useState<GalleryImage[]>([]);
@@ -1004,7 +1004,7 @@ export default function MyPawtraitsGallery() {
   const stickyHeaderFilters: any[] = []; // No filters needed for gallery, just search
 
   return (
-    <CountryProvider>
+    <>
       <UserAwareNavigation />
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
         {/* Sticky Filter Header */}
@@ -1260,6 +1260,14 @@ export default function MyPawtraitsGallery() {
         />
       )}
       </div>
+    </>
+  );
+}
+
+export default function MyPawtraitsGallery() {
+  return (
+    <CountryProvider>
+      <GalleryContent />
     </CountryProvider>
   );
 }
