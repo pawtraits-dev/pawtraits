@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 
+// Force dynamic rendering to avoid build-time Cloudinary configuration issues
+export const dynamic = 'force-dynamic';
+
 // Configure Cloudinary
 function ensureCloudinaryConfig() {
   const cloudinaryConfig = {

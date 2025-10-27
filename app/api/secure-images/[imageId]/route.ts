@@ -366,6 +366,7 @@ async function getSecureVariantUrl(
       const socialUrls = await cloudinaryService.getSocialMediaUrls(publicId, userId, orderId);
       return socialUrls.instagram_post; // Default to Instagram post
       
+    case 'catalog_watermarked':
     case 'full_size':
     case 'thumbnail':
     case 'mid_size':

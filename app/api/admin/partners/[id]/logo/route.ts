@@ -5,6 +5,9 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
+// Force dynamic rendering to avoid build-time Cloudinary configuration issues
+export const dynamic = 'force-dynamic';
+
 // Configure Cloudinary
 if (!cloudinary.config().cloud_name) {
   cloudinary.config({

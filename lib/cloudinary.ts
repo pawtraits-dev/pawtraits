@@ -782,7 +782,7 @@ export class CloudinaryImageService {
   /**
    * Get public variant URL by type with security (signed URLs)
    */
-  getPublicVariantUrl(publicId: string, variant: 'full_size' | 'thumbnail' | 'mid_size' | 'purchased'): string {
+  getPublicVariantUrl(publicId: string, variant: 'full_size' | 'thumbnail' | 'mid_size' | 'purchased' | 'catalog_watermarked'): string {
     try {
       ensureCloudinaryConfig();
       
@@ -801,6 +801,18 @@ export class CloudinaryImageService {
       let generatedUrl: string;
       
       switch (variant) {
+        case 'catalog_watermarked':
+          generatedUrl = cloudinary.url(publicId, {
+            ...baseConfig,
+            width: 800,
+            crop: 'limit', // Maintain aspect ratio, don't crop
+            quality: 85,
+            overlay: watermarkId,
+            opacity: watermarkOpacity,
+            gravity: 'center'
+          });
+          break;
+
         case 'full_size':
           generatedUrl = cloudinary.url(publicId, {
             ...baseConfig,
