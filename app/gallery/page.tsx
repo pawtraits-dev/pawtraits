@@ -650,13 +650,15 @@ function GalleryContent() {
     setShowCustomizeModal(true);
   };
 
-  const getImageProductInfo = (imageId: string, formatId?: string) => {
-    if (!formatId) {
+  const getImageProductInfo = (imageId: string) => {
+    const image = images.find(img => img.id === imageId);
+
+    if (!image || !image.format_id) {
       return { productCount: 0, lowestPrice: null, currency: null, currencySymbol: null };
     }
 
     const availableProducts = (products || []).filter(p =>
-      p.is_active && p.format_id === formatId
+      p.is_active && p.format_id === image.format_id
     );
 
     if (availableProducts.length === 0) {
@@ -917,7 +919,7 @@ function GalleryContent() {
 
           {/* Pricing and sizes */}
           {(() => {
-            const productInfo = getImageProductInfo(image.id, image.format_id);
+            const productInfo = getImageProductInfo(image.id);
             return productInfo.lowestPrice && (
               <div className="mb-3">
                 <p className="text-sm font-medium text-green-600">
@@ -1246,17 +1248,22 @@ function GalleryContent() {
       {/* Customize Modal */}
       {imageToCustomize && (
         <CustomerImageCustomizationModal
+          image={imageToCustomize}
           isOpen={showCustomizeModal}
           onClose={() => {
             setShowCustomizeModal(false);
             setImageToCustomize(null);
           }}
-          imageId={imageToCustomize.id}
-          imageUrl={imageToCustomize.public_url}
-          imageTitle={imageToCustomize.prompt_text}
-          currentBreedId={imageToCustomize.breed_id}
-          currentThemeId={imageToCustomize.theme_id}
-          currentStyleId={imageToCustomize.style_id}
+          onGenerationComplete={(variations) => {
+            console.log('Generated variations:', variations);
+            // Reload gallery images after customization
+            const supabaseService = new SupabaseService();
+            supabaseService.getCurrentUserProfile().then(profile => {
+              if (profile) {
+                loadGalleryImages(profile);
+              }
+            });
+          }}
         />
       )}
       </div>
