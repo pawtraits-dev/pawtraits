@@ -29,9 +29,10 @@ function getTwilioClient() {
 
 // Default configuration
 const DEFAULT_FROM_NUMBER = process.env.TWILIO_PHONE_NUMBER || '';
-const BASE_URL = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
+  || (process.env.VERCEL_ENV === 'production' && process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : 'http://localhost:3000');
 
 /**
  * Send an SMS using Twilio

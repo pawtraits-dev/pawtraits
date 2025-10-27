@@ -1070,10 +1070,10 @@ async function handleCustomerCreditFromMetadata(
     };
 
     // Build base URL for API calls (webhook runs in production)
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_BASE_URL
-      || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+      || (process.env.VERCEL_ENV === 'production' && process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'http://localhost:3000');
 
     // Use API endpoint for customer credit creation
     const creditResponse = await fetch(`${baseUrl}/api/commissions/customer`, {
@@ -1577,9 +1577,10 @@ async function sendPartnerCommissionEmail(
     });
 
     // Build dashboard URL
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+      || (process.env.VERCEL_ENV === 'production' && process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'http://localhost:3000');
     const dashboardUrl = `${baseUrl}/partners/dashboard`;
 
     // Estimate payout date (end of next month)
@@ -1655,9 +1656,10 @@ async function sendCustomerCreditEmail(
     const referredCustomerName = referredCustomer.email.split('@')[0]; // Use email prefix if no name
 
     // Build URLs
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+      || (process.env.VERCEL_ENV === 'production' && process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'http://localhost:3000');
     const shopUrl = `${baseUrl}/shop`;
     const referralsUrl = `${baseUrl}/customer/referrals`;
 
@@ -1757,9 +1759,10 @@ async function sendOrderConfirmationEmail(
       : 'Within 7-10 business days';
 
     // Build order URL
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+      || (process.env.VERCEL_ENV === 'production' && process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'http://localhost:3000');
     const orderUrl = `${baseUrl}/orders/${order.id}`;
 
     // Send email via messaging service
