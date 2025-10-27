@@ -650,9 +650,7 @@ function GalleryContent() {
     setShowCustomizeModal(true);
   };
 
-  const getImageProductInfo = (imageId: string) => {
-    const image = images.find(img => img.id === imageId);
-
+  const getImageProductInfo = (image: GalleryImage) => {
     if (!image || !image.format_id) {
       return { productCount: 0, lowestPrice: null, currency: null, currencySymbol: null };
     }
@@ -898,28 +896,37 @@ function GalleryContent() {
 
           {/* Theme and Breed badges */}
           {(image.theme || image.breed) && (
-            <div className="flex flex-wrap gap-1 mb-3">
-              {image.theme && (
-                <a
-                  href={`/browse?theme=${image.theme.id}`}
-                  className="inline-block"
-                >
-                  <Badge variant="secondary" className="text-xs hover:bg-blue-100 hover:text-blue-800 transition-colors cursor-pointer">
-                    🎨 {image.theme.name}
-                  </Badge>
-                </a>
-              )}
+            <div className="space-y-1 mb-3">
               {image.breed && (
-                <Badge className="bg-purple-100 text-purple-800 text-xs">
-                  {image.breed.animal_type === 'cat' ? '🐈' : '🐕'} {image.breed.name}
-                </Badge>
+                <div>
+                  <a
+                    href={`/browse?breed=${image.breed.id}`}
+                    className="inline-block"
+                  >
+                    <Badge className="bg-purple-100 text-purple-800 text-xs hover:bg-purple-200 transition-colors cursor-pointer">
+                      {image.breed.animal_type === 'cat' ? '🐈' : '🐕'} {image.breed.name}
+                    </Badge>
+                  </a>
+                </div>
+              )}
+              {image.theme && (
+                <div>
+                  <a
+                    href={`/browse?theme=${image.theme.id}`}
+                    className="inline-block"
+                  >
+                    <Badge variant="secondary" className="text-xs hover:bg-blue-100 hover:text-blue-800 transition-colors cursor-pointer">
+                      🎨 {image.theme.name}
+                    </Badge>
+                  </a>
+                </div>
               )}
             </div>
           )}
 
           {/* Pricing and sizes */}
           {(() => {
-            const productInfo = getImageProductInfo(image.id);
+            const productInfo = getImageProductInfo(image);
             return productInfo.lowestPrice && (
               <div className="mb-3">
                 <p className="text-sm font-medium text-green-600">
