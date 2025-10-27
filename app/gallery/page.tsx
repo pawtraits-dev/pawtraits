@@ -14,7 +14,6 @@ import { SupabaseService } from '@/lib/supabase';
 import type { UserProfile } from '@/lib/user-types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
-import ProductSelectionModal from '@/components/ProductSelectionModal';
 import ShareModal from '@/components/share-modal';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ImageModal from '@/components/ImageModal';
@@ -68,8 +67,6 @@ function GalleryContent() {
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [filteredImages, setFilteredImages] = useState<GalleryImage[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
-  const [showProductModal, setShowProductModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [imageToShare, setImageToShare] = useState<GalleryImage | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -111,6 +108,7 @@ function GalleryContent() {
     if (userProfile) {
       // Load all data in parallel for better performance
       Promise.all([
+        loadProductData(),
         loadUserPets(),
         loadCustomImages(),
         loadGalleryImages()
@@ -612,10 +610,6 @@ function GalleryContent() {
     return filteredImages.filter(image => image.interaction_types.includes(type));
   };
 
-  const handleBuyClick = (image: GalleryImage) => {
-    setSelectedImage(image);
-    setShowProductModal(true);
-  };
 
   const handleShare = (image: GalleryImage) => {
     setImageToShare(image);
@@ -956,13 +950,13 @@ function GalleryContent() {
           )}
           {!image.interaction_types.includes('purchased') && !image.interaction_types.includes('in_basket') && (
             <div className="pt-3 border-t">
-              <Button 
+              <Button
                 size="sm"
                 className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                onClick={() => handleBuyClick(image)}
+                onClick={() => handleImageClick(image)}
               >
                 <ShoppingCart className="w-4 h-4 mr-2" />
-                Buy Now
+                View & Buy
               </Button>
             </div>
           )}
@@ -1192,21 +1186,6 @@ function GalleryContent() {
 
       </div>
 
-      {/* Product Selection Modal */}
-      {selectedImage && (
-        <ProductSelectionModal
-          isOpen={showProductModal}
-          onClose={() => {
-            setShowProductModal(false);
-            setSelectedImage(null);
-          }}
-          image={selectedImage}
-          products={products}
-          pricing={pricing}
-          onAddToBasket={() => {}} // TODO: Implement
-        />
-      )}
-
       {/* Share Modal */}
       {imageToShare && (
         <ShareModal
@@ -1241,7 +1220,7 @@ function GalleryContent() {
             tags: modalImage.tags,
             public_url: modalImage.public_url
           }}
-          onBuyClick={() => handleBuyClick(modalImage)}
+          onBuyClick={() => handleImageClick(modalImage)}
           onShareClick={() => handleShare(modalImage)}
           onDownloadClick={modalImage.interaction_types.includes('purchased') ? () => handleDownload(modalImage) : undefined}
           isShared={modalImage.interaction_types.includes('shared')}
