@@ -176,13 +176,14 @@ function CustomerInvitationPageContent() {
             </div>
 
             <h1 className="text-4xl lg:text-6xl font-bold mb-6 font-[family-name:var(--font-life-savers)]">
-              You&apos;re Invited by {getReferrerName()}!
+              You&apos;re Invited!
             </h1>
             <p className="text-xl lg:text-2xl mb-8 max-w-3xl mx-auto opacity-90">
-              {getReferrerName()} has referred you to Pawtraits. Create stunning AI-generated portraits of your beloved pets and get{' '}
+              {getReferrerName()} thinks you&apos;ll love what we do here, and honestly, who are we to argue! Welcome to Pawtraits, where our master AI artist Pawcasso has thousands of maximum-cuteness-level masterpieces ready for you and the VIP (Very Important Pet) in your life. And if you&apos;re not satisfied, Pawcasso is very happy to help you create your very own Paw-sonalised Puss or Pooch. The best part? {getReferrerName()} has twisted our arms and secured you a{' '}
               <span className="font-bold bg-white bg-opacity-20 px-2 py-1 rounded">
-                {referralData?.discount_rate}% off your first order
-              </span>!
+                10% discount
+              </span>{' '}
+              for your first order.
             </p>
 
             {/* Main CTA */}
@@ -193,7 +194,7 @@ function CustomerInvitationPageContent() {
                   className="bg-white text-purple-600 hover:bg-gray-100 shadow-lg text-lg px-8 py-4"
                 >
                   <Sparkles className="w-6 h-6 mr-2" />
-                  Start Creating - Get {referralData?.discount_rate}% Off
+                  Start Creating - Get 10% Off
                 </Button>
               </Link>
             </div>
@@ -260,11 +261,8 @@ function CustomerInvitationPageContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
-              Create Beautiful AI Pet Portraits
+              Create Your Pawtrait
             </h2>
-            <p className="text-xl text-gray-600">
-              Transform your pet's photo into stunning artwork in just three steps
-            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -274,9 +272,9 @@ function CustomerInvitationPageContent() {
                 <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <span className="text-2xl font-bold text-purple-600">1</span>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Upload Your Pet&apos;s Photo</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Choose Your Style</h3>
                 <p className="text-gray-600">
-                  Share a clear, high-quality photo of your beloved pet. Our AI works best with well-lit, close-up shots.
+                  Browse our gallery of AI-generated portraits. From regal Renaissance vibes to tropical beach getaways, we&apos;ve got styles that&apos;ll make your pet look absolutely magnificent.
                 </p>
               </CardContent>
             </Card>
@@ -287,9 +285,9 @@ function CustomerInvitationPageContent() {
                 <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <span className="text-2xl font-bold text-purple-600">2</span>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Choose Your Style</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Customize (or Costumize!)</h3>
                 <p className="text-gray-600">
-                  Pick from dozens of artistic themes and styles, from Renaissance masterpieces to modern digital art.
+                  Want to tweak the breed, coat color, or theme? Use your customization credits to create something uniquely yours. Pawcasso works fast—about 90 seconds per masterpiece.
                 </p>
               </CardContent>
             </Card>
@@ -300,9 +298,9 @@ function CustomerInvitationPageContent() {
                 <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <span className="text-2xl font-bold text-purple-600">3</span>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Get Your Portrait</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Order Your Print</h3>
                 <p className="text-gray-600">
-                  Receive professional-quality AI-generated artwork perfect for framing or sharing with friends.
+                  Love what you see? Order a professional-quality print on premium materials. We&apos;ll ship it right to your door, ready to make your walls significantly more interesting, and your pet proud.
                 </p>
               </CardContent>
             </Card>
@@ -315,21 +313,18 @@ function CustomerInvitationPageContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
-              Why Choose Pawtraits?
+              Why Pet Parents Love Pawtraits
             </h2>
-            <p className="text-xl text-gray-600">
-              Trusted by thousands of pet parents worldwide
-            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {/* Feature 1 */}
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Camera className="w-8 h-8 text-blue-600" />
+                <Sparkles className="w-8 h-8 text-blue-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">AI-Powered Art</h3>
-              <p className="text-gray-600">Advanced AI creates stunning, unique portraits of your pet with incredible detail.</p>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">🎨 Pawcasso, Our AI Artist</h3>
+              <p className="text-gray-600">Our master AI artist creates stunning, one-of-a-kind portraits with incredible detail. Every piece is unique, just like your pet.</p>
             </div>
 
             {/* Feature 2 */}
@@ -337,8 +332,8 @@ function CustomerInvitationPageContent() {
               <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Star className="w-8 h-8 text-yellow-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Professional Quality</h3>
-              <p className="text-gray-600">Museum-quality prints on premium materials that will last for generations.</p>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">🖼️ Museum-Quality Prints</h3>
+              <p className="text-gray-600">Professional prints on premium materials that&apos;ll last for generations. We&apos;re talking the kind of quality that makes people say &quot;Wait, where did you get that?!&quot;</p>
             </div>
 
             {/* Feature 3 */}
@@ -346,8 +341,8 @@ function CustomerInvitationPageContent() {
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Gift className="w-8 h-8 text-green-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Special Discount</h3>
-              <p className="text-gray-600">{referralData?.discount_rate}% off your first order thanks to {getReferrerName()}.</p>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">💰 Your Special 10% Discount</h3>
+              <p className="text-gray-600">Thanks to {getReferrerName()}, you&apos;re getting 10% off your first order. Use it on prints, customizations, or both!</p>
             </div>
 
             {/* Feature 4 */}
@@ -355,8 +350,8 @@ function CustomerInvitationPageContent() {
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Heart className="w-8 h-8 text-red-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Made with Love</h3>
-              <p className="text-gray-600">Every portrait celebrates the unique bond between you and your beloved pet.</p>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">💜 Made with Love</h3>
+              <p className="text-gray-600">Every portrait celebrates the unique bond between you and your pet. Because they deserve to be immortalized in art form (and they&apos;ve probably been demanding it through strategic staring).</p>
             </div>
           </div>
         </div>
@@ -368,31 +363,22 @@ function CustomerInvitationPageContent() {
           <h2 className="text-4xl font-bold mb-6 font-[family-name:var(--font-life-savers)]">
             Ready to Create Your Pet's Portrait?
           </h2>
-          <p className="text-xl mb-8 opacity-90">
-            Join thousands of happy pet parents and get {referralData?.discount_rate}% off your first order
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
             <Link href={`/signup/user?ref=${referralData?.code}`}>
               <Button
                 size="lg"
                 className="bg-white text-purple-600 hover:bg-gray-100 shadow-lg text-lg px-8 py-4"
               >
-                <ArrowRight className="w-6 h-6 mr-2" />
-                Start Creating Now
-              </Button>
-            </Link>
-            <Link href="/auth/login">
-              <Button
-                variant="outline"
-                size="lg"
-                className="border-white text-white hover:bg-white hover:text-purple-600 text-lg px-8 py-4"
-              >
-                Already Have an Account?
+                <Sparkles className="w-6 h-6 mr-2" />
+                Start Creating - Get 10% Off
               </Button>
             </Link>
           </div>
-          <p className="text-sm mt-4 opacity-75">
-            Your {referralData?.discount_rate}% discount will be automatically applied with referral code {referralData?.code}
+          <p className="text-sm opacity-90">
+            Questions? We&apos;re here to help at{' '}
+            <a href="mailto:support@pawtraits.pics" className="underline hover:text-purple-100">
+              support@pawtraits.pics
+            </a>
           </p>
         </div>
       </section>
