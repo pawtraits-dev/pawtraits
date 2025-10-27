@@ -21,6 +21,8 @@ import StickyFilterHeader from '@/components/StickyFilterHeader';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
+import CustomerImageCustomizationModal from '@/components/CustomerImageCustomizationModal';
+import UserInteractionsService from '@/lib/user-interactions';
 
 interface GalleryImage {
   id: string;
@@ -38,6 +40,7 @@ interface GalleryImage {
   created_at: string;
   interaction_types: ('liked' | 'shared' | 'purchased' | 'in_basket')[];
   interaction_dates: { type: 'liked' | 'shared' | 'purchased' | 'in_basket'; date: string }[];
+  source?: 'custom' | 'catalog'; // Track image origin
   // Related data
   breed?: {
     id: string;
@@ -78,6 +81,11 @@ export default function MyPawtraitsGallery() {
   const [loadingRecommended, setLoadingRecommended] = useState(false);
   const [loadingCustomImages, setLoadingCustomImages] = useState(false);
 
+  // State for like tracking and customize modal
+  const [likedImageIds, setLikedImageIds] = useState<Set<string>>(new Set());
+  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [imageToCustomize, setImageToCustomize] = useState<GalleryImage | null>(null);
+
   const supabaseService = new SupabaseService();
   const { totalItems, items: cartItems } = useHybridCart();
 
@@ -85,6 +93,15 @@ export default function MyPawtraitsGallery() {
     loadUserData();
     loadProductData();
   }, []);
+
+  useEffect(() => {
+    // Load liked images from local storage
+    if (userProfile?.email) {
+      const userInteractions = new UserInteractionsService(userProfile.email);
+      const likedImages = userInteractions.getInteractionsByType('liked');
+      setLikedImageIds(new Set(likedImages.map(img => img.imageId)));
+    }
+  }, [userProfile]);
 
   useEffect(() => {
     if (userProfile) {
@@ -173,7 +190,8 @@ export default function MyPawtraitsGallery() {
           public_url: img.public_url,
           prompt_text: img.prompt_text,
           description: img.generation_metadata?.ai_description || img.prompt_text,
-          tags: [],
+          tags: ['custom'],
+          source: 'custom',
           breed_id: img.breed_id,
           theme_id: img.theme_id,
           style_id: img.style_id,
@@ -237,6 +255,7 @@ export default function MyPawtraitsGallery() {
           prompt_text: img.prompt_text,
           description: img.description,
           tags: img.tags || [],
+          source: 'catalog',
           breed_id: img.breed_id,
           theme_id: img.theme_id,
           style_id: img.style_id,
@@ -302,6 +321,7 @@ export default function MyPawtraitsGallery() {
         prompt_text: string;
         description: string;
         tags: string[];
+        source?: 'custom' | 'catalog';
         breed_id?: string;
         theme_id?: string;
         style_id?: string;
@@ -328,6 +348,7 @@ export default function MyPawtraitsGallery() {
         prompt_text: item.imageData.prompt_text,
         description: item.imageData.description,
         tags: item.imageData.tags || [],
+        source: 'catalog',
         breed_id: item.imageData.breed_id,
         theme_id: item.imageData.theme_id,
         style_id: item.imageData.style_id,
@@ -426,6 +447,7 @@ export default function MyPawtraitsGallery() {
                     prompt_text: item.image_title || 'Purchased Portrait',
                     description: catalogData?.description || item.image_title || 'Purchased Portrait',
                     tags: ['purchased', order.order_type || 'customer'],
+                    source: 'catalog',
                     breed_id: catalogData?.breed_id,
                     theme_id: catalogData?.theme_id,
                     style_id: catalogData?.style_id,
@@ -474,6 +496,7 @@ export default function MyPawtraitsGallery() {
         prompt_text: cartItem.imageTitle || 'In Basket',
         description: `Added to basket on ${new Date(cartItem.addedAt).toLocaleDateString()}`,
         tags: ['in_basket', cartItem.product.name],
+        source: 'catalog',
         breed_id: undefined,
         theme_id: undefined,
         style_id: undefined,
@@ -525,6 +548,7 @@ export default function MyPawtraitsGallery() {
             prompt_text: tempImage.prompt_text,
             description: tempImage.description,
             tags: tempImage.tags,
+            source: tempImage.source,
             breed_id: tempImage.breed_id,
             theme_id: tempImage.theme_id,
             style_id: tempImage.style_id,
@@ -591,6 +615,38 @@ export default function MyPawtraitsGallery() {
   const handleShare = (image: GalleryImage) => {
     setImageToShare(image);
     setShowShareModal(true);
+  };
+
+  const handleLike = (image: GalleryImage) => {
+    if (!userProfile?.email) return;
+
+    const userInteractions = new UserInteractionsService(userProfile.email);
+    const isLiked = likedImageIds.has(image.id);
+
+    if (isLiked) {
+      // Unlike
+      userInteractions.removeInteraction(image.id, 'liked');
+      setLikedImageIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(image.id);
+        return newSet;
+      });
+    } else {
+      // Like
+      userInteractions.addInteraction({
+        imageId: image.id,
+        imageUrl: image.public_url,
+        imageTitle: image.prompt_text,
+        type: 'liked',
+        timestamp: new Date().toISOString()
+      });
+      setLikedImageIds(prev => new Set(prev).add(image.id));
+    }
+  };
+
+  const handleCustomize = (image: GalleryImage) => {
+    setImageToCustomize(image);
+    setShowCustomizeModal(true);
   };
 
   const handleImageClick = (image: GalleryImage) => {
@@ -715,7 +771,34 @@ export default function MyPawtraitsGallery() {
               variant="ghost"
               size="sm"
               className="w-8 h-8 p-0 bg-white/90 hover:bg-white"
-              onClick={() => handleShare(image)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLike(image);
+              }}
+            >
+              <Heart className={`w-4 h-4 ${likedImageIds.has(image.id) ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
+            </Button>
+            {image.source === 'catalog' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-8 h-8 p-0 bg-white/90 hover:bg-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCustomize(image);
+                }}
+              >
+                <Wand2 className="w-4 h-4 text-purple-600" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-8 h-8 p-0 bg-white/90 hover:bg-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleShare(image);
+              }}
             >
               <Share2 className="w-4 h-4 text-gray-600" />
             </Button>
@@ -724,7 +807,10 @@ export default function MyPawtraitsGallery() {
                 variant="ghost"
                 size="sm"
                 className="w-8 h-8 p-0 bg-white/90 hover:bg-white"
-                onClick={() => handleDownload(image)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDownload(image);
+                }}
               >
                 <Download className="w-4 h-4 text-gray-600" />
               </Button>
@@ -747,31 +833,34 @@ export default function MyPawtraitsGallery() {
 
           {/* Interaction dates - only show most recent, avoid duplicate purchase dates */}
           <div className="text-xs text-gray-500 mb-3">
-            {image.interaction_dates
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-              .slice(0, 1) // Only show most recent interaction
-              .map((interaction) => (
-                <p key={interaction.type}>
-                  {interaction.type === 'purchased' && image.order_id ? (
-                    <a
-                      href={userProfile?.user_type === 'partner'
-                        ? `/partners/orders/${image.order_id}`
-                        : `/orders/${image.order_id}`}
-                      className="text-purple-600 hover:text-purple-800 hover:underline"
-                    >
-                      Purchased on {new Date(interaction.date).toLocaleDateString()}
-                    </a>
-                  ) : (
-                    <>
-                      {interaction.type === 'purchased' ? 'Purchased' :
-                       interaction.type === 'liked' ? 'Liked' :
-                       interaction.type === 'shared' ? 'Shared' :
-                       'Added'} on {new Date(interaction.date).toLocaleDateString()}
-                    </>
-                  )}
-                </p>
-              ))
-            }
+            {image.source === 'custom' ? (
+              <p>Custom made on {new Date(image.created_at).toLocaleDateString()}</p>
+            ) : (
+              image.interaction_dates
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .slice(0, 1) // Only show most recent interaction
+                .map((interaction) => (
+                  <p key={interaction.type}>
+                    {interaction.type === 'purchased' && image.order_id ? (
+                      <a
+                        href={userProfile?.user_type === 'partner'
+                          ? `/partners/orders/${image.order_id}`
+                          : `/orders/${image.order_id}`}
+                        className="text-purple-600 hover:text-purple-800 hover:underline"
+                      >
+                        Purchased on {new Date(interaction.date).toLocaleDateString()}
+                      </a>
+                    ) : (
+                      <>
+                        {interaction.type === 'purchased' ? 'Purchased' :
+                         interaction.type === 'liked' ? 'Liked' :
+                         interaction.type === 'shared' ? 'Shared' :
+                         'Added'} on {new Date(interaction.date).toLocaleDateString()}
+                      </>
+                    )}
+                  </p>
+                ))
+            )}
           </div>
 
           {/* Theme badge as hyperlink */}
@@ -1126,6 +1215,23 @@ export default function MyPawtraitsGallery() {
           showActions={true}
           products={products}
           pricing={pricing}
+        />
+      )}
+
+      {/* Customize Modal */}
+      {imageToCustomize && (
+        <CustomerImageCustomizationModal
+          isOpen={showCustomizeModal}
+          onClose={() => {
+            setShowCustomizeModal(false);
+            setImageToCustomize(null);
+          }}
+          imageId={imageToCustomize.id}
+          imageUrl={imageToCustomize.public_url}
+          imageTitle={imageToCustomize.prompt_text}
+          currentBreedId={imageToCustomize.breed_id}
+          currentThemeId={imageToCustomize.theme_id}
+          currentStyleId={imageToCustomize.style_id}
         />
       )}
       </div>
