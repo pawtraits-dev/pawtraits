@@ -1379,10 +1379,11 @@ export class SupabaseService {
 
   async signUp(email: string, password: string, metadata?: any) {
     console.log('SupabaseService.signUp called with:', { email, hasPassword: !!password, metadata });
-    
-    // Get origin safely
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-    
+
+    // Prioritize production URL from env, fallback to current origin or localhost
+    const origin = process.env.NEXT_PUBLIC_BASE_URL
+      || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+
     const signUpData = {
       email,
       password,
