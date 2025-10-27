@@ -138,10 +138,10 @@ export async function POST(request: NextRequest) {
         business_address: businessAddress || null,
         personal_referral_code: personalReferralCode,
         personal_qr_code_url: personalQRCodeUrl || null,
-        is_active: true,
-        is_verified: true,  // Auto-approve
+        is_active: false,
+        is_verified: false,
         onboarding_completed: false,
-        approval_status: 'approved',
+        approval_status: 'pending',
         notification_preferences: {
           email_commissions: true,
           email_referrals: true,
