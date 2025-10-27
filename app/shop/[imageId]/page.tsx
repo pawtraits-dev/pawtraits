@@ -282,15 +282,8 @@ function QRLandingPageContent() {
                   imageId={image.id}
                   alt={image.description || 'Pet portrait'}
                   className="w-full h-full object-cover"
+                  variant="catalog_watermarked"
                 />
-                
-                {/* Rating overlay */}
-                {image.rating && image.rating > 0 && (
-                  <div className="absolute top-4 left-4 bg-black bg-opacity-60 text-white px-3 py-1 rounded-full flex items-center space-x-1">
-                    <Star className="w-4 h-4 fill-current" />
-                    <span className="text-sm font-medium">{image.rating}</span>
-                  </div>
-                )}
 
                 {/* Partner discount badge */}
                 {partner && (
@@ -302,66 +295,67 @@ function QRLandingPageContent() {
             </CardContent>
           </Card>
 
-          {/* Image Description */}
-          {image.description && (
-            <Card>
-              <CardContent className="pt-6">
-                <ReactMarkdown className="prose prose-sm max-w-none">
-                  {image.description}
-                </ReactMarkdown>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Customize Section - Customer Only */}
-          {userProfile?.user_type === 'customer' && (
-            <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
-              <CardContent className="pt-6">
-                <div className="flex items-start space-x-4">
-                  <div className="p-3 bg-purple-600 rounded-lg">
-                    <Wand2 className="w-8 h-8 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">
-                      Want to Make This Portrait Uniquely Yours?
-                    </h3>
-                    <p className="text-gray-700 mb-4">
-                      Customize this portrait with AI! Change the breed, coat color, outfit, and more to create your perfect pet portrait.
-                    </p>
-                    <ul className="space-y-2 mb-4">
-                      <li className="flex items-center text-sm text-gray-600">
-                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                        Change breed and coat colors
-                      </li>
-                      <li className="flex items-center text-sm text-gray-600">
-                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                        Add or change outfits
-                      </li>
-                      <li className="flex items-center text-sm text-gray-600">
-                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                        Create portraits with two pets together
-                      </li>
-                      <li className="flex items-center text-sm text-gray-600">
-                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                        Generate multiple variations
-                      </li>
-                    </ul>
-                    <Button
-                      onClick={handleCustomize}
-                      className="bg-purple-600 hover:bg-purple-700"
-                      size="lg"
-                    >
-                      <Wand2 className="w-5 h-5 mr-2" />
-                      Customize This Portrait
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Product Details */}
+          {/* Right Column - Description, Customize, Products */}
           <div className="space-y-6">
+            {/* Image Description */}
+            {image.description && (
+              <Card>
+                <CardContent className="pt-6">
+                  <ReactMarkdown className="prose prose-sm max-w-none">
+                    {image.description}
+                  </ReactMarkdown>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Customize Section - Customer Only */}
+            {userProfile?.user_type === 'customer' && (
+              <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
+                <CardContent className="pt-6">
+                  <div className="flex items-start space-x-4">
+                    <div className="p-3 bg-purple-600 rounded-lg">
+                      <Wand2 className="w-8 h-8 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">
+                        Want to Make This Portrait Uniquely Yours?
+                      </h3>
+                      <p className="text-gray-700 mb-4">
+                        Customize this portrait with AI! Change the breed, coat color, outfit, and more to create your perfect pet portrait.
+                      </p>
+                      <ul className="space-y-2 mb-4">
+                        <li className="flex items-center text-sm text-gray-600">
+                          <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                          Change breed and coat colors
+                        </li>
+                        <li className="flex items-center text-sm text-gray-600">
+                          <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                          Add or change outfits
+                        </li>
+                        <li className="flex items-center text-sm text-gray-600">
+                          <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                          Create portraits with two pets together
+                        </li>
+                        <li className="flex items-center text-sm text-gray-600">
+                          <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                          Generate multiple variations
+                        </li>
+                      </ul>
+                      <Button
+                        onClick={handleCustomize}
+                        className="bg-purple-600 hover:bg-purple-700"
+                        size="lg"
+                      >
+                        <Wand2 className="w-5 h-5 mr-2" />
+                        Customize This Portrait
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Product Details */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
