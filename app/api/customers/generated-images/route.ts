@@ -37,10 +37,23 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    // Fetch customer generated images with optimized field selection
+    // Fetch customer generated images with AI descriptions and related data
     const { data: generatedImages, error } = await supabaseAdmin
       .from('customer_generated_images')
-      .select('id, cloudinary_public_id, public_url, prompt_text, breed_id, theme_id, style_id, format_id, created_at')
+      .select(`
+        id,
+        cloudinary_public_id,
+        public_url,
+        prompt_text,
+        generation_metadata,
+        breed_id,
+        theme_id,
+        style_id,
+        format_id,
+        created_at,
+        breeds(id, name),
+        themes(id, name)
+      `)
       .eq('customer_id', userProfile.id)
       .order('created_at', { ascending: false })
       .limit(limit);

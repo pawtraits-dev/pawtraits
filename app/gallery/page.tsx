@@ -172,8 +172,8 @@ export default function MyPawtraitsGallery() {
           filename: img.cloudinary_public_id || `custom-${img.id}.jpg`,
           public_url: img.public_url,
           prompt_text: img.prompt_text,
-          description: img.prompt_text,
-          tags: ['custom', 'generated'],
+          description: img.generation_metadata?.ai_description || img.prompt_text,
+          tags: [],
           breed_id: img.breed_id,
           theme_id: img.theme_id,
           style_id: img.style_id,
@@ -183,8 +183,8 @@ export default function MyPawtraitsGallery() {
           created_at: img.created_at,
           interaction_types: [],
           interaction_dates: [],
-          breed: img.breed_id ? { id: img.breed_id, name: '' } : undefined,
-          theme: img.theme_id ? { id: img.theme_id, name: '' } : undefined,
+          breed: img.breeds ? { id: img.breeds.id, name: img.breeds.name } : undefined,
+          theme: img.themes ? { id: img.themes.id, name: img.themes.name } : undefined,
           style: img.style_id ? { id: img.style_id, name: '' } : undefined,
         }));
 
