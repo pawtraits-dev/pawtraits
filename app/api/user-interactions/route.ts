@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
         rating,
         is_featured,
         created_at,
-        breeds(id, name),
+        breeds(id, name, animal_type),
         themes(id, name),
         styles(id, name)
       `)

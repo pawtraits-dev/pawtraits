@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
         style_id,
         format_id,
         created_at,
-        breeds(id, name),
+        breeds(id, name, animal_type),
         themes(id, name)
       `)
       .eq('customer_id', userProfile.id)

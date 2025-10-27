@@ -45,6 +45,7 @@ interface GalleryImage {
   breed?: {
     id: string;
     name: string;
+    animal_type?: 'dog' | 'cat';
   };
   theme?: {
     id: string;
@@ -200,7 +201,7 @@ export default function MyPawtraitsGallery() {
           created_at: img.created_at,
           interaction_types: [],
           interaction_dates: [],
-          breed: img.breeds ? { id: img.breeds.id, name: img.breeds.name } : undefined,
+          breed: img.breeds ? { id: img.breeds.id, name: img.breeds.name, animal_type: img.breeds.animal_type } : undefined,
           theme: img.themes ? { id: img.themes.id, name: img.themes.name } : undefined,
           style: img.style_id ? { id: img.style_id, name: '' } : undefined,
         }));
@@ -264,7 +265,7 @@ export default function MyPawtraitsGallery() {
           created_at: img.created_at,
           interaction_types: [],
           interaction_dates: [],
-          breed: img.breeds ? { id: img.breeds.id, name: img.breeds.name } : undefined,
+          breed: img.breeds ? { id: img.breeds.id, name: img.breeds.name, animal_type: img.breeds.animal_type } : undefined,
           theme: img.themes ? { id: img.themes.id, name: img.themes.name } : undefined,
           style: img.styles ? { id: img.styles.id, name: img.styles.name } : undefined,
         }));
@@ -330,7 +331,7 @@ export default function MyPawtraitsGallery() {
         created_at: string;
         interaction_type: 'liked' | 'shared' | 'purchased' | 'in_basket';
         interaction_date: string;
-        breed?: { id: string; name: string };
+        breed?: { id: string; name: string; animal_type?: 'dog' | 'cat' };
         theme?: { id: string; name: string };
         style?: { id: string; name: string };
         order_type?: string;
@@ -458,7 +459,8 @@ export default function MyPawtraitsGallery() {
                     interaction_date: order.created_at,
                     breed: catalogData?.breeds ? {
                       id: catalogData.breeds.id,
-                      name: catalogData.breeds.name
+                      name: catalogData.breeds.name,
+                      animal_type: catalogData.breeds.animal_type
                     } : undefined,
                     theme: catalogData?.themes ? {
                       id: catalogData.themes.id,
@@ -751,6 +753,11 @@ export default function MyPawtraitsGallery() {
                 🛒 In Basket
               </Badge>
             )}
+            {image.source === 'custom' && (
+              <Badge className="bg-purple-100 text-purple-800 text-xs">
+                ✨ Custom
+              </Badge>
+            )}
           </div>
           
           {/* Featured badge */}
@@ -811,13 +818,6 @@ export default function MyPawtraitsGallery() {
               </Button>
             )}
           </div>
-          
-          {/* Breed badge */}
-          {image.breed && (
-            <Badge className="absolute bottom-2 left-2 bg-purple-100 text-purple-800">
-              {image.breed.name}
-            </Badge>
-          )}
         </div>
         
         <div className="p-4">
@@ -827,9 +827,9 @@ export default function MyPawtraitsGallery() {
 
 
           {/* Interaction dates - only show most recent, avoid duplicate purchase dates */}
-          <div className="text-xs text-gray-500 mb-3">
+          <div className="text-xs mb-3">
             {image.source === 'custom' ? (
-              <p>Custom made on {new Date(image.created_at).toLocaleDateString()}</p>
+              <p className="text-purple-600">Custom made on {new Date(image.created_at).toLocaleDateString()}</p>
             ) : (
               image.interaction_dates
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -846,29 +846,36 @@ export default function MyPawtraitsGallery() {
                         Purchased on {new Date(interaction.date).toLocaleDateString()}
                       </a>
                     ) : (
-                      <>
+                      <span className="text-purple-600">
                         {interaction.type === 'purchased' ? 'Purchased' :
                          interaction.type === 'liked' ? 'Liked' :
                          interaction.type === 'shared' ? 'Shared' :
                          'Added'} on {new Date(interaction.date).toLocaleDateString()}
-                      </>
+                      </span>
                     )}
                   </p>
                 ))
             )}
           </div>
 
-          {/* Theme badge as hyperlink */}
-          {image.theme && (
+          {/* Theme and Breed badges */}
+          {(image.theme || image.breed) && (
             <div className="flex flex-wrap gap-1 mb-3">
-              <a
-                href={`/browse?theme=${image.theme.id}`}
-                className="inline-block"
-              >
-                <Badge variant="secondary" className="text-xs hover:bg-blue-100 hover:text-blue-800 transition-colors cursor-pointer">
-                  🎨 {image.theme.name}
+              {image.theme && (
+                <a
+                  href={`/browse?theme=${image.theme.id}`}
+                  className="inline-block"
+                >
+                  <Badge variant="secondary" className="text-xs hover:bg-blue-100 hover:text-blue-800 transition-colors cursor-pointer">
+                    🎨 {image.theme.name}
+                  </Badge>
+                </a>
+              )}
+              {image.breed && (
+                <Badge className="bg-purple-100 text-purple-800 text-xs">
+                  {image.breed.animal_type === 'cat' ? '🐈' : '🐕'} {image.breed.name}
                 </Badge>
-              </a>
+              )}
             </div>
           )}
 
@@ -878,9 +885,12 @@ export default function MyPawtraitsGallery() {
             const excludedTags = [
               'purchased', 'customer', 'partner', 'partner_for_client',
               'ai-generated', 'generated', 'artificial', 'digital',
-              'portrait', 'pet', 'animal', 'image', 'photo', 'picture'
+              'portrait', 'pet', 'animal', 'image', 'photo', 'picture',
+              'gemini-variation', 'custom'
             ];
-            return !excludedTags.some(excluded => tag.toLowerCase().includes(excluded.toLowerCase()));
+            // Also exclude breed slug tags (containing '--')
+            return !excludedTags.some(excluded => tag.toLowerCase().includes(excluded.toLowerCase()))
+              && !tag.includes('--');
           }).length > 0 && (
             <div className="flex flex-wrap gap-1 mb-3">
               {image.tags
@@ -888,9 +898,12 @@ export default function MyPawtraitsGallery() {
                   const excludedTags = [
                     'purchased', 'customer', 'partner', 'partner_for_client',
                     'ai-generated', 'generated', 'artificial', 'digital',
-                    'portrait', 'pet', 'animal', 'image', 'photo', 'picture'
+                    'portrait', 'pet', 'animal', 'image', 'photo', 'picture',
+                    'gemini-variation', 'custom'
                   ];
-                  return !excludedTags.some(excluded => tag.toLowerCase().includes(excluded.toLowerCase()));
+                  // Also exclude breed slug tags (containing '--')
+                  return !excludedTags.some(excluded => tag.toLowerCase().includes(excluded.toLowerCase()))
+                    && !tag.includes('--');
                 })
                 .slice(0, 2)
                 .map((tag) => (

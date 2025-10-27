@@ -53,7 +53,8 @@ export async function POST(request: NextRequest) {
         created_at,
         breeds!inner (
           id,
-          name
+          name,
+          animal_type
         ),
         themes (
           id,
