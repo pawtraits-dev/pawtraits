@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +13,7 @@ import { SupabaseService } from '@/lib/supabase';
 // Removed AdminSupabaseService - using SupabaseService for customer access
 import type { UserProfile } from '@/lib/user-types';
 import type { Product, ProductPricing } from '@/lib/product-types';
+import { formatPrice } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
 import ShareModal from '@/components/share-modal';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
@@ -19,7 +21,7 @@ import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
 import StickyFilterHeader from '@/components/StickyFilterHeader';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
-import { CountryProvider } from '@/lib/country-context';
+import { CountryProvider, useCountryPricing } from '@/lib/country-context';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
 import CustomerImageCustomizationModal from '@/components/CustomerImageCustomizationModal';
 import UserInteractionsService from '@/lib/user-interactions';
@@ -89,6 +91,8 @@ export default function MyPawtraitsGallery() {
 
   const supabaseService = new SupabaseService();
   const { totalItems, items: cartItems } = useHybridCart();
+  const router = useRouter();
+  const { getCountryPricing } = useCountryPricing();
 
   useEffect(() => {
     loadUserData();
@@ -646,9 +650,41 @@ export default function MyPawtraitsGallery() {
     setShowCustomizeModal(true);
   };
 
+  const getImageProductInfo = (imageId: string, formatId?: string) => {
+    if (!formatId) {
+      return { productCount: 0, lowestPrice: null, currency: null, currencySymbol: null };
+    }
+
+    const availableProducts = (products || []).filter(p =>
+      p.is_active && p.format_id === formatId
+    );
+
+    if (availableProducts.length === 0) {
+      return { productCount: 0, lowestPrice: null, currency: null, currencySymbol: null };
+    }
+
+    const countryPricing = getCountryPricing(pricing || []).filter(p =>
+      availableProducts.some(product => product.id === p.product_id)
+    );
+
+    if (countryPricing.length === 0) {
+      return { productCount: availableProducts.length, lowestPrice: null, currency: null, currencySymbol: null };
+    }
+
+    const lowestPricing = countryPricing.reduce((lowest, current) =>
+      current.sale_price < lowest.sale_price ? current : lowest
+    );
+
+    return {
+      productCount: availableProducts.length,
+      lowestPrice: lowestPricing.sale_price,
+      currency: lowestPricing.currency_code,
+      currencySymbol: lowestPricing.currency_symbol
+    };
+  };
+
   const handleImageClick = (image: GalleryImage) => {
-    setModalImage(image);
-    setShowImageModal(true);
+    router.push(`/shop/${image.id}`);
   };
 
   const handleShareComplete = (platform: string) => {
@@ -879,41 +915,22 @@ export default function MyPawtraitsGallery() {
             </div>
           )}
 
-          {/* Additional tags (only relevant descriptive tags) */}
-          {image.tags && image.tags.filter(tag => {
-            // Exclude technical/system tags and keep only relevant descriptive tags
-            const excludedTags = [
-              'purchased', 'customer', 'partner', 'partner_for_client',
-              'ai-generated', 'generated', 'artificial', 'digital',
-              'portrait', 'pet', 'animal', 'image', 'photo', 'picture',
-              'gemini-variation', 'custom'
-            ];
-            // Also exclude breed slug tags (containing '--')
-            return !excludedTags.some(excluded => tag.toLowerCase().includes(excluded.toLowerCase()))
-              && !tag.includes('--');
-          }).length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-3">
-              {image.tags
-                .filter(tag => {
-                  const excludedTags = [
-                    'purchased', 'customer', 'partner', 'partner_for_client',
-                    'ai-generated', 'generated', 'artificial', 'digital',
-                    'portrait', 'pet', 'animal', 'image', 'photo', 'picture',
-                    'gemini-variation', 'custom'
-                  ];
-                  // Also exclude breed slug tags (containing '--')
-                  return !excludedTags.some(excluded => tag.toLowerCase().includes(excluded.toLowerCase()))
-                    && !tag.includes('--');
-                })
-                .slice(0, 2)
-                .map((tag) => (
-                  <Badge key={tag} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))
-              }
-            </div>
-          )}
+          {/* Pricing and sizes */}
+          {(() => {
+            const productInfo = getImageProductInfo(image.id, image.format_id);
+            return productInfo.lowestPrice && (
+              <div className="mb-3">
+                <p className="text-sm font-medium text-green-600">
+                  from {formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol)}
+                </p>
+                {productInfo.productCount > 1 && (
+                  <p className="text-xs text-gray-500">
+                    {productInfo.productCount} size{productInfo.productCount > 1 ? 's' : ''} available
+                  </p>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Action buttons */}
           {image.interaction_types.includes('in_basket') && !image.interaction_types.includes('purchased') && (
