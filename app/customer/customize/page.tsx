@@ -129,10 +129,11 @@ export default function CustomerCustomizePage() {
 
   const loadFeaturedCatalogImages = async () => {
     try {
-      const response = await fetch('/api/images?is_featured=true&limit=5');
+      const response = await fetch('/api/images?featured=true&limit=5');
       if (response.ok) {
         const data = await response.json();
-        setCatalogImages(data || []);
+        // API returns { images, total_count, current_page, total_pages }
+        setCatalogImages(data.images || []);
       }
     } catch (error) {
       console.error('Error loading catalog images:', error);
