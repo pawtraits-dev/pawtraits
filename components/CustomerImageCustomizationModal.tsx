@@ -894,10 +894,12 @@ export default function CustomerImageCustomizationModal({
                 <h4 className="font-medium">Your Customization:</h4>
                 <div className="space-y-1">
                   <p className="text-sm">
-                    <strong>Breed:</strong> {keepCurrentBreed ? `${currentBreed?.name} (Current)` : selectedBreed?.name}
+                    <strong>Breed:</strong> {selectedBreed?.name || currentBreed?.name}
+                    {!selectedBreed && currentBreed && <span className="text-gray-500 ml-1">(Current)</span>}
                   </p>
                   <p className="text-sm">
-                    <strong>Coat:</strong> {keepCurrentCoat ? `${currentCoatInfo?.name} (Current)` : selectedCoat?.name}
+                    <strong>Coat:</strong> {selectedCoat?.name || currentCoatInfo?.name}
+                    {!selectedCoat && currentCoatInfo && <span className="text-gray-500 ml-1">(Current)</span>}
                   </p>
                   {selectedOutfit && (
                     <p className="text-sm">
