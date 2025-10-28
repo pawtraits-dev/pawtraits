@@ -684,21 +684,39 @@ export default function CustomerImageCustomizationModal({
                 </p>
               </div>
 
-              {/* Current Breed Display */}
-              {currentBreed && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm font-medium text-gray-900">Current Breed</p>
-                  <p className="text-lg font-semibold text-blue-700">{currentBreed.name}</p>
-                  <p className="text-xs text-gray-600 capitalize">{currentBreed.animal_type}</p>
-                </div>
-              )}
+              {/* Before/After Breed Comparison */}
+              {(currentBreed || selectedBreed) && (
+                <div className="p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50">
+                  <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center">
+                    {/* Original Breed */}
+                    <div className="text-left">
+                      <p className="text-xs font-medium text-gray-500 uppercase mb-1">Original</p>
+                      {currentBreed ? (
+                        <>
+                          <p className="text-lg font-semibold text-blue-700">{currentBreed.name}</p>
+                          <p className="text-xs text-gray-600 capitalize">{currentBreed.animal_type}</p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-gray-400 italic">None</p>
+                      )}
+                    </div>
 
-              {/* Selected New Breed Display */}
-              {selectedBreed && (
-                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                  <p className="text-sm font-medium text-gray-900">New Selection</p>
-                  <p className="text-lg font-semibold text-purple-700">{selectedBreed.name}</p>
-                  <p className="text-xs text-gray-600 capitalize">{selectedBreed.animal_type}</p>
+                    {/* Arrow */}
+                    <div className="text-2xl text-gray-400">→</div>
+
+                    {/* New Selection */}
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-gray-500 uppercase mb-1">New Selection</p>
+                      {selectedBreed ? (
+                        <>
+                          <p className="text-lg font-semibold text-purple-700">{selectedBreed.name}</p>
+                          <p className="text-xs text-gray-600 capitalize">{selectedBreed.animal_type}</p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-gray-400 italic">Choose below</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -739,33 +757,47 @@ export default function CustomerImageCustomizationModal({
                 </p>
               </div>
 
-              {/* Current Coat Display */}
-              {currentCoatInfo && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className="w-12 h-12 rounded-full border-2 border-white shadow"
-                      style={{ backgroundColor: currentCoatInfo.hex_color || '#ccc' }}
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Current Coat</p>
-                      <p className="text-lg font-semibold text-blue-700">{currentCoatInfo.name}</p>
+              {/* Before/After Coat Comparison */}
+              {(currentCoatInfo || selectedCoat) && (
+                <div className="p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50">
+                  <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center">
+                    {/* Original Coat */}
+                    <div className="text-left">
+                      <p className="text-xs font-medium text-gray-500 uppercase mb-2">Original</p>
+                      {currentCoatInfo ? (
+                        <div className="flex items-center space-x-3">
+                          <div
+                            className="w-12 h-12 rounded-full border-2 border-white shadow"
+                            style={{ backgroundColor: currentCoatInfo.hex_color || '#ccc' }}
+                          />
+                          <div>
+                            <p className="text-lg font-semibold text-blue-700">{currentCoatInfo.name}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-400 italic">None</p>
+                      )}
                     </div>
-                  </div>
-                </div>
-              )}
 
-              {/* Selected New Coat Display */}
-              {selectedCoat && (
-                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className="w-12 h-12 rounded-full border-2 border-white shadow"
-                      style={{ backgroundColor: selectedCoat.hex_color || '#ccc' }}
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">New Selection</p>
-                      <p className="text-lg font-semibold text-purple-700">{selectedCoat.name}</p>
+                    {/* Arrow */}
+                    <div className="text-2xl text-gray-400">→</div>
+
+                    {/* New Selection */}
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-gray-500 uppercase mb-2">New Selection</p>
+                      {selectedCoat ? (
+                        <div className="flex items-center justify-end space-x-3">
+                          <div>
+                            <p className="text-lg font-semibold text-purple-700">{selectedCoat.name}</p>
+                          </div>
+                          <div
+                            className="w-12 h-12 rounded-full border-2 border-white shadow"
+                            style={{ backgroundColor: selectedCoat.hex_color || '#ccc' }}
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-400 italic">Choose below</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -811,12 +843,26 @@ export default function CustomerImageCustomizationModal({
                 </p>
               </div>
 
-              {/* Selected Outfit Display */}
+              {/* Before/After Outfit Comparison */}
               {selectedOutfit && (
-                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                  <p className="text-sm font-medium text-gray-900">Selected Outfit</p>
-                  <p className="text-lg font-semibold text-purple-700">{selectedOutfit.name}</p>
-                  <p className="text-xs text-gray-600 capitalize">{selectedOutfit.category}</p>
+                <div className="p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50">
+                  <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center">
+                    {/* Original Outfit */}
+                    <div className="text-left">
+                      <p className="text-xs font-medium text-gray-500 uppercase mb-1">Original</p>
+                      <p className="text-sm text-gray-400 italic">No outfit</p>
+                    </div>
+
+                    {/* Arrow */}
+                    <div className="text-2xl text-gray-400">→</div>
+
+                    {/* New Selection */}
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-gray-500 uppercase mb-1">New Selection</p>
+                      <p className="text-lg font-semibold text-purple-700">{selectedOutfit.name}</p>
+                      <p className="text-xs text-gray-600 capitalize">{selectedOutfit.category}</p>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -889,23 +935,50 @@ export default function CustomerImageCustomizationModal({
                 </div>
               )}
 
-              {/* Summary */}
-              <div className="space-y-2 p-4 border rounded-lg bg-gray-50">
-                <h4 className="font-medium">Your Customization:</h4>
-                <div className="space-y-1">
-                  <p className="text-sm">
-                    <strong>Breed:</strong> {selectedBreed?.name || currentBreed?.name}
-                    {!selectedBreed && currentBreed && <span className="text-gray-500 ml-1">(Current)</span>}
-                  </p>
-                  <p className="text-sm">
-                    <strong>Coat:</strong> {selectedCoat?.name || currentCoatInfo?.name}
-                    {!selectedCoat && currentCoatInfo && <span className="text-gray-500 ml-1">(Current)</span>}
-                  </p>
-                  {selectedOutfit && (
-                    <p className="text-sm">
-                      <strong>Outfit:</strong> {selectedOutfit.name}
-                    </p>
-                  )}
+              {/* Summary - Before/After Comparison */}
+              <div className="p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50">
+                <h4 className="font-medium mb-3 text-center">Your Customization Summary</h4>
+                <div className="grid grid-cols-[1fr_auto_1fr] gap-4">
+                  {/* Original Column */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium text-gray-500 uppercase text-center mb-2">Original</p>
+                    <div>
+                      <p className="text-xs text-gray-600">Breed:</p>
+                      <p className="text-sm font-semibold text-blue-700">{currentBreed?.name || 'None'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Coat:</p>
+                      <p className="text-sm font-semibold text-blue-700">{currentCoatInfo?.name || 'None'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Outfit:</p>
+                      <p className="text-sm font-semibold text-blue-700">None</p>
+                    </div>
+                  </div>
+
+                  {/* Arrow Column */}
+                  <div className="flex flex-col justify-center items-center space-y-6 pt-6">
+                    <div className="text-2xl text-gray-400">→</div>
+                    <div className="text-2xl text-gray-400">→</div>
+                    <div className="text-2xl text-gray-400">→</div>
+                  </div>
+
+                  {/* New Selection Column */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium text-gray-500 uppercase text-center mb-2">Your Changes</p>
+                    <div>
+                      <p className="text-xs text-gray-600">Breed:</p>
+                      <p className="text-sm font-semibold text-purple-700">{selectedBreed?.name || currentBreed?.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Coat:</p>
+                      <p className="text-sm font-semibold text-purple-700">{selectedCoat?.name || currentCoatInfo?.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Outfit:</p>
+                      <p className="text-sm font-semibold text-purple-700">{selectedOutfit?.name || 'None'}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
