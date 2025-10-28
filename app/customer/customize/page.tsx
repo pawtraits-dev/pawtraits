@@ -16,10 +16,15 @@ import {
   CreditCard,
   Zap,
   Heart,
-  AlertCircle
+  AlertCircle,
+  Share2
 } from 'lucide-react';
 import { useUserRouting } from '@/hooks/use-user-routing';
 import type { ImageCatalogWithDetails } from '@/lib/types';
+import type { Product, ProductPricing } from '@/lib/product-types';
+import { formatPrice } from '@/lib/product-types';
+import { useCountryPricing } from '@/lib/country-context';
+import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import CustomerImageCustomizationModal from '@/components/CustomerImageCustomizationModal';
 
 interface CreditBalance {
@@ -51,11 +56,19 @@ export default function CustomerCustomizePage() {
   const { userProfile } = useUserRouting();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { selectedCountry, getCountryPricing } = useCountryPricing();
 
   const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
   const [creditPacks, setCreditPacks] = useState<CreditPack[]>([]);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [catalogImages, setCatalogImages] = useState<ImageCatalogWithDetails[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [pricing, setPricing] = useState<ProductPricing[]>([]);
+  const [userInteractions, setUserInteractions] = useState<{
+    likes: string[];
+    shares: string[];
+    purchases: string[];
+  }>({ likes: [], shares: [], purchases: [] });
   const [loading, setLoading] = useState(true);
   const [purchasingPack, setPurchasingPack] = useState<string | null>(null);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
@@ -77,7 +90,10 @@ export default function CustomerCustomizePage() {
       await Promise.all([
         loadCreditBalance(),
         loadGeneratedImages(),
-        loadFeaturedCatalogImages()
+        loadFeaturedCatalogImages(),
+        loadProducts(),
+        loadPricing(),
+        loadUserInteractions()
       ]);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -113,13 +129,53 @@ export default function CustomerCustomizePage() {
 
   const loadFeaturedCatalogImages = async () => {
     try {
-      const response = await fetch('/api/images?is_featured=true&limit=6');
+      const response = await fetch('/api/images?is_featured=true&limit=5');
       if (response.ok) {
         const data = await response.json();
         setCatalogImages(data || []);
       }
     } catch (error) {
       console.error('Error loading catalog images:', error);
+    }
+  };
+
+  const loadProducts = async () => {
+    try {
+      const response = await fetch('/api/public/products');
+      if (response.ok) {
+        const data = await response.json();
+        setProducts(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading products:', error);
+    }
+  };
+
+  const loadPricing = async () => {
+    try {
+      const response = await fetch('/api/public/pricing');
+      if (response.ok) {
+        const data = await response.json();
+        setPricing(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading pricing:', error);
+    }
+  };
+
+  const loadUserInteractions = async () => {
+    try {
+      const response = await fetch('/api/interactions/user');
+      if (response.ok) {
+        const data = await response.json();
+        setUserInteractions({
+          likes: data.likes || [],
+          shares: data.shares || [],
+          purchases: data.purchases || []
+        });
+      }
+    } catch (error) {
+      console.error('Error loading user interactions:', error);
     }
   };
 
@@ -143,6 +199,113 @@ export default function CustomerCustomizePage() {
       console.error('Error purchasing credits:', error);
       alert('Failed to initiate purchase. Please try again.');
       setPurchasingPack(null);
+    }
+  };
+
+  const getImageProductInfo = (imageId: string) => {
+    const image = catalogImages.find(img => img.id === imageId);
+
+    if (!image || !image.format_id) {
+      return { productCount: 0, lowestPrice: null, currency: null, currencySymbol: null };
+    }
+
+    const availableProducts = (products || []).filter(p =>
+      p.is_active && p.format_id === image.format_id
+    );
+
+    if (availableProducts.length === 0) {
+      return { productCount: 0, lowestPrice: null, currency: null, currencySymbol: null };
+    }
+
+    const countryPricing = getCountryPricing(pricing);
+    let lowestPrice: number | null = null;
+    let currency: string | null = null;
+    let currencySymbol: string | null = null;
+
+    availableProducts.forEach(product => {
+      const productPricing = countryPricing.find(p => p.product_id === product.id);
+      if (productPricing && (lowestPrice === null || productPricing.sale_price < lowestPrice)) {
+        lowestPrice = productPricing.sale_price;
+        currency = productPricing.currency_code;
+        currencySymbol = productPricing.currency_symbol;
+      }
+    });
+
+    return {
+      productCount: availableProducts.length,
+      lowestPrice,
+      currency,
+      currencySymbol
+    };
+  };
+
+  const handleLike = async (imageId: string) => {
+    const isLiked = userInteractions.likes.includes(imageId);
+
+    // Optimistic update
+    setUserInteractions(prev => ({
+      ...prev,
+      likes: isLiked
+        ? prev.likes.filter(id => id !== imageId)
+        : [...prev.likes, imageId]
+    }));
+
+    try {
+      await fetch('/api/interactions/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          interactions: [{
+            image_id: imageId,
+            interaction_type: isLiked ? 'unlike' : 'like'
+          }]
+        })
+      });
+    } catch (error) {
+      console.error('Error updating like:', error);
+      // Revert on error
+      setUserInteractions(prev => ({
+        ...prev,
+        likes: isLiked
+          ? [...prev.likes, imageId]
+          : prev.likes.filter(id => id !== imageId)
+      }));
+    }
+  };
+
+  const handleShare = async (image: ImageCatalogWithDetails) => {
+    const shareUrl = `${window.location.origin}/shop/${image.id}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: image.description?.split('\n')[0] || 'Pet Portrait',
+          text: 'Check out this amazing pet portrait!',
+          url: shareUrl
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Link copied to clipboard!');
+      }
+
+      // Track share interaction
+      setUserInteractions(prev => ({
+        ...prev,
+        shares: prev.shares.includes(image.id) ? prev.shares : [...prev.shares, image.id]
+      }));
+
+      await fetch('/api/interactions/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          interactions: [{
+            image_id: image.id,
+            interaction_type: 'share'
+          }]
+        })
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
     }
   };
 
@@ -431,7 +594,7 @@ export default function CustomerCustomizePage() {
                   Featured Portraits to Customize
                 </CardTitle>
                 <CardDescription>
-                  Click any image to start customizing
+                  Get inspired by these pawsome portraits
                 </CardDescription>
               </div>
               <Button
@@ -443,30 +606,148 @@ export default function CustomerCustomizePage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-              {catalogImages.map((image) => (
-                <div
-                  key={image.id}
-                  className="relative group cursor-pointer"
-                  onClick={() => handleCustomizeImage(image)}
-                >
-                  <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden">
-                    <img
-                      src={image.image_variants?.catalog_watermarked?.url || image.public_url}
-                      alt={image.description || 'Pet portrait'}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    />
-                  </div>
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300 rounded-lg flex items-center justify-center">
-                    <Button
-                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-purple-600 hover:bg-purple-700"
-                    >
-                      <Wand2 className="w-4 h-4 mr-2" />
-                      Customize
-                    </Button>
-                  </div>
-                </div>
-              ))}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {catalogImages.map((image) => {
+                const productInfo = getImageProductInfo(image.id);
+                const isLiked = userInteractions.likes.includes(image.id);
+                const isShared = userInteractions.shares.includes(image.id);
+                const isPurchased = userInteractions.purchases.includes(image.id);
+
+                return (
+                  <Card
+                    key={image.id}
+                    className="group hover:shadow-xl transition-shadow cursor-pointer overflow-hidden"
+                    onClick={() => router.push(`/shop/${image.id}`)}
+                  >
+                    <div className="relative aspect-square overflow-hidden">
+                      <CatalogImage
+                        imageId={image.id}
+                        alt={image.description || 'Pet portrait'}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+
+                      {/* Overlay with action buttons */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* Top overlay buttons */}
+                        <div className="absolute top-2 left-2 flex flex-col space-y-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLike(image.id);
+                            }}
+                            className={`p-2 rounded-full transition-all ${
+                              isLiked
+                                ? 'bg-red-500 text-white'
+                                : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
+                            }`}
+                            title={isLiked ? 'Unlike' : 'Like'}
+                          >
+                            <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShare(image);
+                            }}
+                            className={`p-2 rounded-full transition-all ${
+                              isShared
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
+                            }`}
+                            title={isShared ? 'Shared' : 'Share'}
+                          >
+                            <Share2 className="w-4 h-4" />
+                          </button>
+
+                          {isPurchased && (
+                            <div className="bg-green-500 text-white p-2 rounded-full" title="Purchased">
+                              <ShoppingCart className="w-4 h-4 fill-current" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Customize Button - Top Right */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCustomizeImage(image);
+                          }}
+                          className="absolute top-2 right-2 p-2 rounded-full transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-lg"
+                          title="Customize this image"
+                        >
+                          <Wand2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <CardContent className="p-4">
+                      {image.description && (
+                        <p className="text-sm text-gray-900 font-medium line-clamp-2 mb-2">
+                          {image.description.split('\n')[0].replace(/\*\*(.*?)\*\*/g, '$1')}
+                        </p>
+                      )}
+
+                      <div className="space-y-1 mb-3">
+                        {image.breed_name && image.breed_id && (
+                          <div>
+                            <Badge
+                              variant="secondary"
+                              className="text-xs cursor-pointer hover:bg-blue-200 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/browse?breed=${image.breed_id}`);
+                              }}
+                            >
+                              {image.breed_name}
+                            </Badge>
+                          </div>
+                        )}
+                        {image.theme_name && image.theme_id && (
+                          <div>
+                            <Badge
+                              variant="secondary"
+                              className="text-xs cursor-pointer hover:bg-purple-200 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/browse?theme=${image.theme_id}`);
+                              }}
+                            >
+                              {image.theme_name}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Country-aware pricing */}
+                      {productInfo.lowestPrice && (
+                        <div className="mb-3">
+                          <p className="text-sm font-medium text-green-600">
+                            from {formatPrice(productInfo.lowestPrice, productInfo.currency ?? 'GBP', productInfo.currencySymbol ?? '£')}
+                          </p>
+                          {productInfo.productCount > 1 && (
+                            <p className="text-xs text-gray-500">
+                              {productInfo.productCount} size{productInfo.productCount > 1 ? 's' : ''} available
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      <Button
+                        className="w-full bg-purple-600 hover:bg-purple-700"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/shop/${image.id}`);
+                        }}
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        View & Buy
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

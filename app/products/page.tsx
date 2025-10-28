@@ -187,14 +187,22 @@ function ProductsPageContent() {
                         key={product.id}
                         className="relative overflow-hidden hover:shadow-xl transition-shadow group"
                       >
-                        {/* Product Image Placeholder */}
-                        <div className="aspect-square bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center">
-                          <div className="text-center p-8">
-                            <Package className="w-16 h-16 text-purple-300 mx-auto mb-4" />
-                            <p className="text-sm text-purple-600 font-medium">
-                              {product.format.name} Format
-                            </p>
-                          </div>
+                        {/* Product Image */}
+                        <div className="aspect-square bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center overflow-hidden">
+                          {medium.preview_image_url ? (
+                            <img
+                              src={medium.preview_image_url}
+                              alt={`${product.medium.name} preview`}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="text-center p-8">
+                              <Package className="w-16 h-16 text-purple-300 mx-auto mb-4" />
+                              <p className="text-sm text-purple-600 font-medium">
+                                {product.format.name} Format
+                              </p>
+                            </div>
+                          )}
                         </div>
 
                         <CardContent className="p-6">

@@ -44,8 +44,6 @@ export default function CustomerImageCustomizationModal({
   const [selectedBreed, setSelectedBreed] = useState<Breed | null>(null);
   const [selectedCoat, setSelectedCoat] = useState<Coat | null>(null);
   const [selectedOutfit, setSelectedOutfit] = useState<Outfit | null>(null);
-  const [keepCurrentBreed, setKeepCurrentBreed] = useState(false);
-  const [keepCurrentCoat, setKeepCurrentCoat] = useState(false);
 
   // Data loading
   const [breeds, setBreeds] = useState<Breed[]>([]);
@@ -102,9 +100,9 @@ export default function CustomerImageCustomizationModal({
   useEffect(() => {
     let cost = 0;
 
-    // Base customization: 1 credit if breed OR coat changes
-    const breedChanged = !keepCurrentBreed && selectedBreed !== null;
-    const coatChanged = !keepCurrentCoat && selectedCoat !== null;
+    // Base customization: 1 credit if breed OR coat is selected
+    const breedChanged = selectedBreed !== null;
+    const coatChanged = selectedCoat !== null;
 
     if (breedChanged || coatChanged) {
       cost = 1; // Base customization cost
@@ -116,18 +114,13 @@ export default function CustomerImageCustomizationModal({
     }
 
     setCreditsRequired(cost);
-  }, [selectedBreed, selectedCoat, selectedOutfit, keepCurrentBreed, keepCurrentCoat]);
+  }, [selectedBreed, selectedCoat, selectedOutfit]);
 
-  // Fetch breed-specific coats when breed is selected or when keeping current breed
+  // Fetch breed-specific coats when breed is selected
   useEffect(() => {
     const loadBreedSpecificCoats = async () => {
-      let breedId: string | null = null;
-
-      if (keepCurrentBreed && image.breed_id) {
-        breedId = image.breed_id;
-      } else if (selectedBreed) {
-        breedId = selectedBreed.id;
-      }
+      // Use selected breed if available, otherwise use current breed from image
+      const breedId = selectedBreed?.id || image.breed_id;
 
       if (breedId) {
         const coats = await fetchBreedCoats(breedId);
@@ -142,7 +135,7 @@ export default function CustomerImageCustomizationModal({
     };
 
     loadBreedSpecificCoats();
-  }, [selectedBreed, keepCurrentBreed, image.breed_id]);
+  }, [selectedBreed, image.breed_id]);
 
   // Rotate progress messages every 6 seconds during generation
   useEffect(() => {
@@ -236,9 +229,9 @@ export default function CustomerImageCustomizationModal({
     try {
       setLoadingMessages(true);
 
-      // Get breed info
-      const breed = keepCurrentBreed ? currentBreed : selectedBreed;
-      const coat = keepCurrentCoat ? currentCoatInfo : selectedCoat;
+      // Get breed info - use selected or fallback to current
+      const breed = selectedBreed || currentBreed;
+      const coat = selectedCoat || currentCoatInfo;
 
       if (!breed || !coat) {
         console.warn('Missing breed or coat info for progress messages');
@@ -291,7 +284,7 @@ export default function CustomerImageCustomizationModal({
   // Generate AI description for completed image
   const generateImageDescription = async (imageData: string) => {
     try {
-      const breed = keepCurrentBreed ? currentBreed : selectedBreed;
+      const breed = selectedBreed || currentBreed;
       if (!breed) return;
 
       // Convert base64 to blob
@@ -362,9 +355,9 @@ export default function CustomerImageCustomizationModal({
   const canProceedFromStep = (): boolean => {
     switch (currentStep) {
       case 'breed-selection':
-        return keepCurrentBreed || selectedBreed !== null;
+        return selectedBreed !== null;
       case 'coat-selection':
-        return keepCurrentCoat || selectedCoat !== null;
+        return selectedCoat !== null;
       case 'outfit-selection':
         return true; // Outfit is optional
       case 'preview':
@@ -406,9 +399,9 @@ export default function CustomerImageCustomizationModal({
       // Prepare variation config
       const variationConfig: any = {};
 
-      // Determine breed and coat to use
-      const targetBreed = keepCurrentBreed ? image.breed_id : selectedBreed?.id;
-      const targetCoat = keepCurrentCoat ? image.coat_id : selectedCoat?.id;
+      // Determine breed and coat to use - selected or fallback to current
+      const targetBreed = selectedBreed?.id || image.breed_id;
+      const targetCoat = selectedCoat?.id || image.coat_id;
 
       if (targetBreed && targetCoat) {
         variationConfig.breedCoats = [{
@@ -622,13 +615,9 @@ export default function CustomerImageCustomizationModal({
             const getSelectedValue = (step: WizardStep): string | null => {
               switch (step) {
                 case 'breed-selection':
-                  if (keepCurrentBreed && currentBreed) return currentBreed.name;
-                  if (selectedBreed) return selectedBreed.name;
-                  return null;
+                  return selectedBreed?.name || null;
                 case 'coat-selection':
-                  if (keepCurrentCoat && currentCoatInfo) return currentCoatInfo.name;
-                  if (selectedCoat) return selectedCoat.name;
-                  return null;
+                  return selectedCoat?.name || null;
                 case 'outfit-selection':
                   return selectedOutfit?.name || null;
                 case 'preview':
@@ -641,18 +630,33 @@ export default function CustomerImageCustomizationModal({
             const selectedValue = getSelectedValue(step);
             const shouldShowValue = (isCompleted || (isActive && selectedValue)) && selectedValue;
 
+            // Allow navigation to completed steps or current step
+            const canNavigateToStep = isCompleted || isActive;
+
+            const handlePawClick = () => {
+              if (canNavigateToStep) {
+                setCurrentStep(step);
+              }
+            };
+
             return (
               <div key={step} className="flex items-center flex-1">
                 <div className="flex flex-col items-center flex-1">
-                  <Image
-                    src={`/assets/logos/paw-svgrepo-200x200-${
-                      isCompleted ? 'green' : isActive ? 'purple' : 'gold'
-                    }.svg`}
-                    alt={stepLabels[step]}
-                    width={40}
-                    height={40}
-                    className="filter drop-shadow-sm"
-                  />
+                  <div
+                    onClick={handlePawClick}
+                    className={`${canNavigateToStep ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-not-allowed opacity-50'}`}
+                    title={canNavigateToStep ? `Go to ${stepLabels[step]} step` : 'Complete previous steps first'}
+                  >
+                    <Image
+                      src={`/assets/logos/paw-svgrepo-200x200-${
+                        isCompleted ? 'green' : isActive ? 'purple' : 'gold'
+                      }.svg`}
+                      alt={stepLabels[step]}
+                      width={40}
+                      height={40}
+                      className="filter drop-shadow-sm"
+                    />
+                  </div>
                   <span className={`text-xs mt-1 ${isActive ? 'font-semibold text-purple-600' : 'text-gray-600'}`}>
                     {stepLabels[step]}
                   </span>
@@ -682,71 +686,48 @@ export default function CustomerImageCustomizationModal({
                 </p>
               </div>
 
-              {/* Unified Breed Selection Box */}
+              {/* Current Breed Display */}
               {currentBreed && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-                  {/* Current Breed */}
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Current Breed</p>
-                    <p className="text-lg font-semibold text-blue-700">{currentBreed.name}</p>
-                    <p className="text-xs text-gray-600 capitalize">{currentBreed.animal_type}</p>
-                  </div>
-
-                  {/* New Breed (if selected) */}
-                  {selectedBreed && !keepCurrentBreed && (
-                    <div className="border-t border-blue-300 pt-3">
-                      <p className="text-sm font-medium text-gray-900">New Breed</p>
-                      <p className="text-lg font-semibold text-purple-700">{selectedBreed.name}</p>
-                      <p className="text-xs text-gray-600 capitalize">{selectedBreed.animal_type}</p>
-                    </div>
-                  )}
-
-                  {/* Change Breed Button */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => {
-                      if (selectedBreed) {
-                        // Navigate to next step
-                        setCurrentStep('coat-selection');
-                      } else {
-                        // Toggle breed selection visibility
-                        setKeepCurrentBreed(!keepCurrentBreed);
-                      }
-                    }}
-                  >
-                    {selectedBreed ? 'Continue to Coat Selection' : 'Change Breed'}
-                  </Button>
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm font-medium text-gray-900">Current Breed</p>
+                  <p className="text-lg font-semibold text-blue-700">{currentBreed.name}</p>
+                  <p className="text-xs text-gray-600 capitalize">{currentBreed.animal_type}</p>
                 </div>
               )}
 
-              {/* Breed Selection Grid (shown when changing breed) */}
-              {!keepCurrentBreed && !selectedBreed && (
-                <div>
-                  <Label>Select New Breed</Label>
-                  <Input
-                    placeholder="Search breeds..."
-                    value={breedSearch}
-                    onChange={(e) => setBreedSearch(e.target.value)}
-                    className="mb-2"
-                  />
-                  <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto border rounded-lg p-2">
-                    {filteredBreeds.map(breed => (
-                      <button
-                        key={breed.id}
-                        onClick={() => setSelectedBreed(breed)}
-                        className={`p-3 text-left border rounded-lg hover:border-purple-300 transition-colors ${
-                          selectedBreed?.id === breed.id ? 'border-purple-500 bg-purple-50' : ''
-                        }`}
-                      >
-                        <p className="font-medium text-sm">{breed.name}</p>
-                        <p className="text-xs text-gray-600 capitalize">{breed.animal_type}</p>
-                      </button>
-                    ))}
-                  </div>
+              {/* Selected New Breed Display */}
+              {selectedBreed && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <p className="text-sm font-medium text-gray-900">New Selection</p>
+                  <p className="text-lg font-semibold text-purple-700">{selectedBreed.name}</p>
+                  <p className="text-xs text-gray-600 capitalize">{selectedBreed.animal_type}</p>
                 </div>
               )}
+
+              {/* Breed Selection Grid - Always Visible */}
+              <div>
+                <Label>Select {currentBreed ? 'Different' : ''} Breed</Label>
+                <Input
+                  placeholder="Search breeds..."
+                  value={breedSearch}
+                  onChange={(e) => setBreedSearch(e.target.value)}
+                  className="mb-2 mt-2"
+                />
+                <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto border rounded-lg p-2">
+                  {filteredBreeds.map(breed => (
+                    <button
+                      key={breed.id}
+                      onClick={() => setSelectedBreed(breed)}
+                      className={`p-3 text-left border rounded-lg hover:border-purple-300 transition-colors ${
+                        selectedBreed?.id === breed.id ? 'border-purple-500 bg-purple-50' : ''
+                      }`}
+                    >
+                      <p className="font-medium text-sm">{breed.name}</p>
+                      <p className="text-xs text-gray-600 capitalize">{breed.animal_type}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -760,10 +741,9 @@ export default function CustomerImageCustomizationModal({
                 </p>
               </div>
 
-              {/* Unified Coat Selection Box */}
+              {/* Current Coat Display */}
               {currentCoatInfo && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-                  {/* Current Coat */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <div
                       className="w-12 h-12 rounded-full border-2 border-white shadow"
@@ -774,72 +754,52 @@ export default function CustomerImageCustomizationModal({
                       <p className="text-lg font-semibold text-blue-700">{currentCoatInfo.name}</p>
                     </div>
                   </div>
+                </div>
+              )}
 
-                  {/* New Coat (if selected) */}
-                  {selectedCoat && !keepCurrentCoat && (
-                    <div className="border-t border-blue-300 pt-3">
-                      <div className="flex items-center space-x-3">
+              {/* Selected New Coat Display */}
+              {selectedCoat && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div
+                      className="w-12 h-12 rounded-full border-2 border-white shadow"
+                      style={{ backgroundColor: selectedCoat.hex_color || '#ccc' }}
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">New Selection</p>
+                      <p className="text-lg font-semibold text-purple-700">{selectedCoat.name}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Coat Selection Grid - Always Visible */}
+              <div>
+                <Label>Select {currentCoatInfo ? 'Different' : ''} Coat Color</Label>
+                {breedCoats.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto border rounded-lg p-2 mt-2">
+                    {breedCoats.map(coat => (
+                      <button
+                        key={coat.id}
+                        onClick={() => setSelectedCoat(coat)}
+                        className={`p-3 text-left border rounded-lg hover:border-purple-300 transition-colors ${
+                          selectedCoat?.id === coat.id ? 'border-purple-500 bg-purple-50' : ''
+                        }`}
+                      >
                         <div
-                          className="w-12 h-12 rounded-full border-2 border-white shadow"
-                          style={{ backgroundColor: selectedCoat.hex_color || '#ccc' }}
+                          className="w-10 h-10 rounded-full mb-2 border-2 border-white shadow"
+                          style={{ backgroundColor: coat.hex_color || '#ccc' }}
                         />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">New Coat</p>
-                          <p className="text-lg font-semibold text-purple-700">{selectedCoat.name}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Change Coat Button */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => {
-                      if (selectedCoat) {
-                        // Navigate to next step
-                        setCurrentStep('outfit-selection');
-                      } else {
-                        // Toggle coat selection visibility
-                        setKeepCurrentCoat(!keepCurrentCoat);
-                      }
-                    }}
-                  >
-                    {selectedCoat ? 'Continue to Outfit Selection' : 'Change Coat'}
-                  </Button>
-                </div>
-              )}
-
-              {/* Coat Selection Grid (shown when changing coat) */}
-              {!keepCurrentCoat && !selectedCoat && (
-                <div>
-                  <Label>Select New Coat Color</Label>
-                  {breedCoats.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto border rounded-lg p-2 mt-2">
-                      {breedCoats.map(coat => (
-                        <button
-                          key={coat.id}
-                          onClick={() => setSelectedCoat(coat)}
-                          className={`p-3 text-left border rounded-lg hover:border-purple-300 transition-colors ${
-                            selectedCoat?.id === coat.id ? 'border-purple-500 bg-purple-50' : ''
-                          }`}
-                        >
-                          <div
-                            className="w-10 h-10 rounded-full mb-2 border-2 border-white shadow"
-                            style={{ backgroundColor: coat.hex_color || '#ccc' }}
-                          />
-                          <p className="font-medium text-xs">{coat.name}</p>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-4 border rounded-lg text-center text-gray-500 mt-2">
-                      <p className="text-sm">Loading coat colors for selected breed...</p>
-                    </div>
-                  )}
-                </div>
-              )}
+                        <p className="font-medium text-xs">{coat.name}</p>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 border rounded-lg text-center text-gray-500 mt-2">
+                    <p className="text-sm">Loading coat colors for selected breed...</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -849,80 +809,54 @@ export default function CustomerImageCustomizationModal({
               <div>
                 <h3 className="text-lg font-semibold mb-2">Select Outfit (Optional)</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Add an outfit to your pet's portrait
+                  Add an outfit to your pet's portrait (+1 credit)
                 </p>
               </div>
 
-              {/* Unified Outfit Selection Box */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-                {/* Selected Outfit Display */}
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Outfit</p>
-                  {selectedOutfit ? (
-                    <div>
-                      <p className="text-lg font-semibold text-purple-700">{selectedOutfit.name}</p>
-                      <p className="text-xs text-gray-600 capitalize">{selectedOutfit.category}</p>
-                    </div>
-                  ) : (
-                    <p className="text-lg font-semibold text-gray-500 italic">No outfit selected</p>
-                  )}
+              {/* Selected Outfit Display */}
+              {selectedOutfit && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <p className="text-sm font-medium text-gray-900">Selected Outfit</p>
+                  <p className="text-lg font-semibold text-purple-700">{selectedOutfit.name}</p>
+                  <p className="text-xs text-gray-600 capitalize">{selectedOutfit.category}</p>
                 </div>
+              )}
 
-                {/* Action Buttons */}
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      if (selectedOutfit) {
-                        // If outfit selected, navigate to preview
-                        setCurrentStep('preview');
-                      } else {
-                        // Show outfit selection grid
-                        // We'll use a state flag for this
-                      }
-                    }}
-                  >
-                    {selectedOutfit ? 'Continue to Preview' : 'Add Outfit (+1 credit)'}
-                  </Button>
-                  {!selectedOutfit && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setCurrentStep('preview')}
+              {/* Outfit Selection Grid - Always Visible */}
+              <div>
+                <Label>Available Outfits</Label>
+                <Input
+                  placeholder="Search outfits..."
+                  value={outfitSearch}
+                  onChange={(e) => setOutfitSearch(e.target.value)}
+                  className="mb-2 mt-2"
+                />
+                <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto border rounded-lg p-2">
+                  {filteredOutfits.map(outfit => (
+                    <button
+                      key={outfit.id}
+                      onClick={() => setSelectedOutfit(outfit)}
+                      className={`p-3 text-center border rounded-lg hover:border-purple-300 transition-colors ${
+                        selectedOutfit?.id === outfit.id ? 'border-purple-500 bg-purple-50' : ''
+                      }`}
                     >
-                      Skip
-                    </Button>
-                  )}
+                      <p className="font-medium text-sm">{outfit.name}</p>
+                      <p className="text-xs text-gray-600 capitalize">{outfit.category}</p>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Outfit Selection Grid (shown when adding outfit) */}
-              {!selectedOutfit && (
-                <div>
-                  <Label>Available Outfits</Label>
-                  <Input
-                    placeholder="Search outfits..."
-                    value={outfitSearch}
-                    onChange={(e) => setOutfitSearch(e.target.value)}
-                    className="mb-2 mt-2"
-                  />
-                  <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto border rounded-lg p-2">
-                    {filteredOutfits.map(outfit => (
-                      <button
-                        key={outfit.id}
-                        onClick={() => setSelectedOutfit(outfit)}
-                        className={`p-3 text-center border rounded-lg hover:border-purple-300 transition-colors ${
-                          selectedOutfit?.id === outfit.id ? 'border-purple-500 bg-purple-50' : ''
-                        }`}
-                      >
-                        <p className="font-medium text-sm">{outfit.name}</p>
-                        <p className="text-xs text-gray-600 capitalize">{outfit.category}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {/* Clear Selection Button */}
+              {selectedOutfit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedOutfit(null)}
+                  className="w-full"
+                >
+                  Clear Selection
+                </Button>
               )}
             </div>
           )}
