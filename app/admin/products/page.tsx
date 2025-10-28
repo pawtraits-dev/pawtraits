@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AdminSupabaseService } from '@/lib/admin-supabase';
-import { ChevronUp, ChevronDown, Plus, Edit, Trash2, Search, Filter } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, Edit, Trash2, Search, Filter, Star } from 'lucide-react';
 import Link from 'next/link';
 
 interface Product {
@@ -61,6 +61,7 @@ export default function ProductsPage() {
   const [mediumFilter, setMediumFilter] = useState('');
   const [formatFilter, setFormatFilter] = useState('');
   const [stockStatusFilter, setStockStatusFilter] = useState('');
+  const [featuredFilter, setFeaturedFilter] = useState('');
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -139,7 +140,11 @@ export default function ProductsPage() {
       
       // Stock status filter
       if (stockStatusFilter && product.stock_status !== stockStatusFilter) return false;
-      
+
+      // Featured filter
+      if (featuredFilter === 'featured' && !product.is_featured) return false;
+      if (featuredFilter === 'non-featured' && product.is_featured) return false;
+
       return true;
     })
     .sort((a, b) => {
@@ -179,6 +184,10 @@ export default function ProductsPage() {
         case 'stock':
           aVal = a.stock_status;
           bVal = b.stock_status;
+          break;
+        case 'featured':
+          aVal = a.is_featured ? 1 : 0;
+          bVal = b.is_featured ? 1 : 0;
           break;
         default:
           return 0;
@@ -220,7 +229,7 @@ export default function ProductsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
             {/* Search */}
             <div>
               <label className="block text-sm font-medium mb-2">Search</label>
@@ -285,6 +294,20 @@ export default function ProductsPage() {
               </Select>
             </div>
 
+            {/* Featured Filter */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Featured</label>
+              <Select value={featuredFilter} onValueChange={setFeaturedFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All products" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="featured">Featured Only</SelectItem>
+                  <SelectItem value="non-featured">Non-Featured Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Clear Filters */}
             <div className="flex items-end">
               <Button
@@ -294,6 +317,7 @@ export default function ProductsPage() {
                   setMediumFilter('');
                   setFormatFilter('');
                   setStockStatusFilter('');
+                  setFeaturedFilter('');
                   setSortField('');
                 }}
                 className="w-full"
@@ -352,11 +376,17 @@ export default function ProductsPage() {
                   >
                     Price {getSortIcon('price')}
                   </th>
-                  <th 
+                  <th
                     className="text-center p-4 font-medium cursor-pointer hover:bg-gray-50"
                     onClick={() => handleSort('stock')}
                   >
                     Status {getSortIcon('stock')}
+                  </th>
+                  <th
+                    className="text-center p-4 font-medium cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleSort('featured')}
+                  >
+                    Featured {getSortIcon('featured')}
                   </th>
                   <th className="text-right p-4 font-medium">
                     Actions
@@ -416,6 +446,13 @@ export default function ProductsPage() {
                         {product.stock_status.replace('_', ' ')}
                       </span>
                     </td>
+                    <td className="p-4 text-center">
+                      {product.is_featured ? (
+                        <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 inline" />
+                      ) : (
+                        <span className="text-gray-300">-</span>
+                      )}
+                    </td>
                     <td className="p-4">
                       <div className="flex items-center justify-end space-x-2">
                         <Link href={`/admin/products/${product.id}/edit`}>
@@ -423,8 +460,8 @@ export default function ProductsPage() {
                             <Edit className="w-4 h-4" />
                           </Button>
                         </Link>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => handleDelete(product.id)}
                           className="text-red-600 hover:text-red-700"
@@ -440,8 +477,8 @@ export default function ProductsPage() {
             
             {filteredAndSortedProducts.length === 0 && (
               <div className="text-center py-8 text-gray-500">
-                {searchTerm || mediumFilter || formatFilter || stockStatusFilter ? 
-                  'No products match your filters' : 
+                {searchTerm || mediumFilter || formatFilter || stockStatusFilter || featuredFilter ?
+                  'No products match your filters' :
                   'No products found'
                 }
               </div>

@@ -388,14 +388,25 @@ function QRLandingPageContent() {
 
                 {/* Products */}
                 <div className="space-y-3">
-                  <h4 className="font-semibold">Available Products</h4>
-                  {products.filter(product =>
-                    product.is_active &&
-                    (!image.format_id || product.format_id === image.format_id)
-                  ).slice(0, 3).map((product) => {
-                    const countryPricing = getCountryPricing(pricing);
-                    const productPricing = countryPricing.find(p => p.product_id === product.id);
-                    if (!productPricing) return null;
+                  <h4 className="font-semibold">Popular Products</h4>
+                  {products
+                    .filter(product =>
+                      product.is_active &&
+                      product.is_featured &&
+                      (!image.format_id || product.format_id === image.format_id)
+                    )
+                    .sort((a, b) => {
+                      // Sort by price (low to high)
+                      const countryPricing = getCountryPricing(pricing);
+                      const priceA = countryPricing.find(p => p.product_id === a.id)?.sale_price || 0;
+                      const priceB = countryPricing.find(p => p.product_id === b.id)?.sale_price || 0;
+                      return priceA - priceB;
+                    })
+                    .slice(0, 3)
+                    .map((product) => {
+                      const countryPricing = getCountryPricing(pricing);
+                      const productPricing = countryPricing.find(p => p.product_id === product.id);
+                      if (!productPricing) return null;
 
                     const originalPrice = productPricing.sale_price;
                     const discountedPrice = partner ? originalPrice * (1 - discountAmount / 100) : originalPrice;

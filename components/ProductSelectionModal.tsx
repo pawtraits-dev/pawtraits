@@ -73,14 +73,25 @@ export default function ProductSelectionModal({
   };
 
   // Get products that match the image's format and have pricing for selected country
-  const availableProducts = products.filter(product => {
-    const countryPricing = pricing.find(p => 
-      p.product_id === product.id && p.country_code === selectedCountry
-    );
-    // Filter by format_id if available, otherwise show all active products with pricing
-    const formatMatches = !image.format_id || product.format_id === image.format_id;
-    return product.is_active && countryPricing && formatMatches;
-  });
+  const availableProducts = products
+    .filter(product => {
+      const countryPricing = pricing.find(p =>
+        p.product_id === product.id && p.country_code === selectedCountry
+      );
+      // Filter by format_id if available, otherwise show all active products with pricing
+      const formatMatches = !image.format_id || product.format_id === image.format_id;
+      return product.is_active && countryPricing && formatMatches;
+    })
+    .sort((a, b) => {
+      // Sort by featured status first, then by price (low to high)
+      if (a.is_featured && !b.is_featured) return -1;
+      if (!a.is_featured && b.is_featured) return 1;
+
+      // Both have same featured status, sort by price
+      const priceA = pricing.find(p => p.product_id === a.id && p.country_code === selectedCountry)?.sale_price || 0;
+      const priceB = pricing.find(p => p.product_id === b.id && p.country_code === selectedCountry)?.sale_price || 0;
+      return priceA - priceB;
+    });
 
   const getProductPricing = (productId: string) => {
     return pricing.find(p => p.product_id === productId && p.country_code === selectedCountry);
@@ -236,7 +247,14 @@ export default function ProductSelectionModal({
                       {/* Product Info */}
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <h4 className="font-medium text-sm">{product.name}</h4>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium text-sm">{product.name}</h4>
+                            {product.is_featured && (
+                              <Badge variant="secondary" className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 text-xs">
+                                ⭐ Popular
+                              </Badge>
+                            )}
+                          </div>
                           <div className="flex items-center space-x-2 text-xs text-gray-600 mt-1">
                             <span>{product.medium?.name}</span>
                             <span>•</span>
