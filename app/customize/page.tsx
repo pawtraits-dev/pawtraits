@@ -127,12 +127,12 @@ function CustomerCustomizePageContent() {
 
   const loadFeaturedCatalogImages = async () => {
     try {
-      const response = await fetch('/api/images?is_featured=true&limit=6');
+      const response = await fetch('/api/images?featured=true&limit=6');
       if (response.ok) {
         const data = await response.json();
         console.log('Catalog images API response:', data);
-        // Ensure data is always an array
-        const images = Array.isArray(data) ? data : [];
+        // API returns { images, total_count, current_page, total_pages }
+        const images = Array.isArray(data.images) ? data.images : [];
         console.log('Setting catalog images:', images);
         setCatalogImages(images);
       }
@@ -470,6 +470,7 @@ function CustomerCustomizePageContent() {
         )}
 
         {/* Featured Catalog Images - Call to Action */}
+        {catalogImages.length > 0 && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -518,6 +519,7 @@ function CustomerCustomizePageContent() {
             </div>
           </CardContent>
         </Card>
+        )}
 
       </div>
       </div>
