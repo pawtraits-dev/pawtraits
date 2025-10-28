@@ -242,19 +242,12 @@ export default function ProductSelectionModal({
                 if (!productPricing) return null;
 
                 return (
-                  <Card key={product.id} className="p-4">
+                  <Card key={product.id} className="relative p-4">
                     <div className="space-y-3">
                       {/* Product Info */}
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium text-sm">{product.name}</h4>
-                            {product.is_featured && (
-                              <Badge variant="secondary" className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 text-xs">
-                                ⭐ Popular
-                              </Badge>
-                            )}
-                          </div>
+                          <h4 className="font-medium text-sm">{product.name}</h4>
                           <div className="flex items-center space-x-2 text-xs text-gray-600 mt-1">
                             <span>{product.medium?.name}</span>
                             <span>•</span>
@@ -299,14 +292,21 @@ export default function ProductSelectionModal({
                         {quantity > 0 && (
                           <div className="text-sm font-medium">
                             Subtotal: {formatPrice(
-                              productPricing.sale_price * quantity, 
-                              productPricing.currency_code, 
+                              productPricing.sale_price * quantity,
+                              productPricing.currency_code,
                               productPricing.currency_symbol
                             )}
                           </div>
                         )}
                       </div>
                     </div>
+
+                    {/* Popular Badge - Bottom Right */}
+                    {product.is_featured && (
+                      <Badge variant="secondary" className="absolute bottom-2 right-2 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 text-xs">
+                        ⭐ Popular
+                      </Badge>
+                    )}
                   </Card>
                 );
               })}
