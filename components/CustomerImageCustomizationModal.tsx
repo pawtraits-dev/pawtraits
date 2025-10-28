@@ -630,13 +630,11 @@ export default function CustomerImageCustomizationModal({
             const selectedValue = getSelectedValue(step);
             const shouldShowValue = (isCompleted || (isActive && selectedValue)) && selectedValue;
 
-            // Allow navigation to completed steps or current step
-            const canNavigateToStep = isCompleted || isActive;
+            // Allow navigation to all steps - users can click any paw at any time
+            const canNavigateToStep = true;
 
             const handlePawClick = () => {
-              if (canNavigateToStep) {
-                setCurrentStep(step);
-              }
+              setCurrentStep(step);
             };
 
             return (
@@ -644,8 +642,8 @@ export default function CustomerImageCustomizationModal({
                 <div className="flex flex-col items-center flex-1">
                   <div
                     onClick={handlePawClick}
-                    className={`${canNavigateToStep ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-not-allowed opacity-50'}`}
-                    title={canNavigateToStep ? `Go to ${stepLabels[step]} step` : 'Complete previous steps first'}
+                    className="cursor-pointer hover:scale-110 transition-transform"
+                    title={`Go to ${stepLabels[step]} step`}
                   >
                     <Image
                       src={`/assets/logos/paw-svgrepo-200x200-${

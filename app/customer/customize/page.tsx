@@ -585,6 +585,7 @@ export default function CustomerCustomizePage() {
         )}
 
         {/* Featured Catalog Images - Call to Action */}
+        {catalogImages.length > 0 && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -751,6 +752,7 @@ export default function CustomerCustomizePage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
       </div>
 
