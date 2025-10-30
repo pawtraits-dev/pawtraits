@@ -490,8 +490,8 @@ export default function CustomerImageCustomizationModal({
   };
 
   const handlePurchaseCredits = () => {
-    // Open credit purchase modal or redirect
-    window.location.href = '/customer/customize?show_credit_purchase=true';
+    // Redirect to customize page where credit packs are displayed
+    window.location.href = '/customize';
   };
 
   const handleLikeVariation = (index: number) => {
@@ -564,17 +564,28 @@ export default function CustomerImageCustomizationModal({
               </p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold text-purple-600">
-              {loadingCredits ? '...' : creditBalance}
-            </p>
-            <p className="text-xs text-gray-600">
-              {creditsRequired > 0 && creditBalance >= creditsRequired ? (
-                <>{creditBalance - creditsRequired} after generation</>
-              ) : (
-                'credits available'
-              )}
-            </p>
+          <div className="flex items-center space-x-4">
+            <div className="text-right">
+              <p className="text-2xl font-bold text-purple-600">
+                {loadingCredits ? '...' : creditBalance}
+              </p>
+              <p className="text-xs text-gray-600">
+                {creditsRequired > 0 && creditBalance >= creditsRequired ? (
+                  <>{creditBalance - creditsRequired} after generation</>
+                ) : (
+                  'credits available'
+                )}
+              </p>
+            </div>
+            <Button
+              onClick={handlePurchaseCredits}
+              size="sm"
+              variant={creditBalance < creditsRequired ? "default" : "outline"}
+              className={creditBalance < creditsRequired ? "bg-purple-600 hover:bg-purple-700 animate-pulse" : ""}
+            >
+              <CreditCard className="w-4 h-4 mr-2" />
+              Buy Credits
+            </Button>
           </div>
         </div>
 
