@@ -3,6 +3,7 @@ import { Inter, Margarine, Life_Savers } from 'next/font/google';
 import './globals.css';
 import { HybridCartProvider } from '@/lib/hybrid-cart-context';
 import EnvironmentIndicator from '@/components/EnvironmentIndicator';
+import { Analytics } from '@vercel/analytics/react';
 
 const inter = Inter({ subsets: ['latin'] });
 const margarine = Margarine({ 
@@ -54,6 +55,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} ${margarine.variable} ${lifeSavers.variable}`}>
         <EnvironmentIndicator />
+        <Analytics />
         <div id="root">
           <HybridCartProvider>
             {children}
