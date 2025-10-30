@@ -8,9 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, Users, TrendingUp, DollarSign, QrCode, Mail, Phone, MapPin, Globe, ArrowRight, Gift } from 'lucide-react';
+import { CheckCircle, Users, TrendingUp, DollarSign, QrCode, Mail, Phone, MapPin, Globe, ArrowRight, Gift, Sparkles, Star, HandHeart, Building, Package, Target, BarChart } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
 
 const businessTypes = [
   { value: 'groomer', label: 'Pet Groomer', icon: '✂️' },
@@ -307,19 +309,27 @@ function PartnerSignupForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+      {/* Navigation */}
+      <UserAwareNavigation />
+
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-20">
-        <div className="max-w-4xl mx-auto px-8 text-center">
-          <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            🎨 Partner with Pawtraits
-          </h1>
-          <p className="text-xl md:text-2xl text-purple-100 mb-8">
-            Earn 10% commission for life on every sale from clients you refer!
-          </p>
+      <section className="py-16 bg-gradient-to-r from-purple-600 to-blue-600 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-black bg-opacity-10"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <div className="flex items-center justify-center mb-6">
+              <HandHeart className="w-16 h-16" />
+            </div>
+            <h1 className="text-4xl lg:text-6xl font-bold mb-6 font-[family-name:var(--font-life-savers)]">
+              Partner with Pawtraits
+            </h1>
+            <p className="text-xl lg:text-2xl mb-8 max-w-3xl mx-auto opacity-90">
+              Earn 10% commission for life on every sale from clients you refer!
+            </p>
           
-          {/* Benefits */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12">
+          {/* Key Benefits */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mt-12">
             <div className="text-center">
               <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <DollarSign className="w-8 h-8" />
@@ -348,13 +358,147 @@ function PartnerSignupForm() {
               <h3 className="font-semibold mb-2">20% Partner Discount</h3>
               <p className="text-purple-100 text-sm">Save on your own orders and gifts</p>
             </div>
+            <div className="text-center">
+              <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Target className="w-8 h-8" />
+              </div>
+              <h3 className="font-semibold mb-2">No Caps or Limits</h3>
+              <p className="text-purple-100 text-sm">Unlimited earning potential</p>
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <BarChart className="w-8 h-8" />
+              </div>
+              <h3 className="font-semibold mb-2">Marketing Support</h3>
+              <p className="text-purple-100 text-sm">Resources to help you succeed</p>
+            </div>
+          </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
+              How It Works
+            </h2>
+            <p className="text-xl text-gray-600">
+              Start earning in three simple steps
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Step 1 */}
+            <Card className="text-center bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <CardContent className="p-8">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-2xl font-bold text-purple-600">1</span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Sign Up & Get Approved</h3>
+                <p className="text-gray-600">
+                  Complete your partner application with your business details and get approved to start referring customers.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Step 2 */}
+            <Card className="text-center bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <CardContent className="p-8">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-2xl font-bold text-purple-600">2</span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Share Your Unique Code</h3>
+                <p className="text-gray-600">
+                  Share your unique referral code with customers, giving them a 10% discount on their first order.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Step 3 */}
+            <Card className="text-center bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <CardContent className="p-8">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-2xl font-bold text-purple-600">3</span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Earn Commission</h3>
+                <p className="text-gray-600">
+                  Earn 10% commission on all referred customer orders - for life. Track your earnings in your partner dashboard.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Commission Structure */}
+      <section className="py-16 bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-4xl font-bold mb-6 font-[family-name:var(--font-life-savers)]">
+            Generous Commission Structure
+          </h2>
+          <Card className="shadow-lg border-0 bg-white">
+            <CardContent className="p-8">
+              <div className="bg-purple-50 rounded-lg p-8 mb-6">
+                <div className="text-center">
+                  <p className="text-6xl font-bold text-purple-600 mb-2">10%</p>
+                  <p className="text-xl text-purple-700 font-medium">Commission on Every Order</p>
+                </div>
+              </div>
+              <p className="text-gray-600 mb-6">
+                Commission calculated on order total (excluding shipping) • Paid monthly • No minimum thresholds
+              </p>
+              <div className="grid md:grid-cols-3 gap-6 text-left">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-1">Customer Orders £100</p>
+                  <p className="text-2xl font-bold text-purple-600">£10</p>
+                  <p className="text-xs text-gray-500">Your Commission</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-1">Customer Orders £500</p>
+                  <p className="text-2xl font-bold text-purple-600">£50</p>
+                  <p className="text-xs text-gray-500">Your Commission</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-1">Customer Orders £1,000</p>
+                  <p className="text-2xl font-bold text-purple-600">£100</p>
+                  <p className="text-xs text-gray-500">Your Commission</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* Perfect For Section */}
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-[family-name:var(--font-life-savers)]">
+              Perfect For Pet Care Professionals
+            </h2>
+            <p className="text-xl text-gray-600">
+              Join pet care professionals already earning with Pawtraits
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {businessTypes.map((type) => (
+              <Card key={type.value} className="text-center hover:shadow-lg transition-shadow">
+                <CardContent className="p-6">
+                  <div className="text-4xl mb-3">{type.icon}</div>
+                  <h3 className="font-semibold text-gray-900">{type.label}</h3>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Signup Form */}
-      <div className="py-16 px-8">
-        <div className="max-w-2xl mx-auto">
+      <section className="py-16 bg-white">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <Card>
             <CardHeader className="text-center">
               <CardTitle className="text-2xl">Create Your Partner Account</CardTitle>
@@ -653,7 +797,71 @@ function PartnerSignupForm() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-12 bg-gray-900 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            {/* Branding */}
+            <div>
+              <div className="flex items-center space-x-2 mb-4">
+                <HandHeart className="w-8 h-8 text-purple-400" />
+                <span className="text-xl font-bold font-[family-name:var(--font-life-savers)]">Pawtraits</span>
+              </div>
+              <p className="text-gray-400 text-sm">
+                Fantastic Fun Pictures of your Furry Friends
+              </p>
+            </div>
+
+            {/* Contact Info */}
+            <div>
+              <h3 className="font-semibold mb-4 text-lg">Contact Us</h3>
+              <div className="space-y-2 text-sm text-gray-400">
+                <div className="flex items-center space-x-2">
+                  <Mail className="w-4 h-4" />
+                  <a href="mailto:partners@pawtraits.pics" className="hover:text-purple-400 transition-colors">
+                    partners@pawtraits.pics
+                  </a>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Globe className="w-4 h-4" />
+                  <a href="https://www.pawtraits.pics" className="hover:text-purple-400 transition-colors">
+                    www.pawtraits.pics
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Links */}
+            <div>
+              <h3 className="font-semibold mb-4 text-lg">Quick Links</h3>
+              <div className="space-y-2 text-sm text-gray-400">
+                <div>
+                  <Link href="/auth/login" className="hover:text-purple-400 transition-colors">
+                    Partner Login
+                  </Link>
+                </div>
+                <div>
+                  <Link href="/" className="hover:text-purple-400 transition-colors">
+                    Home
+                  </Link>
+                </div>
+                <div>
+                  <Link href="/shop" className="hover:text-purple-400 transition-colors">
+                    Shop
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="border-t border-gray-800 pt-8 text-center text-sm text-gray-400">
+            <p>&copy; {new Date().getFullYear()} Pawtraits. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
