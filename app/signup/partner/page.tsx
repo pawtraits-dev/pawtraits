@@ -13,6 +13,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
+import { CountryProvider } from '@/lib/country-context';
 
 const businessTypes = [
   { value: 'groomer', label: 'Pet Groomer', icon: '✂️' },
@@ -47,7 +48,7 @@ interface FormData {
 }
 
 // Component that handles search params and needs Suspense
-function PartnerSignupForm() {
+function PartnerSignupFormContent() {
   const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>({
@@ -863,6 +864,15 @@ function PartnerSignupForm() {
         </div>
       </footer>
     </div>
+  );
+}
+
+// Wrapper component with CountryProvider
+function PartnerSignupForm() {
+  return (
+    <CountryProvider>
+      <PartnerSignupFormContent />
+    </CountryProvider>
   );
 }
 
