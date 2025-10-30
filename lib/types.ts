@@ -676,6 +676,7 @@ export interface PreRegistrationCode {
   admin_id?: string;
   scans_count: number;
   conversions_count: number;
+  last_scanned_at?: string;
   created_at: string;
   updated_at: string;
 }

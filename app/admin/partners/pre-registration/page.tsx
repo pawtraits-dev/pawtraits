@@ -482,12 +482,21 @@ export default function PreRegistrationManagementPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <span className="font-medium">{code.scans_count}</span>
-                        {code.conversions_count > 0 && (
-                          <span className="text-xs text-green-600 ml-1">
-                            ({code.conversions_count} converted)
-                          </span>
-                        )}
+                        <div className="flex flex-col">
+                          <div>
+                            <span className="font-medium">{code.scans_count}</span>
+                            {code.conversions_count > 0 && (
+                              <span className="text-xs text-green-600 ml-1">
+                                ({code.conversions_count} converted)
+                              </span>
+                            )}
+                          </div>
+                          {code.last_scanned_at && (
+                            <span className="text-xs text-gray-500 mt-1">
+                              Last: {new Date(code.last_scanned_at).toLocaleDateString()} {new Date(code.last_scanned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4">
                         <span className="text-sm text-gray-600">
