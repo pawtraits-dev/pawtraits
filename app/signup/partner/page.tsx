@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, Users, TrendingUp, DollarSign, QrCode, Mail, Phone, MapPin, Globe, ArrowRight } from 'lucide-react';
+import { CheckCircle, Users, TrendingUp, DollarSign, QrCode, Mail, Phone, MapPin, Globe, ArrowRight, Gift } from 'lucide-react';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
 
@@ -319,7 +319,7 @@ function PartnerSignupForm() {
           </p>
           
           {/* Benefits */}
-          <div className="grid md:grid-cols-3 gap-6 mt-12">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12">
             <div className="text-center">
               <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <DollarSign className="w-8 h-8" />
@@ -340,6 +340,13 @@ function PartnerSignupForm() {
               </div>
               <h3 className="font-semibold mb-2">Real-time Tracking</h3>
               <p className="text-purple-100 text-sm">Monitor conversions and earnings</p>
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Gift className="w-8 h-8" />
+              </div>
+              <h3 className="font-semibold mb-2">20% Partner Discount</h3>
+              <p className="text-purple-100 text-sm">Save on your own orders and gifts</p>
             </div>
           </div>
         </div>
