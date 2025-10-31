@@ -16,6 +16,7 @@ import CustomerImageCustomizationModal from '@/components/CustomerImageCustomiza
 import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ShareModal from '@/components/share-modal';
+import UserInteractionsService from '@/lib/user-interactions';
 import { getSupabaseClient } from '@/lib/supabase-client';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
@@ -48,6 +49,7 @@ function QRLandingPageContent() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(10); // 10% default
+  const [likedImage, setLikedImage] = useState(false);
 
   // Using API endpoints instead of direct database access
   const supabase = getSupabaseClient();
@@ -55,6 +57,14 @@ function QRLandingPageContent() {
   useEffect(() => {
     loadData();
   }, [imageId, partnerId]);
+
+  // Load interaction state
+  useEffect(() => {
+    if (image) {
+      const likedImageIds = UserInteractionsService.getLikedImageIds();
+      setLikedImage(likedImageIds.includes(image.id));
+    }
+  }, [image]);
 
   // Auto-add to cart after successful signup
   useEffect(() => {
@@ -219,6 +229,31 @@ function QRLandingPageContent() {
     setShowCustomizeModal(true);
   };
 
+  const handleLike = () => {
+    if (!image) return;
+    const isNowLiked = UserInteractionsService.toggleLikeSync(image.id, {
+      id: image.id,
+      public_url: image.public_url,
+      breed_name: image.breed_name,
+      theme_name: image.theme_name
+    });
+    setLikedImage(isNowLiked);
+  };
+
+  const handleShare = () => {
+    setShowShareModal(true);
+  };
+
+  const handleShareComplete = (platform: string) => {
+    if (image) {
+      UserInteractionsService.recordShare(image.id, platform, {
+        id: image.id,
+        public_url: image.public_url
+      });
+    }
+    setShowShareModal(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 flex items-center justify-center">
@@ -363,7 +398,15 @@ function QRLandingPageContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setShowShareModal(true)}
+                      onClick={handleLike}
+                      className={likedImage ? 'text-red-500 border-red-500' : ''}
+                    >
+                      <Heart className={`w-4 h-4 ${likedImage ? 'fill-red-500' : ''}`} />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleShare}
                     >
                       <Share2 className="w-4 h-4" />
                     </Button>
@@ -480,6 +523,7 @@ function QRLandingPageContent() {
         <ShareModal
           isOpen={showShareModal}
           onClose={() => setShowShareModal(false)}
+          onShare={handleShareComplete}
           image={{
             id: image.id,
             public_url: image.public_url,

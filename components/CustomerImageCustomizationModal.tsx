@@ -442,8 +442,8 @@ export default function CustomerImageCustomizationModal({
         // Extract it from the first variation
         if (result.variations && result.variations.length > 0) {
           const firstVariation = result.variations[0];
-          if (firstVariation.description) {
-            setGeneratedDescription(firstVariation.description);
+          if (firstVariation.ai_description) {
+            setGeneratedDescription(firstVariation.ai_description);
           }
         }
 
@@ -483,12 +483,22 @@ export default function CustomerImageCustomizationModal({
   };
 
   const handleLikeVariation = (index: number) => {
+    const variation = generatedVariations[index];
+    if (!variation) return;
+
+    const isNowLiked = UserInteractionsService.toggleLikeSync(variation.id, {
+      id: variation.id,
+      public_url: variation.public_url,
+      breed_name: variation.metadata?.breed?.name,
+      theme_name: image.theme_name
+    });
+
     setLikedVariations(prev => {
       const newLiked = new Set(prev);
-      if (newLiked.has(index)) {
-        newLiked.delete(index);
-      } else {
+      if (isNowLiked) {
         newLiked.add(index);
+      } else {
+        newLiked.delete(index);
       }
       return newLiked;
     });
@@ -497,6 +507,17 @@ export default function CustomerImageCustomizationModal({
   const handleShareVariation = (variation: any) => {
     setVariationToShare(variation);
     setShowShareModal(true);
+  };
+
+  const handleShareComplete = (platform: string) => {
+    if (variationToShare) {
+      UserInteractionsService.recordShare(variationToShare.id, platform, {
+        id: variationToShare.id,
+        public_url: variationToShare.public_url
+      });
+    }
+    setShowShareModal(false);
+    setVariationToShare(null);
   };
 
   const handleRateVariation = (index: number, rating: number) => {
@@ -1134,11 +1155,7 @@ export default function CustomerImageCustomizationModal({
             prompt_text: variationToShare.prompt || '',
             description: generatedDescription || image.description || ''
           }}
-          onShare={(platform) => {
-            console.log(`Shared to ${platform}`);
-            setShowShareModal(false);
-            setVariationToShare(null);
-          }}
+          onShare={handleShareComplete}
         />
       )}
     </Dialog>
