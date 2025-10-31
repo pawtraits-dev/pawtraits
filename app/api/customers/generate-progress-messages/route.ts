@@ -8,7 +8,7 @@ const anthropic = new Anthropic({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { breedName, breedDescription, themeName, themeDescription, coatColor } = body;
+    const { breedName, breedDescription, themeName, themeDescription, coatColor, outfitName, outfitDescription } = body;
 
     if (!breedName || !coatColor) {
       return NextResponse.json(
@@ -20,7 +20,8 @@ export async function POST(request: NextRequest) {
     console.log('Generating progress messages for:', {
       breedName,
       themeName,
-      coatColor
+      coatColor,
+      outfitName
     });
 
     const prompt = `
@@ -30,13 +31,13 @@ Context:
 - Breed: ${breedName}
 - Breed Personality: ${breedDescription || 'playful, loyal, intelligent'}
 - Setting/Theme: ${themeName || 'studio portrait'} ${themeDescription ? `- ${themeDescription}` : ''}
-- Coat Color: ${coatColor}
+- Coat Color: ${coatColor}${outfitName ? `\n- Outfit: ${outfitName}${outfitDescription ? ` - ${outfitDescription}` : ''}` : ''}
 
 Requirements:
 - Reference "Pawcasso" (our AI artist) working in his studio
 - Incorporate the breed's personality traits naturally
 - Reference the setting/theme context
-- Mention the coat color creatively
+- Mention the coat color creatively${outfitName ? '\n- Reference the outfit in a playful way' : ''}
 - Be playful, engaging, match brand voice examples
 - Each message: 15-25 words, one sentence
 - Progress from starting work to near completion
@@ -46,7 +47,7 @@ Brand Voice Examples:
 - "Pawcasso is setting up the perfect beach chair for this golden relaxation expert... 🎨"
 - "Selecting designer sunglasses that match a Bulldog's sophisticated nap philosophy... 🖌️"
 - "Capturing that 'professional couch warmer on vacation' energy... ✨"
-- "Adding those signature ${breedName} features with extra personality... 🐾"
+- "Adding those signature ${breedName} features with extra personality... 🐾"${outfitName ? `\n- "Making sure the ${outfitName.toLowerCase()} fits perfectly for maximum style... 👨‍🎨"` : ''}
 
 Output Format: Return ONLY a JSON array of 5 strings, no other text or explanation.
 Example: ["message1", "message2", "message3", "message4", "message5"]

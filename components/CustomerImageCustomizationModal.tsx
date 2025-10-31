@@ -297,7 +297,9 @@ export default function CustomerImageCustomizationModal({
           breedDescription: breed.personality_traits?.join(', ') || breed.description || '',
           themeName,
           themeDescription,
-          coatColor: coat.name
+          coatColor: coat.name,
+          outfitName: selectedOutfit?.name || null,
+          outfitDescription: selectedOutfit?.description || null
         })
       });
 
