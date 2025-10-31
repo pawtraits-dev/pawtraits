@@ -934,10 +934,10 @@ export default function CustomerImageCustomizationModal({
                     </div>
 
                     {/* RIGHT SIDE: Dynamic Content */}
-                    <div className="p-6 flex flex-col justify-center space-y-4">
+                    <div className="p-6 flex flex-col space-y-4">
                       {generating ? (
                         // WHILE GENERATING: Show progress messages
-                        <div className="space-y-6">
+                        <div className="space-y-6 flex-1 flex flex-col justify-center">
                           <div className="flex justify-center">
                             <PawSpinner size="xl" speed="normal" />
                           </div>
@@ -954,8 +954,8 @@ export default function CustomerImageCustomizationModal({
                       ) : (
                         // AFTER GENERATION: Show description and actions
                         generatedVariations[0] && (
-                          <div className="space-y-4">
-                            {/* AI Description */}
+                          <>
+                            {/* AI Description - Always visible at top */}
                             {generatedDescription && (
                               <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-purple-200 rounded-lg">
                                 <h4 className="font-bold mb-3 text-purple-900 flex items-center text-lg">
@@ -993,60 +993,63 @@ export default function CustomerImageCustomizationModal({
                               </div>
                             </div>
 
-                            {/* Star Rating */}
-                            <div className="flex items-center justify-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                              <span className="text-sm font-medium">Rate this image:</span>
-                              <div className="flex gap-1">
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                  <button
-                                    key={star}
-                                    onClick={() => handleRateVariation(0, star)}
-                                    className="transition-colors"
-                                    title={`${star} star${star > 1 ? 's' : ''}`}
-                                  >
-                                    <Star
-                                      className={`w-5 h-5 ${
-                                        star <= (variationRatings.get(0) || 0)
-                                          ? 'fill-yellow-400 text-yellow-400'
-                                          : 'text-gray-300'
-                                      }`}
-                                    />
-                                  </button>
-                                ))}
+                            {/* CTAs Below Description - Separate section */}
+                            <div className="space-y-3 pt-2">
+                              {/* Star Rating */}
+                              <div className="flex items-center justify-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <span className="text-sm font-medium">Rate:</span>
+                                <div className="flex gap-1">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                      key={star}
+                                      onClick={() => handleRateVariation(0, star)}
+                                      className="transition-colors"
+                                      title={`${star} star${star > 1 ? 's' : ''}`}
+                                    >
+                                      <Star
+                                        className={`w-5 h-5 ${
+                                          star <= (variationRatings.get(0) || 0)
+                                            ? 'fill-yellow-400 text-yellow-400'
+                                            : 'text-gray-300'
+                                        }`}
+                                      />
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
-                            </div>
 
-                            {/* Action Buttons */}
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleLikeVariation(0)}
-                                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
-                                  likedVariations.has(0)
-                                    ? 'bg-red-500 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-red-500 hover:text-white'
-                                }`}
-                              >
-                                <Heart className={`w-4 h-4 ${likedVariations.has(0) ? 'fill-current' : ''}`} />
-                                {likedVariations.has(0) ? 'Liked' : 'Like'}
-                              </button>
-                              <button
-                                onClick={() => handleShareVariation(generatedVariations[0])}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium bg-blue-100 text-blue-700 hover:bg-blue-500 hover:text-white transition-all"
-                              >
-                                <Share2 className="w-4 h-4" />
-                                Share
-                              </button>
-                            </div>
+                              {/* Action Buttons */}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleLikeVariation(0)}
+                                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
+                                    likedVariations.has(0)
+                                      ? 'bg-red-500 text-white'
+                                      : 'bg-gray-100 text-gray-700 hover:bg-red-500 hover:text-white'
+                                  }`}
+                                >
+                                  <Heart className={`w-4 h-4 ${likedVariations.has(0) ? 'fill-current' : ''}`} />
+                                  {likedVariations.has(0) ? 'Liked' : 'Like'}
+                                </button>
+                                <button
+                                  onClick={() => handleShareVariation(generatedVariations[0])}
+                                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium bg-blue-100 text-blue-700 hover:bg-blue-500 hover:text-white transition-all"
+                                >
+                                  <Share2 className="w-4 h-4" />
+                                  Share
+                                </button>
+                              </div>
 
-                            {/* Buy Now Button */}
-                            <Button
-                              onClick={() => handleBuyNow(generatedVariations[0])}
-                              className="w-full bg-green-600 hover:bg-green-700 py-6 text-lg"
-                            >
-                              <ShoppingCart className="w-5 h-5 mr-2" />
-                              Buy This Pawtrait
-                            </Button>
-                          </div>
+                              {/* Buy Now Button */}
+                              <Button
+                                onClick={() => handleBuyNow(generatedVariations[0])}
+                                className="w-full bg-green-600 hover:bg-green-700 py-6 text-lg"
+                              >
+                                <ShoppingCart className="w-5 h-5 mr-2" />
+                                Buy This Pawtrait
+                              </Button>
+                            </div>
+                          </>
                         )
                       )}
                     </div>
