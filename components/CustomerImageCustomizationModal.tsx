@@ -397,8 +397,12 @@ export default function CustomerImageCustomizationModal({
         variationConfig.outfits = [selectedOutfit.id];
       }
 
-      // Get image data as base64
-      const imageData = await fetchImageAsBase64(image.public_url || '');
+      // Get image data as base64 - use smaller variant to avoid 413 errors
+      // Prioritize mid_size (600x600) or thumbnail to stay under 2MB limit
+      const imageUrl = image.image_variants?.mid_size?.url ||
+                       image.image_variants?.thumbnail?.url ||
+                       image.public_url || '';
+      const imageData = await fetchImageAsBase64(imageUrl);
 
       // Call customer generation API
       const response = await fetch('/api/customers/generate-variations', {
