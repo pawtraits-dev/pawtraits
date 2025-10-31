@@ -33,7 +33,6 @@ import UserInteractionsService from '@/lib/user-interactions';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
 import ClickableMetadataTags from '@/components/clickable-metadata-tags';
-import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import ContentBasedCarousel from '@/components/ContentBasedCarousel';
@@ -51,8 +50,6 @@ function HomePageContent() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [imageToShare, setImageToShare] = useState<ImageCatalogWithDetails | null>(null);
-  const [showImageModal, setShowImageModal] = useState(false);
-  const [modalImage, setModalImage] = useState<ImageCatalogWithDetails | null>(null);
   const [likedImages, setLikedImages] = useState<Set<string>>(new Set());
   const [sharedImages, setSharedImages] = useState<Set<string>>(new Set());
   const [purchasedImages, setPurchasedImages] = useState<Set<string>>(new Set());
@@ -231,11 +228,6 @@ function HomePageContent() {
     setShowShareModal(true);
   };
 
-  const handleImageClick = (image: ImageCatalogWithDetails) => {
-    setModalImage(image);
-    setShowImageModal(true);
-  };
-
   const handleShareComplete = (platform: string) => {
     if (imageToShare) {
       UserInteractionsService.recordShare(imageToShare.id, platform, imageToShare);
@@ -294,9 +286,9 @@ function HomePageContent() {
 
     return (
       <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
-        <div 
+        <div
           className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
-          onClick={() => handleImageClick(image)}
+          onClick={() => router.push(`/shop/${image.id}`)}
         >
           <CatalogImage
             imageId={image.id}
@@ -639,25 +631,6 @@ function HomePageContent() {
             setImageToShare(null);
           }}
           onShare={handleShareComplete}
-        />
-      )}
-
-      {modalImage && (
-        <ImageModal
-          imageId={modalImage.id}
-          imageData={{
-            id: modalImage.id,
-            description: modalImage.description,
-            prompt_text: modalImage.prompt_text,
-            breed_name: modalImage.breed_name,
-            theme_name: modalImage.theme_name,
-            style_name: modalImage.style_name
-          }}
-          isOpen={showImageModal}
-          onClose={() => {
-            setShowImageModal(false);
-            setModalImage(null);
-          }}
         />
       )}
     </div>
