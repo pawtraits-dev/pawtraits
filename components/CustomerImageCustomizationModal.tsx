@@ -60,6 +60,7 @@ export default function CustomerImageCustomizationModal({
   // Store current image metadata
   const [currentBreed, setCurrentBreed] = useState<Breed | null>(null);
   const [currentCoatInfo, setCurrentCoatInfo] = useState<Coat | null>(null);
+  const [currentOutfit, setCurrentOutfit] = useState<Outfit | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -204,6 +205,16 @@ export default function CustomerImageCustomizationModal({
           if (coat) setCurrentCoatInfo(coat);
         }
       }
+
+      // Fetch current outfit if available
+      if (image.outfit_id) {
+        const outfitRes = await fetch(`/api/outfits`);
+        if (outfitRes.ok) {
+          const allOutfits = await outfitRes.json();
+          const outfit = allOutfits.find((o: Outfit) => o.id === image.outfit_id);
+          if (outfit) setCurrentOutfit(outfit);
+        }
+      }
     } catch (err) {
       console.error('Error loading current image metadata:', err);
     }
@@ -281,56 +292,6 @@ export default function CustomerImageCustomizationModal({
     }
   };
 
-  // Generate AI description for completed image
-  const generateImageDescription = async (imageData: string) => {
-    try {
-      const breed = selectedBreed || currentBreed;
-      if (!breed) return;
-
-      // Convert base64 to blob
-      const byteString = atob(imageData);
-      const arrayBuffer = new ArrayBuffer(byteString.length);
-      const uint8Array = new Uint8Array(arrayBuffer);
-      for (let i = 0; i < byteString.length; i++) {
-        uint8Array[i] = byteString.charCodeAt(i);
-      }
-      const blob = new Blob([uint8Array], { type: 'image/png' });
-      const file = new File([blob], 'generated.png', { type: 'image/png' });
-
-      const formData = new FormData();
-      formData.append('image', file);
-      formData.append('breed', breed.name);
-
-      const response = await fetch('/api/generate-description/file', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const description = data.description;
-        setGeneratedDescription(description);
-
-        // Save description to all generated variations
-        for (const variation of generatedVariations) {
-          if (variation.id) {
-            try {
-              await fetch(`/api/customers/generated-images/${variation.id}/description`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ aiDescription: description })
-              });
-            } catch (saveErr) {
-              console.error(`Failed to save description for variation ${variation.id}:`, saveErr);
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Failed to generate description:', err);
-      // Gracefully degrade - don't show error to user
-    }
-  };
 
   const handleNext = () => {
     if (currentStep === 'breed-selection') {
@@ -454,8 +415,8 @@ export default function CustomerImageCustomizationModal({
         // Extract it from the first variation
         if (result.variations && result.variations.length > 0) {
           const firstVariation = result.variations[0];
-          if (firstVariation.ai_description) {
-            setGeneratedDescription(firstVariation.ai_description);
+          if (firstVariation.description) {
+            setGeneratedDescription(firstVariation.description);
           }
         }
 
@@ -1010,7 +971,7 @@ export default function CustomerImageCustomizationModal({
                             <div className="space-y-1 text-sm">
                               <p><span className="font-medium">Breed</span> : <strong>{currentBreed?.name || 'Unknown'}</strong></p>
                               <p><span className="font-medium">Coat</span> : <strong>{currentCoatInfo?.name || 'Unknown'}</strong></p>
-                              <p><span className="font-medium">Outfit</span> : <strong>{image.outfit_name || 'None'}</strong></p>
+                              <p><span className="font-medium">Outfit</span> : <strong>{currentOutfit?.name || 'None'}</strong></p>
                             </div>
                           </div>
 
@@ -1020,7 +981,7 @@ export default function CustomerImageCustomizationModal({
                             <div className="space-y-1 text-sm">
                               <p><span className="font-medium">Breed</span> : <strong>{variation.metadata?.breed?.name || selectedBreed?.name || currentBreed?.name}</strong></p>
                               <p><span className="font-medium">Coat</span> : <strong>{variation.metadata?.coat?.coat_name || selectedCoat?.name || currentCoatInfo?.name}</strong></p>
-                              <p><span className="font-medium">Outfit</span> : <strong>{selectedOutfit?.name || image.outfit_name || 'None'}</strong></p>
+                              <p><span className="font-medium">Outfit</span> : <strong>{selectedOutfit?.name || currentOutfit?.name || 'None'}</strong></p>
                             </div>
                           </div>
                         </div>

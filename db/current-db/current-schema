@@ -194,7 +194,7 @@ CREATE TABLE public.cart_items (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   product_id text NOT NULL,
-  image_id uuid NOT NULL,
+  image_id uuid,
   image_url text NOT NULL,
   image_title text NOT NULL,
   quantity integer NOT NULL DEFAULT 1 CHECK (quantity > 0),
@@ -205,7 +205,6 @@ CREATE TABLE public.cart_items (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT cart_items_pkey PRIMARY KEY (id),
-  CONSTRAINT cart_items_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id),
   CONSTRAINT cart_items_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id)
 );
 CREATE TABLE public.client_orders (
@@ -273,7 +272,7 @@ CREATE TABLE public.commission_payments (
 );
 CREATE TABLE public.commissions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  order_id uuid NOT NULL,
+  order_id uuid,
   order_amount integer NOT NULL,
   recipient_type text NOT NULL CHECK (recipient_type = ANY (ARRAY['partner'::text, 'customer'::text])),
   recipient_id uuid NOT NULL,
@@ -358,7 +357,7 @@ CREATE TABLE public.customer_customization_credits (
   credits_remaining integer DEFAULT 0 CHECK (credits_remaining >= 0),
   credits_purchased integer DEFAULT 0,
   credits_used integer DEFAULT 0,
-  free_trial_credits_granted integer DEFAULT 2,
+  free_trial_credits_granted integer DEFAULT 5,
   last_purchase_date timestamp with time zone,
   total_spent_amount integer DEFAULT 0,
   total_generations integer DEFAULT 0,
@@ -978,6 +977,7 @@ CREATE TABLE public.pre_registration_codes (
   conversions_count integer DEFAULT 0,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  last_scanned_at timestamp with time zone,
   CONSTRAINT pre_registration_codes_pkey PRIMARY KEY (id),
   CONSTRAINT pre_registration_codes_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id)
 );
@@ -1134,6 +1134,36 @@ CREATE TABLE public.referrals (
   CONSTRAINT referrals_pet_coat_id_fkey FOREIGN KEY (pet_coat_id) REFERENCES public.coats(id),
   CONSTRAINT referrals_customer_referrer_id_fkey FOREIGN KEY (customer_referrer_id) REFERENCES public.customers(id),
   CONSTRAINT referrals_pre_registration_code_id_fkey FOREIGN KEY (pre_registration_code_id) REFERENCES public.pre_registration_codes(id)
+);
+CREATE TABLE public.reviews (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_item_id uuid NOT NULL,
+  order_id uuid NOT NULL,
+  customer_id uuid NOT NULL,
+  rating integer NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment text NOT NULL CHECK (length(TRIM(BOTH FROM comment)) >= 10 AND length(comment) <= 1000),
+  customer_first_name text NOT NULL,
+  customer_city text NOT NULL,
+  customer_country text NOT NULL,
+  image_id text NOT NULL,
+  image_url text NOT NULL,
+  image_thumbnail_url text,
+  breed_name text,
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'hidden'::text])),
+  is_auto_approved boolean NOT NULL DEFAULT false,
+  is_published boolean NOT NULL DEFAULT false,
+  is_early_adopter boolean NOT NULL DEFAULT false,
+  admin_response text CHECK (admin_response IS NULL OR length(TRIM(BOTH FROM admin_response)) <= 500),
+  admin_responder_id uuid,
+  admin_responded_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  published_at timestamp with time zone,
+  CONSTRAINT reviews_pkey PRIMARY KEY (id),
+  CONSTRAINT reviews_order_item_id_fkey FOREIGN KEY (order_item_id) REFERENCES public.order_items(id),
+  CONSTRAINT reviews_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT reviews_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
+  CONSTRAINT reviews_admin_responder_id_fkey FOREIGN KEY (admin_responder_id) REFERENCES public.user_profiles(id)
 );
 CREATE TABLE public.share_events (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

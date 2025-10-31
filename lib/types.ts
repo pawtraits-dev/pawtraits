@@ -177,6 +177,7 @@ export interface ImageCatalog {
   style_id?: string;
   format_id?: string;
   coat_id?: string;
+  outfit_id?: string;
   ai_model?: string;
   generation_parameters?: Record<string, any>;
   rating?: number;
@@ -197,6 +198,8 @@ export interface ImageCatalogWithDetails extends ImageCatalog {
   coat_name?: string;
   coat_hex_color?: string;
   coat_animal_type?: 'dog' | 'cat';
+  outfit_name?: string;
+  outfit?: Outfit;
 }
 
 export type ImageCatalogCreate = Omit<ImageCatalog, 'id' | 'created_at' | 'updated_at'>;
