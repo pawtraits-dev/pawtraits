@@ -283,18 +283,24 @@ function PreRegistrationLandingPageContent() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Step 1 */}
-            <Card className="text-center bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
-              <CardContent className="p-8">
-                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <span className="text-2xl font-bold text-purple-600">1</span>
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Register as a Partner</h3>
-                <p className="text-gray-600">
-                  Complete your partner application with your business details and get approved to start referring customers.
-                </p>
-              </CardContent>
-            </Card>
+            {/* Step 1 - Direct CTA Link */}
+            <Link href={`/signup/partner?ref=${codeData?.code}#signup-form`} className="group">
+              <Card className="text-center bg-white shadow-lg border-0 hover:shadow-xl transition-all hover:border-purple-500 hover:scale-105 cursor-pointer h-full">
+                <CardContent className="p-8">
+                  <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:bg-purple-600 transition-colors">
+                    <span className="text-2xl font-bold text-purple-600 group-hover:text-white transition-colors">1</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-4 group-hover:text-purple-600 transition-colors">Register as a Partner</h3>
+                  <p className="text-gray-600 mb-4">
+                    Complete your partner application with your business details and get approved to start referring customers.
+                  </p>
+                  <div className="flex items-center justify-center text-purple-600 font-semibold group-hover:underline">
+                    <span className="mr-2">Get Started</span>
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
 
             {/* Step 2 */}
             <Card className="text-center bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
