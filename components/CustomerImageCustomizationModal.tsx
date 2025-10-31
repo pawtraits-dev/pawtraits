@@ -908,179 +908,105 @@ export default function CustomerImageCustomizationModal({
                 </p>
               </div>
 
-              {/* Progress Messages with Paw Spinner */}
-              {generating && (
-                <div className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    {/* Rotating Paw Logo Spinner */}
-                    <PawSpinner size="xl" speed="normal" />
+              {/* Side-by-Side Layout: Image on Left, Content on Right */}
+              {(generating || generatedVariations.length > 0) && (
+                <div className="border rounded-lg overflow-hidden bg-white">
+                  <div className="grid grid-cols-2 gap-0">
+                    {/* LEFT SIDE: Image */}
+                    <div className="relative bg-gray-100 flex items-center justify-center min-h-[500px]">
+                      {generating ? (
+                        // Show original image while generating
+                        <img
+                          src={image.public_url || image.image_url}
+                          alt="Original pawtrait"
+                          className="w-full h-auto object-contain max-h-[600px]"
+                        />
+                      ) : (
+                        // Show generated image when complete
+                        generatedVariations[0] && (
+                          <img
+                            src={`data:image/png;base64,${generatedVariations[0].imageData}`}
+                            alt="Generated variation"
+                            className="w-full h-auto object-contain max-h-[600px]"
+                          />
+                        )
+                      )}
+                    </div>
 
-                    {/* Progress Message */}
-                    <div className="flex-1">
-                      <p className="text-lg font-medium text-purple-900 leading-relaxed">
-                        {loadingMessages
-                          ? "Preparing your customization..."
-                          : progressMessages[currentMessageIndex] || "Pawcasso is working his magic... 🎨"
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Summary - Before/After Comparison */}
-              <div className="p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50">
-                <h4 className="font-medium mb-3 text-center">Your Customization Summary</h4>
-                <div className="grid grid-cols-[1fr_auto_1fr] gap-4">
-                  {/* Original Column */}
-                  <div className="space-y-3">
-                    <p className="text-xs font-medium text-gray-500 uppercase text-center mb-2">Original</p>
-                    <div>
-                      <p className="text-xs text-gray-600">Breed:</p>
-                      <p className="text-sm font-semibold text-blue-700">{currentBreed?.name || 'None'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600">Coat:</p>
-                      <p className="text-sm font-semibold text-blue-700">{currentCoatInfo?.name || 'None'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600">Outfit:</p>
-                      <p className="text-sm font-semibold text-blue-700">None</p>
-                    </div>
-                  </div>
-
-                  {/* Arrow Column */}
-                  <div className="flex flex-col justify-center items-center space-y-6 pt-6">
-                    <div className="text-2xl text-gray-400">→</div>
-                    <div className="text-2xl text-gray-400">→</div>
-                    <div className="text-2xl text-gray-400">→</div>
-                  </div>
-
-                  {/* New Selection Column */}
-                  <div className="space-y-3">
-                    <p className="text-xs font-medium text-gray-500 uppercase text-center mb-2">Your Changes</p>
-                    <div>
-                      <p className="text-xs text-gray-600">Breed:</p>
-                      <p className="text-sm font-semibold text-purple-700">{selectedBreed?.name || currentBreed?.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600">Coat:</p>
-                      <p className="text-sm font-semibold text-purple-700">{selectedCoat?.name || currentCoatInfo?.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600">Outfit:</p>
-                      <p className="text-sm font-semibold text-purple-700">{selectedOutfit?.name || 'None'}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Generated Variations */}
-              {generatedVariations.length > 0 && (
-                <div className="space-y-6">
-                  {generatedVariations.map((variation, index) => {
-                    const isLiked = likedVariations.has(index);
-                    const rating = variationRatings.get(index) || 0;
-
-                    return (
-                      <div key={index} className="border rounded-lg overflow-hidden bg-white">
-                        {/* Side-by-Side Comparison Layout */}
-                        <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50">
-                          {/* Original Pawtrait */}
-                          <div>
-                            <h3 className="text-lg font-bold mb-3">Original Pawtrait</h3>
-                            <div className="space-y-1 text-sm">
-                              <p><span className="font-medium">Breed</span> : <strong>{currentBreed?.name || 'Unknown'}</strong></p>
-                              <p><span className="font-medium">Coat</span> : <strong>{currentCoatInfo?.name || 'Unknown'}</strong></p>
-                              <p><span className="font-medium">Outfit</span> : <strong>{currentOutfit?.name || 'None'}</strong></p>
-                            </div>
+                    {/* RIGHT SIDE: Dynamic Content */}
+                    <div className="p-6 flex flex-col justify-center space-y-4">
+                      {generating ? (
+                        // WHILE GENERATING: Show progress messages
+                        <div className="space-y-6">
+                          <div className="flex justify-center">
+                            <PawSpinner size="xl" speed="normal" />
                           </div>
-
-                          {/* Custom Pawtrait */}
-                          <div>
-                            <h3 className="text-lg font-bold mb-3">Custom Pawtrait</h3>
-                            <div className="space-y-1 text-sm">
-                              <p><span className="font-medium">Breed</span> : <strong>{variation.metadata?.breed?.name || selectedBreed?.name || currentBreed?.name}</strong></p>
-                              <p><span className="font-medium">Coat</span> : <strong>{variation.metadata?.coat?.coat_name || selectedCoat?.name || currentCoatInfo?.name}</strong></p>
-                              <p><span className="font-medium">Outfit</span> : <strong>{selectedOutfit?.name || currentOutfit?.name || 'None'}</strong></p>
-                            </div>
+                          <div className="text-center space-y-2">
+                            <h3 className="text-xl font-bold text-purple-900">Creating Your Custom Pawtrait</h3>
+                            <p className="text-lg font-medium text-purple-700 leading-relaxed">
+                              {loadingMessages
+                                ? "Preparing your customization..."
+                                : progressMessages[currentMessageIndex] || "Pawcasso is working his magic... 🎨"
+                              }
+                            </p>
                           </div>
                         </div>
+                      ) : (
+                        // AFTER GENERATION: Show description and actions
+                        generatedVariations[0] && (
+                          <div className="space-y-4">
+                            {/* AI Description */}
+                            {generatedDescription && (
+                              <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-purple-200 rounded-lg">
+                                <h4 className="font-bold mb-3 text-purple-900 flex items-center text-lg">
+                                  <Sparkles className="w-5 h-5 mr-2" />
+                                  Pawcasso's Description
+                                </h4>
+                                <div className="text-sm text-gray-800 leading-relaxed">
+                                  {generatedDescription}
+                                </div>
+                              </div>
+                            )}
 
-                        {/* Side-by-Side Images */}
-                        <div className="grid grid-cols-2 gap-4 p-4 bg-gray-100">
-                          {/* Original Image */}
-                          <div className="relative bg-white rounded-lg overflow-hidden">
-                            <img
-                              src={image.public_url || image.image_url}
-                              alt="Original pawtrait"
-                              className="w-full h-auto object-contain max-h-[500px]"
-                            />
-                          </div>
-
-                          {/* Generated Image */}
-                          <div className="relative bg-white rounded-lg overflow-hidden">
-                            <img
-                              src={`data:image/png;base64,${variation.imageData}`}
-                              alt="Generated variation"
-                              className="w-full h-auto object-contain max-h-[500px]"
-                            />
-
-                            {/* Action Buttons Overlay */}
-                            <div className="absolute top-4 right-4 flex gap-2">
-                              <button
-                                onClick={() => handleLikeVariation(index)}
-                                className={`p-2 rounded-full transition-all ${
-                                  isLiked
-                                    ? 'bg-red-500 text-white'
-                                    : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
-                                }`}
-                                title={isLiked ? 'Unlike' : 'Like'}
-                              >
-                                <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-                              </button>
-
-                              <button
-                                onClick={() => handleShareVariation(variation)}
-                                className="p-2 rounded-full transition-all bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white"
-                                title="Share"
-                              >
-                                <Share2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* AI Description, Rating, and Actions */}
-                        <div className="p-4 space-y-4">
-                          {/* AI-Generated Description */}
-                          {generatedDescription && index === 0 && (
-                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                              <h4 className="font-semibold mb-2 text-blue-900 flex items-center">
-                                <Sparkles className="w-4 h-4 mr-2" />
-                                Pawcasso's Description
-                              </h4>
-                              <div className="text-sm text-gray-800">
-                                {generatedDescription}
+                            {/* Customization Details */}
+                            <div className="p-4 bg-gray-50 border rounded-lg">
+                              <h4 className="font-semibold mb-3 text-gray-900">Your Customizations</h4>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Breed:</span>
+                                  <span className="font-semibold text-purple-700">
+                                    {generatedVariations[0].metadata?.breed?.name || selectedBreed?.name || currentBreed?.name}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Coat:</span>
+                                  <span className="font-semibold text-purple-700">
+                                    {generatedVariations[0].metadata?.coat?.coat_name || selectedCoat?.name || currentCoatInfo?.name}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Outfit:</span>
+                                  <span className="font-semibold text-purple-700">
+                                    {selectedOutfit?.name || currentOutfit?.name || 'None'}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          )}
 
-                          {/* Star Rating */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                            {/* Star Rating */}
+                            <div className="flex items-center justify-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                               <span className="text-sm font-medium">Rate this image:</span>
                               <div className="flex gap-1">
                                 {[1, 2, 3, 4, 5].map((star) => (
                                   <button
                                     key={star}
-                                    onClick={() => handleRateVariation(index, star)}
+                                    onClick={() => handleRateVariation(0, star)}
                                     className="transition-colors"
                                     title={`${star} star${star > 1 ? 's' : ''}`}
                                   >
                                     <Star
                                       className={`w-5 h-5 ${
-                                        star <= rating
+                                        star <= (variationRatings.get(0) || 0)
                                           ? 'fill-yellow-400 text-yellow-400'
                                           : 'text-gray-300'
                                       }`}
@@ -1090,19 +1016,41 @@ export default function CustomerImageCustomizationModal({
                               </div>
                             </div>
 
+                            {/* Action Buttons */}
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleLikeVariation(0)}
+                                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
+                                  likedVariations.has(0)
+                                    ? 'bg-red-500 text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-red-500 hover:text-white'
+                                }`}
+                              >
+                                <Heart className={`w-4 h-4 ${likedVariations.has(0) ? 'fill-current' : ''}`} />
+                                {likedVariations.has(0) ? 'Liked' : 'Like'}
+                              </button>
+                              <button
+                                onClick={() => handleShareVariation(generatedVariations[0])}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium bg-blue-100 text-blue-700 hover:bg-blue-500 hover:text-white transition-all"
+                              >
+                                <Share2 className="w-4 h-4" />
+                                Share
+                              </button>
+                            </div>
+
                             {/* Buy Now Button */}
                             <Button
-                              onClick={() => handleBuyNow(variation)}
-                              className="bg-green-600 hover:bg-green-700"
+                              onClick={() => handleBuyNow(generatedVariations[0])}
+                              className="w-full bg-green-600 hover:bg-green-700 py-6 text-lg"
                             >
-                              <ShoppingCart className="w-4 h-4 mr-2" />
-                              Buy Now
+                              <ShoppingCart className="w-5 h-5 mr-2" />
+                              Buy This Pawtrait
                             </Button>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        )
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
