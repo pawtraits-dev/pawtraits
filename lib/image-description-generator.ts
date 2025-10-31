@@ -48,7 +48,7 @@ Now write a fun description for this image in exactly that style, incorporating 
       const prompt = this.buildDescriptionPrompt(breed, traits);
       
       const response = await anthropic.messages.create({
-        model: "claude-3-5-sonnet-20240620",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 500,
         messages: [
           {
@@ -190,7 +190,7 @@ Now write a fun description for this image in exactly that style, incorporating 
       else if (processedFile.type === 'image/gif') mediaType = 'image/gif';
       
       const response = await anthropic.messages.create({
-        model: "claude-3-5-sonnet-20240620",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 500,
         messages: [
           {

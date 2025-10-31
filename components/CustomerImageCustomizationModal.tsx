@@ -71,6 +71,10 @@ export default function CustomerImageCustomizationModal({
   const [creditBalance, setCreditBalance] = useState<number>(0);
   const [creditsRequired, setCreditsRequired] = useState<number>(1);
   const [loadingCredits, setLoadingCredits] = useState(false);
+  const [creditCosts, setCreditCosts] = useState({
+    base_variation_cost: 1,
+    outfit_variation_cost: 1
+  });
 
   // Progress messages
   const [progressMessages, setProgressMessages] = useState<string[]>([]);
@@ -92,6 +96,7 @@ export default function CustomerImageCustomizationModal({
   useEffect(() => {
     if (isOpen) {
       fetchCreditBalance();
+      fetchCreditCosts();
       loadData();
       loadCurrentImageMetadata();
     }
@@ -101,21 +106,21 @@ export default function CustomerImageCustomizationModal({
   useEffect(() => {
     let cost = 0;
 
-    // Base customization: 1 credit if breed OR coat is CHANGED (different from original)
+    // Base customization: breed OR coat CHANGED (different from original)
     const breedChanged = selectedBreed !== null && selectedBreed?.id !== currentBreed?.id;
     const coatChanged = selectedCoat !== null && selectedCoat?.id !== currentCoatInfo?.id;
 
     if (breedChanged || coatChanged) {
-      cost = 1; // Base customization cost
+      cost = creditCosts.base_variation_cost; // Use database setting
     }
 
-    // Outfit: +1 credit if selected AND different from original
+    // Outfit: if selected AND different from original
     if (selectedOutfit && selectedOutfit?.id !== currentOutfit?.id) {
-      cost += 1;
+      cost += creditCosts.outfit_variation_cost; // Use database setting
     }
 
     setCreditsRequired(cost);
-  }, [selectedBreed, selectedCoat, selectedOutfit, currentBreed, currentCoatInfo, currentOutfit]);
+  }, [selectedBreed, selectedCoat, selectedOutfit, currentBreed, currentCoatInfo, currentOutfit, creditCosts]);
 
   // Fetch breed-specific coats when breed is selected
   useEffect(() => {
@@ -161,6 +166,22 @@ export default function CustomerImageCustomizationModal({
       console.error('Error fetching credit balance:', err);
     } finally {
       setLoadingCredits(false);
+    }
+  };
+
+  const fetchCreditCosts = async () => {
+    try {
+      const response = await fetch('/api/credit-costs');
+      if (response.ok) {
+        const data = await response.json();
+        setCreditCosts({
+          base_variation_cost: data.base_variation_cost || 1,
+          outfit_variation_cost: data.outfit_variation_cost || 1
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching credit costs:', err);
+      // Keep default values on error
     }
   };
 
