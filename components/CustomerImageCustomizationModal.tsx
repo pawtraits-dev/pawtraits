@@ -101,21 +101,21 @@ export default function CustomerImageCustomizationModal({
   useEffect(() => {
     let cost = 0;
 
-    // Base customization: 1 credit if breed OR coat is selected
-    const breedChanged = selectedBreed !== null;
-    const coatChanged = selectedCoat !== null;
+    // Base customization: 1 credit if breed OR coat is CHANGED (different from original)
+    const breedChanged = selectedBreed !== null && selectedBreed?.id !== currentBreed?.id;
+    const coatChanged = selectedCoat !== null && selectedCoat?.id !== currentCoatInfo?.id;
 
     if (breedChanged || coatChanged) {
       cost = 1; // Base customization cost
     }
 
-    // Outfit: +1 credit if selected
-    if (selectedOutfit) {
+    // Outfit: +1 credit if selected AND different from original
+    if (selectedOutfit && selectedOutfit?.id !== currentOutfit?.id) {
       cost += 1;
     }
 
     setCreditsRequired(cost);
-  }, [selectedBreed, selectedCoat, selectedOutfit]);
+  }, [selectedBreed, selectedCoat, selectedOutfit, currentBreed, currentCoatInfo, currentOutfit]);
 
   // Fetch breed-specific coats when breed is selected
   useEffect(() => {
