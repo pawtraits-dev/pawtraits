@@ -290,6 +290,11 @@ function BrowsePageContent() {
   };
 
   const handleCustomize = (image: ImageCatalogWithDetails) => {
+    // Check if user is authenticated and is a customer
+    if (!userProfile || userProfile.user_type !== 'customer') {
+      router.push('/signup/user');
+      return;
+    }
     setImageToCustomize(image);
     setShowCustomizeModal(true);
   };
@@ -796,19 +801,17 @@ function BrowsePageContent() {
                               )}
                             </div>
 
-                            {/* Customize Button - Customers only */}
-                            {userProfile?.user_type === 'customer' && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCustomize(image);
-                                }}
-                                className="p-2 rounded-full transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-lg"
-                                title="Customize this image"
-                              >
-                                <Wand2 className="w-4 h-4" />
-                              </button>
-                            )}
+                            {/* Customize Button - Visible to All, Redirects Non-Customers to Sign Up */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCustomize(image);
+                              }}
+                              className="p-2 rounded-full transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-lg"
+                              title="Customize this image"
+                            >
+                              <Wand2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
 

@@ -211,6 +211,11 @@ function QRLandingPageContent() {
   };
 
   const handleCustomize = () => {
+    // Check if user is authenticated and is a customer
+    if (!userProfile || userProfile.user_type !== 'customer') {
+      router.push('/signup/user');
+      return;
+    }
     setShowCustomizeModal(true);
   };
 
@@ -308,48 +313,46 @@ function QRLandingPageContent() {
               </Card>
             )}
 
-            {/* Customize Section - Customer Only */}
-            {userProfile?.user_type === 'customer' && (
-              <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
-                <CardContent className="pt-6">
-                  <div className="flex items-start space-x-4">
-                    <div className="p-3 bg-purple-600 rounded-lg">
-                      <Wand2 className="w-8 h-8 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-gray-900 mb-2">
-                        Not quite right?
-                      </h3>
-                      <p className="text-gray-700 mb-4">
-                        If this beautiful {image.breed_name || 'portrait'} isn't perfect in every way (hard to believe, but who are we to judge), why not let Pawcasso get creative:
-                      </p>
-                      <ul className="space-y-2 mb-4">
-                        <li className="flex items-center text-sm text-gray-600">
-                          <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                          Choose another breed
-                        </li>
-                        <li className="flex items-center text-sm text-gray-600">
-                          <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                          Try another colour coat
-                        </li>
-                        <li className="flex items-center text-sm text-gray-600">
-                          <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                          Pull another outfit from our extensive wardrobe
-                        </li>
-                      </ul>
-                      <Button
-                        onClick={handleCustomize}
-                        className="bg-purple-600 hover:bg-purple-700"
-                        size="lg"
-                      >
-                        <Wand2 className="w-5 h-5 mr-2" />
-                        Customize This Portrait
-                      </Button>
-                    </div>
+            {/* Customize Section - Visible to All, Redirects Non-Customers to Sign Up */}
+            <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
+              <CardContent className="pt-6">
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-purple-600 rounded-lg">
+                    <Wand2 className="w-8 h-8 text-white" />
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                      Not quite right?
+                    </h3>
+                    <p className="text-gray-700 mb-4">
+                      If this beautiful {image.breed_name || 'portrait'} isn't perfect in every way (hard to believe, but who are we to judge), why not let Pawcasso get creative:
+                    </p>
+                    <ul className="space-y-2 mb-4">
+                      <li className="flex items-center text-sm text-gray-600">
+                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                        Choose another breed
+                      </li>
+                      <li className="flex items-center text-sm text-gray-600">
+                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                        Try another colour coat
+                      </li>
+                      <li className="flex items-center text-sm text-gray-600">
+                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                        Pull another outfit from our extensive wardrobe
+                      </li>
+                    </ul>
+                    <Button
+                      onClick={handleCustomize}
+                      className="bg-purple-600 hover:bg-purple-700"
+                      size="lg"
+                    >
+                      <Wand2 className="w-5 h-5 mr-2" />
+                      Customize This Portrait
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Product Details */}
             <Card>
