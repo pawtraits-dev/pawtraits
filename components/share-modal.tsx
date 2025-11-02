@@ -1,14 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Copy, Facebook, Instagram, MessageCircle, Share2, X, CheckCircle, Smartphone, Loader2, Sparkles } from 'lucide-react';
-import Image from 'next/image';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Copy, Facebook, Instagram, MessageCircle, Share2 } from 'lucide-react';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 
 interface ShareModalProps {
@@ -25,62 +23,49 @@ interface ShareModalProps {
 
 export default function ShareModal({ isOpen, onClose, image, onShare }: ShareModalProps) {
   const [copied, setCopied] = useState(false);
-  const [generatedMessages, setGeneratedMessages] = useState<string[]>([]);
-  const [selectedMessageIndex, setSelectedMessageIndex] = useState<number>(0);
+  const [includeDescription, setIncludeDescription] = useState(true);
+  const [includeHashtag, setIncludeHashtag] = useState(true);
   const [customMessage, setCustomMessage] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [usingFallback, setUsingFallback] = useState(false);
-  
+
   // Generate share URL (you might want to create a dedicated share page)
   const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/shop/${image.id}`;
 
-  // Generate AI messages when modal opens
-  useEffect(() => {
-    if (isOpen && generatedMessages.length === 0) {
-      generateShareMessages();
+  // Build share message based on user options
+  const buildShareMessage = () => {
+    if (customMessage.trim()) {
+      return customMessage;
     }
-  }, [isOpen]);
 
-  const generateShareMessages = async () => {
-    setIsGenerating(true);
-    try {
-      const response = await fetch('/api/social/generate-message', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          breedName: (image as any)?.breed_name,
-          themeName: (image as any)?.theme_name,
-          styleName: (image as any)?.style_name,
-          coatName: (image as any)?.coat_name,
-          outfitName: (image as any)?.outfit_name,
-          description: image.description
-        }),
-      });
+    const parts: string[] = [];
+    const breedName = (image as any)?.breed_name || 'Pet';
 
-      const data = await response.json();
-      setGeneratedMessages(data.messages || []);
-      setCustomMessage(data.messages?.[0] || '');
-      setUsingFallback(data.fallback || false);
-    } catch (error) {
-      console.error('Failed to generate messages:', error);
-      // Use fallback
-      const fallback = `Check out this amazing ${(image as any)?.breed_name || 'pet'} portrait!`;
-      setGeneratedMessages([fallback]);
-      setCustomMessage(fallback);
-      setUsingFallback(true);
-    } finally {
-      setIsGenerating(false);
+    // Add description if enabled
+    if (includeDescription && image.description) {
+      // Clean up the description - take first sentence or first 100 chars
+      let cleanDesc = image.description
+        .split(/[.!?]\s/)[0] // Get first sentence
+        .trim();
+
+      if (cleanDesc.length > 100) {
+        cleanDesc = cleanDesc.substring(0, 100) + '...';
+      }
+
+      parts.push(cleanDesc);
+    } else {
+      // Simple fallback message
+      parts.push(`Check out this amazing ${breedName} portrait!`);
     }
+
+    // Add breed hashtag if enabled
+    if (includeHashtag && breedName) {
+      const hashtag = `#${breedName.replace(/\s+/g, '')}`;
+      parts.push(hashtag);
+    }
+
+    return parts.join(' ');
   };
 
-  // Get the share text (uses custom message if edited, otherwise selected message)
-  const getShareText = () => {
-    return customMessage || generatedMessages[selectedMessageIndex] || 'Check out this amazing pet portrait!';
-  };
-
-  const shareText = getShareText();
+  const shareText = buildShareMessage();
 
   const handleCopyLink = async () => {
     try {
@@ -318,66 +303,66 @@ export default function ShareModal({ isOpen, onClose, image, onShare }: ShareMod
             </div>
           </div>
 
-          {/* AI-Generated Share Messages */}
-          <div className="space-y-2 w-full">
-            <Label className="text-sm font-medium flex items-center gap-1">
-              <Sparkles className="w-4 h-4 text-purple-500" />
-              Your Share Message
-            </Label>
+          {/* Share Message Options */}
+          <div className="space-y-3 w-full">
+            <Label className="text-sm font-medium">Share Message Options</Label>
 
-            {isGenerating ? (
-              <div className="flex items-center justify-center p-6 bg-gray-50 rounded-lg">
-                <Loader2 className="w-5 h-5 animate-spin text-purple-500 mr-2" />
-                <span className="text-sm text-gray-600">Crafting the perfect message...</span>
+            {/* Toggle Options */}
+            <div className="space-y-2 p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="includeDescription"
+                  checked={includeDescription}
+                  onChange={(e) => setIncludeDescription(e.target.checked)}
+                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                />
+                <label htmlFor="includeDescription" className="text-sm text-gray-700 cursor-pointer">
+                  Include AI description
+                </label>
               </div>
-            ) : (
-              <>
-                {/* Message Options */}
-                {generatedMessages.length > 1 && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-gray-600">Choose a message style:</p>
-                    <div className="grid grid-cols-1 gap-2">
-                      {generatedMessages.map((message, index) => (
-                        <button
-                          key={index}
-                          onClick={() => {
-                            setSelectedMessageIndex(index);
-                            setCustomMessage(message);
-                          }}
-                          className={`text-left p-3 rounded-lg border-2 transition-all ${
-                            selectedMessageIndex === index
-                              ? 'border-purple-500 bg-purple-50'
-                              : 'border-gray-200 hover:border-purple-300 bg-white'
-                          }`}
-                        >
-                          <p className="text-sm">{message}</p>
-                          {index === 0 && <span className="text-xs text-gray-500 mt-1 block">Enthusiastic</span>}
-                          {index === 1 && <span className="text-xs text-gray-500 mt-1 block">Playful</span>}
-                          {index === 2 && <span className="text-xs text-gray-500 mt-1 block">Heartwarming</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
-                {/* Editable Message */}
-                <div className="space-y-1">
-                  <p className="text-xs text-gray-600">Customize your message:</p>
-                  <Textarea
-                    value={customMessage}
-                    onChange={(e) => setCustomMessage(e.target.value)}
-                    className="text-sm min-h-[80px]"
-                    placeholder="Write your own message..."
-                  />
-                  {usingFallback && (
-                    <p className="text-xs text-amber-600 flex items-center gap-1">
-                      <span>⚠️</span>
-                      Using fallback message - you can edit it above
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="includeHashtag"
+                  checked={includeHashtag}
+                  onChange={(e) => setIncludeHashtag(e.target.checked)}
+                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                />
+                <label htmlFor="includeHashtag" className="text-sm text-gray-700 cursor-pointer">
+                  Include breed hashtag
+                </label>
+              </div>
+            </div>
+
+            {/* Message Preview */}
+            <div className="space-y-1">
+              <p className="text-xs text-gray-600">Preview:</p>
+              <div className="p-3 bg-white border border-gray-200 rounded-lg">
+                <p className="text-sm text-gray-900 whitespace-pre-wrap">{shareText}</p>
+                <p className="text-xs text-purple-600 mt-2">{shareUrl}</p>
+              </div>
+            </div>
+
+            {/* Custom Message Override */}
+            <div className="space-y-1">
+              <p className="text-xs text-gray-600">Or write your own message:</p>
+              <Textarea
+                value={customMessage}
+                onChange={(e) => setCustomMessage(e.target.value)}
+                className="text-sm min-h-[60px]"
+                placeholder="Custom message (optional)..."
+              />
+              {customMessage && (
+                <button
+                  onClick={() => setCustomMessage('')}
+                  className="text-xs text-purple-600 hover:text-purple-700"
+                >
+                  Clear custom message
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Native Share (if available) */}
