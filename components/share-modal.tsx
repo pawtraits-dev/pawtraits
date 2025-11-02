@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Copy, Facebook, Instagram, MessageCircle, Share2, X, CheckCircle, Smartphone } from 'lucide-react';
+import { Copy, Facebook, Instagram, MessageCircle, Share2, X, CheckCircle, Smartphone, Loader2, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 
@@ -24,28 +25,59 @@ interface ShareModalProps {
 
 export default function ShareModal({ isOpen, onClose, image, onShare }: ShareModalProps) {
   const [copied, setCopied] = useState(false);
+  const [generatedMessages, setGeneratedMessages] = useState<string[]>([]);
+  const [selectedMessageIndex, setSelectedMessageIndex] = useState<number>(0);
+  const [customMessage, setCustomMessage] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [usingFallback, setUsingFallback] = useState(false);
   
   // Generate share URL (you might want to create a dedicated share page)
   const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/shop/${image.id}`;
-  // Create formatted share text with breed name and first line of description
+
+  // Generate AI messages when modal opens
+  useEffect(() => {
+    if (isOpen && generatedMessages.length === 0) {
+      generateShareMessages();
+    }
+  }, [isOpen]);
+
+  const generateShareMessages = async () => {
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/social/generate-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          breedName: (image as any)?.breed_name,
+          themeName: (image as any)?.theme_name,
+          styleName: (image as any)?.style_name,
+          coatName: (image as any)?.coat_name,
+          outfitName: (image as any)?.outfit_name,
+          description: image.description
+        }),
+      });
+
+      const data = await response.json();
+      setGeneratedMessages(data.messages || []);
+      setCustomMessage(data.messages?.[0] || '');
+      setUsingFallback(data.fallback || false);
+    } catch (error) {
+      console.error('Failed to generate messages:', error);
+      // Use fallback
+      const fallback = `Check out this amazing ${(image as any)?.breed_name || 'pet'} portrait!`;
+      setGeneratedMessages([fallback]);
+      setCustomMessage(fallback);
+      setUsingFallback(true);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Get the share text (uses custom message if edited, otherwise selected message)
   const getShareText = () => {
-    // Extract breed name from image data
-    const breedName = (image as any)?.breed_name || 'Pet';
-
-    // Get the first line of the description, removing any technical prompt details
-    let description = image.description || image.prompt_text || 'Amazing Pawtrait';
-
-    // Split by common delimiters and take the first meaningful part
-    const firstLine = description
-      .split(/[,\n]|--ar|\|\||A breed/)[0]  // Split on comma, newline, --ar, ||, or "A breed"
-      .trim()
-      .replace(/^(A |An |The )/i, '')  // Remove leading articles
-      .toLowerCase();
-
-    // Capitalize first letter and ensure it's not empty
-    const cleanDescription = firstLine.charAt(0).toUpperCase() + firstLine.slice(1) || 'Amazing Pawtrait';
-
-    return `I love this ${breedName} Pawtrait: ${cleanDescription}`;
+    return customMessage || generatedMessages[selectedMessageIndex] || 'Check out this amazing pet portrait!';
   };
 
   const shareText = getShareText();
@@ -284,6 +316,68 @@ export default function ShareModal({ isOpen, onClose, image, onShare }: ShareMod
                 {image.description}
               </p>
             </div>
+          </div>
+
+          {/* AI-Generated Share Messages */}
+          <div className="space-y-2 w-full">
+            <Label className="text-sm font-medium flex items-center gap-1">
+              <Sparkles className="w-4 h-4 text-purple-500" />
+              Your Share Message
+            </Label>
+
+            {isGenerating ? (
+              <div className="flex items-center justify-center p-6 bg-gray-50 rounded-lg">
+                <Loader2 className="w-5 h-5 animate-spin text-purple-500 mr-2" />
+                <span className="text-sm text-gray-600">Crafting the perfect message...</span>
+              </div>
+            ) : (
+              <>
+                {/* Message Options */}
+                {generatedMessages.length > 1 && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-600">Choose a message style:</p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {generatedMessages.map((message, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setSelectedMessageIndex(index);
+                            setCustomMessage(message);
+                          }}
+                          className={`text-left p-3 rounded-lg border-2 transition-all ${
+                            selectedMessageIndex === index
+                              ? 'border-purple-500 bg-purple-50'
+                              : 'border-gray-200 hover:border-purple-300 bg-white'
+                          }`}
+                        >
+                          <p className="text-sm">{message}</p>
+                          {index === 0 && <span className="text-xs text-gray-500 mt-1 block">Enthusiastic</span>}
+                          {index === 1 && <span className="text-xs text-gray-500 mt-1 block">Playful</span>}
+                          {index === 2 && <span className="text-xs text-gray-500 mt-1 block">Heartwarming</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Editable Message */}
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-600">Customize your message:</p>
+                  <Textarea
+                    value={customMessage}
+                    onChange={(e) => setCustomMessage(e.target.value)}
+                    className="text-sm min-h-[80px]"
+                    placeholder="Write your own message..."
+                  />
+                  {usingFallback && (
+                    <p className="text-xs text-amber-600 flex items-center gap-1">
+                      <span>⚠️</span>
+                      Using fallback message - you can edit it above
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Native Share (if available) */}
