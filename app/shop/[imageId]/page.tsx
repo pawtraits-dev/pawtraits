@@ -62,7 +62,7 @@ function QRLandingPageContent() {
   useEffect(() => {
     if (image) {
       const likedImageIds = UserInteractionsService.getLikedImageIds();
-      setLikedImage(likedImageIds.includes(image.id));
+      setLikedImage(likedImageIds.has(image.id));
     }
   }, [image]);
 
