@@ -26,6 +26,8 @@ const nextConfig = {
         },
       ],
     },
+    // Empty turbopack config to acknowledge Turbopack usage in Next.js 16
+    turbopack: {},
     webpack: (config) => {
       config.resolve.fallback = {
         ...config.resolve.fallback,
