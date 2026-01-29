@@ -20,6 +20,12 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     console.log('🎨 [GENERATE API] Request received');
+    console.log('🔑 [GENERATE API] Environment check:', {
+      hasGeminiKey: !!process.env.GEMINI_API_KEY,
+      hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasServiceRole: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      hasCloudinaryConfig: !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY)
+    });
 
     // 1. Extract client IP and check rate limit
     const clientIp = getClientIp(request.headers);
@@ -239,20 +245,28 @@ Important: The dog's appearance from the uploaded photo should be accurately rep
       });
 
     } catch (geminiError: any) {
-      console.error('Gemini generation error:', geminiError);
+      console.error('❌ [GENERATE API] Gemini generation error:', {
+        message: geminiError.message,
+        stack: geminiError.stack,
+        name: geminiError.name,
+        fullError: geminiError
+      });
 
       // Check if it's a rate limit or quota error from Gemini
       if (geminiError.message?.includes('quota') || geminiError.message?.includes('rate')) {
+        console.log('⚠️ [GENERATE API] Detected quota/rate limit error');
         return NextResponse.json(
           {
             error: 'AI service temporarily unavailable',
             message: 'The AI image generation service is currently at capacity. Please try again in a few minutes.',
-            retryAfter: 60
+            retryAfter: 60,
+            details: process.env.NODE_ENV === 'development' ? geminiError.message : undefined
           },
           { status: 503 }
         );
       }
 
+      console.error('❌ [GENERATE API] Unexpected Gemini error, re-throwing');
       throw geminiError;
     }
 
