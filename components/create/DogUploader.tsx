@@ -128,7 +128,6 @@ export function DogUploader({ onUpload, onError, disabled = false }: DogUploader
         ref={fileInputRef}
         type="file"
         accept="image/jpeg,image/jpg,image/png"
-        capture="environment" // Enables camera on mobile
         onChange={handleFileChange}
         className="hidden"
         disabled={disabled || isValidating}
@@ -157,7 +156,7 @@ export function DogUploader({ onUpload, onError, disabled = false }: DogUploader
                   {isValidating ? 'Processing image...' : 'Upload Your Dog\'s Photo'}
                 </p>
                 <p className="text-sm text-gray-600">
-                  Tap to take a photo or choose from gallery
+                  Choose a photo from your gallery
                 </p>
                 <p className="text-xs text-gray-500">
                   JPEG or PNG • Max 5MB • Min 512x512px
