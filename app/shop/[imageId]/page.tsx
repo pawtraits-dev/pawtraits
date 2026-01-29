@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, Star, Heart, Share2, Tag, MapPin, QrCode, UserPlus, Wand2, Sparkles } from 'lucide-react';
+import { ShoppingCart, Star, Heart, Share2, Tag, MapPin, QrCode, UserPlus, Wand2, Sparkles, Camera } from 'lucide-react';
 // Removed direct database service imports - using API endpoints instead
 import type { ImageCatalogWithDetails } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
@@ -347,6 +347,36 @@ function QRLandingPageContent() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Put My Pet in This Pic CTA */}
+            <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50">
+              <CardContent className="pt-6">
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-blue-600 rounded-lg flex-shrink-0">
+                    <Camera className="w-8 h-8 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                      Put My Pet in This Pic!
+                    </h3>
+                    <p className="text-gray-700 mb-4">
+                      Love this style? Upload a photo of your pet and we'll transform it to match this artistic portrait! Our AI will recreate this exact look with your pet's unique features.
+                    </p>
+                    <Button
+                      onClick={() => router.push(`/create?id=${image.id}`)}
+                      className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+                      size="lg"
+                    >
+                      <Camera className="w-5 h-5 mr-2" />
+                      Create My Pet's Portrait
+                    </Button>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Free to try • 3 generations per hour
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Customize Section - Visible to All, Redirects Non-Customers to Sign Up */}
             <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">

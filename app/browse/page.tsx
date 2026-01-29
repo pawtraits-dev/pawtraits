@@ -20,7 +20,8 @@ import {
   Cat,
   Palette,
   QrCode,
-  Wand2
+  Wand2,
+  Camera
 } from 'lucide-react';
 // Import SupabaseService for authentication checking
 import { SupabaseService } from '@/lib/supabase';
@@ -872,17 +873,31 @@ function BrowsePageContent() {
                           </div>
                         )}
 
-                        <Button
-                          className="w-full bg-purple-600 hover:bg-purple-700"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/shop/${image.id}`);
-                          }}
-                        >
-                          <ShoppingCart className="w-4 h-4 mr-2" />
-                          View & Buy
-                        </Button>
+                        <div className="space-y-2">
+                          <Button
+                            className="w-full bg-blue-600 hover:bg-blue-700"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/create?id=${image.id}`);
+                            }}
+                          >
+                            <Camera className="w-4 h-4 mr-2" />
+                            Put My Pet in This Pic
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/shop/${image.id}`);
+                            }}
+                          >
+                            <ShoppingCart className="w-4 h-4 mr-2" />
+                            View & Buy
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                     );
