@@ -17,13 +17,17 @@ export async function GET(
   try {
     const { id } = await params;
 
+    console.log('📸 [CATALOG API] Request received for ID:', id);
+
     if (!id) {
+      console.log('❌ [CATALOG API] No ID provided');
       return NextResponse.json(
         { error: 'Catalog image ID is required' },
         { status: 400 }
       );
     }
 
+    console.log('🔍 [CATALOG API] Fetching from database...');
     // Fetch catalog image with related metadata
     const { data: catalogImage, error } = await supabaseServiceRole
       .from('image_catalog')
@@ -65,9 +69,10 @@ export async function GET(
       .single();
 
     if (error) {
-      console.error('Error fetching catalog image:', error);
+      console.error('❌ [CATALOG API] Database error:', error);
 
       if (error.code === 'PGRST116') {
+        console.log('❌ [CATALOG API] Image not found or not public');
         return NextResponse.json(
           { error: 'Catalog image not found or not public' },
           { status: 404 }
@@ -77,7 +82,15 @@ export async function GET(
       throw error;
     }
 
+    console.log('✅ [CATALOG API] Found catalog image:', {
+      id: catalogImage.id,
+      cloudinaryPublicId: catalogImage.cloudinary_public_id,
+      breedName: catalogImage.breed?.name,
+      isPublic: true
+    });
+
     // Generate Cloudinary URLs for different variants
+    console.log('🖼️ [CATALOG API] Generating Cloudinary URLs...');
     const imageUrl = catalogImage.cloudinary_public_id
       ? cloudinaryService.getPublicVariantUrl(catalogImage.cloudinary_public_id, 'full_size')
       : null;
@@ -85,6 +98,12 @@ export async function GET(
     const thumbnailUrl = catalogImage.cloudinary_public_id
       ? cloudinaryService.getPublicVariantUrl(catalogImage.cloudinary_public_id, 'thumbnail')
       : null;
+
+    console.log('🔗 [CATALOG API] Generated URLs:', {
+      imageUrl: imageUrl?.substring(0, 100) + '...',
+      thumbnailUrl: thumbnailUrl?.substring(0, 100) + '...',
+      hasCloudinaryId: !!catalogImage.cloudinary_public_id
+    });
 
     // Format response
     const response = {
@@ -117,9 +136,10 @@ export async function GET(
       } : null
     };
 
+    console.log('✅ [CATALOG API] Returning response with breed:', response.breed?.displayName);
     return NextResponse.json(response);
   } catch (error: any) {
-    console.error('Public catalog image API error:', error);
+    console.error('❌ [CATALOG API] Unexpected error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch catalog image', details: error.message },
       { status: 500 }

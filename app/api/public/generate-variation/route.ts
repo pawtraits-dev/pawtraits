@@ -19,11 +19,15 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🎨 [GENERATE API] Request received');
+
     // 1. Extract client IP and check rate limit
     const clientIp = getClientIp(request.headers);
     const endpoint = '/api/public/generate-variation';
 
+    console.log('🔒 [GENERATE API] Checking rate limit for IP:', clientIp);
     const rateLimitResult = await rateLimiter.checkLimit(clientIp, endpoint);
+    console.log('🔒 [GENERATE API] Rate limit result:', rateLimitResult);
 
     if (!rateLimitResult.allowed) {
       return NextResponse.json(
@@ -41,7 +45,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { catalogImageId, userImageBase64 } = body;
 
+    console.log('📦 [GENERATE API] Request data:', {
+      catalogImageId,
+      hasUserImage: !!userImageBase64,
+      userImageSize: userImageBase64?.length
+    });
+
     if (!catalogImageId || !userImageBase64) {
+      console.log('❌ [GENERATE API] Missing required fields');
       return NextResponse.json(
         { error: 'Missing required fields: catalogImageId and userImageBase64' },
         { status: 400 }
@@ -67,6 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Fetch catalog image metadata
+    console.log('🔍 [GENERATE API] Fetching catalog image metadata...');
     const { data: catalogImage, error: catalogError } = await supabaseServiceRole
       .from('image_catalog')
       .select(`
@@ -82,26 +94,38 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (catalogError || !catalogImage) {
-      console.error('Catalog image not found:', catalogError);
+      console.error('❌ [GENERATE API] Catalog image not found:', catalogError);
       return NextResponse.json(
         { error: 'Catalog image not found or not public' },
         { status: 404 }
       );
     }
 
+    console.log('✅ [GENERATE API] Catalog image found:', {
+      id: catalogImage.id,
+      cloudinaryId: catalogImage.cloudinary_public_id,
+      breed: catalogImage.breed?.name
+    });
+
     // 4. Download catalog image from Cloudinary as base64
+    console.log('📥 [GENERATE API] Downloading catalog image from Cloudinary...');
     const catalogImageUrl = cloudinaryService.getPublicVariantUrl(
       catalogImage.cloudinary_public_id,
       'full_size'
     );
+    console.log('🔗 [GENERATE API] Catalog image URL:', catalogImageUrl.substring(0, 100));
 
     const catalogImageResponse = await fetch(catalogImageUrl);
+    console.log('📥 [GENERATE API] Cloudinary fetch status:', catalogImageResponse.status);
+
     if (!catalogImageResponse.ok) {
+      console.error('❌ [GENERATE API] Failed to download catalog image:', catalogImageResponse.status);
       throw new Error('Failed to download catalog image');
     }
 
     const catalogImageBuffer = await catalogImageResponse.arrayBuffer();
     const catalogImageBase64 = Buffer.from(catalogImageBuffer).toString('base64');
+    console.log('✅ [GENERATE API] Catalog image downloaded, size:', catalogImageBase64.length);
 
     // 5. Generate variation using Gemini
     // Create a custom prompt that transforms the catalog style to match the user's dog
@@ -123,9 +147,10 @@ Task: Create a new portrait that:
 
 Important: The dog's appearance from the uploaded photo should be accurately represented, but styled to match the reference portrait's artistic treatment.`;
 
-    console.log(`🎨 Generating variation for IP ${clientIp}`);
-    console.log(`📷 Catalog image: ${catalogImage.id}`);
-    console.log(`🐕 Breed: ${catalogImage.breed?.name || 'unknown'}`);
+    console.log('🤖 [GENERATE API] Starting Gemini generation...');
+    console.log(`🎨 [GENERATE API] IP: ${clientIp}`);
+    console.log(`📷 [GENERATE API] Catalog: ${catalogImage.id}`);
+    console.log(`🐕 [GENERATE API] Breed: ${catalogImage.breed?.name || 'unknown'}`);
 
     const geminiStartTime = Date.now();
 
@@ -150,9 +175,10 @@ Important: The dog's appearance from the uploaded photo should be accurately rep
       });
 
       const geminiDuration = Date.now() - geminiStartTime;
-      console.log(`✅ Gemini generation completed in ${geminiDuration}ms`);
+      console.log(`✅ [GENERATE API] Gemini completed in ${geminiDuration}ms`);
 
       if (!response.candidates?.[0]?.content?.parts) {
+        console.error('❌ [GENERATE API] No candidates in response');
         throw new Error('No image data returned from Gemini');
       }
 
@@ -161,10 +187,14 @@ Important: The dog's appearance from the uploaded photo should be accurately rep
       )?.inlineData?.data;
 
       if (!generatedImageData) {
+        console.error('❌ [GENERATE API] No image data in parts');
         throw new Error('No image data in Gemini response');
       }
 
+      console.log('✅ [GENERATE API] Image generated, size:', generatedImageData.length);
+
       // 6. Upload to Cloudinary with watermark
+      console.log('📤 [GENERATE API] Uploading to Cloudinary...');
       const timestamp = Date.now();
       const filename = `public-generated/${catalogImage.breed?.name || 'dog'}-${timestamp}`;
 
@@ -178,19 +208,24 @@ Important: The dog's appearance from the uploaded photo should be accurately rep
       );
 
       if (!uploadResult) {
+        console.error('❌ [GENERATE API] Cloudinary upload failed');
         throw new Error('Failed to upload generated image to Cloudinary');
       }
+
+      console.log('✅ [GENERATE API] Uploaded to Cloudinary:', uploadResult.publicId);
 
       // 7. Generate watermarked URL
       const watermarkedUrl = cloudinaryService.getPublicVariantUrl(
         uploadResult.publicId,
         'catalog_watermarked'
       );
+      console.log('🔗 [GENERATE API] Watermarked URL:', watermarkedUrl.substring(0, 100));
 
       // 8. Record successful request for rate limiting
       await rateLimiter.recordRequest(clientIp, endpoint);
 
       // 9. Return response
+      console.log('✅ [GENERATE API] Success! Returning response');
       return NextResponse.json({
         success: true,
         watermarkedUrl,

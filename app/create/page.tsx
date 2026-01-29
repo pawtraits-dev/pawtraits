@@ -84,9 +84,15 @@ function CreatePageContent() {
       setIsLoadingCatalog(true);
       setCatalogError(null);
 
+      console.log('📸 [CREATE PAGE] Loading catalog image:', id);
       const response = await fetch(`/api/public/catalog-images/${id}`);
 
+      console.log('📸 [CREATE PAGE] API response status:', response.status);
+
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ [CREATE PAGE] API error:', response.status, errorData);
+
         if (response.status === 404) {
           throw new Error('Portrait not found. Please check your link.');
         }
@@ -94,9 +100,17 @@ function CreatePageContent() {
       }
 
       const data = await response.json();
+      console.log('✅ [CREATE PAGE] Catalog data received:', {
+        id: data.id,
+        hasImageUrl: !!data.imageUrl,
+        imageUrl: data.imageUrl?.substring(0, 100),
+        breedName: data.breed?.displayName,
+        cloudinaryPublicId: data.cloudinaryPublicId
+      });
+
       setCatalogImage(data);
     } catch (error: any) {
-      console.error('Error loading catalog image:', error);
+      console.error('❌ [CREATE PAGE] Error loading catalog image:', error);
       setCatalogError(error.message || 'Failed to load portrait');
     } finally {
       setIsLoadingCatalog(false);
@@ -115,13 +129,16 @@ function CreatePageContent() {
 
   const handleGenerate = async () => {
     if (!catalogImage || !userDogBase64) {
+      console.log('⚠️ [CREATE PAGE] Missing data for generation');
       return;
     }
 
+    console.log('🎨 [CREATE PAGE] Starting generation...');
     setIsGenerating(true);
     setGenerationError(null);
 
     try {
+      console.log('📤 [CREATE PAGE] Sending request to generate API');
       const response = await fetch('/api/public/generate-variation', {
         method: 'POST',
         headers: {
@@ -133,9 +150,12 @@ function CreatePageContent() {
         }),
       });
 
+      console.log('📥 [CREATE PAGE] Generation response status:', response.status);
       const data = await response.json();
 
       if (!response.ok) {
+        console.error('❌ [CREATE PAGE] Generation failed:', data);
+
         if (response.status === 429) {
           // Rate limit exceeded
           const retryMinutes = Math.ceil(data.retryAfter / 60);
@@ -146,6 +166,13 @@ function CreatePageContent() {
 
         throw new Error(data.message || data.error || 'Generation failed');
       }
+
+      console.log('✅ [CREATE PAGE] Generation successful:', {
+        hasWatermarkedUrl: !!data.watermarkedUrl,
+        watermarkedUrl: data.watermarkedUrl?.substring(0, 100),
+        metadata: data.metadata,
+        rateLimitRemaining: data.rateLimitRemaining
+      });
 
       setGenerationResult(data);
       setRateLimitRemaining(data.rateLimitRemaining);
