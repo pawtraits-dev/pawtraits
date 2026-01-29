@@ -202,14 +202,16 @@ Important: The dog's appearance from the uploaded photo should be accurately rep
       // 6. Upload to Cloudinary with watermark
       console.log('📤 [GENERATE API] Uploading to Cloudinary...');
       const timestamp = Date.now();
-      const filename = `public-generated/${catalogImage.breed?.name || 'dog'}-${timestamp}`;
+      const filename = `public-generated-${catalogImage.breed?.name || 'dog'}-${timestamp}.png`;
 
-      const uploadResult = await cloudinaryService.uploadImageBuffer(
+      const uploadResult = await cloudinaryService.uploadAndProcessImage(
         Buffer.from(generatedImageData, 'base64'),
         filename,
         {
-          folder: 'pawtraits/public-generated',
-          tags: ['public-generation', 'user-created', catalogImage.breed?.name || 'unknown']
+          breed: catalogImage.breed?.name || 'dog',
+          theme: catalogImage.theme?.name || 'custom',
+          style: catalogImage.style?.name || 'portrait',
+          format: 'square'
         }
       );
 
@@ -218,11 +220,11 @@ Important: The dog's appearance from the uploaded photo should be accurately rep
         throw new Error('Failed to upload generated image to Cloudinary');
       }
 
-      console.log('✅ [GENERATE API] Uploaded to Cloudinary:', uploadResult.publicId);
+      console.log('✅ [GENERATE API] Uploaded to Cloudinary:', uploadResult.public_id);
 
       // 7. Generate watermarked URL
       const watermarkedUrl = cloudinaryService.getPublicVariantUrl(
-        uploadResult.publicId,
+        uploadResult.public_id,
         'catalog_watermarked'
       );
       console.log('🔗 [GENERATE API] Watermarked URL:', watermarkedUrl.substring(0, 100));
