@@ -162,7 +162,7 @@ Important: The dog's appearance from the uploaded photo should be accurately rep
 
     try {
       const response = await geminiService.ai.models.generateContent({
-        model: "gemini-1.5-flash", // Using stable model that supports multimodal
+        model: "gemini-3-pro-image-preview",
         contents: [
           { text: customPrompt },
           {
