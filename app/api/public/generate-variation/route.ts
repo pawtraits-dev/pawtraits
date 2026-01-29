@@ -85,9 +85,9 @@ export async function POST(request: NextRequest) {
         id,
         cloudinary_public_id,
         prompt_text,
-        breed:breeds(id, name, display_name),
-        theme:themes(id, name, display_name),
-        style:styles(id, name, display_name)
+        breed:breeds(id, name),
+        theme:themes(id, name),
+        style:styles(id, name)
       `)
       .eq('id', catalogImageId)
       .eq('is_public', true)
@@ -230,9 +230,9 @@ Important: The dog's appearance from the uploaded photo should be accurately rep
         success: true,
         watermarkedUrl,
         metadata: {
-          breedName: catalogImage.breed?.display_name || 'Unknown',
-          themeName: catalogImage.theme?.display_name || 'Unknown',
-          styleName: catalogImage.style?.display_name || 'Unknown'
+          breedName: catalogImage.breed?.name || 'Unknown',
+          themeName: catalogImage.theme?.name || 'Unknown',
+          styleName: catalogImage.style?.name || 'Unknown'
         },
         rateLimitRemaining: rateLimitResult.remaining,
         generationTimeMs: Date.now() - geminiStartTime

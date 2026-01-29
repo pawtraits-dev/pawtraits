@@ -43,19 +43,16 @@ export async function GET(
         breed:breeds(
           id,
           name,
-          display_name,
           animal_type
         ),
         theme:themes(
           id,
           name,
-          display_name,
           base_prompt_template
         ),
         style:styles(
           id,
           name,
-          display_name,
           prompt_suffix
         ),
         format:formats(
@@ -116,18 +113,18 @@ export async function GET(
       breed: catalogImage.breed ? {
         id: catalogImage.breed.id,
         name: catalogImage.breed.name,
-        displayName: catalogImage.breed.display_name,
+        displayName: catalogImage.breed.name, // Use name as displayName
         animalType: catalogImage.breed.animal_type
       } : null,
       theme: catalogImage.theme ? {
         id: catalogImage.theme.id,
         name: catalogImage.theme.name,
-        displayName: catalogImage.theme.display_name
+        displayName: catalogImage.theme.name // Use name as displayName
       } : null,
       style: catalogImage.style ? {
         id: catalogImage.style.id,
         name: catalogImage.style.name,
-        displayName: catalogImage.style.display_name
+        displayName: catalogImage.style.name // Use name as displayName
       } : null,
       format: catalogImage.format ? {
         id: catalogImage.format.id,
