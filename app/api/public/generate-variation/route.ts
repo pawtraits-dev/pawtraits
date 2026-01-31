@@ -137,29 +137,36 @@ export async function POST(request: NextRequest) {
     // Create a custom prompt that transforms the catalog style to match the user's dog
     const userImageData = userImageBase64.split(',')[1]; // Remove data:image prefix
 
-    const customPrompt = `CRITICAL: ARTISTIC MEDIUM TRANSFORMATION
+    const customPrompt = `CRITICAL INSTRUCTION: MODIFY THE REFERENCE IMAGE, DO NOT CREATE A NEW IMAGE
 
-The reference portrait is rendered in a specific artistic medium (oil painting, watercolor, digital art, etc.)
-The uploaded photo is a PHOTOGRAPHIC REFERENCE ONLY for the subject's physical appearance.
+You are given a reference portrait image. Your task is to MODIFY this EXACT image by REPLACING ONLY the subject with the subject from the uploaded photo.
 
-You MUST transform the subject into the SAME artistic medium as the reference portrait.
-DO NOT composite a photographic subject into a painted/stylized background.
-RENDER the subject as if it were painted/drawn in the original artistic style from scratch.
+PRESERVATION REQUIREMENTS (THESE MUST REMAIN IDENTICAL):
+- The EXACT background from the reference image
+- The EXACT composition, framing, and camera angle
+- The EXACT lighting setup, shadows, and highlights
+- The EXACT props, objects, and scenic elements
+- The EXACT color palette and mood
+- The EXACT artistic style, brushwork, and texture
+- The EXACT position and pose of the subject (same location in frame)
 
-Reference Portrait Style:
+REPLACEMENT REQUIREMENT (ONLY THIS CHANGES):
+- Replace the original subject with the subject from the uploaded photo
+- The new subject must have the EXACT physical appearance from the uploaded photo (coloring, markings, facial features, fur/hair patterns, distinctive characteristics)
+- The new subject must be rendered in the SAME artistic medium as the reference (if reference is oil painting, paint the new subject in oil paint style; if watercolor, render as watercolor, etc.)
+- The new subject must match the lighting and style of the reference portrait
+- DO NOT make the subject photorealistic - it must match the artistic style of the reference
+
+Reference Portrait Metadata:
 - Theme: ${catalogImage.theme?.display_name || 'original theme'}
 - Style: ${catalogImage.style?.display_name || 'original style'}
 - Original Subject: ${catalogImage.breed?.display_name || 'original subject'}
 
-Task: Create a new portrait that:
-1. TRANSFORMS the uploaded photo into the reference's artistic medium (if reference is oil painting, paint the subject in oil paint style; if watercolor, render as watercolor; if digital art, render as digital art, etc.)
-2. Features the subject's EXACT physical appearance from the uploaded photo (preserve unique coloring, markings, facial features, fur/hair patterns, and any distinctive characteristics)
-3. Maintains the artistic style, lighting, mood, and brushwork/texture of the reference portrait
-4. Keeps the same composition, framing, and perspective
-5. Preserves the theme elements (background, props, atmosphere)
-6. Ensures the result looks like a cohesive artwork created in a single artistic medium
-
-CRITICAL: The entire output must look like it was created in ONE artistic medium. The subject (whether pet, human, or other) must be rendered in the SAME style as the reference portrait, not as a photorealistic element inserted into a stylized scene.`;
+CRITICAL VERIFICATION:
+- If someone compared your output to the reference image, the ONLY difference should be the subject's appearance
+- Everything else (background, composition, lighting, style, props) must be IDENTICAL to the reference
+- DO NOT invent new backgrounds, change the scene, or alter the composition
+- This is a subject replacement task, NOT a new image generation task`;
 
     console.log('🤖 [GENERATE API] Starting Gemini generation...');
     console.log(`🎨 [GENERATE API] IP: ${clientIp}`);

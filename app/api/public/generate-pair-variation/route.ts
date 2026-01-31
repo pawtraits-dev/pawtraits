@@ -142,35 +142,41 @@ export async function POST(request: NextRequest) {
     const pet1ImageData = pet1ImageBase64.split(',')[1]; // Remove data:image prefix
     const pet2ImageData = pet2ImageBase64.split(',')[1]; // Remove data:image prefix
 
-    const customPrompt = `CRITICAL: ARTISTIC MEDIUM TRANSFORMATION
+    const customPrompt = `CRITICAL INSTRUCTION: MODIFY THE REFERENCE IMAGE, DO NOT CREATE A NEW IMAGE
 
-The reference portrait is rendered in a specific artistic medium (oil painting, watercolor, digital art, etc.)
-The uploaded photos are PHOTOGRAPHIC REFERENCES ONLY for the subjects' physical appearances.
+You are given a reference portrait image showing TWO subjects. Your task is to MODIFY this EXACT image by REPLACING ONLY the two subjects with the subjects from the two uploaded photos.
 
-You MUST transform BOTH subjects into the SAME artistic medium as the reference portrait.
-DO NOT composite photographic subjects into a painted/stylized background.
-RENDER both subjects as if they were painted/drawn in the original artistic style from scratch.
+PRESERVATION REQUIREMENTS (THESE MUST REMAIN IDENTICAL):
+- The EXACT background from the reference image
+- The EXACT composition, framing, and camera angle
+- The EXACT lighting setup, shadows, and highlights
+- The EXACT props, objects, and scenic elements
+- The EXACT color palette and mood
+- The EXACT artistic style, brushwork, and texture
+- The EXACT positions and poses of the two subjects (same locations in frame, same relative positioning)
 
-Reference Portrait Style:
+REPLACEMENT REQUIREMENTS (ONLY THIS CHANGES):
+- Replace the two original subjects with the subjects from the two uploaded photos
+- First uploaded photo → replaces first subject position
+- Second uploaded photo → replaces second subject position
+- Each new subject must have the EXACT physical appearance from their uploaded photo (coloring, markings, facial features, fur/hair patterns, distinctive characteristics)
+- ANALYZE the apparent size of each uploaded subject and maintain REALISTIC RELATIVE PROPORTIONS (if one appears significantly smaller, make them smaller; if they appear similar in size, make them similar)
+- Both subjects must be rendered in the SAME artistic medium as the reference (if reference is oil painting, paint both subjects in oil paint style; if watercolor, render as watercolor, etc.)
+- Both subjects must match the lighting and style of the reference portrait
+- DO NOT make subjects photorealistic - they must match the artistic style of the reference
+
+Reference Portrait Metadata:
 - Theme: ${catalogImage.theme?.name || 'original theme'}
 - Style: ${catalogImage.style?.name || 'original style'}
 - Original Subjects: ${catalogImage.breed?.name || 'original subjects'}
 
-Task: Create a new portrait that:
-1. TRANSFORMS both uploaded photos into the reference's artistic medium (if reference is oil painting, paint both subjects in oil paint style; if watercolor, render as watercolor; if digital art, render as digital art, etc.)
-2. Features BOTH subjects' EXACT physical appearances from the uploaded photos (preserve unique colorings, markings, facial features, fur/hair patterns, and any distinctive characteristics for each subject)
-3. ANALYZES the apparent size and scale of each uploaded subject and maintains REALISTIC RELATIVE PROPORTIONS (if one appears significantly smaller than the other, scale them appropriately - do not artificially make them the same size unless they naturally appear similar in size)
-4. Positions both subjects similarly to how the two figures are positioned in the reference image, while respecting their natural size differences
-5. Maintains the artistic style, lighting, mood, and brushwork/texture of the reference portrait
-6. Keeps the same composition, framing, and perspective
-7. Preserves the theme elements (background, props, atmosphere)
-8. Ensures the result looks like a cohesive artwork created in a single artistic medium with two distinct, properly-scaled subjects
-
-CRITICAL REQUIREMENTS:
-- The entire output must look like it was created in ONE artistic medium
-- Both subjects (whether pets, humans, or other) must be rendered in the SAME style as the reference portrait, not as photorealistic elements inserted into a stylized scene
-- Maintain realistic size relationships between the subjects based on their apparent sizes in the uploaded photos
-- Natural size differences should be preserved (a small animal should appear smaller than a large animal, a child smaller than an adult, etc.)`;
+CRITICAL VERIFICATION:
+- If someone compared your output to the reference image, the ONLY differences should be:
+  1. The appearance of the two subjects (now showing the uploaded photos' subjects)
+  2. The relative sizes of the subjects (if the uploaded subjects are different sizes)
+- Everything else (background, composition, lighting, style, props, positioning) must be IDENTICAL to the reference
+- DO NOT invent new backgrounds, change the scene, or alter the composition
+- This is a subject replacement task, NOT a new image generation task`;
 
     console.log('🤖 [PAIR GENERATE API] Starting Gemini generation with TWO pets...');
     console.log(`🎨 [PAIR GENERATE API] IP: ${clientIp}`);
