@@ -307,7 +307,7 @@ function CreatePageContent() {
 
         {/* Dog uploader */}
         <div>
-          <h2 className="text-xl font-bold mb-3">Upload Your Dog&apos;s Photo</h2>
+          <h2 className="text-xl font-bold mb-3">Upload Your Pet&apos;s Photo</h2>
           <DogUploader
             onUpload={handleDogUpload}
             onError={handleUploadError}

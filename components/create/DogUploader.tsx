@@ -153,7 +153,7 @@ export function DogUploader({ onUpload, onError, disabled = false }: DogUploader
 
               <div className="text-center space-y-2">
                 <p className="text-lg font-semibold text-gray-900">
-                  {isValidating ? 'Processing image...' : 'Upload Your Dog\'s Photo'}
+                  {isValidating ? 'Processing image...' : 'Upload Your Photo'}
                 </p>
                 <p className="text-sm text-gray-600">
                   Choose a photo from your gallery
@@ -178,7 +178,7 @@ export function DogUploader({ onUpload, onError, disabled = false }: DogUploader
               <div className="relative w-full aspect-square overflow-hidden rounded-lg bg-gray-100">
                 <Image
                   src={preview}
-                  alt="Your dog"
+                  alt="Uploaded photo"
                   fill
                   className="object-cover"
                   sizes="(max-width: 768px) 100vw, 50vw"

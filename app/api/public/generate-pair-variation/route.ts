@@ -145,32 +145,32 @@ export async function POST(request: NextRequest) {
     const customPrompt = `CRITICAL: ARTISTIC MEDIUM TRANSFORMATION
 
 The reference portrait is rendered in a specific artistic medium (oil painting, watercolor, digital art, etc.)
-The uploaded dog photos are PHOTOGRAPHIC REFERENCES ONLY for the dogs' physical appearances.
+The uploaded photos are PHOTOGRAPHIC REFERENCES ONLY for the subjects' physical appearances.
 
-You MUST transform BOTH dogs into the SAME artistic medium as the reference portrait.
-DO NOT composite photographic dogs into a painted/stylized background.
-RENDER both dogs as if they were painted/drawn in the original artistic style from scratch.
+You MUST transform BOTH subjects into the SAME artistic medium as the reference portrait.
+DO NOT composite photographic subjects into a painted/stylized background.
+RENDER both subjects as if they were painted/drawn in the original artistic style from scratch.
 
 Reference Portrait Style:
 - Theme: ${catalogImage.theme?.name || 'original theme'}
 - Style: ${catalogImage.style?.name || 'original style'}
-- Breed: ${catalogImage.breed?.name || 'original breed'}
+- Original Subjects: ${catalogImage.breed?.name || 'original subjects'}
 
 Task: Create a new portrait that:
-1. TRANSFORMS both uploaded photos into the reference's artistic medium (if reference is oil painting, paint both dogs in oil paint style; if watercolor, render as watercolor; if digital art, render as digital art, etc.)
-2. Features BOTH dogs' EXACT physical appearances from the uploaded photos (preserve unique colorings, markings, facial features, fur patterns for each dog)
-3. ANALYZES the apparent breed and size of each uploaded dog and maintains REALISTIC RELATIVE PROPORTIONS (if one appears to be a small breed like a Chihuahua and the other a large breed like a Great Dane, scale them appropriately - do not make them the same size)
-4. Positions both dogs similarly to how the two animals are positioned in the reference image, while respecting their natural size differences
+1. TRANSFORMS both uploaded photos into the reference's artistic medium (if reference is oil painting, paint both subjects in oil paint style; if watercolor, render as watercolor; if digital art, render as digital art, etc.)
+2. Features BOTH subjects' EXACT physical appearances from the uploaded photos (preserve unique colorings, markings, facial features, fur/hair patterns, and any distinctive characteristics for each subject)
+3. ANALYZES the apparent size and scale of each uploaded subject and maintains REALISTIC RELATIVE PROPORTIONS (if one appears significantly smaller than the other, scale them appropriately - do not artificially make them the same size unless they naturally appear similar in size)
+4. Positions both subjects similarly to how the two figures are positioned in the reference image, while respecting their natural size differences
 5. Maintains the artistic style, lighting, mood, and brushwork/texture of the reference portrait
 6. Keeps the same composition, framing, and perspective
 7. Preserves the theme elements (background, props, atmosphere)
-8. Ensures the result looks like a cohesive artwork created in a single artistic medium with two distinct, properly-scaled pets
+8. Ensures the result looks like a cohesive artwork created in a single artistic medium with two distinct, properly-scaled subjects
 
 CRITICAL REQUIREMENTS:
 - The entire output must look like it was created in ONE artistic medium
-- Both dogs must be rendered in the SAME style as the reference portrait, not as photorealistic elements inserted into a stylized scene
-- Maintain realistic size relationships between the dogs based on their apparent breeds/sizes in the uploaded photos
-- A toy breed should appear significantly smaller than a giant breed`;
+- Both subjects (whether pets, humans, or other) must be rendered in the SAME style as the reference portrait, not as photorealistic elements inserted into a stylized scene
+- Maintain realistic size relationships between the subjects based on their apparent sizes in the uploaded photos
+- Natural size differences should be preserved (a small animal should appear smaller than a large animal, a child smaller than an adult, etc.)`;
 
     console.log('🤖 [PAIR GENERATE API] Starting Gemini generation with TWO pets...');
     console.log(`🎨 [PAIR GENERATE API] IP: ${clientIp}`);
@@ -227,13 +227,13 @@ CRITICAL REQUIREMENTS:
       // 6. Upload to Cloudinary with watermark
       console.log('📤 [PAIR GENERATE API] Uploading to Cloudinary...');
       const timestamp = Date.now();
-      const filename = `public-pair-${catalogImage.breed?.name || 'dog'}-${timestamp}.png`;
+      const filename = `public-pair-${catalogImage.breed?.name || 'pets'}-${timestamp}.png`;
 
       const uploadResult = await cloudinaryService.uploadAndProcessImage(
         Buffer.from(generatedImageData, 'base64'),
         filename,
         {
-          breed: catalogImage.breed?.name || 'dog',
+          breed: catalogImage.breed?.name || 'pets',
           theme: catalogImage.theme?.name || 'custom',
           style: catalogImage.style?.name || 'portrait',
           format: 'square'

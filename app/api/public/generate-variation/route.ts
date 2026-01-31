@@ -140,26 +140,26 @@ export async function POST(request: NextRequest) {
     const customPrompt = `CRITICAL: ARTISTIC MEDIUM TRANSFORMATION
 
 The reference portrait is rendered in a specific artistic medium (oil painting, watercolor, digital art, etc.)
-The uploaded dog photo is a PHOTOGRAPHIC REFERENCE ONLY for the dog's physical appearance.
+The uploaded photo is a PHOTOGRAPHIC REFERENCE ONLY for the subject's physical appearance.
 
-You MUST transform the dog into the SAME artistic medium as the reference portrait.
-DO NOT composite a photographic dog into a painted/stylized background.
-RENDER the dog as if it were painted/drawn in the original artistic style from scratch.
+You MUST transform the subject into the SAME artistic medium as the reference portrait.
+DO NOT composite a photographic subject into a painted/stylized background.
+RENDER the subject as if it were painted/drawn in the original artistic style from scratch.
 
 Reference Portrait Style:
 - Theme: ${catalogImage.theme?.display_name || 'original theme'}
 - Style: ${catalogImage.style?.display_name || 'original style'}
-- Breed: ${catalogImage.breed?.display_name || 'original breed'}
+- Original Subject: ${catalogImage.breed?.display_name || 'original subject'}
 
 Task: Create a new portrait that:
-1. TRANSFORMS the uploaded photo into the reference's artistic medium (if reference is oil painting, paint the dog in oil paint style; if watercolor, render as watercolor; if digital art, render as digital art, etc.)
-2. Features the dog's EXACT physical appearance from the uploaded photo (preserve unique coloring, markings, facial features, fur patterns)
+1. TRANSFORMS the uploaded photo into the reference's artistic medium (if reference is oil painting, paint the subject in oil paint style; if watercolor, render as watercolor; if digital art, render as digital art, etc.)
+2. Features the subject's EXACT physical appearance from the uploaded photo (preserve unique coloring, markings, facial features, fur/hair patterns, and any distinctive characteristics)
 3. Maintains the artistic style, lighting, mood, and brushwork/texture of the reference portrait
 4. Keeps the same composition, framing, and perspective
 5. Preserves the theme elements (background, props, atmosphere)
 6. Ensures the result looks like a cohesive artwork created in a single artistic medium
 
-CRITICAL: The entire output must look like it was created in ONE artistic medium. The dog must be rendered in the SAME style as the reference portrait, not as a photorealistic element inserted into a stylized scene.`;
+CRITICAL: The entire output must look like it was created in ONE artistic medium. The subject (whether pet, human, or other) must be rendered in the SAME style as the reference portrait, not as a photorealistic element inserted into a stylized scene.`;
 
     console.log('🤖 [GENERATE API] Starting Gemini generation...');
     console.log(`🎨 [GENERATE API] IP: ${clientIp}`);
@@ -210,13 +210,13 @@ CRITICAL: The entire output must look like it was created in ONE artistic medium
       // 6. Upload to Cloudinary with watermark
       console.log('📤 [GENERATE API] Uploading to Cloudinary...');
       const timestamp = Date.now();
-      const filename = `public-generated-${catalogImage.breed?.name || 'dog'}-${timestamp}.png`;
+      const filename = `public-generated-${catalogImage.breed?.name || 'pet'}-${timestamp}.png`;
 
       const uploadResult = await cloudinaryService.uploadAndProcessImage(
         Buffer.from(generatedImageData, 'base64'),
         filename,
         {
-          breed: catalogImage.breed?.name || 'dog',
+          breed: catalogImage.breed?.name || 'pet',
           theme: catalogImage.theme?.name || 'custom',
           style: catalogImage.style?.name || 'portrait',
           format: 'square'
