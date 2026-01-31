@@ -27,14 +27,21 @@ export interface PublicRateLimitResult {
 /**
  * Database-backed rate limiter for public endpoints
  * Designed for serverless environments where in-memory storage doesn't persist
+ *
+ * Configurable via environment variables:
+ * - PUBLIC_RATE_LIMIT_MAX_REQUESTS (default: 3)
+ * - PUBLIC_RATE_LIMIT_WINDOW_MINUTES (default: 60)
  */
 export class PublicRateLimiter {
   private maxRequests: number;
   private windowMinutes: number;
 
-  constructor(maxRequests: number = 3, windowMinutes: number = 60) {
-    this.maxRequests = maxRequests;
-    this.windowMinutes = windowMinutes;
+  constructor(maxRequests?: number, windowMinutes?: number) {
+    // Read from environment variables with fallback defaults
+    this.maxRequests = maxRequests ??
+      parseInt(process.env.PUBLIC_RATE_LIMIT_MAX_REQUESTS || '3', 10);
+    this.windowMinutes = windowMinutes ??
+      parseInt(process.env.PUBLIC_RATE_LIMIT_WINDOW_MINUTES || '60', 10);
   }
 
   /**

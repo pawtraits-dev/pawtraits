@@ -10,7 +10,7 @@ const supabaseServiceRole = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const rateLimiter = new PublicRateLimiter(3, 60); // 3 requests per hour
+const rateLimiter = new PublicRateLimiter(); // Configured via environment variables
 const geminiService = new GeminiVariationService();
 const cloudinaryService = new CloudinaryImageService();
 
@@ -142,7 +142,14 @@ export async function POST(request: NextRequest) {
     const pet1ImageData = pet1ImageBase64.split(',')[1]; // Remove data:image prefix
     const pet2ImageData = pet2ImageBase64.split(',')[1]; // Remove data:image prefix
 
-    const customPrompt = `Transform the reference image (a pet portrait with two animals) to feature the two dogs shown in the uploaded photos, while maintaining the original artistic style, theme, and composition.
+    const customPrompt = `CRITICAL: ARTISTIC MEDIUM TRANSFORMATION
+
+The reference portrait is rendered in a specific artistic medium (oil painting, watercolor, digital art, etc.)
+The uploaded dog photos are PHOTOGRAPHIC REFERENCES ONLY for the dogs' physical appearances.
+
+You MUST transform BOTH dogs into the SAME artistic medium as the reference portrait.
+DO NOT composite photographic dogs into a painted/stylized background.
+RENDER both dogs as if they were painted/drawn in the original artistic style from scratch.
 
 Reference Portrait Style:
 - Theme: ${catalogImage.theme?.name || 'original theme'}
@@ -150,17 +157,20 @@ Reference Portrait Style:
 - Breed: ${catalogImage.breed?.name || 'original breed'}
 
 Task: Create a new portrait that:
-1. Features BOTH dogs from the uploaded photos (preserve their unique appearances, colorings, and markings)
-2. Position the first dog and second dog similarly to how the two animals are positioned in the reference image
-3. Maintains the artistic style, lighting, and mood of the reference portrait
-4. Keeps the same composition and framing
-5. Preserves the theme elements (background, props, atmosphere)
-6. Ensures the result looks professionally composed and cohesive with two distinct pets
+1. TRANSFORMS both uploaded photos into the reference's artistic medium (if reference is oil painting, paint both dogs in oil paint style; if watercolor, render as watercolor; if digital art, render as digital art, etc.)
+2. Features BOTH dogs' EXACT physical appearances from the uploaded photos (preserve unique colorings, markings, facial features, fur patterns for each dog)
+3. ANALYZES the apparent breed and size of each uploaded dog and maintains REALISTIC RELATIVE PROPORTIONS (if one appears to be a small breed like a Chihuahua and the other a large breed like a Great Dane, scale them appropriately - do not make them the same size)
+4. Positions both dogs similarly to how the two animals are positioned in the reference image, while respecting their natural size differences
+5. Maintains the artistic style, lighting, mood, and brushwork/texture of the reference portrait
+6. Keeps the same composition, framing, and perspective
+7. Preserves the theme elements (background, props, atmosphere)
+8. Ensures the result looks like a cohesive artwork created in a single artistic medium with two distinct, properly-scaled pets
 
-Important:
-- Both dogs' appearances from the uploaded photos should be accurately represented
-- Position them in a complementary way that matches the reference composition
-- Style both dogs to match the reference portrait's artistic treatment`;
+CRITICAL REQUIREMENTS:
+- The entire output must look like it was created in ONE artistic medium
+- Both dogs must be rendered in the SAME style as the reference portrait, not as photorealistic elements inserted into a stylized scene
+- Maintain realistic size relationships between the dogs based on their apparent breeds/sizes in the uploaded photos
+- A toy breed should appear significantly smaller than a giant breed`;
 
     console.log('🤖 [PAIR GENERATE API] Starting Gemini generation with TWO pets...');
     console.log(`🎨 [PAIR GENERATE API] IP: ${clientIp}`);

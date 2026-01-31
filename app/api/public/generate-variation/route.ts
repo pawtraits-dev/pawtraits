@@ -10,7 +10,7 @@ const supabaseServiceRole = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const rateLimiter = new PublicRateLimiter(3, 60); // 3 requests per hour
+const rateLimiter = new PublicRateLimiter(); // Configured via environment variables
 const geminiService = new GeminiVariationService();
 const cloudinaryService = new CloudinaryImageService();
 
@@ -137,7 +137,14 @@ export async function POST(request: NextRequest) {
     // Create a custom prompt that transforms the catalog style to match the user's dog
     const userImageData = userImageBase64.split(',')[1]; // Remove data:image prefix
 
-    const customPrompt = `Transform the reference image (a pet portrait) to feature the dog shown in the uploaded photo, while maintaining the original artistic style, theme, and composition.
+    const customPrompt = `CRITICAL: ARTISTIC MEDIUM TRANSFORMATION
+
+The reference portrait is rendered in a specific artistic medium (oil painting, watercolor, digital art, etc.)
+The uploaded dog photo is a PHOTOGRAPHIC REFERENCE ONLY for the dog's physical appearance.
+
+You MUST transform the dog into the SAME artistic medium as the reference portrait.
+DO NOT composite a photographic dog into a painted/stylized background.
+RENDER the dog as if it were painted/drawn in the original artistic style from scratch.
 
 Reference Portrait Style:
 - Theme: ${catalogImage.theme?.display_name || 'original theme'}
@@ -145,13 +152,14 @@ Reference Portrait Style:
 - Breed: ${catalogImage.breed?.display_name || 'original breed'}
 
 Task: Create a new portrait that:
-1. Features the EXACT dog from the uploaded photo (preserve their unique appearance, coloring, and markings)
-2. Maintains the artistic style, lighting, and mood of the reference portrait
-3. Keeps the same composition and framing
-4. Preserves the theme elements (background, props, atmosphere)
-5. Ensures the result looks professionally composed and cohesive
+1. TRANSFORMS the uploaded photo into the reference's artistic medium (if reference is oil painting, paint the dog in oil paint style; if watercolor, render as watercolor; if digital art, render as digital art, etc.)
+2. Features the dog's EXACT physical appearance from the uploaded photo (preserve unique coloring, markings, facial features, fur patterns)
+3. Maintains the artistic style, lighting, mood, and brushwork/texture of the reference portrait
+4. Keeps the same composition, framing, and perspective
+5. Preserves the theme elements (background, props, atmosphere)
+6. Ensures the result looks like a cohesive artwork created in a single artistic medium
 
-Important: The dog's appearance from the uploaded photo should be accurately represented, but styled to match the reference portrait's artistic treatment.`;
+CRITICAL: The entire output must look like it was created in ONE artistic medium. The dog must be rendered in the SAME style as the reference portrait, not as a photorealistic element inserted into a stylized scene.`;
 
     console.log('🤖 [GENERATE API] Starting Gemini generation...');
     console.log(`🎨 [GENERATE API] IP: ${clientIp}`);
