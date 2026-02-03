@@ -264,6 +264,17 @@ export default function CatalogUploadPage() {
 
       const analysisData: CompositionAnalysis = await response.json();
 
+      console.log('📊 Analysis received:', {
+        subjectCount: analysisData.subjects.length,
+        subjects: analysisData.subjects.map(s => ({
+          order: s.subjectOrder,
+          breedId: s.breedId,
+          coatId: s.coatId,
+          suggestedBreed: s.suggestedBreed?.name,
+          suggestedCoat: s.suggestedCoat?.name
+        }))
+      });
+
       setAnalysisStep('complete');
       setAnalysisProgress('Analysis complete!');
       setAnalysis(analysisData);
@@ -272,6 +283,8 @@ export default function CatalogUploadPage() {
       setMarketingDescription(analysisData.marketingDescription);
       setCompositionAnalysis(analysisData.compositionAnalysis);
       setIsMultiSubject(analysisData.subjects.length > 1);
+
+      // Set subjects with AI-matched breeds/coats already populated
       setSubjects(analysisData.subjects);
 
     } catch (error: any) {
