@@ -224,7 +224,7 @@ export function MultiSubjectEditor({
                       )}
 
                       <Select
-                        value={subject.breedId || undefined}
+                        value={subject.breedId}
                         onValueChange={(value) => handleUpdateSubject(index, { breedId: value, coatId: undefined })}
                       >
                         <SelectTrigger id={`subject-${index}-breed`}>
@@ -271,7 +271,7 @@ export function MultiSubjectEditor({
                         )}
 
                         <Select
-                          value={subject.coatId || undefined}
+                          value={subject.coatId}
                           onValueChange={(value) => handleUpdateSubject(index, { coatId: value })}
                         >
                           <SelectTrigger id={`subject-${index}-coat`}>

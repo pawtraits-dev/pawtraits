@@ -287,6 +287,30 @@ export default function CatalogUploadPage() {
       // Set subjects with AI-matched breeds/coats already populated
       setSubjects(analysisData.subjects);
 
+      // Auto-select format based on composition framing
+      if (analysisData.compositionMetadata?.composition?.framing && formats.length > 0) {
+        const framing = analysisData.compositionMetadata.composition.framing.toLowerCase();
+
+        // Try to match framing to format
+        const matchedFormat = formats.find((f: any) => {
+          const formatName = (f.name || f.display_name || '').toLowerCase();
+
+          // Map common framing types to formats
+          if (framing.includes('portrait') && formatName.includes('portrait')) return true;
+          if (framing.includes('square') && formatName.includes('square')) return true;
+          if (framing.includes('landscape') && formatName.includes('landscape')) return true;
+          if (framing.includes('closeup') && formatName.includes('square')) return true; // Closeups often work as square
+          if (framing.includes('full') && formatName.includes('portrait')) return true; // Full body often portrait
+
+          return false;
+        });
+
+        if (matchedFormat) {
+          console.log(`📐 Auto-selected format: ${matchedFormat.name} (based on framing: ${framing})`);
+          setSelectedFormat(matchedFormat.id);
+        }
+      }
+
     } catch (error: any) {
       console.error('Analysis error:', error);
       setAnalysisStep('error');
