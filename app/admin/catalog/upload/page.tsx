@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -83,9 +83,9 @@ export default function CatalogUploadPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   // Load metadata options on mount
-  useState(() => {
+  useEffect(() => {
     loadMetadataOptions();
-  });
+  }, []);
 
   const loadMetadataOptions = async () => {
     try {
