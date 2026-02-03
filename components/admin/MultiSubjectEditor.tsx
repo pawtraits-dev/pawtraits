@@ -292,14 +292,14 @@ export function MultiSubjectEditor({
                     <div className="space-y-2">
                       <Label htmlFor={`subject-${index}-outfit`}>Outfit (Optional)</Label>
                       <Select
-                        value={subject.outfitId || ''}
-                        onValueChange={(value) => handleUpdateSubject(index, { outfitId: value })}
+                        value={subject.outfitId || 'none'}
+                        onValueChange={(value) => handleUpdateSubject(index, { outfitId: value === 'none' ? undefined : value })}
                       >
                         <SelectTrigger id={`subject-${index}-outfit`}>
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="none">None</SelectItem>
                           {outfits.map((outfit: any) => (
                             <SelectItem key={outfit.id} value={outfit.id}>
                               {outfit.display_name || outfit.name}
