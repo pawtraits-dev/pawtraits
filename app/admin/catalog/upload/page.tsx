@@ -12,6 +12,8 @@ import { Upload, X, Sparkles, AlertCircle, CheckCircle, Loader2, ArrowLeft } fro
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { MultiSubjectEditor } from '@/components/admin/MultiSubjectEditor';
+import { CompositionAnalysisPanel } from '@/components/admin/CompositionAnalysisPanel';
 
 interface SubjectIdentification {
   subjectOrder: number;
@@ -495,18 +497,146 @@ export default function CatalogUploadPage() {
             </CardContent>
           </Card>
 
-          {/* TODO: Add MultiSubjectEditor component here */}
-          {/* TODO: Add CompositionAnalysisPanel component here */}
+          {/* Multi-Subject Editor */}
+          <MultiSubjectEditor
+            subjects={subjects}
+            onChange={setSubjects}
+            breeds={breeds}
+            coats={coats}
+            outfits={outfits}
+            isMultiSubject={isMultiSubject}
+            onMultiSubjectChange={setIsMultiSubject}
+          />
 
-          {/* Metadata Section - Placeholder */}
+          {/* Composition Analysis Panel */}
+          <CompositionAnalysisPanel
+            compositionAnalysis={compositionAnalysis}
+            variationPromptTemplate={analysis.variationPromptTemplate}
+            compositionMetadata={analysis.compositionMetadata}
+            confidence={analysis.confidence.compositionAnalysis}
+            onCompositionChange={setCompositionAnalysis}
+            onPromptTemplateChange={(value) => {
+              setAnalysis({ ...analysis, variationPromptTemplate: value });
+            }}
+            editable={true}
+          />
+
+          {/* Metadata Section */}
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Step 3: Metadata & Settings</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">
-                Theme, Style, Format selectors and subject management will be added here.
-              </p>
+            <CardContent className="space-y-6">
+              {/* Theme, Style, Format Selection */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="theme">Theme *</Label>
+                  <select
+                    id="theme"
+                    value={selectedTheme}
+                    onChange={(e) => setSelectedTheme(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="">Select theme...</option>
+                    {themes.map((theme) => (
+                      <option key={theme.id} value={theme.id}>
+                        {theme.display_name || theme.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="style">Style *</Label>
+                  <select
+                    id="style"
+                    value={selectedStyle}
+                    onChange={(e) => setSelectedStyle(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="">Select style...</option>
+                    {styles.map((style) => (
+                      <option key={style.id} value={style.id}>
+                        {style.display_name || style.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="format">Format *</Label>
+                  <select
+                    id="format"
+                    value={selectedFormat}
+                    onChange={(e) => setSelectedFormat(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="">Select format...</option>
+                    {formats.map((format) => (
+                      <option key={format.id} value={format.id}>
+                        {format.display_name || format.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div className="space-y-2">
+                <Label htmlFor="tags">Tags (Optional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="tags"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddTag();
+                      }
+                    }}
+                    placeholder="Enter tag and press Enter..."
+                  />
+                  <Button type="button" onClick={handleAddTag}>
+                    Add
+                  </Button>
+                </div>
+                {tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {tags.map((tag) => (
+                      <Badge key={tag} variant="secondary" className="cursor-pointer">
+                        {tag}
+                        <X
+                          className="w-3 h-3 ml-1"
+                          onClick={() => handleRemoveTag(tag)}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Featured & Public Toggles */}
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={isFeatured}
+                    onChange={(e) => setIsFeatured(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">Featured Image</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={(e) => setIsPublic(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">Public (visible to customers)</span>
+                </label>
+              </div>
             </CardContent>
           </Card>
 
