@@ -159,37 +159,35 @@ export default function CatalogUploadPage() {
     if (!selectedFile) return;
 
     setAnalysisStep('uploading');
-    setAnalysisProgress('Uploading image...');
+    setAnalysisProgress('Preparing image...');
     setError(null);
 
     try {
-      // Convert to base64
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(selectedFile);
-      });
-
       setAnalysisStep('analyzing');
       setAnalysisProgress('Analyzing composition with Claude AI...');
+
+      // Use FormData (following established pattern from /admin/generate)
+      const formData = new FormData();
+      formData.append('image', selectedFile);
+      if (selectedTheme) formData.append('themeId', selectedTheme);
+      if (selectedStyle) formData.append('styleId', selectedStyle);
 
       // Call analysis API
       const response = await fetch('/api/admin/analyze-composition', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          imageBase64: base64,
-          themeId: selectedTheme || undefined,
-          styleId: selectedStyle || undefined
-        })
+        body: formData // No Content-Type header needed with FormData
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Analysis failed');
+        console.error('API Response not ok:', response.status, response.statusText);
+        try {
+          const errorData = await response.json();
+          console.error('Error data from API:', errorData);
+          throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        } catch (jsonError) {
+          console.error('Could not parse error response as JSON:', jsonError);
+          throw new Error(`HTTP ${response.status}: ${response.statusText} - Could not parse error details`);
+        }
       }
 
       const analysisData: CompositionAnalysis = await response.json();

@@ -1,81 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ClaudeCompositionAnalyzer } from '@/lib/claude-composition-analyzer';
 import { createClient } from '@supabase/supabase-js';
-import sharp from 'sharp';
 
-// Initialize Supabase for breed/coat matching
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { autoRefreshToken: false, persistSession: false }
-});
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 /**
  * POST /api/admin/analyze-composition
  *
- * Analyzes an uploaded image using Claude AI to generate:
- * - Marketing description
- * - Composition analysis
- * - Subject identification (breeds/coats)
- * - Variation prompt template
- *
- * Request body:
- * {
- *   imageBase64: string (data:image/jpeg;base64,...),
- *   themeId?: string,
- *   styleId?: string
- * }
+ * Analyzes an uploaded image using Claude AI (following established pattern from /api/generate-description/file)
  */
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    console.log('🎨 [Analyze API] Request received');
+    console.log('🎨 [Analyze API] Received composition analysis request');
 
-    // TODO: Add admin authentication check
-    // const { data: { user } } = await supabase.auth.getUser();
-    // if (!user || user.role !== 'admin') {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    // }
+    // Parse FormData (following established pattern)
+    const formData = await req.formData();
+    const file = formData.get('image') as File;
+    const themeId = formData.get('themeId') as string | null;
+    const styleId = formData.get('styleId') as string | null;
 
-    // Parse request body
-    const body = await request.json();
-    const { imageBase64, themeId, styleId } = body;
+    console.log('📦 [Analyze API] Request data:', {
+      hasFile: !!file,
+      fileName: file?.name,
+      fileType: file?.type,
+      fileSize: file?.size,
+      themeId,
+      styleId
+    });
 
-    if (!imageBase64) {
-      return NextResponse.json(
-        { error: 'Missing required field: imageBase64' },
-        { status: 400 }
-      );
+    // Validate file
+    if (!file) {
+      return NextResponse.json({ error: 'Image file required' }, { status: 400 });
     }
 
-    // Validate base64 format
-    const base64Match = imageBase64.match(/^data:image\/(jpeg|jpg|png|webp);base64,(.+)$/);
-    if (!base64Match) {
-      return NextResponse.json(
-        { error: 'Invalid image format. Must be data:image/[jpeg|png|webp];base64,...' },
-        { status: 400 }
-      );
+    if (!file.type.startsWith('image/')) {
+      return NextResponse.json({ error: 'Invalid file type. Please upload an image.' }, { status: 400 });
     }
 
-    const imageFormat = `image/${base64Match[1]}` as 'image/jpeg' | 'image/png' | 'image/webp';
-    const base64Data = base64Match[2];
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'File too large. Maximum size is 10MB.' }, { status: 400 });
+    }
 
-    // Compress image to max 1024px for cost optimization (Claude API)
-    console.log('🖼️  [Analyze API] Compressing image...');
-    const originalBuffer = Buffer.from(base64Data, 'base64');
-    const compressedBuffer = await sharp(originalBuffer)
-      .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
-      .toFormat('png')
-      .toBuffer();
-
-    const compressedBase64 = compressedBuffer.toString('base64');
-    console.log(`📦 [Analyze API] Compressed: ${originalBuffer.length} → ${compressedBuffer.length} bytes`);
-
-    // Fetch context data (theme, style, breeds)
+    // Fetch context data (theme, style, breeds, coats)
     console.log('📚 [Analyze API] Loading context data...');
     const [themesData, stylesData, breedsData, coatsData] = await Promise.all([
-      themeId ? supabase.from('themes').select('*').eq('id', themeId).single() : null,
-      styleId ? supabase.from('styles').select('*').eq('id', styleId).single() : null,
+      themeId ? supabase.from('themes').select('*').eq('id', themeId).single() : Promise.resolve({ data: null }),
+      styleId ? supabase.from('styles').select('*').eq('id', styleId).single() : Promise.resolve({ data: null }),
       supabase.from('breeds').select('id, name, display_name').eq('is_active', true),
       supabase.from('coats').select('id, name, display_name, breed_id')
     ]);
@@ -91,19 +64,14 @@ export async function POST(request: NextRequest) {
       breedCount: breeds.length
     });
 
-    // Initialize Claude analyzer
+    // Initialize analyzer and process image
+    console.log('🤖 [Analyze API] Starting Claude analysis...');
     const analyzer = new ClaudeCompositionAnalyzer();
 
-    // Analyze image
-    console.log('🤖 [Analyze API] Starting Claude analysis...');
-    const analysis = await analyzer.analyzeImage({
-      imageBase64: compressedBase64,
-      imageFormat: 'image/png', // Always PNG after compression
-      context: {
-        theme: theme?.display_name || theme?.name,
-        style: style?.display_name || style?.name,
-        knownBreeds: breeds.map(b => b.display_name || b.name)
-      }
+    const analysis = await analyzer.analyzeImageFromFile(file, {
+      theme: theme?.display_name || theme?.name,
+      style: style?.display_name || style?.name,
+      knownBreeds: breeds.map(b => b.display_name || b.name)
     });
 
     console.log('✅ [Analyze API] Analysis complete');
@@ -138,7 +106,7 @@ export async function POST(request: NextRequest) {
         suggestedBreed: matchedBreed ? {
           id: matchedBreed.id,
           name: matchedBreed.display_name || matchedBreed.name,
-          confidence: subject.identifiedBreed.confidence / 10 // Convert 1-10 to 0-1
+          confidence: subject.identifiedBreed.confidence / 10
         } : undefined,
         suggestedCoat: matchedCoat ? {
           id: matchedCoat.id,
@@ -164,61 +132,22 @@ export async function POST(request: NextRequest) {
     });
 
     // Return enriched analysis
-    const response = {
+    console.log('📤 [Analyze API] Returning response');
+    return NextResponse.json({
       marketingDescription: analysis.marketingDescription,
       compositionAnalysis: analysis.compositionAnalysis,
       subjects: enrichedSubjects,
       compositionMetadata: analysis.compositionMetadata,
       variationPromptTemplate: analysis.variationPromptTemplate,
       confidence: analysis.confidence
-    };
+    });
 
-    console.log('📤 [Analyze API] Returning response');
-    return NextResponse.json(response);
-
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ [Analyze API] Error:', error);
-
-    // Check for specific error types
-    if (error.message?.includes('Claude analysis failed')) {
-      return NextResponse.json(
-        {
-          error: 'AI Analysis Failed',
-          message: 'Claude AI could not analyze the image. Please try a different image or contact support.',
-          details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        },
-        { status: 500 }
-      );
-    }
-
-    if (error.message?.includes('CLAUDE_API_KEY')) {
-      return NextResponse.json(
-        {
-          error: 'Configuration Error',
-          message: 'Claude AI is not properly configured. Please contact administrator.',
-          details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        },
-        { status: 500 }
-      );
-    }
-
-    // Generic error
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      {
-        error: 'Analysis Failed',
-        message: 'An error occurred during image analysis. Please try again.',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
+      { error: `Failed to analyze image: ${errorMessage}` },
       { status: 500 }
     );
   }
 }
-
-// Enable body parsing for base64 images (increase limit)
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '15mb' // Allow up to 15MB for base64 images
-    }
-  }
-};

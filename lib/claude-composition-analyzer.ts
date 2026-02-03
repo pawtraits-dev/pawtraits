@@ -102,7 +102,78 @@ export class ClaudeCompositionAnalyzer {
   }
 
   /**
-   * Analyze image composition and generate all outputs in single API call
+   * Analyze image from File object (following established pattern from ImageDescriptionGenerator)
+   */
+  async analyzeImageFromFile(
+    file: File,
+    context?: { theme?: string; style?: string; knownBreeds?: string[] }
+  ): Promise<CompositionAnalysisResponse> {
+    console.log('🎨 [Claude Analyzer] Starting image analysis from file...');
+    const startTime = Date.now();
+
+    try {
+      // Convert File to base64 using sharp (following established pattern)
+      const arrayBuffer = await file.arrayBuffer();
+      const inputBuffer = Buffer.from(arrayBuffer);
+
+      // Compress and resize to stay within Claude limits (~5MB base64)
+      const sharp = (await import('sharp')).default;
+      const compressedBuffer = await sharp(inputBuffer)
+        .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+
+      const base64Data = compressedBuffer.toString('base64');
+      console.log(`📦 [Claude Analyzer] Compressed: ${inputBuffer.length} → ${compressedBuffer.length} bytes`);
+
+      // Build prompt
+      const prompt = this.buildAnalysisPrompt(context);
+
+      // Call Claude API
+      const response = await this.anthropic.messages.create({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 2500,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: 'image/jpeg',
+                  data: base64Data
+                }
+              },
+              {
+                type: 'text',
+                text: prompt
+              }
+            ]
+          }
+        ]
+      });
+
+      const duration = Date.now() - startTime;
+      console.log(`✅ [Claude Analyzer] Analysis completed in ${duration}ms`);
+
+      // Parse the response
+      const analysisResult = this.parseResponse(response);
+      console.log('📊 [Claude Analyzer] Parsed response:', {
+        subjectCount: analysisResult.subjects.length,
+        overallConfidence: analysisResult.confidence.overall
+      });
+
+      return analysisResult;
+    } catch (error: any) {
+      console.error('❌ [Claude Analyzer] Analysis failed:', error);
+      throw new Error(`Claude analysis failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Analyze image composition from base64 data
+   * @deprecated Use analyzeImageFromFile for better pattern consistency
    */
   async analyzeImage(request: CompositionAnalysisRequest): Promise<CompositionAnalysisResponse> {
     console.log('🎨 [Claude Analyzer] Starting image analysis...');
