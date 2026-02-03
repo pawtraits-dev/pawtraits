@@ -42,6 +42,71 @@ interface CompositionAnalysis {
 
 type AnalysisStep = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error';
 
+/**
+ * Compress image if needed to stay under Vercel's 4.5MB limit
+ * Uses client-side canvas compression before upload
+ */
+async function compressImageIfNeeded(file: File): Promise<File> {
+  const maxSizeBytes = 4 * 1024 * 1024; // 4MB to stay under Vercel's 4.5MB limit
+  if (file.size <= maxSizeBytes) {
+    console.log(`File size ${file.size} bytes is within limit, no compression needed`);
+    return file;
+  }
+
+  console.log(`File size ${file.size} bytes exceeds limit, compressing...`);
+
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new window.Image();
+
+    img.onerror = () => reject(new Error('Failed to load image for compression'));
+
+    img.onload = () => {
+      const maxDimension = 1024;
+      let { width, height } = img;
+
+      // Resize maintaining aspect ratio
+      if (width > height) {
+        if (width > maxDimension) {
+          height = (height * maxDimension) / width;
+          width = maxDimension;
+        }
+      } else {
+        if (height > maxDimension) {
+          width = (width * maxDimension) / height;
+          height = maxDimension;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      ctx?.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('Failed to compress image'));
+            return;
+          }
+
+          const compressedFile = new File([blob], file.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          });
+
+          console.log(`Compressed: ${file.size} bytes → ${compressedFile.size} bytes`);
+          resolve(compressedFile);
+        },
+        'image/jpeg',
+        0.8 // 80% quality
+      );
+    };
+
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export default function CatalogUploadPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -163,12 +228,17 @@ export default function CatalogUploadPage() {
     setError(null);
 
     try {
+      // Compress image if needed (CRITICAL: Vercel 4.5MB limit)
+      setAnalysisProgress('Compressing image...');
+      const compressedFile = await compressImageIfNeeded(selectedFile);
+      console.log(`Image prepared: ${selectedFile.size} → ${compressedFile.size} bytes`);
+
       setAnalysisStep('analyzing');
       setAnalysisProgress('Analyzing composition with Claude AI...');
 
       // Use FormData (following established pattern from /admin/generate)
       const formData = new FormData();
-      formData.append('image', selectedFile);
+      formData.append('image', compressedFile); // Use compressed file
       if (selectedTheme) formData.append('themeId', selectedTheme);
       if (selectedStyle) formData.append('styleId', selectedStyle);
 
