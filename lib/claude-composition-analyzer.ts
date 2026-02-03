@@ -355,7 +355,14 @@ Respond with ONLY valid JSON in this exact structure:
 }
 \`\`\`
 
-IMPORTANT: Return ONLY the JSON object. No additional text before or after.`;
+CRITICAL REQUIREMENTS:
+1. Return ONLY the JSON object. No additional text before or after.
+2. Ensure ALL string values are properly JSON-escaped:
+   - Use \\\\ for backslashes
+   - Use \\" for quotes within strings
+   - Use \\n for newlines within strings
+3. Multi-line strings (like composition_analysis_markdown) must use \\n for line breaks, NOT actual newlines
+4. Validate the JSON is well-formed before responding`;
   }
 
   /**
@@ -379,8 +386,29 @@ IMPORTANT: Return ONLY the JSON object. No additional text before or after.`;
         jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '');
       }
 
+      // Log raw JSON for debugging (first 500 chars and last 500 chars)
+      console.log('📄 [Claude Analyzer] Raw JSON preview (first 500 chars):', jsonText.substring(0, 500));
+      console.log('📄 [Claude Analyzer] Raw JSON preview (last 500 chars):', jsonText.substring(Math.max(0, jsonText.length - 500)));
+
       // Parse JSON
-      const parsed = JSON.parse(jsonText);
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonText);
+      } catch (parseError: any) {
+        // If JSON parsing fails, log the problematic area
+        console.error('❌ [Claude Analyzer] JSON parse error:', parseError.message);
+
+        // Try to extract position from error message
+        const posMatch = parseError.message.match(/position (\d+)/);
+        if (posMatch) {
+          const pos = parseInt(posMatch[1]);
+          const start = Math.max(0, pos - 100);
+          const end = Math.min(jsonText.length, pos + 100);
+          console.error('📍 [Claude Analyzer] JSON around error position:', jsonText.substring(start, end));
+        }
+
+        throw parseError;
+      }
 
       // Validate required fields
       if (!parsed.marketing_description || !parsed.composition_analysis_markdown || !parsed.subjects || !parsed.variation_prompt_template) {
