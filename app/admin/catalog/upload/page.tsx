@@ -143,7 +143,7 @@ export default function CatalogUploadPage() {
   const [styles, setStyles] = useState<any[]>([]);
   const [formats, setFormats] = useState<any[]>([]);
   const [breeds, setBreeds] = useState<any[]>([]);
-  const [coats, setCoats] = useState<any[]>([]);
+  const [coats, setCoats] = useState<any[]>([]); // All breed-coat relationships
   const [outfits, setOutfits] = useState<any[]>([]);
 
   // Saving state
@@ -156,21 +156,21 @@ export default function CatalogUploadPage() {
 
   const loadMetadataOptions = async () => {
     try {
-      const [themesRes, stylesRes, formatsRes, breedsRes, coatsRes, outfitsRes] = await Promise.all([
+      const [themesRes, stylesRes, formatsRes, breedsRes, breedCoatsRes, outfitsRes] = await Promise.all([
         fetch('/api/themes'),
         fetch('/api/styles'),
         fetch('/api/formats'),
         fetch('/api/breeds'),
-        fetch('/api/coats'),
+        fetch('/api/breed-coats'), // Load all breed-coat relationships
         fetch('/api/outfits')
       ]);
 
-      const [themesData, stylesData, formatsData, breedsData, coatsData, outfitsData] = await Promise.all([
+      const [themesData, stylesData, formatsData, breedsData, breedCoatsData, outfitsData] = await Promise.all([
         themesRes.json(),
         stylesRes.json(),
         formatsRes.json(),
         breedsRes.json(),
-        coatsRes.json(),
+        breedCoatsRes.json(),
         outfitsRes.json()
       ]);
 
@@ -178,7 +178,24 @@ export default function CatalogUploadPage() {
       setStyles(stylesData.filter((s: any) => s.is_active));
       setFormats(formatsData.filter((f: any) => f.is_active));
       setBreeds(breedsData.filter((b: any) => b.is_active));
-      setCoats(coatsData);
+
+      // Transform breed-coat relationships to include coat details
+      // Each item has: { id, breed_id, coat_id, breeds: {...}, coats: {...} }
+      const transformedCoats = breedCoatsData.map((bc: any) => ({
+        id: bc.coats.id, // Coat ID
+        breed_id: bc.breed_id, // Add breed_id for filtering
+        name: bc.coats.name,
+        display_name: bc.coats.display_name || bc.coats.name,
+        slug: bc.coats.slug,
+        hex_color: bc.coats.hex_color,
+        pattern_type: bc.coats.pattern_type,
+        rarity: bc.coats.rarity,
+        is_common: bc.is_common,
+        is_standard: bc.is_standard
+      }));
+
+      console.log('📦 Loaded breed-coat relationships:', transformedCoats.length);
+      setCoats(transformedCoats);
       setOutfits(outfitsData.filter((o: any) => o.is_active));
     } catch (error) {
       console.error('Failed to load metadata options:', error);
