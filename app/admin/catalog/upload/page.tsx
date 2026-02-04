@@ -376,31 +376,44 @@ export default function CatalogUploadPage() {
     setError(null);
 
     try {
-      // TODO: Implement save to database
-      // This will upload to Cloudinary, save to image_catalog, and create junction table entries
+      console.log('📤 Saving catalog entry to API...');
 
-      console.log('Saving catalog entry:', {
-        file: selectedFile,
-        marketingDescription,
-        compositionAnalysis,
-        isMultiSubject,
-        subjects,
-        theme: selectedTheme,
-        style: selectedStyle,
-        format: selectedFormat,
-        tags,
-        isFeatured,
-        isPublic,
-        variationPromptTemplate: analysis.variationPromptTemplate,
-        compositionMetadata: analysis.compositionMetadata
+      // Call save API endpoint
+      const response = await fetch('/api/admin/catalog/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: previewUrl, // This already contains the data URL with base64
+          filename: selectedFile.name,
+          marketingDescription,
+          compositionAnalysis,
+          isMultiSubject,
+          subjects,
+          themeId: selectedTheme,
+          styleId: selectedStyle,
+          formatId: selectedFormat,
+          tags,
+          isFeatured,
+          isPublic,
+          variationPromptTemplate: analysis.variationPromptTemplate,
+          compositionMetadata: analysis.compositionMetadata
+        })
       });
 
-      // For now, show success and redirect
-      alert('Catalog entry saved successfully! (API endpoint to be implemented)');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to save catalog entry');
+      }
+
+      const result = await response.json();
+      console.log('✅ Catalog entry saved successfully:', result);
+
+      // Show success and redirect
+      alert(`Catalog entry saved successfully!\n\nImage ID: ${result.imageId}\nSubjects: ${result.metadata.subjectCount}\nBreed: ${result.metadata.primaryBreed}`);
       router.push('/admin/catalog');
 
     } catch (error: any) {
-      console.error('Save error:', error);
+      console.error('❌ Save error:', error);
       setError(error.message || 'Failed to save catalog entry');
     } finally {
       setIsSaving(false);
