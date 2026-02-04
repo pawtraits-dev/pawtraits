@@ -580,6 +580,7 @@ export default function CatalogUploadPage() {
           <PreviewVariationPanel
             referenceImagePreview={previewUrl}
             compositionPromptTemplate={analysis.variationPromptTemplate}
+            subjects={subjects}
             metadata={{
               breedName: breeds.find(b => b.id === subjects[0]?.breedId)?.name,
               themeName: themes.find(t => t.id === selectedTheme)?.name,

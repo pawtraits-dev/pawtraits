@@ -7,9 +7,17 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Upload, CheckCircle, AlertCircle, RefreshCw, Download } from 'lucide-react';
 import Image from 'next/image';
 
+interface SubjectData {
+  subjectOrder: number;
+  isPrimary: boolean;
+  breedId?: string;
+  suggestedBreed?: { name: string };
+}
+
 interface PreviewVariationPanelProps {
   referenceImagePreview: string; // Base64 data URL from admin upload form
   compositionPromptTemplate?: string; // From Claude analysis
+  subjects: SubjectData[]; // Array of subjects from MultiSubjectEditor
   metadata: {
     breedName?: string;
     themeName?: string;
@@ -32,16 +40,22 @@ interface GenerationResult {
 export function PreviewVariationPanel({
   referenceImagePreview,
   compositionPromptTemplate,
+  subjects,
   metadata
 }: PreviewVariationPanelProps) {
-  const [customPetImage, setCustomPetImage] = useState<string | null>(null);
-  const [customPetFile, setCustomPetFile] = useState<File | null>(null);
+  const subjectCount = subjects.length;
+  const isMultiSubject = subjectCount > 1;
+
+  // Track uploaded pet images for each subject
+  const [petImages, setPetImages] = useState<Array<{ file: File | null; base64: string | null }>>(() =>
+    Array(subjectCount).fill(null).map(() => ({ file: null, base64: null }))
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [previewResult, setPreviewResult] = useState<GenerationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleCustomPetUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCustomPetUpload = async (e: React.ChangeEvent<HTMLInputElement>, subjectIndex: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -57,7 +71,6 @@ export function PreviewVariationPanel({
       return;
     }
 
-    setCustomPetFile(file);
     setError(null);
 
     // Compress image if needed before converting to base64
@@ -66,7 +79,12 @@ export function PreviewVariationPanel({
     // Convert to base64 for preview and API call
     const reader = new FileReader();
     reader.onload = () => {
-      setCustomPetImage(reader.result as string);
+      const base64 = reader.result as string;
+      setPetImages(prev => {
+        const updated = [...prev];
+        updated[subjectIndex] = { file: compressedFile, base64 };
+        return updated;
+      });
     };
     reader.readAsDataURL(compressedFile);
   };
@@ -185,12 +203,14 @@ export function PreviewVariationPanel({
   }
 
   const handleGeneratePreview = async () => {
-    if (!customPetImage) {
-      setError('Please upload a pet photo first');
+    // Validate all pets are uploaded
+    const allPetsUploaded = petImages.every(p => p.base64 !== null);
+    if (!allPetsUploaded) {
+      setError(`Please upload ${isMultiSubject ? 'all' : 'a'} pet photo${isMultiSubject ? 's' : ''} (${petImages.filter(p => p.base64).length}/${subjectCount})`);
       return;
     }
 
-    console.log('🎨 [PREVIEW PANEL] Starting preview generation...');
+    console.log(`🎨 [PREVIEW PANEL] Starting ${isMultiSubject ? 'pair' : 'single'} preview generation...`);
     setIsGenerating(true);
     setError(null);
     setGenerationProgress(0);
@@ -204,27 +224,37 @@ export function PreviewVariationPanel({
       // Compress reference image if needed (it comes from parent as base64)
       console.log('📦 [PREVIEW PANEL] Compressing images for API call...');
       const compressedRefImage = await compressBase64ImageIfNeeded(referenceImagePreview);
-      const compressedPetImage = customPetImage; // Already compressed during upload
 
-      console.log('📤 [PREVIEW PANEL] Sending request...', {
+      // Determine which endpoint to use and prepare request body
+      const endpoint = isMultiSubject ? '/api/admin/preview-pair-variation' : '/api/admin/preview-variation';
+      const requestBody: any = {
+        referenceImageBase64: compressedRefImage,
+        compositionPromptTemplate,
+        metadata
+      };
+
+      if (isMultiSubject) {
+        // Multi-subject: send all pet images
+        requestBody.pet1ImageBase64 = petImages[0].base64;
+        requestBody.pet2ImageBase64 = petImages[1].base64;
+        console.log('📤 [PREVIEW PANEL] Sending PAIR request...');
+      } else {
+        // Single subject: send one pet image
+        requestBody.petImageBase64 = petImages[0].base64;
+        console.log('📤 [PREVIEW PANEL] Sending SINGLE request...');
+      }
+
+      console.log('📊 [PREVIEW PANEL] Request details:', {
+        endpoint,
+        subjectCount,
         hasReference: !!compressedRefImage,
-        hasPet: !!compressedPetImage,
-        refSize: compressedRefImage.length,
-        petSize: compressedPetImage.length,
-        refSizeMB: (compressedRefImage.length * 0.75 / 1024 / 1024).toFixed(2),
-        petSizeMB: (compressedPetImage.length * 0.75 / 1024 / 1024).toFixed(2),
-        totalMB: ((compressedRefImage.length + compressedPetImage.length) * 0.75 / 1024 / 1024).toFixed(2)
+        refSizeMB: (compressedRefImage.length * 0.75 / 1024 / 1024).toFixed(2)
       });
 
-      const response = await fetch('/api/admin/preview-variation', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          referenceImageBase64: compressedRefImage,
-          petImageBase64: compressedPetImage,
-          compositionPromptTemplate,
-          metadata
-        })
+        body: JSON.stringify(requestBody)
       });
 
       clearInterval(progressInterval);
@@ -274,6 +304,7 @@ export function PreviewVariationPanel({
     setPreviewResult(null);
     setError(null);
     setGenerationProgress(0);
+    // Don't clear uploaded pet images - allow retry with same pets
   };
 
   return (
@@ -281,59 +312,69 @@ export function PreviewVariationPanel({
       <CardHeader>
         <CardTitle>Step 4: Test Variation Preview (Optional)</CardTitle>
         <p className="text-sm text-gray-600">
-          Test how this reference image will look with a customer pet photo before saving to catalog
+          Test how this reference image will look with {isMultiSubject ? `${subjectCount} customer pet photos` : 'a customer pet photo'} before saving to catalog
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Pet Photo Upload */}
+        {/* Pet Photo Upload - One slot per subject */}
         {!previewResult && (
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium block mb-2">Upload Test Pet Photo</label>
-              <div className="flex items-center gap-4">
-                <label className="relative rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-primary transition-colors p-8 flex flex-col items-center justify-center flex-1">
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp"
-                    onChange={handleCustomPetUpload}
-                    disabled={isGenerating}
-                    className="hidden"
-                  />
-                  <Upload className="w-10 h-10 text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-600 text-center">
-                    {customPetFile ? customPetFile.name : 'Click to upload pet photo'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">JPEG, PNG, or WEBP (max 10MB)</p>
+            {subjects.map((subject, index) => (
+              <div key={subject.subjectOrder}>
+                <label className="text-sm font-medium block mb-2">
+                  {isMultiSubject ? `Subject ${subject.subjectOrder}` : 'Upload Test Pet Photo'}
+                  {subject.suggestedBreed && (
+                    <span className="text-gray-500 ml-2">({subject.suggestedBreed.name})</span>
+                  )}
+                  {subject.isPrimary && isMultiSubject && (
+                    <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Primary</span>
+                  )}
                 </label>
-
-                {/* Pet Photo Preview */}
-                {customPetImage && (
-                  <div className="w-32 h-32 relative rounded-lg overflow-hidden border-2 border-gray-200">
-                    <Image
-                      src={customPetImage}
-                      alt="Uploaded pet"
-                      fill
-                      className="object-cover"
+                <div className="flex items-center gap-4">
+                  <label className="relative rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-primary transition-colors p-8 flex flex-col items-center justify-center flex-1">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      onChange={(e) => handleCustomPetUpload(e, index)}
+                      disabled={isGenerating}
+                      className="hidden"
                     />
-                  </div>
-                )}
+                    <Upload className="w-10 h-10 text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-600 text-center">
+                      {petImages[index]?.file ? petImages[index].file.name : 'Click to upload pet photo'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">JPEG, PNG, or WEBP (max 10MB)</p>
+                  </label>
+
+                  {/* Pet Photo Preview */}
+                  {petImages[index]?.base64 && (
+                    <div className="w-32 h-32 relative rounded-lg overflow-hidden border-2 border-gray-200">
+                      <Image
+                        src={petImages[index].base64}
+                        alt={`Uploaded pet ${index + 1}`}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            ))}
 
             {/* Generate Button */}
             <Button
               onClick={handleGeneratePreview}
-              disabled={!customPetImage || isGenerating}
+              disabled={!petImages.every(p => p.base64) || isGenerating}
               className="w-full h-12 text-base font-semibold"
               size="lg"
             >
               {isGenerating ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Generating Preview... {generationProgress}%
+                  Generating {isMultiSubject ? 'Pair ' : ''}Preview... {generationProgress}%
                 </>
               ) : (
-                '🎨 Generate Test Variation'
+                `🎨 Generate Test ${isMultiSubject ? 'Pair ' : ''}Variation`
               )}
             </Button>
 
@@ -449,9 +490,14 @@ export function PreviewVariationPanel({
           <div className="text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
             <p className="font-medium mb-1">💡 Purpose:</p>
             <p>
-              This preview simulates the customer-facing &quot;/create&quot; workflow. Upload a test pet photo to see how
+              This preview simulates the customer-facing &quot;/create{isMultiSubject ? '-pair' : ''}&quot; workflow. Upload {isMultiSubject ? `${subjectCount} test pet photos (one per subject)` : 'a test pet photo'} to see how
               well the reference image works with subject replacement before adding it to the catalog.
             </p>
+            {isMultiSubject && (
+              <p className="mt-2 text-orange-700">
+                ⚠️ For multi-subject images, upload one pet photo per subject in the order they appear in the reference image.
+              </p>
+            )}
           </div>
         )}
       </CardContent>
