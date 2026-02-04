@@ -1,0 +1,319 @@
+'use client';
+
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Upload, CheckCircle, AlertCircle, RefreshCw, Download } from 'lucide-react';
+import Image from 'next/image';
+
+interface PreviewVariationPanelProps {
+  referenceImagePreview: string; // Base64 data URL from admin upload form
+  compositionPromptTemplate?: string; // From Claude analysis
+  metadata: {
+    breedName?: string;
+    themeName?: string;
+    styleName?: string;
+    formatName?: string;
+  };
+}
+
+interface GenerationResult {
+  watermarkedUrl: string;
+  fullSizeUrl?: string;
+  metadata: {
+    generationTimeMs: number;
+    geminiModel: string;
+    promptUsed?: string;
+    cloudinaryPublicId?: string;
+  };
+}
+
+export function PreviewVariationPanel({
+  referenceImagePreview,
+  compositionPromptTemplate,
+  metadata
+}: PreviewVariationPanelProps) {
+  const [customPetImage, setCustomPetImage] = useState<string | null>(null);
+  const [customPetFile, setCustomPetFile] = useState<File | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [previewResult, setPreviewResult] = useState<GenerationResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleCustomPetUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.match(/^image\/(jpeg|jpg|png|webp)$/)) {
+      setError('Please upload a JPEG, PNG, or WEBP image');
+      return;
+    }
+
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Image too large. Maximum size is 10MB.');
+      return;
+    }
+
+    setCustomPetFile(file);
+    setError(null);
+
+    // Convert to base64 for preview and API call
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCustomPetImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleGeneratePreview = async () => {
+    if (!customPetImage) {
+      setError('Please upload a pet photo first');
+      return;
+    }
+
+    console.log('🎨 [PREVIEW PANEL] Starting preview generation...');
+    setIsGenerating(true);
+    setError(null);
+    setGenerationProgress(0);
+
+    try {
+      // Simulate progress (Gemini takes 10-20s typically)
+      const progressInterval = setInterval(() => {
+        setGenerationProgress(prev => Math.min(prev + 4, 95));
+      }, 750);
+
+      // Call admin preview API
+      const response = await fetch('/api/admin/preview-variation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          referenceImageBase64: referenceImagePreview,
+          petImageBase64: customPetImage,
+          compositionPromptTemplate,
+          metadata
+        })
+      });
+
+      clearInterval(progressInterval);
+      setGenerationProgress(100);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('❌ [PREVIEW PANEL] Generation failed:', data);
+        throw new Error(data.message || data.error || 'Generation failed');
+      }
+
+      console.log('✅ [PREVIEW PANEL] Generation successful:', {
+        hasWatermarkedUrl: !!data.watermarkedUrl,
+        generationTime: data.metadata?.generationTimeMs
+      });
+
+      setPreviewResult(data);
+
+      // Scroll to result
+      setTimeout(() => {
+        const resultElement = document.getElementById('preview-result');
+        if (resultElement) {
+          resultElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    } catch (err: any) {
+      console.error('❌ [PREVIEW PANEL] Generation error:', err);
+      setError(err.message || 'Failed to generate preview variation');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleReset = () => {
+    setPreviewResult(null);
+    setError(null);
+    setGenerationProgress(0);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Step 4: Test Variation Preview (Optional)</CardTitle>
+        <p className="text-sm text-gray-600">
+          Test how this reference image will look with a customer pet photo before saving to catalog
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Pet Photo Upload */}
+        {!previewResult && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium block mb-2">Upload Test Pet Photo</label>
+              <div className="flex items-center gap-4">
+                <label className="relative rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-primary transition-colors p-8 flex flex-col items-center justify-center flex-1">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleCustomPetUpload}
+                    disabled={isGenerating}
+                    className="hidden"
+                  />
+                  <Upload className="w-10 h-10 text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-600 text-center">
+                    {customPetFile ? customPetFile.name : 'Click to upload pet photo'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">JPEG, PNG, or WEBP (max 10MB)</p>
+                </label>
+
+                {/* Pet Photo Preview */}
+                {customPetImage && (
+                  <div className="w-32 h-32 relative rounded-lg overflow-hidden border-2 border-gray-200">
+                    <Image
+                      src={customPetImage}
+                      alt="Uploaded pet"
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Generate Button */}
+            <Button
+              onClick={handleGeneratePreview}
+              disabled={!customPetImage || isGenerating}
+              className="w-full h-12 text-base font-semibold"
+              size="lg"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Generating Preview... {generationProgress}%
+                </>
+              ) : (
+                '🎨 Generate Test Variation'
+              )}
+            </Button>
+
+            {/* Progress Bar */}
+            {isGenerating && (
+              <div className="space-y-2">
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${generationProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-600 text-center">
+                  This typically takes 10-20 seconds...
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Error Display */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Preview Results */}
+        {previewResult && (
+          <div id="preview-result" className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              {/* Reference Image */}
+              <div>
+                <p className="text-sm font-medium mb-2">Reference Image</p>
+                <div className="border rounded-lg overflow-hidden aspect-square relative">
+                  <Image
+                    src={referenceImagePreview}
+                    alt="Reference"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              </div>
+
+              {/* Generated Variation */}
+              <div>
+                <p className="text-sm font-medium mb-2">Generated Variation</p>
+                <div className="border rounded-lg overflow-hidden aspect-square relative">
+                  <Image
+                    src={previewResult.watermarkedUrl}
+                    alt="Generated"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Quality Indicators */}
+            <Alert>
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription>
+                <div className="space-y-1">
+                  <p className="font-medium">✓ Subject replaced successfully</p>
+                  <p className="text-sm">
+                    ⏱ Generation time: {(previewResult.metadata.generationTimeMs / 1000).toFixed(1)}s
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    Model: {previewResult.metadata.geminiModel}
+                  </p>
+                  {previewResult.metadata.cloudinaryPublicId && (
+                    <p className="text-xs text-gray-500">
+                      ID: {previewResult.metadata.cloudinaryPublicId}
+                    </p>
+                  )}
+                </div>
+              </AlertDescription>
+            </Alert>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleReset} className="flex-1">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Try Another Pet
+              </Button>
+              {previewResult.fullSizeUrl && (
+                <Button variant="outline" asChild className="flex-1">
+                  <a href={previewResult.fullSizeUrl} download target="_blank" rel="noopener noreferrer">
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Full Size
+                  </a>
+                </Button>
+              )}
+            </div>
+
+            {/* Debug Info (collapsible) */}
+            {previewResult.metadata.promptUsed && process.env.NODE_ENV === 'development' && (
+              <details className="text-xs">
+                <summary className="cursor-pointer text-gray-600 hover:text-gray-900">
+                  Show Prompt Used (Dev Only)
+                </summary>
+                <pre className="mt-2 p-3 bg-gray-50 rounded border text-xs overflow-x-auto">
+                  {previewResult.metadata.promptUsed}
+                </pre>
+              </details>
+            )}
+          </div>
+        )}
+
+        {/* Help Text */}
+        {!previewResult && (
+          <div className="text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="font-medium mb-1">💡 Purpose:</p>
+            <p>
+              This preview simulates the customer-facing &quot;/create&quot; workflow. Upload a test pet photo to see how
+              well the reference image works with subject replacement before adding it to the catalog.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

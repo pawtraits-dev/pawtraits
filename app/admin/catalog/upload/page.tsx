@@ -14,6 +14,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { MultiSubjectEditor } from '@/components/admin/MultiSubjectEditor';
 import { CompositionAnalysisPanel } from '@/components/admin/CompositionAnalysisPanel';
+import { PreviewVariationPanel } from '@/components/admin/PreviewVariationPanel';
 
 interface SubjectIdentification {
   subjectOrder: number;
@@ -573,6 +574,18 @@ export default function CatalogUploadPage() {
               setAnalysis({ ...analysis, variationPromptTemplate: value });
             }}
             editable={true}
+          />
+
+          {/* Test Variation Preview Panel */}
+          <PreviewVariationPanel
+            referenceImagePreview={previewUrl}
+            compositionPromptTemplate={analysis.variationPromptTemplate}
+            metadata={{
+              breedName: breeds.find(b => b.id === subjects[0]?.breedId)?.name,
+              themeName: themes.find(t => t.id === selectedTheme)?.name,
+              styleName: styles.find(s => s.id === selectedStyle)?.name,
+              formatName: formats.find(f => f.id === selectedFormat)?.name
+            }}
           />
 
           {/* Metadata Section */}
