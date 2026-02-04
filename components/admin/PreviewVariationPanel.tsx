@@ -41,7 +41,7 @@ export function PreviewVariationPanel({
   const [previewResult, setPreviewResult] = useState<GenerationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleCustomPetUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCustomPetUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -60,13 +60,74 @@ export function PreviewVariationPanel({
     setCustomPetFile(file);
     setError(null);
 
+    // Compress image if needed before converting to base64
+    const compressedFile = await compressImageIfNeeded(file);
+
     // Convert to base64 for preview and API call
     const reader = new FileReader();
     reader.onload = () => {
       setCustomPetImage(reader.result as string);
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(compressedFile);
   };
+
+  // Compress image to stay under Vercel's 4.5MB request body limit
+  async function compressImageIfNeeded(file: File): Promise<File> {
+    const maxSizeBytes = 3 * 1024 * 1024; // 3MB (conservative for base64 encoding overhead)
+
+    if (file.size <= maxSizeBytes) {
+      return file;
+    }
+
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new window.Image();
+
+      img.onload = () => {
+        // Calculate new dimensions (max 1024px)
+        const maxDimension = 1024;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDimension) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw and compress
+        ctx?.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now()
+              });
+              console.log(`📦 Compressed: ${file.size} → ${compressedFile.size} bytes`);
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          },
+          'image/jpeg',
+          0.8
+        );
+      };
+
+      img.src = URL.createObjectURL(file);
+    });
+  }
 
   const handleGeneratePreview = async () => {
     if (!customPetImage) {
@@ -86,6 +147,13 @@ export function PreviewVariationPanel({
       }, 750);
 
       // Call admin preview API
+      console.log('📤 [PREVIEW PANEL] Sending request...', {
+        hasReference: !!referenceImagePreview,
+        hasPet: !!customPetImage,
+        refSize: referenceImagePreview.length,
+        petSize: customPetImage.length
+      });
+
       const response = await fetch('/api/admin/preview-variation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -99,6 +167,17 @@ export function PreviewVariationPanel({
 
       clearInterval(progressInterval);
       setGenerationProgress(100);
+
+      console.log('📥 [PREVIEW PANEL] Response status:', response.status);
+
+      // Handle non-JSON responses (like 413 errors)
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('❌ [PREVIEW PANEL] Non-JSON response:', response.status, contentType);
+        const text = await response.text();
+        console.error('Response text:', text.substring(0, 200));
+        throw new Error(`Server error (${response.status}): ${response.statusText}`);
+      }
 
       const data = await response.json();
 
