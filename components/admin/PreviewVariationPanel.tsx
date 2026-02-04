@@ -129,6 +129,61 @@ export function PreviewVariationPanel({
     });
   }
 
+  // Compress base64 data URL image to stay under Vercel limits
+  async function compressBase64ImageIfNeeded(base64DataUrl: string): Promise<string> {
+    // Estimate size (base64 is ~1.37x original)
+    const estimatedSizeBytes = base64DataUrl.length * 0.75;
+    const maxSizeBytes = 2 * 1024 * 1024; // 2MB target for reference image
+
+    console.log(`📏 Reference image estimated size: ${(estimatedSizeBytes / 1024 / 1024).toFixed(2)}MB`);
+
+    if (estimatedSizeBytes <= maxSizeBytes) {
+      console.log('✓ Reference image within limits, no compression needed');
+      return base64DataUrl;
+    }
+
+    console.log('⚙️ Compressing reference image...');
+
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new window.Image();
+
+      img.onload = () => {
+        // Calculate new dimensions (max 1024px)
+        const maxDimension = 1024;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDimension) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw and compress
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Convert back to base64 data URL
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+        const newSize = compressedDataUrl.length * 0.75;
+        console.log(`📦 Reference compressed: ${(estimatedSizeBytes / 1024 / 1024).toFixed(2)}MB → ${(newSize / 1024 / 1024).toFixed(2)}MB`);
+        resolve(compressedDataUrl);
+      };
+
+      img.src = base64DataUrl;
+    });
+  }
+
   const handleGeneratePreview = async () => {
     if (!customPetImage) {
       setError('Please upload a pet photo first');
@@ -146,20 +201,27 @@ export function PreviewVariationPanel({
         setGenerationProgress(prev => Math.min(prev + 4, 95));
       }, 750);
 
-      // Call admin preview API
+      // Compress reference image if needed (it comes from parent as base64)
+      console.log('📦 [PREVIEW PANEL] Compressing images for API call...');
+      const compressedRefImage = await compressBase64ImageIfNeeded(referenceImagePreview);
+      const compressedPetImage = customPetImage; // Already compressed during upload
+
       console.log('📤 [PREVIEW PANEL] Sending request...', {
-        hasReference: !!referenceImagePreview,
-        hasPet: !!customPetImage,
-        refSize: referenceImagePreview.length,
-        petSize: customPetImage.length
+        hasReference: !!compressedRefImage,
+        hasPet: !!compressedPetImage,
+        refSize: compressedRefImage.length,
+        petSize: compressedPetImage.length,
+        refSizeMB: (compressedRefImage.length * 0.75 / 1024 / 1024).toFixed(2),
+        petSizeMB: (compressedPetImage.length * 0.75 / 1024 / 1024).toFixed(2),
+        totalMB: ((compressedRefImage.length + compressedPetImage.length) * 0.75 / 1024 / 1024).toFixed(2)
       });
 
       const response = await fetch('/api/admin/preview-variation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          referenceImageBase64: referenceImagePreview,
-          petImageBase64: customPetImage,
+          referenceImageBase64: compressedRefImage,
+          petImageBase64: compressedPetImage,
           compositionPromptTemplate,
           metadata
         })
