@@ -235,10 +235,29 @@ REPLACEMENT REQUIREMENTS (ONLY THIS CHANGES):
 - First uploaded photo → replaces first subject position
 - Second uploaded photo → replaces second subject position
 - Each new subject must have the EXACT physical appearance from their uploaded photo (coloring, markings, facial features, fur/hair patterns, distinctive characteristics)
-- ANALYZE the apparent size of each uploaded subject and maintain REALISTIC RELATIVE PROPORTIONS (if one appears significantly smaller, make them smaller; if they appear similar in size, make them similar)
-- Both subjects must be rendered in the SAME artistic medium as the reference (if reference is oil painting, paint both subjects in oil paint style; if watercolor, render as watercolor, etc.)
-- Both subjects must match the lighting and style of the reference portrait
-- DO NOT make subjects photorealistic - they must match the artistic style of the reference
+
+CRITICAL POSE AND POSITION TRANSFORMATION:
+- EACH new subject MUST adopt the EXACT SAME POSE as the corresponding original subject in the reference image
+- First subject: Match the pose, body position, head tilt, and orientation of the first original subject
+- Second subject: Match the pose, body position, head tilt, and orientation of the second original subject
+- If reference shows sitting subjects, both new subjects must sit in the same positions
+- If reference shows standing subjects, both new subjects must stand in the same positions
+- Match head tilt, ear position, leg placement, body orientation, and spatial relationship EXACTLY
+- MAINTAIN the EXACT relative positioning between the two subjects (distance apart, which is in front/behind, interaction)
+- DO NOT use the poses from the uploaded pet photos - poses MUST match the reference image poses
+- The uploaded photos are ONLY for the pets' physical appearances (colors, markings) - NOT for poses or backgrounds
+- ANALYZE the apparent size relationship in the reference and maintain REALISTIC RELATIVE PROPORTIONS
+
+CRITICAL STYLE TRANSFORMATION:
+- Both subjects must be rendered in the EXACT SAME artistic medium as the reference
+- If reference is oil painting, paint both subjects in oil paint style with visible brushstrokes
+- If reference is watercolor, render both as watercolor with soft edges and color bleeds
+- If reference is digital art, match the digital art style exactly for both subjects
+- If reference is photograph, render both as photographic style
+- DO NOT make the subjects look like the uploaded photos' styles - transform them to match the reference style
+- The uploaded photos are REFERENCES for appearance only - final renders MUST match the reference artistic style
+- Match the lighting, shadows, and highlights of the reference portrait exactly for both subjects
+- Ensure both subjects integrate seamlessly into the reference scene with consistent lighting
 
 Reference Portrait Metadata:
 - Theme: ${metadata?.themeName || 'original theme'}
@@ -247,9 +266,13 @@ Reference Portrait Metadata:
 
 CRITICAL VERIFICATION:
 - If someone compared your output to the reference image, the ONLY differences should be:
-  1. The appearance of the two subjects (now showing the uploaded photos' subjects)
-  2. The relative sizes of the subjects (if the uploaded subjects are different sizes)
-- Everything else (background, composition, lighting, style, props, positioning) must be IDENTICAL to the reference
-- DO NOT invent new backgrounds, change the scene, or alter the composition
-- This is a subject replacement task, NOT a new image generation task`;
+  1. The subjects' physical appearances (colors, markings, breed characteristics)
+- Everything else MUST be IDENTICAL:
+  1. Each subject's pose and body position (head angle, legs, ears, tail)
+  2. Spatial positions in frame (where each subject is located)
+  3. Relative positioning between subjects (distance, interaction, hierarchy)
+  4. Background, composition, lighting, style, props
+- DO NOT use the poses from the uploaded photos - USE THE POSES FROM THE REFERENCE
+- DO NOT use the styles from the uploaded photos - USE THE STYLE FROM THE REFERENCE
+- This is a dual subject REPLACEMENT task with pose and style transformation, NOT a new image generation task`;
 }

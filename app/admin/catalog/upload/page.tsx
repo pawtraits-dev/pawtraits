@@ -303,7 +303,26 @@ export default function CatalogUploadPage() {
       setIsMultiSubject(analysisData.subjects.length > 1);
 
       // Set subjects with AI-matched breeds/coats already populated
-      setSubjects(analysisData.subjects);
+      // Auto-accept high-confidence matches (>70%)
+      const subjectsWithAutoAccept = analysisData.subjects.map(subject => {
+        const updatedSubject = { ...subject };
+
+        // Auto-accept breed if high confidence and not already set
+        if (!updatedSubject.breedId && updatedSubject.suggestedBreed && updatedSubject.aiConfidence && updatedSubject.aiConfidence >= 0.7) {
+          updatedSubject.breedId = updatedSubject.suggestedBreed.id;
+          console.log(`✅ Auto-accepted breed: ${updatedSubject.suggestedBreed.name} (${Math.round(updatedSubject.aiConfidence * 100)}% confidence)`);
+        }
+
+        // Auto-accept coat if breed is set
+        if (updatedSubject.breedId && !updatedSubject.coatId && updatedSubject.suggestedCoat) {
+          updatedSubject.coatId = updatedSubject.suggestedCoat.id;
+          console.log(`✅ Auto-accepted coat: ${updatedSubject.suggestedCoat.name}`);
+        }
+
+        return updatedSubject;
+      });
+
+      setSubjects(subjectsWithAutoAccept);
 
       // Auto-select format based on composition framing
       if (analysisData.compositionMetadata?.composition?.framing && formats.length > 0) {

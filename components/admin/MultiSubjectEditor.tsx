@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Users, Plus, Trash2, AlertCircle, CheckCircle, Star } from 'lucide-react';
+import { Users, Plus, Trash2, AlertCircle, CheckCircle, Star, Search } from 'lucide-react';
 
 interface SubjectData {
   subjectOrder: number;
@@ -45,6 +45,8 @@ export function MultiSubjectEditor({
   onMultiSubjectChange
 }: MultiSubjectEditorProps) {
   const [expandedSubject, setExpandedSubject] = useState<number | null>(subjects.length > 0 ? 0 : null);
+  const [breedSearchTerms, setBreedSearchTerms] = useState<Record<number, string>>({});
+  const [coatSearchTerms, setCoatSearchTerms] = useState<Record<number, string>>({});
 
   const handleAddSubject = () => {
     const newSubject: SubjectData = {
@@ -107,10 +109,42 @@ export function MultiSubjectEditor({
     }
   };
 
+  // Get filtered and sorted breeds for a subject
+  const getFilteredSortedBreeds = (subjectIndex: number) => {
+    const searchTerm = breedSearchTerms[subjectIndex] || '';
+    return breeds
+      .filter((breed: any) => {
+        const name = (breed.display_name || breed.name).toLowerCase();
+        return name.includes(searchTerm.toLowerCase());
+      })
+      .sort((a: any, b: any) => {
+        const nameA = (a.display_name || a.name).toLowerCase();
+        const nameB = (b.display_name || b.name).toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+  };
+
   // Get filtered coats based on selected breed
-  const getCoatsForBreed = (breedId?: string) => {
-    if (!breedId) return coats;
-    return coats.filter((c: any) => c.breed_id === breedId);
+  const getCoatsForBreed = (breedId?: string, subjectIndex?: number) => {
+    const searchTerm = subjectIndex !== undefined ? (coatSearchTerms[subjectIndex] || '') : '';
+    let filteredCoats = coats;
+
+    if (breedId) {
+      filteredCoats = coats.filter((c: any) => c.breed_id === breedId);
+    }
+
+    if (searchTerm) {
+      filteredCoats = filteredCoats.filter((coat: any) => {
+        const name = (coat.display_name || coat.name).toLowerCase();
+        return name.includes(searchTerm.toLowerCase());
+      });
+    }
+
+    return filteredCoats.sort((a: any, b: any) => {
+      const nameA = (a.display_name || a.name).toLowerCase();
+      const nameB = (b.display_name || b.name).toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
   };
 
   return (
@@ -223,6 +257,18 @@ export function MultiSubjectEditor({
                         </Alert>
                       )}
 
+                      {/* Breed Search */}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                        <Input
+                          type="text"
+                          placeholder="Search breeds..."
+                          value={breedSearchTerms[index] || ''}
+                          onChange={(e) => setBreedSearchTerms({ ...breedSearchTerms, [index]: e.target.value })}
+                          className="pl-10"
+                        />
+                      </div>
+
                       <Select
                         value={subject.breedId}
                         onValueChange={(value) => handleUpdateSubject(index, { breedId: value, coatId: undefined })}
@@ -231,7 +277,7 @@ export function MultiSubjectEditor({
                           <SelectValue placeholder="Select breed..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {breeds.map((breed) => (
+                          {getFilteredSortedBreeds(index).map((breed: any) => (
                             <SelectItem key={breed.id} value={breed.id}>
                               {breed.display_name || breed.name}
                             </SelectItem>
@@ -270,6 +316,18 @@ export function MultiSubjectEditor({
                           </Alert>
                         )}
 
+                        {/* Coat Search */}
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                          <Input
+                            type="text"
+                            placeholder="Search coats..."
+                            value={coatSearchTerms[index] || ''}
+                            onChange={(e) => setCoatSearchTerms({ ...coatSearchTerms, [index]: e.target.value })}
+                            className="pl-10"
+                          />
+                        </div>
+
                         <Select
                           value={subject.coatId}
                           onValueChange={(value) => handleUpdateSubject(index, { coatId: value })}
@@ -278,7 +336,7 @@ export function MultiSubjectEditor({
                             <SelectValue placeholder="Select coat..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {getCoatsForBreed(subject.breedId).map((coat: any) => (
+                            {getCoatsForBreed(subject.breedId, index).map((coat: any) => (
                               <SelectItem key={coat.id} value={coat.id}>
                                 {coat.display_name || coat.name}
                               </SelectItem>

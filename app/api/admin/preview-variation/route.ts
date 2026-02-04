@@ -239,9 +239,25 @@ ${preservationRequirements}
 REPLACEMENT REQUIREMENT (ONLY THIS CHANGES):
 - Replace the original subject with the subject from the uploaded photo
 - The new subject must have the EXACT physical appearance from the uploaded photo (coloring, markings, facial features, fur/hair patterns, distinctive characteristics)
-- The new subject must be rendered in the SAME artistic medium as the reference (if reference is oil painting, paint the new subject in oil paint style; if watercolor, render as watercolor, etc.)
-- The new subject must match the lighting and style of the reference portrait
-- DO NOT make the subject photorealistic - it must match the artistic style of the reference
+
+CRITICAL POSE AND POSITION TRANSFORMATION:
+- The new subject MUST adopt the EXACT SAME POSE as the original subject in the reference image
+- If the reference subject is sitting, the new subject must be sitting in the same way
+- If the reference subject is standing, the new subject must stand in the same position
+- Match the head tilt, ear position, leg placement, and body orientation EXACTLY
+- The new subject must occupy the SAME SPATIAL POSITION in the frame as the original
+- DO NOT use the pose from the uploaded pet photo - the pose MUST match the reference image pose
+- The uploaded photo is ONLY for the pet's physical appearance (colors, markings) - NOT for pose or background
+
+CRITICAL STYLE TRANSFORMATION:
+- The new subject must be rendered in the EXACT SAME artistic medium as the reference
+- If reference is oil painting, paint the new subject in oil paint style with visible brushstrokes
+- If reference is watercolor, render as watercolor with soft edges and color bleeds
+- If reference is digital art, match the digital art style exactly
+- If reference is photograph, render as photographic style
+- DO NOT make the subject look like the uploaded photo's style - transform it to match the reference style
+- The uploaded photo is a REFERENCE for appearance only - the final render MUST match the reference artistic style
+- Match the lighting, shadows, and highlights of the reference portrait exactly
 
 Reference Portrait Metadata:
 - Theme: ${metadata?.themeName || 'original theme'}
@@ -250,8 +266,13 @@ Reference Portrait Metadata:
 - Target Breed: ${metadata?.breedName || 'original breed'}
 
 CRITICAL VERIFICATION:
-- If someone compared your output to the reference image, the ONLY difference should be the subject's appearance
-- Everything else (background, composition, lighting, style, props) must be IDENTICAL to the reference
-- DO NOT invent new backgrounds, change the scene, or alter the composition
-- This is a subject replacement task, NOT a new image generation task`;
+- If someone compared your output to the reference image, the ONLY differences should be:
+  1. The subject's physical appearance (colors, markings, breed characteristics)
+- Everything else MUST be IDENTICAL:
+  1. Pose and body position (head angle, legs, ears, tail)
+  2. Spatial position in frame (where the subject is located)
+  3. Background, composition, lighting, style, props
+- DO NOT use the pose from the uploaded photo - USE THE POSE FROM THE REFERENCE
+- DO NOT use the style from the uploaded photo - USE THE STYLE FROM THE REFERENCE
+- This is a subject REPLACEMENT task with pose and style transformation, NOT a new image generation task`;
 }
