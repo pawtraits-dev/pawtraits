@@ -327,7 +327,14 @@ function BrowsePageContent() {
   };
 
   const getBreedImageCount = (breedId: string) => {
-    return images.filter(img => img.breed_id === breedId).length;
+    return images.filter(img => {
+      // Check primary breed_id
+      if (img.breed_id === breedId) return true;
+
+      // Check subjects in generation_parameters
+      const subjects = img.generation_parameters?.subjects || [];
+      return subjects.some((subject: any) => subject.breedId === breedId);
+    }).length;
   };
 
   const getThemeImageCount = (themeId: string) => {
@@ -335,21 +342,44 @@ function BrowsePageContent() {
   };
 
   const getThemeDogImageCount = (themeId: string) => {
-    return images.filter(img =>
-      img.theme_id === themeId &&
-      dogBreeds.some(breed => breed.id === img.breed_id)
-    ).length;
+    return images.filter(img => {
+      if (img.theme_id !== themeId) return false;
+
+      // Check primary breed
+      if (dogBreeds.some(breed => breed.id === img.breed_id)) return true;
+
+      // Check subjects in generation_parameters
+      const subjects = img.generation_parameters?.subjects || [];
+      return subjects.some((subject: any) =>
+        dogBreeds.some(breed => breed.id === subject.breedId)
+      );
+    }).length;
   };
 
   const getThemeCatImageCount = (themeId: string) => {
-    return images.filter(img =>
-      img.theme_id === themeId &&
-      catBreeds.some(breed => breed.id === img.breed_id)
-    ).length;
+    return images.filter(img => {
+      if (img.theme_id !== themeId) return false;
+
+      // Check primary breed
+      if (catBreeds.some(breed => breed.id === img.breed_id)) return true;
+
+      // Check subjects in generation_parameters
+      const subjects = img.generation_parameters?.subjects || [];
+      return subjects.some((subject: any) =>
+        catBreeds.some(breed => breed.id === subject.breedId)
+      );
+    }).length;
   };
 
   const getLowestPriceForBreed = (breedId: string) => {
-    const breedImages = images.filter(img => img.breed_id === breedId);
+    const breedImages = images.filter(img => {
+      // Check primary breed_id
+      if (img.breed_id === breedId) return true;
+
+      // Check subjects in generation_parameters
+      const subjects = img.generation_parameters?.subjects || [];
+      return subjects.some((subject: any) => subject.breedId === breedId);
+    });
     if (breedImages.length === 0) return null;
 
     const countryPricing = getCountryPricing(pricing);
@@ -388,9 +418,16 @@ function BrowsePageContent() {
   const getFilteredImages = () => {
     let filteredImages = [...images];
 
-    // Filter by breed
+    // Filter by breed - check both primary breed_id AND subjects array
     if (selectedBreedId) {
-      filteredImages = filteredImages.filter(img => img.breed_id === selectedBreedId);
+      filteredImages = filteredImages.filter(img => {
+        // Check primary breed_id
+        if (img.breed_id === selectedBreedId) return true;
+
+        // Check subjects in generation_parameters
+        const subjects = img.generation_parameters?.subjects || [];
+        return subjects.some((subject: any) => subject.breedId === selectedBreedId);
+      });
     }
 
     // Filter by theme
