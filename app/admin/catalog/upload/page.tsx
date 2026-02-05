@@ -455,9 +455,9 @@ export default function CatalogUploadPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Upload Curated Reference Image</h1>
+            <h1 className="text-3xl font-bold">Upload Reference Image</h1>
             <p className="text-gray-600 mt-1">
-              Upload a high-quality reference image for AI-powered composition analysis
+              Upload a high-quality reference image 
             </p>
           </div>
         </div>
@@ -528,7 +528,7 @@ export default function CatalogUploadPage() {
                 {analysisStep === 'idle' && (
                   <Button onClick={handleAnalyzeImage}>
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Analyze with Claude AI
+                    Analyse Image Composition
                   </Button>
                 )}
               </div>
@@ -564,7 +564,7 @@ export default function CatalogUploadPage() {
               <div>
                 <Label htmlFor="marketing-description">
                   Website Description
-                  <Badge variant="secondary" className="ml-2">AI Generated - Edit as needed</Badge>
+                  <Badge variant="secondary" className="ml-2">Edit as needed</Badge>
                 </Label>
                 <Textarea
                   id="marketing-description"
