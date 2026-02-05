@@ -838,8 +838,30 @@ export class SupabaseService {
       query = query.eq('is_public', true);
     }
 
+    // Multi-breed filtering: Check both primary breed_id AND subjects in junction table
     if (filters?.breedId) {
-      query = query.eq('breed_id', filters.breedId);
+      // Get image IDs that have this breed in any subject
+      const { data: subjectImages, error: subjectError } = await this.supabase
+        .from('image_catalog_subjects')
+        .select('image_catalog_id')
+        .eq('breed_id', filters.breedId);
+
+      if (subjectError) {
+        console.error('Error fetching subject images:', subjectError);
+        // Fall back to primary breed only
+        query = query.eq('breed_id', filters.breedId);
+      } else {
+        const imageIds = subjectImages?.map(s => s.image_catalog_id) || [];
+
+        // Filter by either primary breed_id OR any subject breed_id
+        if (imageIds.length > 0) {
+          // Include images where breed_id matches OR id is in the subject images list
+          query = query.or(`breed_id.eq.${filters.breedId},id.in.(${imageIds.join(',')})`);
+        } else {
+          // No subjects found, just filter by primary breed_id
+          query = query.eq('breed_id', filters.breedId);
+        }
+      }
     }
 
     if (filters?.themeId) {

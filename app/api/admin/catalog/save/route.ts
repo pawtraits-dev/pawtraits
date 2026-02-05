@@ -175,6 +175,35 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ [ADMIN CATALOG SAVE] Saved to database:', savedImage.id);
 
+    // Create entries in image_catalog_subjects junction table for multi-breed filtering
+    console.log('💾 [ADMIN CATALOG SAVE] Creating subject entries...');
+    const subjectEntries = subjects.map((subject: any) => ({
+      image_catalog_id: savedImage.id,
+      subject_order: subject.subjectOrder,
+      is_primary: subject.isPrimary,
+      breed_id: subject.breedId,
+      coat_id: subject.coatId || null,
+      outfit_id: subject.outfitId || null,
+      position: subject.position,
+      size_prominence: subject.sizeProminence,
+      pose_description: subject.poseDescription,
+      gaze_direction: subject.gazeDirection || null,
+      expression: subject.expression || null
+    }));
+
+    const { data: subjectRows, error: subjectError } = await supabase
+      .from('image_catalog_subjects')
+      .insert(subjectEntries)
+      .select();
+
+    if (subjectError) {
+      console.error('❌ [ADMIN CATALOG SAVE] Subject entries failed:', subjectError);
+      // Don't fail the whole save if this fails - subjects are also in generation_parameters
+      console.log('⚠️ [ADMIN CATALOG SAVE] Continuing without subject entries');
+    } else {
+      console.log(`✅ [ADMIN CATALOG SAVE] Created ${subjectRows.length} subject entries`);
+    }
+
     return NextResponse.json({
       success: true,
       imageId: savedImage.id,
