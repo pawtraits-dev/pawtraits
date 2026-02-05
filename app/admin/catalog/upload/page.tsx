@@ -222,12 +222,72 @@ export default function CatalogUploadPage() {
     setSelectedFile(file);
     setError(null);
 
-    // Create preview
+    // Create preview and detect aspect ratio
     const reader = new FileReader();
     reader.onload = (e) => {
-      setPreviewUrl(e.target?.result as string);
+      const dataUrl = e.target?.result as string;
+      setPreviewUrl(dataUrl);
+
+      // Detect aspect ratio and auto-select format
+      detectAndSetFormat(dataUrl);
     };
     reader.readAsDataURL(file);
+  };
+
+  const detectAndSetFormat = (imageDataUrl: string) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const width = img.width;
+      const height = img.height;
+      const aspectRatio = width / height;
+
+      console.log(`📐 Image dimensions: ${width}x${height}, aspect ratio: ${aspectRatio.toFixed(2)}`);
+
+      // Find matching format based on aspect ratio
+      // Common aspect ratios with tolerance
+      let matchedFormat = null;
+      const tolerance = 0.05; // 5% tolerance
+
+      if (Math.abs(aspectRatio - 1.0) < tolerance) {
+        // 1:1 (Square)
+        matchedFormat = formats.find(f => f.aspect_ratio === '1:1');
+        console.log('🎯 Detected format: Square (1:1)');
+      } else if (Math.abs(aspectRatio - 0.8) < tolerance) {
+        // 4:5 (Portrait)
+        matchedFormat = formats.find(f => f.aspect_ratio === '4:5');
+        console.log('🎯 Detected format: Portrait (4:5)');
+      } else if (Math.abs(aspectRatio - 1.25) < tolerance) {
+        // 5:4 (Landscape)
+        matchedFormat = formats.find(f => f.aspect_ratio === '5:4');
+        console.log('🎯 Detected format: Landscape (5:4)');
+      } else if (Math.abs(aspectRatio - (16/9)) < tolerance) {
+        // 16:9 (Widescreen)
+        matchedFormat = formats.find(f => f.aspect_ratio === '16:9');
+        console.log('🎯 Detected format: Widescreen (16:9)');
+      } else if (Math.abs(aspectRatio - (9/16)) < tolerance) {
+        // 9:16 (Tall portrait)
+        matchedFormat = formats.find(f => f.aspect_ratio === '9:16');
+        console.log('🎯 Detected format: Tall Portrait (9:16)');
+      } else if (Math.abs(aspectRatio - (3/4)) < tolerance) {
+        // 3:4 (Standard portrait)
+        matchedFormat = formats.find(f => f.aspect_ratio === '3:4');
+        console.log('🎯 Detected format: Standard Portrait (3:4)');
+      } else if (Math.abs(aspectRatio - (4/3)) < tolerance) {
+        // 4:3 (Standard landscape)
+        matchedFormat = formats.find(f => f.aspect_ratio === '4:3');
+        console.log('🎯 Detected format: Standard Landscape (4:3)');
+      } else {
+        console.warn(`⚠️ No matching format for aspect ratio ${aspectRatio.toFixed(2)}`);
+      }
+
+      if (matchedFormat) {
+        setSelectedFormat(matchedFormat.id);
+        console.log(`✅ Auto-selected format: ${matchedFormat.name} (${matchedFormat.aspect_ratio})`);
+      } else {
+        console.log('⚠️ No format auto-selected, please select manually');
+      }
+    };
+    img.src = imageDataUrl;
   };
 
   const handleRemoveImage = () => {
@@ -664,7 +724,14 @@ export default function CatalogUploadPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="format">Format *</Label>
+                  <Label htmlFor="format">
+                    Format *
+                    {selectedFormat && (
+                      <Badge variant="secondary" className="ml-2 text-xs">
+                        Auto-detected
+                      </Badge>
+                    )}
+                  </Label>
                   <select
                     id="format"
                     value={selectedFormat}
@@ -674,10 +741,15 @@ export default function CatalogUploadPage() {
                     <option value="">Select format...</option>
                     {formats.map((format) => (
                       <option key={format.id} value={format.id}>
-                        {format.display_name || format.name}
+                        {format.display_name || format.name} ({format.aspect_ratio})
                       </option>
                     ))}
                   </select>
+                  {selectedFormat && (
+                    <p className="text-xs text-gray-600">
+                      Format auto-detected based on image aspect ratio. Products will match this format.
+                    </p>
+                  )}
                 </div>
               </div>
 
