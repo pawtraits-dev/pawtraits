@@ -243,7 +243,13 @@ ${contextInfo}
 Analyze this image and provide the following:
 
 ## PART 1: MARKETING DESCRIPTION
-Write a fun, witty 1-2 paragraph description that would appeal to pet owners. Include personality traits, mood, and what makes this portrait special. Keep it engaging and conversational.
+Write a fun, witty description in Markdown format that would appeal to pet owners. Follow this EXACT structure:
+
+1. **Opening line in bold** - A catchy title or hook that captures the essence of the portrait (e.g., "**Beagle's Beach Bar Happy Hour**")
+2. Main body - 2-3 sentences with personality traits, witty observations, and what makes this portrait special. Be conversational, descriptive, and inject humor.
+3. *Closing line in italics* - A funny, witty final thought that adds character (e.g., "*Some might say she's living her best island life, but that nose knows there's a burger buffet somewhere...*")
+
+Keep it engaging, conversational, and full of personality. The description should make pet owners smile and connect with the image.
 
 ## PART 2: TECHNICAL COMPOSITION ANALYSIS (Markdown)
 Provide detailed analysis covering:
@@ -299,7 +305,7 @@ Respond with ONLY valid JSON in this exact structure:
 
 \`\`\`json
 {
-  "marketing_description": "Fun, witty description here...",
+  "marketing_description": "**Golden Retriever's Perfect Portrait Moment**\\nThis magnificent golden has mastered the art of looking effortlessly photogenic, with that classic head tilt that says 'I know exactly how adorable I am.' Between the soft lighting and that gentle, knowing gaze, this pup is giving serious professional model vibes – though we all know they're probably just waiting patiently for the photographer to drop a treat. *Some might say this is portrait perfection, but that tail wagging suggests there's definitely a tennis ball just out of frame...*",
   "composition_analysis_markdown": "# Lighting\\n\\n**Type:** ...\\n\\n# Background\\n...",
   "subjects": [
     {
