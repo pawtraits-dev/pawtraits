@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, Plus, Trash2, AlertCircle, CheckCircle, Star, Search } from 'lucide-react';
 
 interface SubjectData {
@@ -44,7 +45,7 @@ export function MultiSubjectEditor({
   isMultiSubject,
   onMultiSubjectChange
 }: MultiSubjectEditorProps) {
-  const [expandedSubject, setExpandedSubject] = useState<number | null>(subjects.length > 0 ? 0 : null);
+  const [activeTab, setActiveTab] = useState<string>(subjects.length > 0 ? '0' : '0');
   const [breedSearchTerms, setBreedSearchTerms] = useState<Record<number, string>>({});
   const [coatSearchTerms, setCoatSearchTerms] = useState<Record<number, string>>({});
 
@@ -59,7 +60,7 @@ export function MultiSubjectEditor({
     };
 
     onChange([...subjects, newSubject]);
-    setExpandedSubject(subjects.length);
+    setActiveTab(subjects.length.toString());
     if (subjects.length >= 1) {
       onMultiSubjectChange(true);
     }
@@ -81,8 +82,12 @@ export function MultiSubjectEditor({
       onMultiSubjectChange(false);
     }
 
-    if (expandedSubject === index) {
-      setExpandedSubject(renumbered.length > 0 ? 0 : null);
+    // Switch to first tab if current tab was removed
+    const currentTab = parseInt(activeTab);
+    if (currentTab === index) {
+      setActiveTab('0');
+    } else if (currentTab > index) {
+      setActiveTab((currentTab - 1).toString());
     }
   };
 
@@ -147,6 +152,227 @@ export function MultiSubjectEditor({
     });
   };
 
+  // Render subject details form
+  const renderSubjectForm = (subject: SubjectData, index: number) => (
+    <div className="space-y-4">
+      {/* Breed Selection */}
+      <div className="space-y-2">
+        <Label htmlFor={`subject-${index}-breed`}>
+          Breed *
+          {subject.suggestedBreed && !subject.breedId && (
+            <Badge variant="outline" className="ml-2 text-xs">
+              AI Suggestion Available
+            </Badge>
+          )}
+        </Label>
+
+        {subject.suggestedBreed && !subject.breedId && (
+          <Alert className="bg-blue-50 border-blue-200">
+            <CheckCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="flex items-center justify-between">
+              <span className="text-sm">
+                AI suggests: <strong>{subject.suggestedBreed.name}</strong> ({Math.round(subject.suggestedBreed.confidence * 100)}% confidence)
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleAcceptAISuggestion(index, 'breed')}
+              >
+                Accept
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Breed Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <Input
+            type="text"
+            placeholder="Search breeds..."
+            value={breedSearchTerms[index] || ''}
+            onChange={(e) => setBreedSearchTerms({ ...breedSearchTerms, [index]: e.target.value })}
+            className="pl-10"
+          />
+        </div>
+
+        <Select
+          value={subject.breedId || ''}
+          onValueChange={(value) => handleUpdateSubject(index, { breedId: value, coatId: undefined })}
+        >
+          <SelectTrigger id={`subject-${index}-breed`}>
+            <SelectValue placeholder="Select breed..." />
+          </SelectTrigger>
+          <SelectContent>
+            {getFilteredSortedBreeds(index).map((breed: any) => (
+              <SelectItem key={breed.id} value={breed.id}>
+                {breed.display_name || breed.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Coat Selection */}
+      {subject.breedId && (
+        <div className="space-y-2">
+          <Label htmlFor={`subject-${index}-coat`}>
+            Coat Color/Pattern
+            {subject.suggestedCoat && !subject.coatId && (
+              <Badge variant="outline" className="ml-2 text-xs">
+                AI Suggestion Available
+              </Badge>
+            )}
+          </Label>
+
+          {subject.suggestedCoat && !subject.coatId && (
+            <Alert className="bg-blue-50 border-blue-200">
+              <CheckCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="flex items-center justify-between">
+                <span className="text-sm">
+                  AI suggests: <strong>{subject.suggestedCoat.name}</strong>
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleAcceptAISuggestion(index, 'coat')}
+                >
+                  Accept
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Coat Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <Input
+              type="text"
+              placeholder="Search coats..."
+              value={coatSearchTerms[index] || ''}
+              onChange={(e) => setCoatSearchTerms({ ...coatSearchTerms, [index]: e.target.value })}
+              className="pl-10"
+            />
+          </div>
+
+          <Select
+            value={subject.coatId || ''}
+            onValueChange={(value) => handleUpdateSubject(index, { coatId: value })}
+          >
+            <SelectTrigger id={`subject-${index}-coat`}>
+              <SelectValue placeholder="Select coat..." />
+            </SelectTrigger>
+            <SelectContent>
+              {getCoatsForBreed(subject.breedId, index).map((coat: any) => (
+                <SelectItem key={coat.id} value={coat.id}>
+                  {coat.display_name || coat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Outfit Selection */}
+      <div className="space-y-2">
+        <Label htmlFor={`subject-${index}-outfit`}>Outfit (Optional)</Label>
+        <Select
+          value={subject.outfitId || 'none'}
+          onValueChange={(value) => handleUpdateSubject(index, { outfitId: value === 'none' ? undefined : value })}
+        >
+          <SelectTrigger id={`subject-${index}-outfit`}>
+            <SelectValue placeholder="None" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            {outfits.map((outfit: any) => (
+              <SelectItem key={outfit.id} value={outfit.id}>
+                {outfit.display_name || outfit.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Position & Prominence */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor={`subject-${index}-position`}>Position in Frame</Label>
+          <Select
+            value={subject.position}
+            onValueChange={(value) => handleUpdateSubject(index, { position: value })}
+          >
+            <SelectTrigger id={`subject-${index}-position`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="left">Left</SelectItem>
+              <SelectItem value="center">Center</SelectItem>
+              <SelectItem value="right">Right</SelectItem>
+              <SelectItem value="foreground">Foreground</SelectItem>
+              <SelectItem value="background">Background</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor={`subject-${index}-prominence`}>Size/Prominence</Label>
+          <Select
+            value={subject.sizeProminence}
+            onValueChange={(value) => handleUpdateSubject(index, { sizeProminence: value })}
+          >
+            <SelectTrigger id={`subject-${index}-prominence`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="primary">Primary (largest)</SelectItem>
+              <SelectItem value="secondary">Secondary</SelectItem>
+              <SelectItem value="equal">Equal</SelectItem>
+              <SelectItem value="dominant">Dominant (much larger)</SelectItem>
+              <SelectItem value="minor">Minor (smaller)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Pose Description */}
+      <div className="space-y-2">
+        <Label htmlFor={`subject-${index}-pose`}>Pose Description</Label>
+        <Input
+          id={`subject-${index}-pose`}
+          value={subject.poseDescription}
+          onChange={(e) => handleUpdateSubject(index, { poseDescription: e.target.value })}
+          placeholder="e.g., sitting, looking at camera"
+        />
+      </div>
+
+      {/* Set Primary Button */}
+      {subjects.length > 1 && !subject.isPrimary && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleSetPrimary(index)}
+        >
+          <Star className="w-4 h-4 mr-2" />
+          Set as Primary Subject
+        </Button>
+      )}
+
+      {/* Remove Subject Button */}
+      {subjects.length > 1 && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleRemoveSubject(index)}
+          className="text-red-600 border-red-300 hover:bg-red-50"
+        >
+          <Trash2 className="w-4 h-4 mr-2" />
+          Remove Subject {subject.subjectOrder}
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -179,262 +405,30 @@ export function MultiSubjectEditor({
               No subjects defined. Click "Add Subject" to begin.
             </AlertDescription>
           </Alert>
-        ) : (
-          <div className="space-y-3">
-            {subjects.map((subject, index) => (
-              <div key={index} className="border rounded-lg overflow-hidden">
-                {/* Subject Header */}
-                <button
-                  onClick={() => setExpandedSubject(expandedSubject === index ? null : index)}
-                  className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">Subject {subject.subjectOrder}</span>
-                      {subject.isPrimary && (
-                        <Badge variant="default" className="text-xs">
-                          <Star className="w-3 h-3 mr-1" />
-                          Primary
-                        </Badge>
-                      )}
-                      {subject.identifiedByAI && subject.aiConfidence && (
-                        <Badge variant="secondary" className="text-xs">
-                          AI: {Math.round(subject.aiConfidence * 100)}%
-                        </Badge>
-                      )}
-                    </div>
-                    {subject.breedId && (
-                      <span className="text-sm text-gray-600">
-                        {breeds.find(b => b.id === subject.breedId)?.name || 'Unknown Breed'}
-                      </span>
-                    )}
-                  </div>
+        ) : isMultiSubject ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${subjects.length}, 1fr)` }}>
+              {subjects.map((subject, index) => (
+                <TabsTrigger key={index} value={index.toString()} className="relative">
                   <div className="flex items-center gap-2">
-                    {subjects.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveSubject(index);
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4 text-red-600" />
-                      </Button>
+                    <span>Subject {subject.subjectOrder}</span>
+                    {subject.isPrimary && (
+                      <Star className="w-3 h-3" />
                     )}
                   </div>
-                </button>
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-                {/* Subject Details (Expanded) */}
-                {expandedSubject === index && (
-                  <div className="p-4 space-y-4 bg-white">
-                    {/* Breed Selection */}
-                    <div className="space-y-2">
-                      <Label htmlFor={`subject-${index}-breed`}>
-                        Breed *
-                        {subject.suggestedBreed && !subject.breedId && (
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            AI Suggestion Available
-                          </Badge>
-                        )}
-                      </Label>
-
-                      {subject.suggestedBreed && !subject.breedId && (
-                        <Alert className="bg-blue-50 border-blue-200">
-                          <CheckCircle className="h-4 w-4 text-blue-600" />
-                          <AlertDescription className="flex items-center justify-between">
-                            <span className="text-sm">
-                              AI suggests: <strong>{subject.suggestedBreed.name}</strong> ({Math.round(subject.suggestedBreed.confidence * 100)}% confidence)
-                            </span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleAcceptAISuggestion(index, 'breed')}
-                            >
-                              Accept
-                            </Button>
-                          </AlertDescription>
-                        </Alert>
-                      )}
-
-                      {/* Breed Search */}
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                        <Input
-                          type="text"
-                          placeholder="Search breeds..."
-                          value={breedSearchTerms[index] || ''}
-                          onChange={(e) => setBreedSearchTerms({ ...breedSearchTerms, [index]: e.target.value })}
-                          className="pl-10"
-                        />
-                      </div>
-
-                      <Select
-                        value={subject.breedId}
-                        onValueChange={(value) => handleUpdateSubject(index, { breedId: value, coatId: undefined })}
-                      >
-                        <SelectTrigger id={`subject-${index}-breed`}>
-                          <SelectValue placeholder="Select breed..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getFilteredSortedBreeds(index).map((breed: any) => (
-                            <SelectItem key={breed.id} value={breed.id}>
-                              {breed.display_name || breed.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Coat Selection */}
-                    {subject.breedId && (
-                      <div className="space-y-2">
-                        <Label htmlFor={`subject-${index}-coat`}>
-                          Coat Color/Pattern
-                          {subject.suggestedCoat && !subject.coatId && (
-                            <Badge variant="outline" className="ml-2 text-xs">
-                              AI Suggestion Available
-                            </Badge>
-                          )}
-                        </Label>
-
-                        {subject.suggestedCoat && !subject.coatId && (
-                          <Alert className="bg-blue-50 border-blue-200">
-                            <CheckCircle className="h-4 w-4 text-blue-600" />
-                            <AlertDescription className="flex items-center justify-between">
-                              <span className="text-sm">
-                                AI suggests: <strong>{subject.suggestedCoat.name}</strong>
-                              </span>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleAcceptAISuggestion(index, 'coat')}
-                              >
-                                Accept
-                              </Button>
-                            </AlertDescription>
-                          </Alert>
-                        )}
-
-                        {/* Coat Search */}
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                          <Input
-                            type="text"
-                            placeholder="Search coats..."
-                            value={coatSearchTerms[index] || ''}
-                            onChange={(e) => setCoatSearchTerms({ ...coatSearchTerms, [index]: e.target.value })}
-                            className="pl-10"
-                          />
-                        </div>
-
-                        <Select
-                          value={subject.coatId}
-                          onValueChange={(value) => handleUpdateSubject(index, { coatId: value })}
-                        >
-                          <SelectTrigger id={`subject-${index}-coat`}>
-                            <SelectValue placeholder="Select coat..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {getCoatsForBreed(subject.breedId, index).map((coat: any) => (
-                              <SelectItem key={coat.id} value={coat.id}>
-                                {coat.display_name || coat.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-
-                    {/* Outfit Selection */}
-                    <div className="space-y-2">
-                      <Label htmlFor={`subject-${index}-outfit`}>Outfit (Optional)</Label>
-                      <Select
-                        value={subject.outfitId || 'none'}
-                        onValueChange={(value) => handleUpdateSubject(index, { outfitId: value === 'none' ? undefined : value })}
-                      >
-                        <SelectTrigger id={`subject-${index}-outfit`}>
-                          <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {outfits.map((outfit: any) => (
-                            <SelectItem key={outfit.id} value={outfit.id}>
-                              {outfit.display_name || outfit.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Position & Prominence */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor={`subject-${index}-position`}>Position in Frame</Label>
-                        <Select
-                          value={subject.position}
-                          onValueChange={(value) => handleUpdateSubject(index, { position: value })}
-                        >
-                          <SelectTrigger id={`subject-${index}-position`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="left">Left</SelectItem>
-                            <SelectItem value="center">Center</SelectItem>
-                            <SelectItem value="right">Right</SelectItem>
-                            <SelectItem value="foreground">Foreground</SelectItem>
-                            <SelectItem value="background">Background</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor={`subject-${index}-prominence`}>Size/Prominence</Label>
-                        <Select
-                          value={subject.sizeProminence}
-                          onValueChange={(value) => handleUpdateSubject(index, { sizeProminence: value })}
-                        >
-                          <SelectTrigger id={`subject-${index}-prominence`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="primary">Primary (largest)</SelectItem>
-                            <SelectItem value="secondary">Secondary</SelectItem>
-                            <SelectItem value="equal">Equal</SelectItem>
-                            <SelectItem value="dominant">Dominant (much larger)</SelectItem>
-                            <SelectItem value="minor">Minor (smaller)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {/* Pose Description */}
-                    <div className="space-y-2">
-                      <Label htmlFor={`subject-${index}-pose`}>Pose Description</Label>
-                      <Input
-                        id={`subject-${index}-pose`}
-                        value={subject.poseDescription}
-                        onChange={(e) => handleUpdateSubject(index, { poseDescription: e.target.value })}
-                        placeholder="e.g., sitting, looking at camera"
-                      />
-                    </div>
-
-                    {/* Set Primary Button */}
-                    {subjects.length > 1 && !subject.isPrimary && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSetPrimary(index)}
-                      >
-                        <Star className="w-4 h-4 mr-2" />
-                        Set as Primary Subject
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
+            {subjects.map((subject, index) => (
+              <TabsContent key={index} value={index.toString()} className="mt-4">
+                {renderSubjectForm(subject, index)}
+              </TabsContent>
             ))}
-          </div>
+          </Tabs>
+        ) : (
+          // Single subject - no tabs needed
+          renderSubjectForm(subjects[0], 0)
         )}
 
         {/* Add Subject Button */}
