@@ -1,7 +1,10 @@
 -- Migration: Create image_catalog_subjects junction table for multi-breed filtering
 -- This allows images with multiple subjects to appear when filtering by any breed
 
-CREATE TABLE IF NOT EXISTS public.image_catalog_subjects (
+-- Drop existing table if it exists (in case of partial previous migration)
+DROP TABLE IF EXISTS public.image_catalog_subjects CASCADE;
+
+CREATE TABLE public.image_catalog_subjects (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   image_catalog_id uuid NOT NULL,
   subject_order integer NOT NULL,
@@ -23,10 +26,10 @@ CREATE TABLE IF NOT EXISTS public.image_catalog_subjects (
   CONSTRAINT image_catalog_subjects_outfit_id_fkey FOREIGN KEY (outfit_id) REFERENCES public.outfits(id)
 );
 
--- Create index for efficient breed-based filtering
-CREATE INDEX IF NOT EXISTS image_catalog_subjects_breed_id_idx ON public.image_catalog_subjects(breed_id);
-CREATE INDEX IF NOT EXISTS image_catalog_subjects_image_catalog_id_idx ON public.image_catalog_subjects(image_catalog_id);
-CREATE INDEX IF NOT EXISTS image_catalog_subjects_is_primary_idx ON public.image_catalog_subjects(is_primary);
+-- Create indexes for efficient breed-based filtering
+CREATE INDEX image_catalog_subjects_breed_id_idx ON public.image_catalog_subjects(breed_id);
+CREATE INDEX image_catalog_subjects_image_catalog_id_idx ON public.image_catalog_subjects(image_catalog_id);
+CREATE INDEX image_catalog_subjects_is_primary_idx ON public.image_catalog_subjects(is_primary);
 
 -- Add RLS policies
 ALTER TABLE public.image_catalog_subjects ENABLE ROW LEVEL SECURITY;
