@@ -5,30 +5,40 @@
 -- Step 1: Create "Digital" medium if it doesn't exist
 INSERT INTO public.media (
   name,
+  slug,
   description,
+  category,
   is_active,
-  sort_order
+  display_order
 ) VALUES (
   'Digital',
+  'digital',
   'Digital download - high-resolution image file',
+  'digital',
   true,
   999
 )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (slug) DO NOTHING;
 
 -- Step 2: Create "Digital" format if it doesn't exist (square aspect ratio for flexibility)
 INSERT INTO public.formats (
   name,
+  slug,
+  description,
   aspect_ratio,
-  orientation,
-  is_active
+  use_case,
+  is_active,
+  is_square
 ) VALUES (
   'Digital File',
-  1.0,
-  'square',
+  'digital-file',
+  'Digital download - any aspect ratio',
+  '1:1',
+  'Digital download file for any use',
+  true,
   true
 )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (slug) DO NOTHING;
 
 -- Step 3: Update the digital bundle product with valid medium and format IDs
 DO $$

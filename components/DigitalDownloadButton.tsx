@@ -61,7 +61,7 @@ export function DigitalDownloadButton({
       }
 
       // Find pricing for the bundle product
-      const bundleProductPricing = pricing.find((p: any) =>
+      let bundleProductPricing = pricing.find((p: any) =>
         p.product_id === bundleProduct.id
       );
 
