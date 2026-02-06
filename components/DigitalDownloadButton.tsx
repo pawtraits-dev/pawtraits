@@ -35,33 +35,56 @@ export function DigitalDownloadButton({
   async function handleAddDigitalDownload() {
     setLoading(true);
     try {
-      // Get master bundle product ID
-      const masterProductId = await getMasterBundleProductId();
+      // Fetch products and pricing from public API (same as physical products)
+      const [productsResponse, pricingResponse] = await Promise.all([
+        fetch('/api/public/products'),
+        fetch('/api/public/pricing')
+      ]);
 
-      if (!masterProductId) {
-        throw new Error('Digital download product not configured. Please contact support.');
-      }
-
-      // Fetch product and pricing data
-      const productResponse = await fetch(`/api/shop/products/${masterProductId}`);
-      if (!productResponse.ok) {
+      if (!productsResponse.ok || !pricingResponse.ok) {
         throw new Error('Failed to load product information');
       }
 
-      const productData = await productResponse.json();
+      const [products, pricing] = await Promise.all([
+        productsResponse.json(),
+        pricingResponse.json()
+      ]);
 
-      // Add to cart with minimal pricing (actual pricing calculated by bundle service)
+      // Find the master bundle product
+      const bundleProduct = products.find((p: any) =>
+        p.product_type === 'digital_download' &&
+        p.name === 'Digital Download Bundle'
+      );
+
+      if (!bundleProduct) {
+        throw new Error('Digital download product not configured. Please contact support.');
+      }
+
+      // Find pricing for the bundle product
+      const bundleProductPricing = pricing.find((p: any) =>
+        p.product_id === bundleProduct.id
+      );
+
+      if (!bundleProductPricing) {
+        // Use default pricing if not found in database
+        bundleProductPricing = {
+          product_id: bundleProduct.id,
+          price: 999,
+          sale_price: 999,
+          currency_code: 'GBP',
+          currency_symbol: '£',
+          formatted_price: '£9.99'
+        };
+      }
+
+      // Add to cart using same pattern as physical products
       await addToCart({
-        productId: masterProductId,
+        productId: bundleProduct.id,
         imageId,
         imageUrl,
         imageTitle,
-        product: productData.product,
-        pricing: {
-          price: 999, // Base price in pence (£9.99) - actual bundle price calculated by context
-          currency: 'GBP',
-          formatted_price: '£9.99'
-        },
+        product: bundleProduct,
+        pricing: bundleProductPricing,
         quantity: 1
       });
 
