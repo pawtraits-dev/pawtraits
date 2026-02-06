@@ -14,6 +14,7 @@ import { useUserRouting } from "@/hooks/use-user-routing"
 import { extractDescriptionTitle } from '@/lib/utils'
 import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider } from '@/lib/country-context'
+import { BundlePricingDisplay } from '@/components/BundlePricingDisplay'
 
 function ShoppingCartPageContent() {
   const { items, totalItems, totalPrice, updateQuantity, removeFromCart, isGuest } = useHybridCart();
@@ -231,6 +232,9 @@ function ShoppingCartPageContent() {
                 </CardContent>
               </Card>
             ))}
+
+            {/* Bundle Pricing Display */}
+            <BundlePricingDisplay />
           </div>
 
           {/* Order Summary */}

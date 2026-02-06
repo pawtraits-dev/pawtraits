@@ -1,7 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import type { Product, ProductPricing } from '@/lib/product-types';
+import { BundlePricingService, type BundlePricing } from '@/lib/bundle-pricing-service';
 
 export interface CartItem {
   id: string; // Unique cart item ID
@@ -32,6 +33,8 @@ interface CartContextType {
   totalPrice: number;
   loading: boolean;
   isGuest: boolean;
+  digitalBundlePricing: BundlePricing | null;
+  getMasterBundleProductId: () => Promise<string | null>;
   addToCart: (item: Omit<CartItem, 'id' | 'addedAt'>) => Promise<void>;
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
@@ -47,6 +50,10 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(true);
+  const [digitalBundlePricing, setDigitalBundlePricing] = useState<BundlePricing | null>(null);
+
+  // Initialize bundle pricing service once
+  const bundlePricingService = useMemo(() => new BundlePricingService(), []);
 
   // Check auth status and load appropriate cart
   useEffect(() => {
@@ -524,35 +531,89 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     }
   }, []);
 
+  const getMasterBundleProductId = useCallback(async () => {
+    try {
+      return await bundlePricingService.getMasterBundleProductId();
+    } catch (error) {
+      console.error('❌ [Bundle Pricing] Failed to get master bundle product ID:', error);
+      return null;
+    }
+  }, [bundlePricingService]);
+
+  // Load bundle pricing when items change
+  useEffect(() => {
+    const loadBundlePricing = async () => {
+      try {
+        // Filter digital download items
+        const digitalItems = items.filter(item => {
+          const productData = item.product as any;
+          return productData?.product_type === 'digital_download';
+        });
+
+        if (digitalItems.length > 0) {
+          console.log(`💰 [Bundle Pricing] Calculating pricing for ${digitalItems.length} digital items`);
+          const pricing = await bundlePricingService.calculateBundlePrice(digitalItems.length);
+          setDigitalBundlePricing(pricing);
+        } else {
+          setDigitalBundlePricing(null);
+        }
+      } catch (error) {
+        console.error('❌ [Bundle Pricing] Failed to calculate bundle pricing:', error);
+        setDigitalBundlePricing(null);
+      }
+    };
+
+    loadBundlePricing();
+  }, [items, bundlePricingService]);
+
   // Calculate totals
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = items.reduce((sum, item) => {
-    // Safety check for pricing data
-    if (!item.pricing) {
-      console.warn('Cart item missing pricing data:', {
-        itemId: item.id,
-        productId: item.productId,
-        hasProduct: !!item.product,
-        hasPricing: !!item.pricing,
-        item: item
-      });
-      return sum;
+
+  const totalPrice = useMemo(() => {
+    let total = 0;
+
+    // Physical products: use individual pricing
+    const physicalItems = items.filter(item => {
+      const productData = item.product as any;
+      return productData?.product_type !== 'digital_download';
+    });
+
+    for (const item of physicalItems) {
+      // Safety check for pricing data
+      if (!item.pricing) {
+        console.warn('Cart item missing pricing data:', {
+          itemId: item.id,
+          productId: item.productId,
+          hasProduct: !!item.product,
+          hasPricing: !!item.pricing,
+          item: item
+        });
+        continue;
+      }
+
+      // Get the price from whatever field is available
+      const itemPrice = item.pricing.sale_price ||
+                       item.pricing.price ||
+                       item.pricing.amount ||
+                       item.pricing.total ||
+                       0;
+
+      if (typeof itemPrice !== 'number' || itemPrice <= 0) {
+        console.warn('Cart item has no valid price field:', item);
+        continue;
+      }
+
+      total += itemPrice * item.quantity;
     }
 
-    // Get the price from whatever field is available
-    const itemPrice = item.pricing.sale_price ||
-                     item.pricing.price ||
-                     item.pricing.amount ||
-                     item.pricing.total ||
-                     0;
-
-    if (typeof itemPrice !== 'number' || itemPrice <= 0) {
-      console.warn('Cart item has no valid price field:', item);
-      return sum;
+    // Digital products: use bundle pricing
+    if (digitalBundlePricing) {
+      total += digitalBundlePricing.total_price;
+      console.log(`💰 [Bundle Pricing] Total price: Physical £${(total - digitalBundlePricing.total_price) / 100} + Digital £${digitalBundlePricing.total_price / 100} = £${total / 100}`);
     }
 
-    return sum + (itemPrice * item.quantity);
-  }, 0);
+    return total;
+  }, [items, digitalBundlePricing]);
 
   const value: CartContextType = {
     items,
@@ -560,6 +621,8 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     totalPrice,
     loading,
     isGuest,
+    digitalBundlePricing,
+    getMasterBundleProductId,
     addToCart,
     updateQuantity,
     removeFromCart,

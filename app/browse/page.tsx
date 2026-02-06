@@ -40,6 +40,7 @@ import { useUserRouting } from '@/hooks/use-user-routing';
 import ContentBasedCarousel from '@/components/ContentBasedCarousel';
 import { PageType } from '@/lib/carousel-types';
 import ReactMarkdown from 'react-markdown';
+import { DigitalDownloadButton } from '@/components/DigitalDownloadButton';
 
 type BrowseTab = 'all' | 'dogs' | 'cats' | 'themes';
 
@@ -934,6 +935,13 @@ function BrowsePageContent() {
                             <ShoppingCart className="w-4 h-4 mr-2" />
                             View & Buy
                           </Button>
+                          <DigitalDownloadButton
+                            imageId={image.id}
+                            imageUrl={image.public_url || image.image_url || ''}
+                            imageTitle={image.description?.split('\n')[0].replace(/\*\*(.*?)\*\*/g, '$1') || 'Pet Portrait'}
+                            className="w-full"
+                            variant="outline"
+                          />
                         </div>
                       </CardContent>
                     </Card>

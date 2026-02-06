@@ -22,6 +22,8 @@ import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
 import { useUserRouting } from '@/hooks/use-user-routing';
 import ReactMarkdown from 'react-markdown';
+import { DigitalDownloadButton } from '@/components/DigitalDownloadButton';
+import { Download } from 'lucide-react';
 
 function QRLandingPageContent() {
   const params = useParams();
@@ -372,6 +374,53 @@ function QRLandingPageContent() {
                     </Button>
                     <p className="text-xs text-gray-500 mt-2">
                       Free to try • 3 generations per hour
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Digital Download Section */}
+            <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
+              <CardContent className="pt-6">
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-blue-600 rounded-lg flex-shrink-0">
+                    <Download className="w-8 h-8 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                      Get the Digital Download
+                    </h3>
+                    <p className="text-gray-700 mb-4">
+                      High-resolution digital file perfect for sharing on social media, setting as wallpaper, or printing at home. Buy multiple images and save with bundle pricing!
+                    </p>
+                    <ul className="space-y-2 mb-4">
+                      <li className="flex items-center text-sm text-gray-600">
+                        <Sparkles className="w-4 h-4 mr-2 text-blue-600" />
+                        High-resolution JPG format
+                      </li>
+                      <li className="flex items-center text-sm text-gray-600">
+                        <Sparkles className="w-4 h-4 mr-2 text-blue-600" />
+                        Personal use license included
+                      </li>
+                      <li className="flex items-center text-sm text-gray-600">
+                        <Sparkles className="w-4 h-4 mr-2 text-blue-600" />
+                        Bundle pricing: More images = More savings!
+                      </li>
+                      <li className="flex items-center text-sm text-gray-600">
+                        <Sparkles className="w-4 h-4 mr-2 text-blue-600" />
+                        7-day download access
+                      </li>
+                    </ul>
+                    <DigitalDownloadButton
+                      imageId={image.id}
+                      imageUrl={image.public_url || image.image_url || ''}
+                      imageTitle={image.description?.split('\n')[0] || 'Pet Portrait'}
+                      variant="default"
+                      className="bg-blue-600 hover:bg-blue-700"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      2 images £17.49 • 3 images £22.49 • Save up to 49%!
                     </p>
                   </div>
                 </div>
