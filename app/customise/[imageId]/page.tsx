@@ -63,21 +63,36 @@ export default function CustomisePage() {
       setLoading(true);
 
       // Fetch catalog image
+      console.log('🎨 Fetching catalog image:', imageId);
       const imageRes = await fetch(`/api/public/catalog-images/${imageId}`);
+      console.log('📥 Catalog image response status:', imageRes.status);
+
       if (!imageRes.ok) throw new Error('Image not found');
+
       const imageData = await imageRes.json();
+      console.log('✅ Catalog image loaded:', {
+        id: imageData.id,
+        hasImageUrl: !!imageData.imageUrl,
+        imageUrl: imageData.imageUrl,
+        theme: imageData.theme?.name,
+        style: imageData.style?.name
+      });
       setCatalogImage(imageData);
 
       // Fetch user's pets
+      console.log('🐕 Fetching user pets...');
       const petsRes = await fetch('/api/customers/pets', {
         credentials: 'include'
       });
+      console.log('📥 Pets response status:', petsRes.status);
 
       if (petsRes.ok) {
         const petsData = await petsRes.json();
+        console.log('✅ Pets loaded:', petsData.pets?.length || 0);
         setPets(petsData.pets || []);
       }
     } catch (err) {
+      console.error('❌ Error loading data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
       setLoading(false);
@@ -298,7 +313,7 @@ export default function CustomisePage() {
                 {catalogImage && (
                   <div className="relative aspect-square w-full rounded-lg overflow-hidden">
                     <Image
-                      src={catalogImage.public_url}
+                      src={catalogImage.imageUrl}
                       alt={catalogImage.description || 'Catalog image'}
                       fill
                       className="object-cover"
