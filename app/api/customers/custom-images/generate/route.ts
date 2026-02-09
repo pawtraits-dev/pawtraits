@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { v2 as cloudinary } from 'cloudinary';
 import { GoogleGenAI } from '@google/genai';
 import fetch from 'node-fetch';
+import { CloudinaryImageService } from '@/lib/cloudinary';
 
 // Configure Cloudinary
 cloudinary.config({
@@ -12,6 +13,8 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
+
+const cloudinaryService = new CloudinaryImageService();
 
 // Helper function to fetch image and convert to base64
 async function imageUrlToBase64(imageUrl: string): Promise<string> {
@@ -230,6 +233,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get catalog image details
+    console.log('🖼️ Fetching catalog image:', catalogImageId);
     const { data: catalogImage, error: catalogError } = await supabase
       .from('image_catalog')
       .select(`
@@ -239,7 +243,7 @@ export async function POST(request: NextRequest) {
         theme_id,
         style_id,
         breed_id,
-        prompt,
+        prompt_text,
         breeds (id, name, display_name),
         themes (id, name, display_name),
         styles (id, name, display_name)
@@ -247,10 +251,45 @@ export async function POST(request: NextRequest) {
       .eq('id', catalogImageId)
       .single();
 
-    if (catalogError || !catalogImage) {
+    if (catalogError) {
+      console.error('❌ Catalog image fetch error:', catalogError);
+      return NextResponse.json(
+        { error: 'Catalog image not found', details: catalogError.message },
+        { status: 404 }
+      );
+    }
+
+    if (!catalogImage) {
+      console.error('❌ Catalog image not found for ID:', catalogImageId);
       return NextResponse.json(
         { error: 'Catalog image not found' },
         { status: 404 }
+      );
+    }
+
+    console.log('✅ Catalog image found:', {
+      id: catalogImage.id,
+      hasCloudinaryId: !!catalogImage.cloudinary_public_id,
+      hasPublicUrl: !!catalogImage.public_url,
+      theme: catalogImage.themes?.name,
+      style: catalogImage.styles?.name
+    });
+
+    // Generate Cloudinary URL if we have the public_id
+    let catalogImageUrl = catalogImage.public_url;
+    if (!catalogImageUrl && catalogImage.cloudinary_public_id) {
+      catalogImageUrl = cloudinaryService.getPublicVariantUrl(
+        catalogImage.cloudinary_public_id,
+        'full_size'
+      );
+      console.log('🔗 Generated catalog URL from Cloudinary ID:', catalogImageUrl);
+    }
+
+    if (!catalogImageUrl) {
+      console.error('❌ No catalog image URL available');
+      return NextResponse.json(
+        { error: 'Catalog image URL not available' },
+        { status: 500 }
       );
     }
 
@@ -381,12 +420,12 @@ export async function POST(request: NextRequest) {
     // Start generation process in background (don't await)
     generateCustomImage(
       customImage.id,
-      catalogImage.public_url,
+      catalogImageUrl,
       petImageUrl,
-      catalogImage.prompt,
-      catalogImage.themes?.name || catalogImage.themes?.display_name,
-      catalogImage.styles?.name || catalogImage.styles?.display_name,
-      catalogImage.breeds?.name || catalogImage.breeds?.display_name,
+      catalogImage.prompt_text || '',
+      catalogImage.themes?.name || catalogImage.themes?.display_name || 'Custom',
+      catalogImage.styles?.name || catalogImage.styles?.display_name || 'Portrait',
+      catalogImage.breeds?.name || catalogImage.breeds?.display_name || 'Pet',
       petData?.breeds?.name || petData?.breeds?.display_name
     ).catch(async (error) => {
       console.error('❌ Error in background generation:', error);
