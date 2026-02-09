@@ -1,0 +1,418 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { v2 as cloudinary } from 'cloudinary';
+import { GoogleGenAI } from '@google/genai';
+import fetch from 'node-fetch';
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Helper function to fetch image and convert to base64
+async function imageUrlToBase64(imageUrl: string): Promise<string> {
+  const response = await fetch(imageUrl);
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  return buffer.toString('base64');
+}
+
+// Helper function to upload base64 image to Cloudinary
+async function uploadBase64ToCloudinary(base64Data: string, folder: string): Promise<{ url: string; publicId: string }> {
+  const uploadResult = await cloudinary.uploader.upload(
+    `data:image/png;base64,${base64Data}`,
+    {
+      folder: folder,
+      resource_type: 'image',
+      transformation: [
+        { width: 1024, height: 1024, crop: 'limit' },
+        { quality: 'auto', fetch_format: 'auto' }
+      ]
+    }
+  );
+
+  return {
+    url: uploadResult.secure_url,
+    publicId: uploadResult.public_id
+  };
+}
+
+// Background generation function
+async function generateCustomImage(
+  customImageId: string,
+  catalogImageUrl: string,
+  petImageUrl: string,
+  catalogPrompt: string,
+  themeName: string,
+  styleName: string,
+  catalogBreedName: string,
+  customerPetBreedName?: string
+): Promise<void> {
+  console.log('🎨 Starting custom image generation for:', customImageId);
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const geminiApiKey = process.env.GEMINI_API_KEY!;
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  });
+
+  try {
+    // Fetch both images and convert to base64
+    console.log('📥 Fetching images...');
+    const catalogImageBase64 = await imageUrlToBase64(catalogImageUrl);
+    const petImageBase64 = await imageUrlToBase64(petImageUrl);
+
+    // Initialize Gemini AI
+    const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+
+    // Create prompt for pet substitution
+    const breedInfo = customerPetBreedName ? ` (a ${customerPetBreedName})` : '';
+    const generationPrompt = `You are an expert pet portrait artist. Using the composition, theme, style, and pose from the first image (the reference catalog image), create a new portrait featuring the pet from the second image${breedInfo}.
+
+**Reference Image (First):** A ${themeName} ${styleName} portrait of a ${catalogBreedName}. This defines the composition, pose, background, lighting, and artistic style you should match.
+
+**Pet to Feature (Second):** The customer's pet that should be the subject of the new portrait.
+
+**Instructions:**
+1. Analyze the composition of the reference image: pose, angle, background, lighting, artistic style
+2. Identify the customer's pet characteristics from the second image: breed, coat color, markings, facial features
+3. Generate a NEW portrait that:
+   - Features the customer's pet from the second image
+   - Uses the EXACT same composition, pose, and angle as the reference image
+   - Maintains the ${themeName} theme and ${styleName} artistic style
+   - Keeps the same background, lighting, and overall mood
+   - Preserves the coat color and markings of the customer's pet accurately
+   - Matches the professional quality and detail of the reference image
+
+Create a beautiful, cohesive portrait that looks like it was professionally created for this specific pet in this specific style.`;
+
+    console.log('🤖 Calling Gemini API for generation...');
+
+    // Call Gemini with both images
+    const prompt = [
+      { text: generationPrompt },
+      {
+        inlineData: {
+          mimeType: "image/png",
+          data: catalogImageBase64,
+        },
+      },
+      {
+        inlineData: {
+          mimeType: "image/png",
+          data: petImageBase64,
+        },
+      },
+    ];
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-image-preview",
+      contents: prompt,
+    });
+
+    if (!response.candidates?.[0]?.content?.parts) {
+      throw new Error('No image generated from Gemini');
+    }
+
+    // Extract generated image
+    let generatedImageBase64: string | null = null;
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData?.data) {
+        generatedImageBase64 = part.inlineData.data;
+        break;
+      }
+    }
+
+    if (!generatedImageBase64) {
+      throw new Error('No image data in Gemini response');
+    }
+
+    console.log('✅ Image generated, uploading to Cloudinary...');
+
+    // Upload to Cloudinary
+    const { url: generatedImageUrl, publicId: generatedCloudinaryId } = await uploadBase64ToCloudinary(
+      generatedImageBase64,
+      'customer-custom-images'
+    );
+
+    console.log('✅ Uploaded to Cloudinary:', generatedCloudinaryId);
+
+    // Update database record
+    await supabase
+      .from('customer_custom_images')
+      .update({
+        generated_image_url: generatedImageUrl,
+        generated_cloudinary_id: generatedCloudinaryId,
+        generation_prompt: generationPrompt,
+        status: 'complete',
+        generated_at: new Date().toISOString(),
+        generation_metadata: {
+          catalog_image_url: catalogImageUrl,
+          pet_image_url: petImageUrl,
+          theme: themeName,
+          style: styleName,
+          model: 'gemini-2.5-flash-image-preview'
+        }
+      })
+      .eq('id', customImageId);
+
+    console.log('✅ Custom image generation complete:', customImageId);
+
+  } catch (error) {
+    console.error('❌ Error in generateCustomImage:', error);
+    throw error;
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    // Authenticate user using cookie-based auth
+    const cookieStore = await cookies();
+    const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore });
+
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    console.log('🎨 Custom image generation: Authenticated user:', user.email);
+
+    // Use service role client for database operations
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // Parse FormData
+    const formData = await request.formData();
+    const catalogImageId = formData.get('catalogImageId') as string;
+    const petId = formData.get('petId') as string | null;
+    const petPhoto = formData.get('petPhoto') as File | null;
+
+    if (!catalogImageId) {
+      return NextResponse.json(
+        { error: 'Catalog image ID is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!petId && !petPhoto) {
+      return NextResponse.json(
+        { error: 'Either pet ID or pet photo is required' },
+        { status: 400 }
+      );
+    }
+
+    // Get customer record
+    const { data: customer, error: customerError } = await supabase
+      .from('customers')
+      .select('id, email')
+      .eq('email', user.email)
+      .single();
+
+    if (customerError || !customer) {
+      return NextResponse.json(
+        { error: 'Customer profile not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get catalog image details
+    const { data: catalogImage, error: catalogError } = await supabase
+      .from('image_catalog')
+      .select(`
+        id,
+        cloudinary_public_id,
+        public_url,
+        theme_id,
+        style_id,
+        breed_id,
+        prompt,
+        breeds (id, name, display_name),
+        themes (id, name, display_name),
+        styles (id, name, display_name)
+      `)
+      .eq('id', catalogImageId)
+      .single();
+
+    if (catalogError || !catalogImage) {
+      return NextResponse.json(
+        { error: 'Catalog image not found' },
+        { status: 404 }
+      );
+    }
+
+    let petData: any = null;
+    let petImageUrl: string;
+    let petCloudinaryId: string;
+
+    if (petId) {
+      // Use existing pet
+      const { data: pet, error: petError } = await supabase
+        .from('pets')
+        .select(`
+          id,
+          name,
+          breed_id,
+          coat_id,
+          primary_photo_url,
+          breeds (id, name, display_name),
+          coats (id, name, description)
+        `)
+        .eq('id', petId)
+        .eq('customer_id', customer.id)
+        .single();
+
+      if (petError || !pet) {
+        return NextResponse.json(
+          { error: 'Pet not found' },
+          { status: 404 }
+        );
+      }
+
+      petData = pet;
+      petImageUrl = pet.primary_photo_url;
+
+      // Extract Cloudinary ID from URL if it's a Cloudinary URL
+      if (petImageUrl.includes('cloudinary.com')) {
+        const urlParts = petImageUrl.split('/');
+        const uploadIndex = urlParts.indexOf('upload');
+        if (uploadIndex !== -1 && uploadIndex + 2 < urlParts.length) {
+          petCloudinaryId = urlParts.slice(uploadIndex + 2).join('/').split('.')[0];
+        } else {
+          petCloudinaryId = 'unknown';
+        }
+      } else {
+        petCloudinaryId = 'non-cloudinary';
+      }
+    } else if (petPhoto) {
+      // Upload new pet photo
+      console.log('📤 Uploading pet photo to Cloudinary...');
+
+      const arrayBuffer = await petPhoto.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Upload to Cloudinary
+      const uploadResult = await new Promise<any>((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'customer-custom-pets',
+            resource_type: 'image',
+            transformation: [
+              { width: 1024, height: 1024, crop: 'limit' },
+              { quality: 'auto', fetch_format: 'auto' }
+            ]
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        uploadStream.end(buffer);
+      });
+
+      petImageUrl = uploadResult.secure_url;
+      petCloudinaryId = uploadResult.public_id;
+
+      console.log('✅ Pet photo uploaded:', petCloudinaryId);
+
+      // For uploaded photos, we don't have breed/coat info yet
+      // TODO: Add AI analysis to detect breed/coat from uploaded photo
+    }
+
+    // Create custom image record in database
+    const { data: customImage, error: insertError } = await supabase
+      .from('customer_custom_images')
+      .insert({
+        customer_id: customer.id,
+        customer_email: customer.email,
+        catalog_image_id: catalogImageId,
+        pet_id: petId || null,
+        pet_name: petData?.name || 'Uploaded Pet',
+        pet_breed_id: petData?.breed_id || null,
+        pet_coat_id: petData?.coat_id || null,
+        pet_image_url: petImageUrl,
+        pet_cloudinary_id: petCloudinaryId,
+        status: 'pending',
+        is_public: true, // Make shareable by default
+        metadata: {
+          catalog_theme: catalogImage.themes?.name,
+          catalog_style: catalogImage.styles?.name,
+          catalog_breed: catalogImage.breeds?.name,
+        }
+      })
+      .select(`
+        id,
+        generated_image_url,
+        share_token,
+        status,
+        created_at
+      `)
+      .single();
+
+    if (insertError) {
+      console.error('❌ Error creating custom image record:', insertError);
+      return NextResponse.json(
+        { error: 'Failed to create custom image record' },
+        { status: 500 }
+      );
+    }
+
+    console.log('✅ Custom image record created:', customImage.id);
+
+    // Update status to generating
+    await supabase
+      .from('customer_custom_images')
+      .update({ status: 'generating' })
+      .eq('id', customImage.id);
+
+    // Start generation process in background (don't await)
+    generateCustomImage(
+      customImage.id,
+      catalogImage.public_url,
+      petImageUrl,
+      catalogImage.prompt,
+      catalogImage.themes?.name || catalogImage.themes?.display_name,
+      catalogImage.styles?.name || catalogImage.styles?.display_name,
+      catalogImage.breeds?.name || catalogImage.breeds?.display_name,
+      petData?.breeds?.name || petData?.breeds?.display_name
+    ).catch(async (error) => {
+      console.error('❌ Error in background generation:', error);
+      // Update record with error status
+      await supabase
+        .from('customer_custom_images')
+        .update({
+          status: 'failed',
+          error_message: error instanceof Error ? error.message : 'Generation failed'
+        })
+        .eq('id', customImage.id);
+    });
+
+    return NextResponse.json({
+      ...customImage,
+      status: 'generating'
+    });
+
+  } catch (error) {
+    console.error('❌ Error in custom image generation:', error);
+    return NextResponse.json(
+      {
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
+}

@@ -12,7 +12,6 @@ import type { ImageCatalogWithDetails } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
-import CustomerImageCustomizationModal from '@/components/CustomerImageCustomizationModal';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ShareModal from '@/components/share-modal';
@@ -49,7 +48,6 @@ function QRLandingPageContent() {
   const [trackingComplete, setTrackingComplete] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(10); // 10% default
   const [likedImage, setLikedImage] = useState(false);
 
@@ -228,7 +226,10 @@ function QRLandingPageContent() {
       router.push('/signup/user');
       return;
     }
-    setShowCustomizeModal(true);
+    // Navigate to customise page instead of opening modal
+    if (image) {
+      router.push(`/customise/${image.id}`);
+    }
   };
 
   const handleLike = () => {
@@ -612,19 +613,8 @@ function QRLandingPageContent() {
         />
       )}
 
-      {/* Customer Customization Modal */}
-      {image && userProfile?.user_type === 'customer' && (
-        <CustomerImageCustomizationModal
-          image={image}
-          isOpen={showCustomizeModal}
-          onClose={() => setShowCustomizeModal(false)}
-          onGenerationComplete={(variations) => {
-            console.log('Generated variations:', variations);
-            setShowCustomizeModal(false);
-            // Could show success message or redirect to customer gallery
-          }}
-        />
-      )}
+      {/* Customer Customization - Now handled by /customise/[imageId] page */}
+      {/* Old modal-based customization removed - navigation happens in handleCustomize() */}
       </div>
     </>
   );

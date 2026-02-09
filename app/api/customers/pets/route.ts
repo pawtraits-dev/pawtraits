@@ -1,12 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
   try {
-    // Use service role key - EXACT same as working admin API
+    // Support both cookie-based auth (from customise page) and Bearer token auth (from other pages)
+    const cookieStore = await cookies();
+    const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore });
+
+    let user = null;
+    let authError = null;
+
+    // Try cookie-based auth first
+    const cookieAuthResult = await supabaseAuth.auth.getUser();
+    if (cookieAuthResult.data?.user) {
+      user = cookieAuthResult.data.user;
+    } else {
+      // Fallback to Bearer token auth
+      const authHeader = request.headers.get('Authorization');
+      if (authHeader) {
+        const regularClient = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const tokenAuthResult = await regularClient.auth.getUser(
+          authHeader.replace('Bearer ', '')
+        );
+        user = tokenAuthResult.data?.user;
+        authError = tokenAuthResult.error;
+      }
+    }
+
+    if (!user) {
+      console.log('🔧 Auth error:', authError);
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    console.log('🔧 Customer pets API: Authenticated user:', user.id, user.email);
+
+    // Use service role key for database operations
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    
+
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
@@ -14,60 +50,19 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    console.log('🔧 Customer pets API: Getting current user from auth header');
-
-    // Get the authenticated user from the auth header
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'No authorization header' }, { status: 401 });
-    }
-
-    // Create regular client to get user
-    const regularClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
-    const { data: { user }, error: authError } = await regularClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (authError || !user) {
-      console.log('🔧 Auth error:', authError);
-      return NextResponse.json({ error: 'Authentication failed' }, { status: 401 });
-    }
-
-    console.log('🔧 Customer pets API: Authenticated user:', user.id, user.email);
-
-    // Get customer's user_id from user_profiles - EXACT same pattern as working API
-    const { data: customerProfile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('user_id')
-      .eq('user_id', user.id)
-      .eq('user_type', 'customer')
-      .single();
-
-    if (profileError) {
-      console.error('🔧 Error fetching customer profile:', profileError);
-      return NextResponse.json(
-        { error: 'Customer not found' },
-        { status: 404 }
-      );
-    }
-
-    console.log('🔧 Customer pets API: Found customer profile:', customerProfile.user_id);
-
-    // Get pets using EXACT same call as working admin API
+    // Get pets using RPC function
     const { data: pets, error: petsError } = await supabase
-      .rpc('get_user_pets', { user_uuid: customerProfile.user_id });
+      .rpc('get_user_pets', { user_uuid: user.id });
 
     if (petsError) {
       console.error('🔧 Error fetching customer pets:', petsError);
-      return NextResponse.json([], { status: 200 }); // Return empty array if function fails
+      return NextResponse.json({ pets: [] }, { status: 200 });
     }
 
     console.log('🔧 Customer pets API: Found', pets?.length || 0, 'pets for customer');
-    return NextResponse.json(pets || []);
+
+    // Return in format expected by customise page: { pets: Pet[] }
+    return NextResponse.json({ pets: pets || [] });
 
   } catch (error) {
     console.error('🔧 Error fetching customer pets:', error);

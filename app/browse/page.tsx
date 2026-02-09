@@ -32,7 +32,6 @@ import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
 import ShareModal from '@/components/share-modal';
 import PartnerQRModal from '@/components/PartnerQRModal';
-import CustomerImageCustomizationModal from '@/components/CustomerImageCustomizationModal';
 import UserInteractionsService from '@/lib/user-interactions';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
@@ -87,10 +86,8 @@ function BrowsePageContent() {
   // Modal states
   const [showShareModal, setShowShareModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
-  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [imageToShare, setImageToShare] = useState<ImageCatalogWithDetails | null>(null);
   const [imageForQR, setImageForQR] = useState<ImageCatalogWithDetails | null>(null);
-  const [imageToCustomize, setImageToCustomize] = useState<ImageCatalogWithDetails | null>(null);
 
   // Authentication and user states
   const { userProfile, userLoading } = useUserRouting();
@@ -297,8 +294,8 @@ function BrowsePageContent() {
       router.push('/signup/user');
       return;
     }
-    setImageToCustomize(image);
-    setShowCustomizeModal(true);
+    // Navigate to customise page instead of opening modal
+    router.push(`/customise/${image.id}`);
   };
 
   const getCarouselPageType = (): PageType => {
@@ -1289,22 +1286,8 @@ function BrowsePageContent() {
         />
       )}
 
-      {/* Customer Image Customization Modal */}
-      {imageToCustomize && userProfile?.user_type === 'customer' && (
-        <CustomerImageCustomizationModal
-          image={imageToCustomize}
-          isOpen={showCustomizeModal}
-          onClose={() => {
-            setShowCustomizeModal(false);
-            setImageToCustomize(null);
-          }}
-          onGenerationComplete={(variations) => {
-            console.log('Generated variations:', variations);
-            // Optionally redirect to view generated images
-            // or show success message
-          }}
-        />
-      )}
+      {/* Customer Image Customization - Now handled by /customise/[imageId] page */}
+      {/* Old modal-based customization removed - navigation happens in handleCustomize() */}
     </div>
   );
 }
