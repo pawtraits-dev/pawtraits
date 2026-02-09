@@ -21,6 +21,10 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 export async function POST(request: NextRequest) {
   try {
     console.log('📥 [ADMIN CATALOG SAVE] Request received');
+    console.log('📊 [ADMIN CATALOG SAVE] Request headers:', {
+      contentType: request.headers.get('content-type'),
+      contentLength: request.headers.get('content-length')
+    });
 
     // Parse FormData instead of JSON to handle larger payloads
     const formData = await request.formData();
@@ -29,6 +33,14 @@ export async function POST(request: NextRequest) {
     const imageFile = formData.get('image') as File;
     const imageBase64 = formData.get('imageBase64') as string;
     const filename = formData.get('filename') as string;
+
+    console.log('📦 [ADMIN CATALOG SAVE] Received data:', {
+      hasImageFile: !!imageFile,
+      imageFileSize: imageFile?.size,
+      imageFileSizeMB: imageFile ? (imageFile.size / (1024 * 1024)).toFixed(2) + 'MB' : 'N/A',
+      hasImageBase64: !!imageBase64,
+      filename
+    });
     const marketingDescription = formData.get('marketingDescription') as string;
     const compositionAnalysis = formData.get('compositionAnalysis') as string;
     const isMultiSubject = formData.get('isMultiSubject') === 'true';

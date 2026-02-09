@@ -116,6 +116,7 @@ export default function CatalogUploadPage() {
 
   // Upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [compressedFile, setCompressedFile] = useState<File | null>(null); // Store compressed version for saving
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep>('idle');
   const [analysisProgress, setAnalysisProgress] = useState<string>('');
@@ -313,6 +314,9 @@ export default function CatalogUploadPage() {
       const compressedFile = await compressImageIfNeeded(selectedFile);
       console.log(`Image prepared: ${selectedFile.size} → ${compressedFile.size} bytes`);
 
+      // Store compressed file for later use when saving
+      setCompressedFile(compressedFile);
+
       setAnalysisStep('analyzing');
       setAnalysisProgress('Analyzing composition with Claude AI...');
 
@@ -438,9 +442,26 @@ export default function CatalogUploadPage() {
     try {
       console.log('📤 Saving catalog entry to API...');
 
+      // Use the compressed file from analysis (already under 4MB)
+      const fileToSend = compressedFile || selectedFile;
+
+      console.log('📦 File info being sent:', {
+        name: selectedFile.name,
+        originalSize: selectedFile.size,
+        originalSizeMB: (selectedFile.size / (1024 * 1024)).toFixed(2) + 'MB',
+        compressedSize: fileToSend.size,
+        compressedSizeMB: (fileToSend.size / (1024 * 1024)).toFixed(2) + 'MB',
+        usingCompressed: !!compressedFile
+      });
+
+      if (fileToSend.size > 4 * 1024 * 1024) {
+        setError(`File is still too large: ${(fileToSend.size / (1024 * 1024)).toFixed(2)}MB. Maximum is 4MB. Please select a smaller image.`);
+        return;
+      }
+
       // Use FormData to avoid 4.5MB JSON payload limit
       const formData = new FormData();
-      formData.append('image', selectedFile); // Send original file instead of base64
+      formData.append('image', fileToSend); // Send compressed file
       formData.append('filename', selectedFile.name);
       formData.append('marketingDescription', marketingDescription);
       formData.append('compositionAnalysis', compositionAnalysis);
@@ -454,6 +475,18 @@ export default function CatalogUploadPage() {
       formData.append('isPublic', String(isPublic));
       formData.append('variationPromptTemplate', analysis.variationPromptTemplate);
       formData.append('compositionMetadata', JSON.stringify(analysis.compositionMetadata));
+
+      // Log FormData size estimate
+      const subjectsSize = JSON.stringify(subjects).length;
+      const metadataSize = JSON.stringify(analysis.compositionMetadata).length;
+      const totalEstimate = fileToSend.size + subjectsSize + metadataSize + 1000; // +1000 for other fields
+      console.log('📊 FormData size estimate:', {
+        imageSize: fileToSend.size,
+        subjectsSize,
+        metadataSize,
+        totalEstimate,
+        totalMB: (totalEstimate / (1024 * 1024)).toFixed(2) + 'MB'
+      });
 
       // Call save API endpoint
       const response = await fetch('/api/admin/catalog/save', {
