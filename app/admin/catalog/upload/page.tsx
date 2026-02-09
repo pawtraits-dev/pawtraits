@@ -438,26 +438,27 @@ export default function CatalogUploadPage() {
     try {
       console.log('📤 Saving catalog entry to API...');
 
+      // Use FormData to avoid 4.5MB JSON payload limit
+      const formData = new FormData();
+      formData.append('image', selectedFile); // Send original file instead of base64
+      formData.append('filename', selectedFile.name);
+      formData.append('marketingDescription', marketingDescription);
+      formData.append('compositionAnalysis', compositionAnalysis);
+      formData.append('isMultiSubject', String(isMultiSubject));
+      formData.append('subjects', JSON.stringify(subjects));
+      formData.append('themeId', selectedTheme);
+      formData.append('styleId', selectedStyle);
+      formData.append('formatId', selectedFormat);
+      formData.append('tags', JSON.stringify(tags));
+      formData.append('isFeatured', String(isFeatured));
+      formData.append('isPublic', String(isPublic));
+      formData.append('variationPromptTemplate', analysis.variationPromptTemplate);
+      formData.append('compositionMetadata', JSON.stringify(analysis.compositionMetadata));
+
       // Call save API endpoint
       const response = await fetch('/api/admin/catalog/save', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: previewUrl, // This already contains the data URL with base64
-          filename: selectedFile.name,
-          marketingDescription,
-          compositionAnalysis,
-          isMultiSubject,
-          subjects,
-          themeId: selectedTheme,
-          styleId: selectedStyle,
-          formatId: selectedFormat,
-          tags,
-          isFeatured,
-          isPublic,
-          variationPromptTemplate: analysis.variationPromptTemplate,
-          compositionMetadata: analysis.compositionMetadata
-        })
+        body: formData // No Content-Type header with FormData
       });
 
       if (!response.ok) {

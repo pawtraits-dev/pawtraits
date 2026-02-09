@@ -5,6 +5,10 @@ import { CloudinaryImageService } from '@/lib/cloudinary';
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
+// Increase body size limit to 10MB for image uploads
+// Base64 encoding adds ~33% overhead, so 4MB image becomes ~5.3MB
+export const maxDuration = 60; // Allow up to 60 seconds for processing
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
@@ -18,30 +22,31 @@ export async function POST(request: NextRequest) {
   try {
     console.log('📥 [ADMIN CATALOG SAVE] Request received');
 
-    // Parse request body
-    const body = await request.json();
-    const {
-      imageBase64,
-      filename,
-      marketingDescription,
-      compositionAnalysis,
-      isMultiSubject,
-      subjects,
-      themeId,
-      styleId,
-      formatId,
-      tags,
-      isFeatured,
-      isPublic,
-      variationPromptTemplate,
-      compositionMetadata
-    } = body;
+    // Parse FormData instead of JSON to handle larger payloads
+    const formData = await request.formData();
+
+    // Extract fields from FormData
+    const imageFile = formData.get('image') as File;
+    const imageBase64 = formData.get('imageBase64') as string;
+    const filename = formData.get('filename') as string;
+    const marketingDescription = formData.get('marketingDescription') as string;
+    const compositionAnalysis = formData.get('compositionAnalysis') as string;
+    const isMultiSubject = formData.get('isMultiSubject') === 'true';
+    const subjects = JSON.parse(formData.get('subjects') as string);
+    const themeId = formData.get('themeId') as string;
+    const styleId = formData.get('styleId') as string;
+    const formatId = formData.get('formatId') as string;
+    const tags = formData.get('tags') ? JSON.parse(formData.get('tags') as string) : [];
+    const isFeatured = formData.get('isFeatured') === 'true';
+    const isPublic = formData.get('isPublic') !== 'false';
+    const variationPromptTemplate = formData.get('variationPromptTemplate') as string;
+    const compositionMetadata = formData.get('compositionMetadata') ? JSON.parse(formData.get('compositionMetadata') as string) : null;
 
     // Validate required fields
-    if (!imageBase64 || !filename || !marketingDescription) {
+    if ((!imageBase64 && !imageFile) || !filename || !marketingDescription) {
       console.log('❌ [ADMIN CATALOG SAVE] Missing required fields');
       return NextResponse.json(
-        { error: 'Missing required fields: imageBase64, filename, marketingDescription' },
+        { error: 'Missing required fields: image (file or base64), filename, marketingDescription' },
         { status: 400 }
       );
     }
@@ -98,10 +103,22 @@ export async function POST(request: NextRequest) {
 
     console.log('📤 [ADMIN CATALOG SAVE] Uploading to Cloudinary...');
 
-    // Upload to Cloudinary
-    const imageData = imageBase64.split(',')[1]; // Remove data:image/png;base64, prefix
+    // Upload to Cloudinary - handle both File and base64
+    let imageBuffer: Buffer;
+    if (imageFile) {
+      // Convert File to Buffer
+      const arrayBuffer = await imageFile.arrayBuffer();
+      imageBuffer = Buffer.from(arrayBuffer);
+      console.log('📦 [ADMIN CATALOG SAVE] Using uploaded file, size:', imageFile.size);
+    } else {
+      // Convert base64 to Buffer
+      const imageData = imageBase64.split(',')[1]; // Remove data:image/png;base64, prefix
+      imageBuffer = Buffer.from(imageData, 'base64');
+      console.log('📦 [ADMIN CATALOG SAVE] Using base64 data, size:', imageBuffer.length);
+    }
+
     const uploadResult = await cloudinaryService.uploadAndProcessImage(
-      Buffer.from(imageData, 'base64'),
+      imageBuffer,
       filename,
       {
         breed: breed?.name || 'unknown',
@@ -125,8 +142,8 @@ export async function POST(request: NextRequest) {
       'catalog_watermarked'
     );
 
-    // Calculate file size (estimate from base64)
-    const fileSize = Math.round((imageData.length * 3) / 4);
+    // Calculate file size
+    const fileSize = imageFile ? imageFile.size : imageBuffer.length;
 
     // Prepare catalog entry
     const catalogEntry = {
