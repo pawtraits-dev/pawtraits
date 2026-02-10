@@ -151,11 +151,19 @@ async function generateCustomImage(
 
     console.log('✅ Uploaded to Cloudinary:', generatedCloudinaryId);
 
+    // Generate watermarked variant URL for preview
+    const watermarkedUrl = cloudinaryService.getPublicVariantUrl(
+      generatedCloudinaryId,
+      'catalog_watermarked'
+    );
+
+    console.log('🖼️ Generated watermarked URL:', watermarkedUrl.substring(0, 100) + '...');
+
     // Update database record
     await supabase
       .from('customer_custom_images')
       .update({
-        generated_image_url: generatedImageUrl,
+        generated_image_url: watermarkedUrl,  // Store watermarked URL for preview
         generated_cloudinary_id: generatedCloudinaryId,
         generation_prompt: generationPrompt,
         status: 'complete',
@@ -165,7 +173,8 @@ async function generateCustomImage(
           pet_image_url: petImageUrl,
           theme: themeName,
           style: styleName,
-          model: 'gemini-3-pro-image-preview'
+          model: 'gemini-3-pro-image-preview',
+          full_size_url: generatedImageUrl  // Keep full-size URL in metadata
         }
       })
       .eq('id', customImageId);

@@ -6,8 +6,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, Upload, Sparkles, Share2, Check } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ArrowLeft, Upload, Sparkles, Share2, Check, ShoppingCart } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 interface Pet {
@@ -485,20 +485,59 @@ export default function CustomisePage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Your Custom Portrait</CardTitle>
+                  <p className="text-sm text-gray-600 mt-2">
+                    Your personalized portrait is ready! Purchase to download the high-resolution version without watermark.
+                  </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {customImage.status === 'complete' && customImage.generated_image_url ? (
                     <>
-                      <div className="relative aspect-square w-full rounded-lg overflow-hidden">
+                      {/* Image with copy protection */}
+                      <div
+                        className="relative aspect-square w-full rounded-lg overflow-hidden bg-gray-100"
+                        onContextMenu={(e) => e.preventDefault()}
+                        onDragStart={(e) => e.preventDefault()}
+                        style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+                      >
                         <Image
                           src={customImage.generated_image_url}
                           alt="Custom portrait"
                           fill
-                          className="object-cover"
+                          className="object-cover pointer-events-none"
+                          draggable={false}
+                          onContextMenu={(e) => e.preventDefault()}
                         />
+                        {/* Watermark indicator */}
+                        <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded text-xs">
+                          Preview • Watermarked
+                        </div>
                       </div>
 
+                      {/* Purchase CTA Section */}
+                      <Alert className="border-blue-200 bg-blue-50">
+                        <ShoppingCart className="h-4 w-4 text-blue-600" />
+                        <AlertTitle className="text-blue-900">Love your portrait?</AlertTitle>
+                        <AlertDescription className="text-blue-800">
+                          Purchase to get the full high-resolution version without watermark, perfect for printing or sharing!
+                        </AlertDescription>
+                      </Alert>
+
                       <div className="space-y-2">
+                        <Button
+                          onClick={() => {
+                            // TODO: Navigate to purchase flow for custom image
+                            toast({
+                              title: 'Purchase feature coming soon!',
+                              description: 'We\'re working on adding purchase options for custom portraits.',
+                            });
+                          }}
+                          className="w-full bg-blue-600 hover:bg-blue-700"
+                          size="lg"
+                        >
+                          <ShoppingCart className="w-4 h-4 mr-2" />
+                          Purchase Digital Download
+                        </Button>
+
                         <Button
                           onClick={handleShare}
                           variant="outline"
