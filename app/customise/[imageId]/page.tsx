@@ -34,6 +34,7 @@ interface CatalogImage {
   theme?: { name: string; displayName: string };
   style?: { name: string; displayName: string };
   breed?: { name: string; displayName: string };
+  format?: { id: string; name: string; aspectRatio: string };
 }
 
 interface CustomImage {
@@ -62,6 +63,12 @@ export default function CustomisePage() {
   const [hasRated, setHasRated] = useState(false);
   const [progressMessages, setProgressMessages] = useState<string[]>([]);
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+
+  // Helper function to get aspect ratio style
+  const getAspectRatioStyle = (aspectRatio?: string) => {
+    if (!aspectRatio) return { aspectRatio: '1 / 1' }; // Default to square
+    return { aspectRatio: aspectRatio.replace(':', ' / ') }; // Convert '16:9' to '16 / 9'
+  };
 
   // Load catalog image and user's pets
   useEffect(() => {
@@ -493,7 +500,10 @@ export default function CustomisePage() {
               </CardHeader>
               <CardContent>
                 {catalogImage && (
-                  <div className="relative aspect-square w-full rounded-lg overflow-hidden">
+                  <div
+                    className="relative w-full rounded-lg overflow-hidden bg-gray-100"
+                    style={getAspectRatioStyle(catalogImage.format?.aspectRatio)}
+                  >
                     <Image
                       src={catalogImage.imageUrl}
                       alt={catalogImage.description || 'Catalog image'}
@@ -652,10 +662,14 @@ export default function CustomisePage() {
                     <>
                       {/* Image with copy protection */}
                       <div
-                        className="relative aspect-square w-full rounded-lg overflow-hidden bg-gray-100"
+                        className="relative w-full rounded-lg overflow-hidden bg-gray-100"
                         onContextMenu={(e) => e.preventDefault()}
                         onDragStart={(e) => e.preventDefault()}
-                        style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+                        style={{
+                          ...getAspectRatioStyle(catalogImage?.format?.aspectRatio),
+                          userSelect: 'none',
+                          WebkitUserSelect: 'none'
+                        }}
                       >
                         <Image
                           src={customImage.generated_image_url}
