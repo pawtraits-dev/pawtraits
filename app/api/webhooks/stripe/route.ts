@@ -4,6 +4,7 @@ import { constructWebhookEvent } from '@/lib/stripe-server';
 import { createClient } from '@supabase/supabase-js';
 import { createGelatoService } from '@/lib/gelato-service';
 import { sendMessage } from '@/lib/messaging/message-service';
+import { FulfillmentRouter } from '@/lib/fulfillment/fulfillment-router';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -286,8 +287,8 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     // Pass pre-discount subtotal for commission calculations (partners earn on pre-discount amount)
     await handleSimplifiedCommissions(supabase, order, orderingUserProfile, customerEmail, preDiscountSubtotal, metadata);
 
-    // Create Gelato order for fulfillment
-    await createGelatoOrder(order, paymentIntent, supabase, metadata);
+    // Route order to appropriate fulfillment service(s)
+    await routeOrderFulfillment(order, paymentIntent, supabase, metadata);
 
     // Send order confirmation email to customer
     await sendOrderConfirmationEmail(supabase, order, paymentIntent, metadata);
@@ -697,7 +698,59 @@ async function handleSimplifiedCommissions(
   }
 }
 
+// Route order to appropriate fulfillment service(s)
+async function routeOrderFulfillment(order: any, paymentIntent: any, supabase: any, metadata: any = {}) {
+  try {
+    console.log('📦 [Fulfillment] Routing order for fulfillment:', order.order_number);
+
+    // Fetch order items from database
+    const { data: orderItems, error: itemsError } = await supabase
+      .from('order_items')
+      .select('*')
+      .eq('order_id', order.id);
+
+    if (itemsError || !orderItems || orderItems.length === 0) {
+      console.error('❌ [Fulfillment] Failed to fetch order items:', itemsError);
+      console.error('❌ [Fulfillment] Cannot fulfill order without items');
+      return;
+    }
+
+    console.log(`📦 [Fulfillment] Retrieved ${orderItems.length} order items`);
+
+    // Initialize fulfillment router
+    const router = new FulfillmentRouter();
+
+    // Execute fulfillment routing
+    const results = await router.fulfillOrder(order, orderItems);
+
+    // Log results
+    const successCount = results.filter(r => r.success).length;
+    const failureCount = results.filter(r => !r.success).length;
+
+    console.log(`📊 [Fulfillment] Results: ${successCount} successful, ${failureCount} failed`);
+
+    if (failureCount > 0) {
+      console.error('⚠️ [Fulfillment] Some fulfillments failed:');
+      results.filter(r => !r.success).forEach(r => {
+        console.error(`  - ${r.error}`);
+      });
+    }
+
+    // If all fulfillments failed, log critical error
+    if (successCount === 0) {
+      console.error('❌ [Fulfillment] CRITICAL: All fulfillment attempts failed for order:', order.order_number);
+      // TODO: Send admin notification about fulfillment failure
+    }
+
+  } catch (error) {
+    console.error('💥 [Fulfillment] Critical error routing order:', error);
+    // TODO: Send admin notification about fulfillment system failure
+  }
+}
+
 // Create Gelato order for print fulfillment
+// DEPRECATED: Use routeOrderFulfillment instead
+// Kept for reference during Phase 1 implementation
 async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, metadata: any = {}) {
   try {
     console.log('Creating Gelato order for:', order.order_number);

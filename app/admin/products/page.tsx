@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AdminSupabaseService } from '@/lib/admin-supabase';
-import { ChevronUp, ChevronDown, Plus, Edit, Trash2, Search, Filter, Star } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, Edit, Trash2, Search, Filter, Star, Download } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 
 interface Product {
@@ -28,6 +29,9 @@ interface Product {
   stock_status: string;
   created_at: string;
   updated_at: string;
+  product_type?: 'physical_print' | 'digital_download' | 'hybrid';
+  fulfillment_method?: string;
+  requires_shipping?: boolean;
   pricing?: Array<{
     country_code: string;
     sale_price: number;
@@ -58,6 +62,7 @@ export default function ProductsPage() {
   
   // Filtering and sorting state
   const [searchTerm, setSearchTerm] = useState('');
+  const [productTypeFilter, setProductTypeFilter] = useState(''); // New: product type filter
   const [mediumFilter, setMediumFilter] = useState('');
   const [formatFilter, setFormatFilter] = useState('');
   const [stockStatusFilter, setStockStatusFilter] = useState('');
@@ -131,13 +136,19 @@ export default function ProductsPage() {
           return false;
         }
       }
-      
+
+      // Product type filter
+      if (productTypeFilter) {
+        const productType = product.product_type || 'physical_print';
+        if (productType !== productTypeFilter) return false;
+      }
+
       // Medium filter
       if (mediumFilter && product.medium.id !== mediumFilter) return false;
-      
-      // Format filter  
+
+      // Format filter
       if (formatFilter && product.format.id !== formatFilter) return false;
-      
+
       // Stock status filter
       if (stockStatusFilter && product.stock_status !== stockStatusFilter) return false;
 
@@ -212,12 +223,20 @@ export default function ProductsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Products</h1>
           <p className="text-gray-600">Manage your product catalog</p>
         </div>
-        <Link href="/admin/products/new">
-          <Button className="bg-gradient-to-r from-purple-600 to-blue-600">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Product
-          </Button>
-        </Link>
+        <div className="flex gap-3">
+          <Link href="/admin/products/digital/new">
+            <Button variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50">
+              <Download className="w-4 h-4 mr-2" />
+              Add Digital Product
+            </Button>
+          </Link>
+          <Link href="/admin/products/new">
+            <Button className="bg-gradient-to-r from-purple-600 to-blue-600">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Physical Product
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
@@ -229,7 +248,7 @@ export default function ProductsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
             {/* Search */}
             <div>
               <label className="block text-sm font-medium mb-2">Search</label>
@@ -242,6 +261,21 @@ export default function ProductsPage() {
                   className="pl-10"
                 />
               </div>
+            </div>
+
+            {/* Product Type Filter */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Product Type</label>
+              <Select value={productTypeFilter} onValueChange={setProductTypeFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="physical_print">Physical Print</SelectItem>
+                  <SelectItem value="digital_download">Digital Download</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Medium Filter */}
@@ -404,7 +438,20 @@ export default function ProductsPage() {
                     </td>
                     <td className="p-4">
                       <div>
-                        <div className="font-medium">{product.name || 'Unnamed Product'}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{product.name || 'Unnamed Product'}</span>
+                          {product.product_type === 'digital_download' && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs">
+                              <Download className="w-3 h-3 mr-1" />
+                              Digital
+                            </Badge>
+                          )}
+                          {!product.product_type || product.product_type === 'physical_print' && (
+                            <Badge variant="outline" className="text-xs">
+                              Physical + Digital
+                            </Badge>
+                          )}
+                        </div>
                         {product.description && (
                           <div className="text-sm text-gray-600">{product.description.slice(0, 50)}...</div>
                         )}

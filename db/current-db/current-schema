@@ -26,6 +26,25 @@ CREATE TABLE public.api_keys (
   CONSTRAINT api_keys_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT api_keys_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
 );
+CREATE TABLE public.archive_operations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  operation_type text NOT NULL CHECK (operation_type = ANY (ARRAY['catalog_archival'::text, 'catalog_deletion'::text])),
+  started_at timestamp with time zone DEFAULT now(),
+  completed_at timestamp with time zone,
+  performed_by uuid,
+  images_archived integer DEFAULT 0,
+  analytics_archived integer DEFAULT 0,
+  interactions_archived integer DEFAULT 0,
+  total_size_bytes bigint,
+  status text DEFAULT 'in_progress'::text CHECK (status = ANY (ARRAY['in_progress'::text, 'completed'::text, 'failed'::text, 'rolled_back'::text])),
+  error_message text,
+  rollback_script_path text,
+  can_rollback boolean DEFAULT true,
+  rollback_deadline timestamp with time zone,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  CONSTRAINT archive_operations_pkey PRIMARY KEY (id),
+  CONSTRAINT archive_operations_performed_by_fkey FOREIGN KEY (performed_by) REFERENCES public.user_profiles(id)
+);
 CREATE TABLE public.audit_events (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   event_type text NOT NULL CHECK (event_type = ANY (ARRAY['AUTHENTICATION'::text, 'AUTHORIZATION'::text, 'DATA_ACCESS'::text, 'DATA_MODIFICATION'::text, 'DATA_DELETION'::text, 'SYSTEM_ACCESS'::text, 'SECURITY_INCIDENT'::text, 'PRIVACY_EVENT'::text, 'COMPLIANCE_EVENT'::text, 'ADMIN_ACTION'::text, 'API_ACCESS'::text, 'FILE_OPERATION'::text, 'PAYMENT_EVENT'::text])),
@@ -393,6 +412,7 @@ CREATE TABLE public.customer_generated_images (
   is_featured boolean DEFAULT false,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  description text,
   CONSTRAINT customer_generated_images_pkey PRIMARY KEY (id),
   CONSTRAINT customer_generated_images_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.user_profiles(id),
   CONSTRAINT customer_generated_images_original_image_id_fkey FOREIGN KEY (original_image_id) REFERENCES public.image_catalog(id),
@@ -581,13 +601,90 @@ CREATE TABLE public.image_catalog (
   migrated_at timestamp with time zone,
   created_by_customer_id uuid,
   is_customer_generated boolean DEFAULT false,
+  outfit_id uuid,
+  is_multi_subject boolean DEFAULT false,
+  subjects jsonb DEFAULT '[]'::jsonb,
+  composition_analysis text,
+  composition_metadata jsonb DEFAULT '{}'::jsonb,
+  ai_analysis_model text DEFAULT 'claude-sonnet-4-5'::text,
+  ai_analyzed_at timestamp with time zone,
+  marketing_description text,
+  marketing_description_approved boolean DEFAULT false,
+  variation_prompt_template text,
   CONSTRAINT image_catalog_pkey PRIMARY KEY (id),
   CONSTRAINT image_catalog_breed_id_fkey FOREIGN KEY (breed_id) REFERENCES public.breeds(id),
   CONSTRAINT image_catalog_theme_id_fkey FOREIGN KEY (theme_id) REFERENCES public.themes(id),
   CONSTRAINT image_catalog_style_id_fkey FOREIGN KEY (style_id) REFERENCES public.styles(id),
   CONSTRAINT image_catalog_format_id_fkey FOREIGN KEY (format_id) REFERENCES public.formats(id),
   CONSTRAINT image_catalog_coat_id_fkey FOREIGN KEY (coat_id) REFERENCES public.coats(id),
-  CONSTRAINT image_catalog_created_by_customer_id_fkey FOREIGN KEY (created_by_customer_id) REFERENCES public.user_profiles(id)
+  CONSTRAINT image_catalog_created_by_customer_id_fkey FOREIGN KEY (created_by_customer_id) REFERENCES public.user_profiles(id),
+  CONSTRAINT image_catalog_outfit_id_fkey FOREIGN KEY (outfit_id) REFERENCES public.outfits(id)
+);
+CREATE TABLE public.image_catalog_archive (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  original_id uuid NOT NULL,
+  archived_at timestamp with time zone DEFAULT now(),
+  archived_by uuid,
+  archive_reason text DEFAULT 'Catalog pivot to curated approach'::text,
+  filename text NOT NULL,
+  original_filename text NOT NULL,
+  file_size integer NOT NULL,
+  mime_type text NOT NULL,
+  storage_path text NOT NULL,
+  public_url text NOT NULL,
+  prompt_text text NOT NULL,
+  description text,
+  tags ARRAY,
+  breed_id uuid,
+  theme_id uuid,
+  style_id uuid,
+  format_id uuid,
+  coat_id uuid,
+  ai_model text,
+  generation_parameters jsonb DEFAULT '{}'::jsonb,
+  rating integer,
+  is_featured boolean,
+  is_public boolean,
+  share_count integer,
+  last_shared_at timestamp with time zone,
+  like_count integer,
+  view_count integer,
+  last_liked_at timestamp with time zone,
+  last_viewed_at timestamp with time zone,
+  cloudinary_public_id text,
+  cloudinary_version character varying,
+  cloudinary_signature text,
+  image_variants jsonb DEFAULT '{}'::jsonb,
+  access_level text,
+  migration_status text,
+  migrated_at timestamp with time zone,
+  created_by_customer_id uuid,
+  is_customer_generated boolean,
+  original_created_at timestamp with time zone,
+  original_updated_at timestamp with time zone,
+  interaction_snapshot jsonb DEFAULT '{}'::jsonb,
+  CONSTRAINT image_catalog_archive_pkey PRIMARY KEY (id),
+  CONSTRAINT image_catalog_archive_archived_by_fkey FOREIGN KEY (archived_by) REFERENCES public.user_profiles(id)
+);
+CREATE TABLE public.image_catalog_subjects (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  image_catalog_id uuid NOT NULL,
+  subject_order integer NOT NULL,
+  is_primary boolean DEFAULT false,
+  breed_id uuid NOT NULL,
+  coat_id uuid,
+  outfit_id uuid,
+  position text,
+  size_prominence text,
+  pose_description text,
+  gaze_direction text,
+  expression text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT image_catalog_subjects_pkey PRIMARY KEY (id),
+  CONSTRAINT image_catalog_subjects_image_catalog_id_fkey FOREIGN KEY (image_catalog_id) REFERENCES public.image_catalog(id),
+  CONSTRAINT image_catalog_subjects_breed_id_fkey FOREIGN KEY (breed_id) REFERENCES public.breeds(id),
+  CONSTRAINT image_catalog_subjects_coat_id_fkey FOREIGN KEY (coat_id) REFERENCES public.coats(id),
+  CONSTRAINT image_catalog_subjects_outfit_id_fkey FOREIGN KEY (outfit_id) REFERENCES public.outfits(id)
 );
 CREATE TABLE public.influencer_referral_codes (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -691,6 +788,26 @@ CREATE TABLE public.interaction_analytics (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT interaction_analytics_pkey PRIMARY KEY (id),
   CONSTRAINT interaction_analytics_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id)
+);
+CREATE TABLE public.interaction_analytics_archive (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  original_id uuid NOT NULL,
+  archived_image_id uuid,
+  total_likes integer DEFAULT 0,
+  total_unlikes integer DEFAULT 0,
+  net_likes integer DEFAULT 0,
+  total_shares integer DEFAULT 0,
+  total_views integer DEFAULT 0,
+  unique_users integer DEFAULT 0,
+  unique_likers integer DEFAULT 0,
+  unique_sharers integer DEFAULT 0,
+  unique_viewers integer DEFAULT 0,
+  first_interaction_at timestamp with time zone,
+  last_interaction_at timestamp with time zone,
+  original_updated_at timestamp with time zone,
+  archived_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT interaction_analytics_archive_pkey PRIMARY KEY (id),
+  CONSTRAINT interaction_analytics_archive_archived_image_id_fkey FOREIGN KEY (archived_image_id) REFERENCES public.image_catalog_archive(id)
 );
 CREATE TABLE public.media (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -798,6 +915,23 @@ CREATE TABLE public.message_templates (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT message_templates_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.order_fulfillment_tracking (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL,
+  order_item_id uuid,
+  fulfillment_method text NOT NULL,
+  status text NOT NULL CHECK (status = ANY (ARRAY['pending'::text, 'processing'::text, 'fulfilled'::text, 'failed'::text, 'cancelled'::text])),
+  status_message text,
+  tracking_data jsonb,
+  started_at timestamp with time zone DEFAULT now(),
+  completed_at timestamp with time zone,
+  failed_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT order_fulfillment_tracking_pkey PRIMARY KEY (id),
+  CONSTRAINT order_fulfillment_tracking_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT order_fulfillment_tracking_order_item_id_fkey FOREIGN KEY (order_item_id) REFERENCES public.order_items(id)
+);
 CREATE TABLE public.order_items (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   order_id uuid NOT NULL,
@@ -822,6 +956,17 @@ CREATE TABLE public.order_items (
   unit_price integer,
   total_price integer,
   original_price integer,
+  is_physical boolean DEFAULT true,
+  is_digital boolean DEFAULT false,
+  download_url text,
+  download_url_generated_at timestamp with time zone,
+  download_expires_at timestamp with time zone,
+  download_access_count integer DEFAULT 0,
+  last_downloaded_at timestamp with time zone,
+  digital_file_format text,
+  digital_file_size_bytes bigint,
+  license_terms jsonb,
+  image_ids ARRAY,
   CONSTRAINT order_items_pkey PRIMARY KEY (id),
   CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id)
 );
@@ -860,6 +1005,10 @@ CREATE TABLE public.orders (
   discount_amount integer DEFAULT 0,
   referral_code text,
   credit_applied integer DEFAULT 0,
+  fulfillment_type text DEFAULT 'physical'::text CHECK (fulfillment_type = ANY (ARRAY['physical'::text, 'digital'::text, 'hybrid'::text])),
+  fulfillment_status text DEFAULT 'pending'::text CHECK (fulfillment_status = ANY (ARRAY['pending'::text, 'processing'::text, 'fulfilled'::text, 'failed'::text, 'partially_fulfilled'::text])),
+  digital_delivery_status text CHECK (digital_delivery_status = ANY (ARRAY['pending'::text, 'sent'::text, 'downloaded'::text, 'expired'::text])),
+  download_expires_at timestamp with time zone,
   CONSTRAINT orders_pkey PRIMARY KEY (id),
   CONSTRAINT orders_placed_by_partner_id_fkey FOREIGN KEY (placed_by_partner_id) REFERENCES public.partners(id)
 );
@@ -1035,6 +1184,13 @@ CREATE TABLE public.products (
   width_inches numeric,
   height_inches numeric,
   gelato_sku text,
+  product_type text DEFAULT 'physical_print'::text CHECK (product_type = ANY (ARRAY['physical_print'::text, 'digital_download'::text, 'hybrid'::text])),
+  fulfillment_method text DEFAULT 'gelato'::text CHECK (fulfillment_method = ANY (ARRAY['gelato'::text, 'manual'::text, 'prodigi'::text, 'download'::text, 'hybrid'::text])),
+  requires_shipping boolean DEFAULT true,
+  digital_file_type text CHECK (digital_file_type = ANY (ARRAY['jpg'::text, 'png'::text, 'pdf'::text, 'all'::text])),
+  digital_resolution text,
+  license_type text CHECK (license_type = ANY (ARRAY['personal'::text, 'commercial'::text, 'extended'::text])),
+  image_count integer DEFAULT 1,
   CONSTRAINT products_pkey PRIMARY KEY (id),
   CONSTRAINT products_medium_id_fkey FOREIGN KEY (medium_id) REFERENCES public.media(id),
   CONSTRAINT products_format_id_fkey FOREIGN KEY (format_id) REFERENCES public.formats(id)
@@ -1267,6 +1423,23 @@ CREATE TABLE public.user_interactions (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT user_interactions_pkey PRIMARY KEY (id),
   CONSTRAINT user_interactions_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.image_catalog(id)
+);
+CREATE TABLE public.user_interactions_archive (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  original_id uuid NOT NULL,
+  archived_image_id uuid,
+  user_id uuid,
+  session_id text,
+  interaction_type text,
+  platform text,
+  user_agent text,
+  ip_address inet,
+  referrer text,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  original_created_at timestamp with time zone,
+  archived_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_interactions_archive_pkey PRIMARY KEY (id),
+  CONSTRAINT user_interactions_archive_archived_image_id_fkey FOREIGN KEY (archived_image_id) REFERENCES public.image_catalog_archive(id)
 );
 CREATE TABLE public.user_messages (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

@@ -244,9 +244,9 @@ export async function POST(request: NextRequest) {
         style_id,
         breed_id,
         prompt_text,
-        breeds (id, name, display_name),
-        themes (id, name, display_name),
-        styles (id, name, display_name)
+        breeds (id, name),
+        themes (id, name),
+        styles (id, name)
       `)
       .eq('id', catalogImageId)
       .single();
@@ -423,10 +423,10 @@ export async function POST(request: NextRequest) {
       catalogImageUrl,
       petImageUrl,
       catalogImage.prompt_text || '',
-      catalogImage.themes?.name || catalogImage.themes?.display_name || 'Custom',
-      catalogImage.styles?.name || catalogImage.styles?.display_name || 'Portrait',
-      catalogImage.breeds?.name || catalogImage.breeds?.display_name || 'Pet',
-      petData?.breeds?.name || petData?.breeds?.display_name
+      catalogImage.themes?.name || 'Custom',
+      catalogImage.styles?.name || 'Portrait',
+      catalogImage.breeds?.name || 'Pet',
+      petData?.breeds?.name
     ).catch(async (error) => {
       console.error('❌ Error in background generation:', error);
       // Update record with error status
