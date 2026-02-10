@@ -213,17 +213,24 @@ export default function CustomisePage() {
 
         if (response.ok) {
           const data = await response.json();
+          console.log('📊 Poll response:', {
+            status: data.status,
+            hasImageUrl: !!data.generated_image_url,
+            imageUrl: data.generated_image_url?.substring(0, 50) + '...'
+          });
           setCustomImage(data);
 
           if (data.status === 'complete' || data.status === 'failed') {
             clearInterval(poll);
 
             if (data.status === 'complete') {
+              console.log('✅ Generation complete!', data);
               toast({
                 title: 'Image ready!',
                 description: 'Your custom portrait has been generated'
               });
             } else {
+              console.error('❌ Generation failed:', data.error_message);
               setError('Generation failed. Please try again.');
             }
           }

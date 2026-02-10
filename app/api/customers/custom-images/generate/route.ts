@@ -165,7 +165,7 @@ async function generateCustomImage(
           pet_image_url: petImageUrl,
           theme: themeName,
           style: styleName,
-          model: 'gemini-2.5-flash-image-preview'
+          model: 'gemini-3-pro-image-preview'
         }
       })
       .eq('id', customImageId);
