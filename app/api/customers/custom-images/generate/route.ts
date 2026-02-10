@@ -211,6 +211,13 @@ export async function POST(request: NextRequest) {
     const petId = formData.get('petId') as string | null;
     const petPhoto = formData.get('petPhoto') as File | null;
 
+    console.log('📦 FormData received:', {
+      catalogImageId,
+      petId,
+      hasPetPhoto: !!petPhoto,
+      petPhotoSize: petPhoto?.size
+    });
+
     if (!catalogImageId) {
       return NextResponse.json(
         { error: 'Catalog image ID is required' },

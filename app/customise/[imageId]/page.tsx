@@ -89,6 +89,8 @@ export default function CustomisePage() {
       if (petsRes.ok) {
         const petsData = await petsRes.json();
         console.log('✅ Pets loaded:', petsData.pets?.length || 0);
+        console.log('📦 Pet data structure:', petsData.pets?.[0] ? Object.keys(petsData.pets[0]) : 'No pets');
+        console.log('📦 First pet full data:', petsData.pets?.[0]);
         setPets(petsData.pets || []);
       }
     } catch (err) {
