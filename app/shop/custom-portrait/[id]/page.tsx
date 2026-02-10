@@ -264,7 +264,7 @@ export default function CustomPortraitPurchasePage() {
                   src={customImage.generated_image_url}
                   alt="Custom portrait"
                   fill
-                  className="object-cover"
+                  className="object-contain"
                 />
                 <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded text-xs">
                   Preview • Watermarked

@@ -690,7 +690,7 @@ export default function CustomisePage() {
                           src={customImage.generated_image_url}
                           alt="Custom portrait"
                           fill
-                          className="object-cover pointer-events-none"
+                          className="object-contain pointer-events-none"
                           draggable={false}
                           onContextMenu={(e) => e.preventDefault()}
                         />

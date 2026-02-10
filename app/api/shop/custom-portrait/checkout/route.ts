@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Verify the custom image belongs to this user
     const { data: customImage, error: imageError } = await supabaseAdmin
-      .from('custom_images')
+      .from('customer_custom_images')
       .select('id, customer_email, generated_image_url, catalog_image_id')
       .eq('id', customImageId)
       .single();
