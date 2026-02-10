@@ -301,8 +301,8 @@ export async function POST(request: NextRequest) {
     }
 
     let petData: any = null;
-    let petImageUrl: string;
-    let petCloudinaryId: string;
+    let petImageUrl: string = '';
+    let petCloudinaryId: string = '';
 
     if (petId) {
       // Use existing pet
@@ -377,6 +377,21 @@ export async function POST(request: NextRequest) {
       // For uploaded photos, we don't have breed/coat info yet
       // TODO: Add AI analysis to detect breed/coat from uploaded photo
     }
+
+    // Validate that we have pet image data before proceeding
+    if (!petImageUrl || !petCloudinaryId) {
+      console.error('❌ Missing pet image data:', { petImageUrl, petCloudinaryId });
+      return NextResponse.json(
+        { error: 'Failed to process pet image' },
+        { status: 400 }
+      );
+    }
+
+    console.log('✅ Pet image data validated:', {
+      hasUrl: !!petImageUrl,
+      hasCloudinaryId: !!petCloudinaryId,
+      petName: petData?.name || 'Uploaded Pet'
+    });
 
     // Create custom image record in database
     const { data: customImage, error: insertError } = await supabase
@@ -453,10 +468,14 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Error in custom image generation:', error);
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+
+    // Return proper error response
     return NextResponse.json(
       {
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Failed to generate custom image',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined
       },
       { status: 500 }
     );
