@@ -278,7 +278,7 @@ export default function CustomisePage() {
         setHasRated(true);
         toast({
           title: 'Thanks for your feedback!',
-          description: 'Your rating helps us improve our AI model.'
+          description: 'Your rating helps us help you.'
         });
       }
     } catch (error) {
@@ -298,7 +298,7 @@ export default function CustomisePage() {
         setCurrentMessageIndex((prev) =>
           (prev + 1) % progressMessages.length
         );
-      }, 18000); // 18 seconds per message
+      }, 12000); // 18 seconds per message
 
       return () => clearInterval(interval);
     }
@@ -403,7 +403,7 @@ export default function CustomisePage() {
               console.log('✅ Generation complete!', data);
               toast({
                 title: 'Image ready!',
-                description: 'Your custom portrait has been generated'
+                description: 'Your custom Pawtrait is ready!'
               });
             } else {
               console.error('❌ Generation failed:', data.error_message);
@@ -667,9 +667,9 @@ export default function CustomisePage() {
               /* Result */
               <Card>
                 <CardHeader>
-                  <CardTitle>Your Custom Portrait</CardTitle>
+                  <CardTitle>Your Custom Pawtrait</CardTitle>
                   <p className="text-sm text-gray-600 mt-2">
-                    Your personalized portrait is ready! Purchase to download the high-resolution version without watermark.
+                    Your personalized Pawtrait is ready! Purchase to download the high-resolution version without watermark.
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -743,7 +743,7 @@ export default function CustomisePage() {
                           <Check className="h-4 w-4 text-green-600" />
                           <AlertTitle className="text-green-900">Thanks for rating!</AlertTitle>
                           <AlertDescription className="text-green-800">
-                            Your feedback helps us make better portraits for everyone.
+                            Your feedback helps us make better Pawtraits for everyone.
                           </AlertDescription>
                         </Alert>
                       )}
@@ -764,7 +764,7 @@ export default function CustomisePage() {
                           className="w-full"
                         >
                           <Share2 className="w-4 h-4 mr-2" />
-                          Share Your Portrait
+                          Share Your Pawtrait
                         </Button>
 
                         <Button
@@ -790,17 +790,17 @@ export default function CustomisePage() {
                             {progressMessages[currentMessageIndex]}
                           </p>
                           <p className="text-sm text-gray-500">
-                            This usually takes 30-60 seconds
+                            This shouldn't take too long - good things come to those who wait!
                           </p>
                         </>
                       ) : (
                         <>
                           <p className="text-gray-600">
-                            {customImage.status === 'pending' && 'Preparing your portrait...'}
-                            {customImage.status === 'generating' && 'Generating your portrait...'}
+                            {customImage.status === 'pending' && 'Preparing your Pawtrait...'}
+                            {customImage.status === 'generating' && 'Generating your Pawtrait...'}
                           </p>
                           <p className="text-sm text-gray-500 mt-2">
-                            This usually takes 30-60 seconds
+                            This shouldn't take too long - good things come to those who wait!
                           </p>
                         </>
                       )}
