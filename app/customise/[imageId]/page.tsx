@@ -422,6 +422,20 @@ export default function CustomisePage() {
     }, 2000);
   }
 
+  async function handlePurchase() {
+    if (!customImage?.id) {
+      toast({
+        title: 'Error',
+        description: 'Custom portrait ID not found',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Navigate to custom portrait purchase page
+    router.push(`/shop/custom-portrait/${customImage.id}`);
+  }
+
   async function handleShare() {
     if (!customImage?.share_token) return;
 
@@ -735,13 +749,7 @@ export default function CustomisePage() {
 
                       <div className="space-y-2">
                         <Button
-                          onClick={() => {
-                            // TODO: Navigate to purchase flow for custom image
-                            toast({
-                              title: 'Purchase feature coming soon!',
-                              description: 'We\'re working on adding purchase options for custom portraits.',
-                            });
-                          }}
+                          onClick={handlePurchase}
                           className="w-full bg-blue-600 hover:bg-blue-700"
                           size="lg"
                         >
