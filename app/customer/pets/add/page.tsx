@@ -641,16 +641,15 @@ export default function AddPetPage() {
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic Information */}
+        {/* Step 1: Basic Info */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Heart className="w-5 h-5 text-purple-600" />
-              <span>Basic Information</span>
+              <span>Step 1: Basic Information</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Animal Type Selection */}
             <div className="space-y-2">
               <Label htmlFor="animal_type">Pet Type *</Label>
               <Select value={formData.animal_type} onValueChange={handleAnimalTypeChange}>
@@ -664,168 +663,32 @@ export default function AddPetPage() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Pet Name *</Label>
-                <Input
-                  id="name"
-                  placeholder="Enter your pet's name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="gender">Gender</Label>
-                <Select value={formData.gender} onValueChange={(value: 'male' | 'female' | 'unknown') => handleInputChange('gender', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select gender" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="female">Female</SelectItem>
-                    <SelectItem value="unknown">Unknown</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="breed">Breed *</Label>
-                <Select value={formData.breed_id} onValueChange={handleBreedChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={`Select ${formData.animal_type === 'cat' ? 'cat' : 'dog'} breed`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {breeds.map(breed => (
-                      <SelectItem key={breed.id} value={breed.id}>
-                        {breed.animal_type === 'cat' ? '🐱' : '🐕'} {breed.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="coat">Coat Color {formData.breed_id && availableCoats.length < coats.length ? `(${availableCoats.length} available for this breed)` : `(${coats.length} available for ${formData.animal_type === 'cat' ? 'cats' : 'dogs'})`}</Label>
-                <Select value={formData.coat_id} onValueChange={(value) => handleInputChange('coat_id', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={formData.breed_id ? "Select coat color" : `Select ${formData.animal_type === 'cat' ? 'cat' : 'dog'} breed first`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableCoats.map(coat => (
-                      <SelectItem key={coat.id} value={coat.id}>
-                        <div className="flex items-center space-x-2">
-                          {coat.hex_color && (
-                            <div 
-                              className="w-3 h-3 rounded-full border border-gray-300"
-                              style={{ backgroundColor: coat.hex_color }}
-                            />
-                          )}
-                          <span>{coat.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="age">Age (months)</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  placeholder="Age in months"
-                  value={formData.age || ''}
-                  onChange={(e) => handleInputChange('age', e.target.value ? parseInt(e.target.value) : undefined)}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="birthday">Birthday</Label>
-                <Input
-                  id="birthday"
-                  type="date"
-                  value={formData.birthday}
-                  onChange={(e) => handleInputChange('birthday', e.target.value)}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="weight">Weight (lbs)</Label>
-                <Input
-                  id="weight"
-                  type="number"
-                  step="0.1"
-                  placeholder="Weight in pounds"
-                  value={formData.weight || ''}
-                  onChange={(e) => handleInputChange('weight', e.target.value ? parseFloat(e.target.value) : undefined)}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Personality Traits */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Personality Traits</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex space-x-2">
+            <div className="space-y-2">
+              <Label htmlFor="name">Pet Name *</Label>
               <Input
-                placeholder="Add personality trait (e.g., playful, calm, energetic)"
-                value={newTrait}
-                onChange={(e) => setNewTrait(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addPersonalityTrait())}
+                id="name"
+                placeholder="Enter your pet's name"
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                required
               />
-              <Button type="button" onClick={addPersonalityTrait}>
-                Add
-              </Button>
+              <p className="text-sm text-gray-500">
+                We'll use this to personalize your portraits
+              </p>
             </div>
-            
-            {formData.personality_traits.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {formData.personality_traits.map((trait, index) => (
-                  <Badge key={index} variant="secondary" className="bg-purple-50 text-purple-700">
-                    {trait}
-                    <button
-                      type="button"
-                      onClick={() => removePersonalityTrait(trait)}
-                      className="ml-2 text-purple-500 hover:text-purple-700"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
           </CardContent>
         </Card>
 
-        {/* Special Notes */}
+        {/* Step 2: Pet Photos - Upload First for AI Analysis */}
         <Card>
           <CardHeader>
-            <CardTitle>Special Notes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              placeholder="Any special notes about your pet (optional)"
-              value={formData.special_notes}
-              onChange={(e) => handleInputChange('special_notes', e.target.value)}
-              rows={3}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Pet Photos */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Pet Photos (Optional)</CardTitle>
+            <CardTitle className="flex items-center space-x-2">
+              <Camera className="w-5 h-5 text-purple-600" />
+              <span>Step 2: Upload Photos</span>
+            </CardTitle>
+            <p className="text-sm text-gray-600 mt-2">
+              Upload a photo and our AI will automatically detect breed, coat color, and personality traits!
+            </p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-purple-300 transition-colors">
@@ -855,7 +718,7 @@ export default function AddPetPage() {
                 </div>
               </label>
             </div>
-            
+
             {selectedPhotos.length > 0 && (
               <div>
                 <Label className="text-sm font-medium text-gray-700">
@@ -865,8 +728,8 @@ export default function AddPetPage() {
                   {photoPreviewUrls.map((url, index) => (
                     <div key={index} className="relative group">
                       <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                        <img 
-                          src={url} 
+                        <img
+                          src={url}
                           alt={`Preview ${index + 1}`}
                           className="w-full h-full object-cover"
                         />
@@ -885,6 +748,11 @@ export default function AddPetPage() {
                           {selectedPhotos[index].name}
                         </div>
                       </div>
+                      {index === 0 && (
+                        <div className="absolute top-1 left-1">
+                          <Badge className="bg-purple-600 text-white text-xs">Primary</Badge>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -988,7 +856,7 @@ export default function AddPetPage() {
 
               <div className="pt-2 border-t border-blue-200">
                 <p className="text-xs text-blue-700">
-                  ✨ We've pre-filled some details based on this analysis. You can review and modify them above before submitting.
+                  ✨ We've pre-filled breed and coat details below based on this analysis. You can review and modify them if needed.
                 </p>
               </div>
 
@@ -999,7 +867,7 @@ export default function AddPetPage() {
                 size="sm"
                 className="w-full"
               >
-                Looks Good - Continue
+                Continue to Details
               </Button>
             </CardContent>
           </Card>
@@ -1036,6 +904,172 @@ export default function AddPetPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Step 3: Breed & Physical Details */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Heart className="w-5 h-5 text-purple-600" />
+              <span>Step 3: Breed & Physical Details</span>
+            </CardTitle>
+            {aiAnalysis && (
+              <p className="text-sm text-gray-600 mt-2">
+                ✨ Pre-filled from AI analysis - feel free to adjust if needed
+              </p>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="breed">Breed *</Label>
+                <Select value={formData.breed_id} onValueChange={handleBreedChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={`Select ${formData.animal_type === 'cat' ? 'cat' : 'dog'} breed`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {breeds.map(breed => (
+                      <SelectItem key={breed.id} value={breed.id}>
+                        {breed.animal_type === 'cat' ? '🐱' : '🐕'} {breed.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="coat">Coat Color {formData.breed_id && availableCoats.length < coats.length ? `(${availableCoats.length} available for this breed)` : `(${coats.length} available for ${formData.animal_type === 'cat' ? 'cats' : 'dogs'})`}</Label>
+                <Select value={formData.coat_id} onValueChange={(value) => handleInputChange('coat_id', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={formData.breed_id ? "Select coat color" : `Select ${formData.animal_type === 'cat' ? 'cat' : 'dog'} breed first`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableCoats.map(coat => (
+                      <SelectItem key={coat.id} value={coat.id}>
+                        <div className="flex items-center space-x-2">
+                          {coat.hex_color && (
+                            <div
+                              className="w-3 h-3 rounded-full border border-gray-300"
+                              style={{ backgroundColor: coat.hex_color }}
+                            />
+                          )}
+                          <span>{coat.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="gender">Gender</Label>
+                <Select value={formData.gender} onValueChange={(value: 'male' | 'female' | 'unknown') => handleInputChange('gender', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="unknown">Unknown</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="weight">Weight (lbs)</Label>
+                <Input
+                  id="weight"
+                  type="number"
+                  step="0.1"
+                  placeholder="Weight in pounds"
+                  value={formData.weight || ''}
+                  onChange={(e) => handleInputChange('weight', e.target.value ? parseFloat(e.target.value) : undefined)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="age">Age (months)</Label>
+                <Input
+                  id="age"
+                  type="number"
+                  placeholder="Age in months"
+                  value={formData.age || ''}
+                  onChange={(e) => handleInputChange('age', e.target.value ? parseInt(e.target.value) : undefined)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="birthday">Birthday</Label>
+                <Input
+                  id="birthday"
+                  type="date"
+                  value={formData.birthday}
+                  onChange={(e) => handleInputChange('birthday', e.target.value)}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Step 4: Personality Traits */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Step 4: Personality Traits</CardTitle>
+            {aiAnalysis && aiAnalysis.personalityTraits?.length > 0 && (
+              <p className="text-sm text-gray-600 mt-2">
+                ✨ Pre-filled from AI analysis - add or remove as needed
+              </p>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex space-x-2">
+              <Input
+                placeholder="Add personality trait (e.g., playful, calm, energetic)"
+                value={newTrait}
+                onChange={(e) => setNewTrait(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addPersonalityTrait())}
+              />
+              <Button type="button" onClick={addPersonalityTrait}>
+                Add
+              </Button>
+            </div>
+
+            {formData.personality_traits.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {formData.personality_traits.map((trait, index) => (
+                  <Badge key={index} variant="secondary" className="bg-purple-50 text-purple-700">
+                    {trait}
+                    <button
+                      type="button"
+                      onClick={() => removePersonalityTrait(trait)}
+                      className="ml-2 text-purple-500 hover:text-purple-700"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Step 5: Special Notes */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Step 5: Special Notes (Optional)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              placeholder="Any special notes about your pet (optional)"
+              value={formData.special_notes}
+              onChange={(e) => handleInputChange('special_notes', e.target.value)}
+              rows={3}
+            />
+          </CardContent>
+        </Card>
 
         {/* Submit */}
         <div className="flex justify-end space-x-4">
