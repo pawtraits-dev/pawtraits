@@ -37,24 +37,34 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    // Fetch customer generated images with AI descriptions and related data
+    // Get customer record
+    const { data: customer } = await supabaseAdmin
+      .from('customers')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!customer) {
+      return NextResponse.json({ error: 'Customer profile not found' }, { status: 404 });
+    }
+
+    // Fetch customer custom images (generated via /customise page)
     const { data: generatedImages, error } = await supabaseAdmin
-      .from('customer_generated_images')
+      .from('customer_custom_images')
       .select(`
         id,
-        cloudinary_public_id,
-        public_url,
-        prompt_text,
+        generated_cloudinary_id,
+        generated_image_url,
+        generation_prompt,
         generation_metadata,
-        breed_id,
-        theme_id,
-        style_id,
-        format_id,
+        pet_breed_id,
+        rating,
         created_at,
-        breeds(id, name, animal_type),
-        themes(id, name)
+        generated_at,
+        metadata
       `)
-      .eq('customer_id', userProfile.id)
+      .eq('customer_id', customer.id)
+      .eq('status', 'complete')
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -63,10 +73,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch generated images' }, { status: 500 });
     }
 
+    // Transform to match gallery expected format
+    const transformedImages = (generatedImages || []).map((img: any) => ({
+      id: img.id,
+      cloudinary_public_id: img.generated_cloudinary_id,
+      public_url: img.generated_image_url,
+      prompt_text: img.generation_prompt,
+      generation_metadata: {
+        ...img.generation_metadata,
+        ai_description: img.metadata?.catalog_theme && img.metadata?.catalog_style
+          ? `Custom ${img.metadata.catalog_theme} ${img.metadata.catalog_style} portrait`
+          : 'Custom portrait'
+      },
+      breed_id: img.pet_breed_id,
+      theme_id: img.generation_metadata?.catalog_theme_id,
+      style_id: img.generation_metadata?.catalog_style_id,
+      format_id: null,
+      rating: img.rating,
+      created_at: img.created_at || img.generated_at,
+      breeds: img.pet_breed_id ? { id: img.pet_breed_id, name: img.metadata?.catalog_breed || 'Pet' } : null,
+      themes: img.metadata?.catalog_theme ? { id: null, name: img.metadata.catalog_theme } : null
+    }));
+
     return NextResponse.json(
       {
         success: true,
-        images: generatedImages || []
+        images: transformedImages
       },
       {
         headers: {

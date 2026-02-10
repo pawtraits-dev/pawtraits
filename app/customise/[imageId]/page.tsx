@@ -52,6 +52,10 @@ export default function CustomisePage() {
   const [customImage, setCustomImage] = useState<CustomImage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rating, setRating] = useState<number>(0);
+  const [hasRated, setHasRated] = useState(false);
+  const [progressMessages, setProgressMessages] = useState<string[]>([]);
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
 
   // Load catalog image and user's pets
   useEffect(() => {
@@ -142,6 +146,84 @@ export default function CustomisePage() {
     setUploadPreview(null);
   }
 
+  async function loadProgressMessages() {
+    try {
+      const breedName = catalogImage?.breed?.name || 'Pet';
+      const themeName = catalogImage?.theme?.name || 'Portrait';
+      const styleName = catalogImage?.style?.name || 'Artistic';
+
+      const response = await fetch('/api/customers/generate-progress-messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          breedName,
+          themeName,
+          themeDescription: catalogImage?.theme?.displayName,
+          coatColor: 'unique',
+          breedDescription: 'personality-rich'
+        })
+      });
+
+      if (response.ok) {
+        const { messages } = await response.json();
+        setProgressMessages(messages || []);
+        setCurrentMessageIndex(0);
+      }
+    } catch (error) {
+      console.error('Failed to load progress messages:', error);
+      // Use fallback messages
+      setProgressMessages([
+        "Pawcasso is preparing his studio... 🎨",
+        "Selecting the perfect colors and brushes... 🖌️",
+        "Capturing your pet's unique personality... ✨",
+        "Adding those special finishing touches... 🐾",
+        "Almost there! Creating something amazing... 👨‍🎨"
+      ]);
+    }
+  }
+
+  async function handleRating(stars: number) {
+    if (!customImage?.id || hasRated) return;
+
+    try {
+      const response = await fetch(`/api/customers/custom-images/${customImage.id}/rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating: stars }),
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        setRating(stars);
+        setHasRated(true);
+        toast({
+          title: 'Thanks for your feedback!',
+          description: 'Your rating helps us improve our AI model.'
+        });
+      }
+    } catch (error) {
+      console.error('Failed to save rating:', error);
+      toast({
+        title: 'Rating failed',
+        description: 'Could not save your rating. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  }
+
+  // Cycle through progress messages every 18 seconds
+  useEffect(() => {
+    if (generating && progressMessages.length > 0) {
+      const interval = setInterval(() => {
+        setCurrentMessageIndex((prev) =>
+          (prev + 1) % progressMessages.length
+        );
+      }, 18000); // 18 seconds per message
+
+      return () => clearInterval(interval);
+    }
+  }, [generating, progressMessages.length]);
+
   async function handleGenerate() {
     if (!selectedPet && !uploadedFile) {
       toast({
@@ -155,6 +237,9 @@ export default function CustomisePage() {
     try {
       setGenerating(true);
       setError(null);
+
+      // Load progress messages before starting generation
+      await loadProgressMessages();
 
       const formData = new FormData();
       formData.append('catalogImageId', imageId);
@@ -522,6 +607,45 @@ export default function CustomisePage() {
                         </AlertDescription>
                       </Alert>
 
+                      {/* Rating Section */}
+                      {!hasRated && (
+                        <Card className="border-purple-200 bg-purple-50">
+                          <CardContent className="pt-6">
+                            <h4 className="font-semibold text-purple-900 mb-2">
+                              How does it look?
+                            </h4>
+                            <p className="text-sm text-purple-700 mb-3">
+                              Rate this portrait to help us improve Pawcasso's skills
+                            </p>
+                            <div className="flex gap-2 justify-center">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                  key={star}
+                                  onClick={() => handleRating(star)}
+                                  className={`text-3xl transition-all hover:scale-110 ${
+                                    star <= rating
+                                      ? 'text-yellow-500'
+                                      : 'text-gray-300 hover:text-yellow-400'
+                                  }`}
+                                >
+                                  ⭐
+                                </button>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {hasRated && (
+                        <Alert className="border-green-200 bg-green-50">
+                          <Check className="h-4 w-4 text-green-600" />
+                          <AlertTitle className="text-green-900">Thanks for rating!</AlertTitle>
+                          <AlertDescription className="text-green-800">
+                            Your feedback helps us make better portraits for everyone.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
                       <div className="space-y-2">
                         <Button
                           onClick={() => {
@@ -564,13 +688,26 @@ export default function CustomisePage() {
                   ) : (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-                      <p className="text-gray-600">
-                        {customImage.status === 'pending' && 'Preparing your portrait...'}
-                        {customImage.status === 'generating' && 'Generating your portrait...'}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-2">
-                        This usually takes 30-60 seconds
-                      </p>
+                      {progressMessages.length > 0 ? (
+                        <>
+                          <p className="text-lg text-gray-700 font-medium mb-2">
+                            {progressMessages[currentMessageIndex]}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            This usually takes 30-60 seconds
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-gray-600">
+                            {customImage.status === 'pending' && 'Preparing your portrait...'}
+                            {customImage.status === 'generating' && 'Generating your portrait...'}
+                          </p>
+                          <p className="text-sm text-gray-500 mt-2">
+                            This usually takes 30-60 seconds
+                          </p>
+                        </>
+                      )}
                     </div>
                   )}
                 </CardContent>
