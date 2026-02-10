@@ -276,8 +276,6 @@ export default function AddPetPage() {
     if (validFiles.length === 0) return;
 
     // Add to selected photos (limit to 10 total)
-    const isFirstPhoto = selectedPhotos.length === 0 && validFiles.length > 0;
-
     setSelectedPhotos(prev => {
       const combined = [...prev, ...validFiles];
       if (combined.length > 10) {
@@ -288,23 +286,11 @@ export default function AddPetPage() {
     });
 
     // Create preview URLs
-    let firstPhotoProcessed = false;
-    validFiles.forEach((file, index) => {
+    validFiles.forEach((file) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         if (e.target?.result) {
-          setPhotoPreviewUrls(prev => {
-            const newUrls = [...prev, e.target!.result as string];
-
-            // Trigger AI analysis for the first photo after it's loaded
-            if (isFirstPhoto && index === 0 && !firstPhotoProcessed) {
-              firstPhotoProcessed = true;
-              // Use setTimeout to ensure state is updated
-              setTimeout(() => analyzeFirstPhoto(), 100);
-            }
-
-            return newUrls;
-          });
+          setPhotoPreviewUrls(prev => [...prev, e.target!.result as string]);
         }
       };
       reader.readAsDataURL(file);
@@ -684,7 +670,7 @@ export default function AddPetPage() {
               <span>Step 2: Upload Photos</span>
             </CardTitle>
             <p className="text-sm text-gray-600 mt-2">
-              Upload a photo and our AI will automatically detect breed, coat color, and personality traits!
+              Upload photos of your pet, then use our AI to detect breed, coat color, and personality traits!
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -757,6 +743,39 @@ export default function AddPetPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* AI Analysis Trigger Button - Show when photos uploaded but not yet analyzed */}
+        {selectedPhotos.length > 0 && !analyzing && !showAnalysisReview && (
+          <Card className="border-purple-200 bg-purple-50">
+            <CardContent className="py-6">
+              <div className="text-center space-y-3">
+                <div className="flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-purple-900">
+                    Let Pawcasso Analyze Your Pet
+                  </h3>
+                  <p className="text-sm text-purple-700 mt-1">
+                    Our AI will detect breed, coat color, and personality traits to pre-fill the form below
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={analyzeFirstPhoto}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  size="lg"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Analyze Photos with AI
+                </Button>
+                <p className="text-xs text-purple-600">
+                  This will help us auto-fill the details below, saving you time!
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* AI Analysis Loading State */}
         {analyzing && (
