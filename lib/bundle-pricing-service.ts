@@ -140,7 +140,7 @@ export class BundlePricingService {
       total_price: totalPrice,
       savings: Math.max(0, savings),
       discount_percentage: Math.max(0, discountPercentage),
-      next_tier
+      next_tier: nextTier
     };
 
     console.log(`💰 [Bundle Pricing] Calculated for ${quantity} images:`, {
