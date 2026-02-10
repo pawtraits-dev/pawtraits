@@ -5,10 +5,11 @@ import { cookies } from 'next/headers';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('🔍 [CUSTOM IMAGE POLL] Fetching custom image:', params.id);
+    const { id } = await params;
+    console.log('🔍 [CUSTOM IMAGE POLL] Fetching custom image:', id);
 
     // Authenticate user using cookie-based auth
     const cookieStore = await cookies();
@@ -47,7 +48,7 @@ export async function GET(
         created_at,
         generated_at
       `)
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     console.log('📊 [CUSTOM IMAGE POLL] Query result:', {

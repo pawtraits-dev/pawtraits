@@ -207,14 +207,18 @@ export default function CustomisePage() {
   }
 
   async function pollForCompletion(customImageId: string) {
+    console.log('🎯 pollForCompletion called with ID:', customImageId);
     const maxAttempts = 60; // 2 minutes (2 second intervals)
     let attempts = 0;
 
     const poll = setInterval(async () => {
       attempts++;
+      console.log('🔄 Poll attempt', attempts, 'with ID:', customImageId);
 
       try {
-        const response = await fetch(`/api/customers/custom-images/${customImageId}`, {
+        const url = `/api/customers/custom-images/${customImageId}`;
+        console.log('🌐 Polling URL:', url);
+        const response = await fetch(url, {
           credentials: 'include'
         });
 
