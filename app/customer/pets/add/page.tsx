@@ -23,7 +23,6 @@ interface AddPetFormData {
   breed_id: string;
   coat_id: string;
   gender: 'male' | 'female' | 'unknown';
-  age?: number;
   birthday?: string;
   weight?: number;
   personality_traits: string[];
@@ -57,7 +56,6 @@ export default function AddPetPage() {
     breed_id: '',
     coat_id: '',
     gender: 'unknown',
-    age: undefined,
     birthday: '',
     weight: undefined,
     personality_traits: [],
@@ -548,7 +546,6 @@ export default function AddPetPage() {
         breed_id: formData.breed_id,
         coat_id: formData.coat_id || null,
         gender: formData.gender,
-        age: formData.age || null,
         birthday: formData.birthday || null,
         weight: formData.weight || null,
         personality_traits: formData.personality_traits,
@@ -989,27 +986,14 @@ export default function AddPetPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="age">Age (months)</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  placeholder="Age in months"
-                  value={formData.age || ''}
-                  onChange={(e) => handleInputChange('age', e.target.value ? parseInt(e.target.value) : undefined)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="birthday">Birthday</Label>
-                <Input
-                  id="birthday"
-                  type="date"
-                  value={formData.birthday}
-                  onChange={(e) => handleInputChange('birthday', e.target.value)}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="birthday">Birthday</Label>
+              <Input
+                id="birthday"
+                type="date"
+                value={formData.birthday}
+                onChange={(e) => handleInputChange('birthday', e.target.value)}
+              />
             </div>
           </CardContent>
         </Card>
