@@ -14,10 +14,16 @@ interface Pet {
   pet_id: string;  // Note: RPC function returns 'pet_id', not 'id'
   name: string;
   breed_id?: string;
+  breed_name?: string;
+  breed_slug?: string;
   coat_id?: string;
+  coat_name?: string;
+  coat_hex_color?: string;
   primary_photo_url?: string;
   photo_urls?: string[];
-  animal_type: 'dog' | 'cat';
+  animal_type?: 'dog' | 'cat';
+  age?: number;
+  personality_traits?: string[];
 }
 
 interface CatalogImage {
@@ -148,7 +154,32 @@ export default function CustomisePage() {
 
   async function loadProgressMessages() {
     try {
-      const breedName = catalogImage?.breed?.name || 'Pet';
+      // Use the CUSTOMER'S pet information, not the catalog reference
+      let petName = 'your pet';
+      let breedName = 'Pet';
+      let coatColor = 'unique';
+      let breedDescription = 'personality-rich';
+
+      if (selectedPet) {
+        // Using existing pet - we have name, breed, and coat info
+        petName = selectedPet.name || 'your pet';
+        breedName = selectedPet.breed_name || 'Pet';
+        coatColor = selectedPet.coat_name || selectedPet.coat_hex_color || 'unique';
+
+        // Build breed description from personality traits if available
+        if (selectedPet.personality_traits && selectedPet.personality_traits.length > 0) {
+          breedDescription = selectedPet.personality_traits.join(', ');
+        }
+
+        console.log('🎨 Generating progress messages for:', petName, breedName, coatColor);
+      } else if (uploadedFile) {
+        // Uploaded photo - use generic but still personalized
+        petName = 'your pet';
+        breedName = 'adorable companion';
+        coatColor = 'beautiful';
+        console.log('🎨 Generating progress messages for uploaded pet photo');
+      }
+
       const themeName = catalogImage?.theme?.name || 'Portrait';
       const styleName = catalogImage?.style?.name || 'Artistic';
 
@@ -156,11 +187,13 @@ export default function CustomisePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          breedName,
-          themeName,
+          petName,           // ADD: Customer's pet name
+          breedName,         // CHANGED: Customer's pet breed, not catalog breed
+          themeName,         // Catalog theme (the style/setting)
+          styleName,         // Catalog style (artistic style)
           themeDescription: catalogImage?.theme?.displayName,
-          coatColor: 'unique',
-          breedDescription: 'personality-rich'
+          coatColor,         // CHANGED: Customer's pet coat, not generic
+          breedDescription   // Customer's pet personality
         })
       });
 
@@ -172,12 +205,13 @@ export default function CustomisePage() {
     } catch (error) {
       console.error('Failed to load progress messages:', error);
       // Use fallback messages
+      const fallbackName = selectedPet?.name || 'your pet';
       setProgressMessages([
-        "Pawcasso is preparing his studio... 🎨",
-        "Selecting the perfect colors and brushes... 🖌️",
-        "Capturing your pet's unique personality... ✨",
-        "Adding those special finishing touches... 🐾",
-        "Almost there! Creating something amazing... 👨‍🎨"
+        `Pawcasso is preparing his studio for ${fallbackName}... 🎨`,
+        `Selecting the perfect colors and brushes for ${fallbackName}... 🖌️`,
+        `Capturing ${fallbackName}'s unique personality... ✨`,
+        `Adding those special finishing touches for ${fallbackName}... 🐾`,
+        `Almost there! Creating something amazing for ${fallbackName}... 👨‍🎨`
       ]);
     }
   }

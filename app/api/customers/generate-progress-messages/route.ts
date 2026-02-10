@@ -8,7 +8,7 @@ const anthropic = new Anthropic({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { breedName, breedDescription, themeName, themeDescription, coatColor, outfitName, outfitDescription } = body;
+    const { petName, breedName, breedDescription, themeName, themeDescription, styleName, coatColor, outfitName, outfitDescription } = body;
 
     if (!breedName || !coatColor) {
       return NextResponse.json(
@@ -18,8 +18,10 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Generating progress messages for:', {
+      petName,
       breedName,
       themeName,
+      styleName,
       coatColor,
       outfitName
     });
@@ -28,13 +30,15 @@ export async function POST(request: NextRequest) {
 Generate 5 sequential progress messages (18 seconds each) for an AI pet portrait generation process.
 
 Context:
+${petName ? `- Pet Name: ${petName}` : ''}
 - Breed: ${breedName}
 - Breed Personality: ${breedDescription || 'playful, loyal, intelligent'}
 - Setting/Theme: ${themeName || 'studio portrait'} ${themeDescription ? `- ${themeDescription}` : ''}
+- Artistic Style: ${styleName || 'portrait'}
 - Coat Color: ${coatColor}${outfitName ? `\n- Outfit: ${outfitName}${outfitDescription ? ` - ${outfitDescription}` : ''}` : ''}
 
 Requirements:
-- Reference "Pawcasso" (our AI artist) working in his studio
+- Reference "Pawcasso" (our AI artist) working in his studio${petName ? `\n- Use the pet's name "${petName}" naturally in the messages` : ''}
 - Incorporate the breed's personality traits naturally
 - Reference the setting/theme context
 - Mention the coat color creatively${outfitName ? '\n- Reference the outfit in a playful way' : ''}
@@ -42,11 +46,12 @@ Requirements:
 - Each message: 15-25 words, one sentence
 - Progress from starting work to near completion
 - Include one emoji at end of each message (🎨, 🖌️, ✨, 🐾, 👨‍🎨)
+- Make it PERSONAL - this is about ${petName || 'their specific pet'}, not a generic ${breedName}
 
 Brand Voice Examples:
-- "Pawcasso is setting up the perfect beach chair for this golden relaxation expert... 🎨"
-- "Selecting designer sunglasses that match a Bulldog's sophisticated nap philosophy... 🖌️"
-- "Capturing that 'professional couch warmer on vacation' energy... ✨"
+${petName ? `- "Pawcasso is preparing his easel to capture ${petName}'s adorable ${coatColor} ${breedName} charm... 🎨"` : '- "Pawcasso is setting up the perfect beach chair for this golden relaxation expert... 🎨"'}
+${petName ? `- "Selecting the perfect ${coatColor} tones to match ${petName}'s gorgeous coat... 🖌️"` : '- "Selecting designer sunglasses that match a Bulldog\'s sophisticated nap philosophy... 🖌️"'}
+${petName ? `- "Capturing ${petName}'s personality in this ${themeName} setting... ✨"` : '- "Capturing that \'professional couch warmer on vacation\' energy... ✨"'}
 - "Adding those signature ${breedName} features with extra personality... 🐾"${outfitName ? `\n- "Making sure the ${outfitName.toLowerCase()} fits perfectly for maximum style... 👨‍🎨"` : ''}
 
 Output Format: Return ONLY a JSON array of 5 strings, no other text or explanation.
