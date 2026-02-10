@@ -159,15 +159,19 @@ export default function CustomisePage() {
 
       if (selectedPet) {
         formData.append('petId', selectedPet.id);
+        console.log('🐕 Using existing pet:', selectedPet.id, selectedPet.name);
       } else if (uploadedFile) {
         formData.append('petPhoto', uploadedFile);
+        console.log('📤 Uploading new pet photo:', uploadedFile.name, uploadedFile.size);
       }
 
+      console.log('🚀 Calling generate endpoint:', '/api/customers/custom-images/generate');
       const response = await fetch('/api/customers/custom-images/generate', {
         method: 'POST',
         credentials: 'include',
         body: formData
       });
+      console.log('📥 Generate response status:', response.status);
 
       if (!response.ok) {
         const errorData = await response.json();

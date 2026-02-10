@@ -174,6 +174,13 @@ Create a beautiful, cohesive portrait that looks like it was professionally crea
 }
 
 export async function POST(request: NextRequest) {
+  console.log('🎨 [CUSTOM IMAGE GENERATE] Request received at /api/customers/custom-images/generate');
+  console.log('🎨 [CUSTOM IMAGE GENERATE] Request method:', request.method);
+  console.log('🎨 [CUSTOM IMAGE GENERATE] Request headers:', {
+    contentType: request.headers.get('content-type'),
+    contentLength: request.headers.get('content-length')
+  });
+
   try {
     // Authenticate user using cookie-based auth
     const cookieStore = await cookies();
