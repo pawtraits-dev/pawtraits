@@ -181,10 +181,17 @@ export default function CustomisePage() {
       }
 
       const result = await response.json();
+      console.log('📦 Generate response:', result);
+      console.log('🆔 Custom image ID:', result.id);
       setCustomImage(result);
 
       // Poll for completion if status is generating
       if (result.status === 'generating' || result.status === 'pending') {
+        if (!result.id) {
+          console.error('❌ No ID in result, cannot poll:', result);
+          setError('Generation started but cannot track status (no ID returned)');
+          return;
+        }
         pollForCompletion(result.id);
       }
     } catch (err) {

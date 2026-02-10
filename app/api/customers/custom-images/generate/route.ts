@@ -456,6 +456,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ Custom image record created:', customImage.id);
+    console.log('📦 Custom image object:', JSON.stringify(customImage));
 
     // Update status to generating
     await supabase
@@ -485,10 +486,13 @@ export async function POST(request: NextRequest) {
         .eq('id', customImage.id);
     });
 
-    return NextResponse.json({
+    const response = {
       ...customImage,
       status: 'generating'
-    });
+    };
+    console.log('🚀 Returning response:', JSON.stringify(response));
+
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error('❌ Error in custom image generation:', error);
