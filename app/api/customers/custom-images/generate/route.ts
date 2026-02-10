@@ -56,7 +56,8 @@ async function generateCustomImage(
   themeName: string,
   styleName: string,
   catalogBreedName: string,
-  customerPetBreedName?: string
+  customerPetBreedName?: string,
+  aiAnalysisData?: any
 ): Promise<void> {
   console.log('🎨 Starting custom image generation for:', customImageId);
 
@@ -79,13 +80,28 @@ async function generateCustomImage(
 
     // Build prompt using shared service (same as admin)
     console.log('🤖 Building prompt with variation template...');
+
+    // Extract AI-detected characteristics if available
+    let petCharacteristics = undefined;
+    if (aiAnalysisData) {
+      petCharacteristics = {
+        pose: aiAnalysisData.physical_characteristics?.pose,
+        gaze: aiAnalysisData.physical_characteristics?.gaze,
+        expression: aiAnalysisData.physical_characteristics?.expression,
+        detectedBreed: aiAnalysisData.breed_detected,
+        detectedCoat: aiAnalysisData.coat_detected
+      };
+      console.log('✨ Using AI-detected characteristics:', petCharacteristics);
+    }
+
     const generationPrompt = promptBuilder.buildSubjectReplacementPrompt({
       compositionTemplate: variationPromptTemplate,
       metadata: {
         breedName: customerPetBreedName || catalogBreedName,
         themeName: themeName,
         styleName: styleName,
-        formatName: 'portrait'
+        formatName: 'portrait',
+        petCharacteristics // NEW: Include AI-detected physical characteristics
       }
     });
 
@@ -344,6 +360,7 @@ export async function POST(request: NextRequest) {
           breed_id,
           coat_id,
           primary_photo_url,
+          ai_analysis_data,
           breeds (id, name),
           coats (id, name, description)
         `)
@@ -482,7 +499,8 @@ export async function POST(request: NextRequest) {
       catalogImage.themes?.name || 'Custom',
       catalogImage.styles?.name || 'Portrait',
       catalogImage.breeds?.name || 'Pet',
-      petData?.breeds?.name
+      petData?.breeds?.name,
+      petData?.ai_analysis_data // NEW: Pass AI analysis data
     ).catch(async (error) => {
       console.error('❌ Error in background generation:', error);
       // Update record with error status

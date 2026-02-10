@@ -141,10 +141,18 @@ export async function POST(request: NextRequest) {
       birthday: body.birthday || null,
       weight: body.weight || null,
       personality_traits: body.personality_traits || [],
-      special_notes: body.special_notes?.trim() || null
+      special_notes: body.special_notes?.trim() || null,
+      ai_analysis_data: body.ai_analysis_data || null
     };
 
     console.log('🔧 Adding pet with data:', petData);
+    if (body.ai_analysis_data) {
+      console.log('✨ Including AI analysis data:', {
+        breed: body.ai_analysis_data.breed_detected,
+        confidence: body.ai_analysis_data.breed_confidence,
+        traits: body.ai_analysis_data.personality_detected
+      });
+    }
 
     // Insert the pet using service role for better error handling
     const { data: pet, error: insertError } = await supabase

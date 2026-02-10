@@ -159,6 +159,7 @@ export default function CustomisePage() {
       let breedName = 'Pet';
       let coatColor = 'unique';
       let breedDescription = 'personality-rich';
+      let physicalTraits = '';
 
       if (selectedPet) {
         // Using existing pet - we have name, breed, and coat info
@@ -166,12 +167,49 @@ export default function CustomisePage() {
         breedName = selectedPet.breed_name || 'Pet';
         coatColor = selectedPet.coat_name || selectedPet.coat_hex_color || 'unique';
 
-        // Build breed description from personality traits if available
-        if (selectedPet.personality_traits && selectedPet.personality_traits.length > 0) {
-          breedDescription = selectedPet.personality_traits.join(', ');
+        // NEW: Use AI-detected characteristics if available
+        if (selectedPet.ai_analysis_data) {
+          const aiData = selectedPet.ai_analysis_data;
+
+          // Use detected personality traits if available
+          if (aiData.personality_detected && aiData.personality_detected.length > 0) {
+            breedDescription = aiData.personality_detected.join(', ');
+            console.log('✨ Using AI-detected personality:', breedDescription);
+          }
+
+          // Use detected physical characteristics for richer prompts
+          if (aiData.physical_characteristics) {
+            const physical = aiData.physical_characteristics;
+            const traits = [];
+
+            if (physical.pose) traits.push(`${physical.pose} pose`);
+            if (physical.gaze) traits.push(`${physical.gaze} gaze`);
+            if (physical.expression) traits.push(`${physical.expression} expression`);
+
+            if (traits.length > 0) {
+              physicalTraits = traits.join(', ');
+              console.log('✨ Using AI-detected physical traits:', physicalTraits);
+            }
+          }
+
+          // Use AI-detected breed/coat if manual selection wasn't available
+          if (!breedName || breedName === 'Pet') {
+            breedName = aiData.breed_detected || breedName;
+          }
+          if (!coatColor || coatColor === 'unique') {
+            coatColor = aiData.coat_detected || coatColor;
+          }
         }
 
-        console.log('🎨 Generating progress messages for:', petName, breedName, coatColor);
+        // Fallback to manually entered traits if no AI data
+        if (!breedDescription || breedDescription === 'personality-rich') {
+          if (selectedPet.personality_traits && selectedPet.personality_traits.length > 0) {
+            breedDescription = selectedPet.personality_traits.join(', ');
+          }
+        }
+
+        console.log('🎨 Generating progress messages for:', petName, breedName, coatColor,
+                    physicalTraits ? `with traits: ${physicalTraits}` : '');
       } else if (uploadedFile) {
         // Uploaded photo - use generic but still personalized
         petName = 'your pet';
@@ -193,7 +231,8 @@ export default function CustomisePage() {
           styleName,         // Catalog style (artistic style)
           themeDescription: catalogImage?.theme?.displayName,
           coatColor,         // CHANGED: Customer's pet coat, not generic
-          breedDescription   // Customer's pet personality
+          breedDescription,  // Customer's pet personality
+          physicalTraits     // NEW: AI-detected physical characteristics (pose, gaze, expression)
         })
       });
 

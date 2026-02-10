@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Heart, X, Upload, Camera, Trash2, ImageIcon } from 'lucide-react';
+import { ArrowLeft, Heart, X, Upload, Camera, Trash2, ImageIcon, Sparkles, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { getSupabaseClient } from '@/lib/supabase-client';
 import type { UserProfile } from '@/lib/user-types';
@@ -44,6 +44,12 @@ export default function AddPetPage() {
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
+
+  // AI Analysis state
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<any>(null);
+  const [showAnalysisReview, setShowAnalysisReview] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<AddPetFormData>({
     name: '',
@@ -272,6 +278,8 @@ export default function AddPetPage() {
     if (validFiles.length === 0) return;
 
     // Add to selected photos (limit to 10 total)
+    const isFirstPhoto = selectedPhotos.length === 0 && validFiles.length > 0;
+
     setSelectedPhotos(prev => {
       const combined = [...prev, ...validFiles];
       if (combined.length > 10) {
@@ -282,11 +290,23 @@ export default function AddPetPage() {
     });
 
     // Create preview URLs
-    validFiles.forEach(file => {
+    let firstPhotoProcessed = false;
+    validFiles.forEach((file, index) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         if (e.target?.result) {
-          setPhotoPreviewUrls(prev => [...prev, e.target!.result as string]);
+          setPhotoPreviewUrls(prev => {
+            const newUrls = [...prev, e.target!.result as string];
+
+            // Trigger AI analysis for the first photo after it's loaded
+            if (isFirstPhoto && index === 0 && !firstPhotoProcessed) {
+              firstPhotoProcessed = true;
+              // Use setTimeout to ensure state is updated
+              setTimeout(() => analyzeFirstPhoto(), 100);
+            }
+
+            return newUrls;
+          });
         }
       };
       reader.readAsDataURL(file);
@@ -296,6 +316,114 @@ export default function AddPetPage() {
   const removePhoto = (index: number) => {
     setSelectedPhotos(prev => prev.filter((_, i) => i !== index));
     setPhotoPreviewUrls(prev => prev.filter((_, i) => i !== index));
+
+    // Clear AI analysis if removing the first photo
+    if (index === 0) {
+      setAiAnalysis(null);
+      setShowAnalysisReview(false);
+      setAnalysisError(null);
+    }
+  };
+
+  const analyzeFirstPhoto = async () => {
+    if (!selectedPhotos[0] || !photoPreviewUrls[0]) {
+      console.log('No photo to analyze');
+      return;
+    }
+
+    setAnalyzing(true);
+    setAnalysisError(null);
+    console.log('🎨 Starting AI analysis of first photo...');
+
+    try {
+      // The photoPreviewUrls[0] is already in base64 data URL format
+      const imageBase64 = photoPreviewUrls[0];
+
+      const response = await fetch('/api/customers/pets/analyze-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64,
+          animalType: formData.animal_type
+        }),
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const { analysis, processingTime } = await response.json();
+        console.log(`✅ AI analysis complete in ${processingTime}ms:`, analysis);
+
+        setAiAnalysis(analysis);
+        setShowAnalysisReview(true);
+
+        // Auto-fill breed if confidence is high enough
+        if (analysis.breedConfidence >= 6 && analysis.breed) {
+          // Try to find matching breed in our breeds list
+          const matchingBreed = breeds.find(b => {
+            const breedName = b.name.toLowerCase();
+            const detectedBreed = analysis.breed.toLowerCase();
+            // Check for exact match, partial match, or word-level match
+            return breedName === detectedBreed ||
+                   breedName.includes(detectedBreed) ||
+                   detectedBreed.includes(breedName) ||
+                   detectedBreed.split(' ').some(word => breedName.includes(word));
+          });
+
+          if (matchingBreed) {
+            console.log('✅ Auto-filling breed:', matchingBreed.name);
+            await handleBreedChange(matchingBreed.id);
+
+            // After breed is selected, try to match coat
+            if (analysis.coatConfidence >= 5 && analysis.coat && availableCoats.length > 0) {
+              // Give breed change time to update availableCoats
+              setTimeout(() => {
+                const matchingCoat = availableCoats.find(c => {
+                  const coatName = c.name.toLowerCase();
+                  const detectedCoat = analysis.coat.toLowerCase();
+                  // Match coat colors/patterns
+                  return coatName.includes(detectedCoat) ||
+                         detectedCoat.includes(coatName) ||
+                         detectedCoat.split(/[\s/]/).some(word => coatName.includes(word));
+                });
+
+                if (matchingCoat) {
+                  console.log('✅ Auto-filling coat:', matchingCoat.name);
+                  handleInputChange('coat_id', matchingCoat.id);
+                } else {
+                  console.log('⚠️ No matching coat found for:', analysis.coat);
+                }
+              }, 300);
+            }
+          } else {
+            console.log('⚠️ No matching breed found for:', analysis.breed);
+          }
+        }
+
+        // Auto-fill personality traits if detected
+        if (analysis.personalityTraits && analysis.personalityTraits.length > 0) {
+          console.log('✅ Auto-filling personality traits:', analysis.personalityTraits);
+          setFormData(prev => ({
+            ...prev,
+            personality_traits: [...new Set([...prev.personality_traits, ...analysis.personalityTraits])]
+          }));
+        }
+      } else {
+        const errorData = await response.json();
+        const errorMessage = errorData.error || 'Analysis failed';
+        console.error('❌ Analysis failed:', errorMessage);
+        setAnalysisError(errorMessage);
+
+        if (errorData.fallback) {
+          // Analysis failed but we can continue with manual entry
+          console.log('Fallback mode - user can enter details manually');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Analysis error:', error);
+      setAnalysisError('Unable to analyze image. Please fill in details manually.');
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const uploadPhotosForPet = async (petId: string) => {
@@ -424,7 +552,19 @@ export default function AddPetPage() {
         birthday: formData.birthday || null,
         weight: formData.weight || null,
         personality_traits: formData.personality_traits,
-        special_notes: formData.special_notes?.trim() || null
+        special_notes: formData.special_notes?.trim() || null,
+        // Include AI analysis data if available
+        ai_analysis_data: aiAnalysis ? {
+          breed_detected: aiAnalysis.breed,
+          breed_confidence: aiAnalysis.breedConfidence,
+          coat_detected: aiAnalysis.coat,
+          coat_confidence: aiAnalysis.coatConfidence,
+          personality_detected: aiAnalysis.personalityTraits || [],
+          physical_characteristics: aiAnalysis.physicalCharacteristics,
+          species: aiAnalysis.species,
+          analysis_timestamp: new Date().toISOString(),
+          full_composition_analysis: aiAnalysis.fullAnalysis
+        } : null
       };
       
       console.log('🔧 Pet data to submit:', petData);
@@ -752,6 +892,150 @@ export default function AddPetPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* AI Analysis Loading State */}
+        {analyzing && (
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="py-6">
+              <div className="flex items-center justify-center space-x-3">
+                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                <div>
+                  <p className="text-sm font-medium text-blue-900">
+                    Pawcasso is studying your pet...
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    Analyzing breed, coat, and personality traits
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* AI Analysis Results */}
+        {showAnalysisReview && aiAnalysis && !analyzing && (
+          <Card className="border-blue-200 bg-blue-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-blue-900">
+                <Sparkles className="w-5 h-5 text-blue-600" />
+                Pawcasso's Analysis
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">Detected Breed:</p>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-base bg-white">
+                    {aiAnalysis.breed || 'Unknown'}
+                  </Badge>
+                  <span className="text-sm text-gray-600">
+                    Confidence: {aiAnalysis.breedConfidence}/10
+                    {aiAnalysis.breedConfidence >= 7 && ' ✨ High confidence'}
+                    {aiAnalysis.breedConfidence < 5 && ' - Please verify'}
+                  </span>
+                </div>
+              </div>
+
+              {aiAnalysis.coat && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Detected Coat:</p>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-white">
+                      {aiAnalysis.coat}
+                    </Badge>
+                    <span className="text-sm text-gray-600">
+                      Confidence: {aiAnalysis.coatConfidence}/10
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {aiAnalysis.personalityTraits?.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Suggested Personality Traits:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {aiAnalysis.personalityTraits.map((trait: string, idx: number) => (
+                      <Badge key={idx} variant="secondary" className="bg-white">
+                        {trait}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {aiAnalysis.physicalCharacteristics && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Physical Characteristics:</p>
+                  <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                    {aiAnalysis.physicalCharacteristics.pose && (
+                      <span className="bg-white px-2 py-1 rounded">
+                        Pose: {aiAnalysis.physicalCharacteristics.pose}
+                      </span>
+                    )}
+                    {aiAnalysis.physicalCharacteristics.gaze && (
+                      <span className="bg-white px-2 py-1 rounded">
+                        Gaze: {aiAnalysis.physicalCharacteristics.gaze}
+                      </span>
+                    )}
+                    {aiAnalysis.physicalCharacteristics.expression && (
+                      <span className="bg-white px-2 py-1 rounded">
+                        Expression: {aiAnalysis.physicalCharacteristics.expression}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-blue-200">
+                <p className="text-xs text-blue-700">
+                  ✨ We've pre-filled some details based on this analysis. You can review and modify them above before submitting.
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => setShowAnalysisReview(false)}
+                variant="outline"
+                size="sm"
+                className="w-full"
+              >
+                Looks Good - Continue
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* AI Analysis Error */}
+        {analysisError && !analyzing && (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardContent className="py-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <Sparkles className="w-5 h-5 text-yellow-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-yellow-900 mb-1">
+                    AI Analysis Unavailable
+                  </p>
+                  <p className="text-xs text-yellow-700">
+                    {analysisError}
+                  </p>
+                  {selectedPhotos.length > 0 && (
+                    <Button
+                      type="button"
+                      onClick={analyzeFirstPhoto}
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                    >
+                      Try Again
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Submit */}
         <div className="flex justify-end space-x-4">

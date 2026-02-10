@@ -19,6 +19,13 @@ export interface VariationPromptOptions {
     themeName?: string;
     styleName?: string;
     formatName?: string;
+    petCharacteristics?: {  // NEW: AI-detected characteristics from pet photo analysis
+      pose?: string;
+      gaze?: string;
+      expression?: string;
+      detectedBreed?: string;
+      detectedCoat?: string;
+    };
   };
 }
 
@@ -42,6 +49,27 @@ export class VariationPromptBuilder {
 - The EXACT artistic style, brushwork, and texture
 - The EXACT position and pose of the subject`;
 
+    // Build enhanced replacement requirements with AI-detected characteristics
+    let replacementDetails = `- Replace the original subject with the subject from the uploaded photo
+- The new subject must have the EXACT physical appearance from the uploaded photo (coloring, markings, facial features, fur/hair patterns, distinctive characteristics)`;
+
+    // Add AI-detected characteristics if available
+    if (metadata.petCharacteristics) {
+      const traits = metadata.petCharacteristics;
+      if (traits.detectedBreed) {
+        replacementDetails += `\n- Breed: ${traits.detectedBreed}`;
+      }
+      if (traits.detectedCoat) {
+        replacementDetails += `\n- Coat: ${traits.detectedCoat}`;
+      }
+      if (traits.expression) {
+        replacementDetails += `\n- Maintain the natural ${traits.expression} expression characteristic of this specific pet`;
+      }
+      if (traits.gaze || traits.pose) {
+        replacementDetails += `\n- Note: Original pet typically has ${traits.gaze || 'forward'} gaze and ${traits.pose || 'natural'} posture, but MUST adopt the reference image's pose`;
+      }
+    }
+
     return `CRITICAL INSTRUCTION: MODIFY THE REFERENCE IMAGE, DO NOT CREATE A NEW IMAGE
 
 You are given a reference portrait image. Your task is to MODIFY this EXACT image by REPLACING ONLY the subject with the subject from the uploaded photo.
@@ -50,8 +78,7 @@ PRESERVATION REQUIREMENTS (THESE MUST REMAIN IDENTICAL):
 ${preservationRequirements}
 
 REPLACEMENT REQUIREMENT (ONLY THIS CHANGES):
-- Replace the original subject with the subject from the uploaded photo
-- The new subject must have the EXACT physical appearance from the uploaded photo (coloring, markings, facial features, fur/hair patterns, distinctive characteristics)
+${replacementDetails}
 
 CRITICAL POSE AND POSITION TRANSFORMATION:
 - The new subject MUST adopt the EXACT SAME POSE as the original subject in the reference image

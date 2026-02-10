@@ -8,7 +8,7 @@ const anthropic = new Anthropic({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { petName, breedName, breedDescription, themeName, themeDescription, styleName, coatColor, outfitName, outfitDescription } = body;
+    const { petName, breedName, breedDescription, themeName, themeDescription, styleName, coatColor, outfitName, outfitDescription, physicalTraits } = body;
 
     if (!breedName || !coatColor) {
       return NextResponse.json(
@@ -35,13 +35,13 @@ ${petName ? `- Pet Name: ${petName}` : ''}
 - Breed Personality: ${breedDescription || 'playful, loyal, intelligent'}
 - Setting/Theme: ${themeName || 'studio portrait'} ${themeDescription ? `- ${themeDescription}` : ''}
 - Artistic Style: ${styleName || 'portrait'}
-- Coat Color: ${coatColor}${outfitName ? `\n- Outfit: ${outfitName}${outfitDescription ? ` - ${outfitDescription}` : ''}` : ''}
+- Coat Color: ${coatColor}${outfitName ? `\n- Outfit: ${outfitName}${outfitDescription ? ` - ${outfitDescription}` : ''}` : ''}${physicalTraits ? `\n- Physical Traits (AI-detected): ${physicalTraits}` : ''}
 
 Requirements:
 - Reference "Pawcasso" (our AI artist) working in his studio${petName ? `\n- Use the pet's name "${petName}" naturally in the messages` : ''}
 - Incorporate the breed's personality traits naturally
 - Reference the setting/theme context
-- Mention the coat color creatively${outfitName ? '\n- Reference the outfit in a playful way' : ''}
+- Mention the coat color creatively${outfitName ? '\n- Reference the outfit in a playful way' : ''}${physicalTraits ? '\n- Subtly reference detected physical traits (pose, expression, gaze) to make it more personal' : ''}
 - Be playful, engaging, match brand voice examples
 - Each message: 15-25 words, one sentence
 - Progress from starting work to near completion
