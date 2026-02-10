@@ -11,7 +11,7 @@ import { ArrowLeft, Upload, Sparkles, Share2, Check } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 interface Pet {
-  id: string;
+  pet_id: string;  // Note: RPC function returns 'pet_id', not 'id'
   name: string;
   breed_id?: string;
   coat_id?: string;
@@ -160,8 +160,8 @@ export default function CustomisePage() {
       formData.append('catalogImageId', imageId);
 
       if (selectedPet) {
-        formData.append('petId', selectedPet.id);
-        console.log('🐕 Using existing pet:', selectedPet.id, selectedPet.name);
+        formData.append('petId', selectedPet.pet_id);
+        console.log('🐕 Using existing pet:', selectedPet.pet_id, selectedPet.name);
       } else if (uploadedFile) {
         formData.append('petPhoto', uploadedFile);
         console.log('📤 Uploading new pet photo:', uploadedFile.name, uploadedFile.size);
@@ -355,10 +355,10 @@ export default function CustomisePage() {
                       <div className="grid grid-cols-2 gap-4">
                         {pets.map((pet) => (
                           <button
-                            key={pet.id}
+                            key={pet.pet_id}
                             onClick={() => handlePetSelect(pet)}
                             className={`relative p-4 border-2 rounded-lg transition-all ${
-                              selectedPet?.id === pet.id
+                              selectedPet?.pet_id === pet.pet_id
                                 ? 'border-purple-600 bg-purple-50'
                                 : 'border-gray-200 hover:border-purple-300'
                             }`}
@@ -374,7 +374,7 @@ export default function CustomisePage() {
                               </div>
                             )}
                             <p className="font-semibold text-center">{pet.name}</p>
-                            {selectedPet?.id === pet.id && (
+                            {selectedPet?.pet_id === pet.pet_id && (
                               <div className="absolute top-2 right-2 bg-purple-600 rounded-full p-1">
                                 <Check className="w-4 h-4 text-white" />
                               </div>
