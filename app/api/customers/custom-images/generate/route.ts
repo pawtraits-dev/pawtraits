@@ -313,6 +313,7 @@ export async function POST(request: NextRequest) {
 
     if (petId) {
       // Use existing pet
+      console.log('🐕 Fetching pet data for petId:', petId, 'customerId:', customer.id);
       const { data: pet, error: petError } = await supabase
         .from('pets')
         .select(`
@@ -329,12 +330,14 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (petError || !pet) {
+        console.error('❌ Pet lookup failed:', { petError, hasPet: !!pet, petId, customerId: customer.id });
         return NextResponse.json(
-          { error: 'Pet not found' },
+          { error: 'Pet not found', details: petError?.message || 'Pet does not exist or does not belong to customer' },
           { status: 404 }
         );
       }
 
+      console.log('✅ Pet found:', { petId: pet.id, petName: pet.name, hasPhotoUrl: !!pet.primary_photo_url });
       petData = pet;
       petImageUrl = pet.primary_photo_url;
 
@@ -350,6 +353,7 @@ export async function POST(request: NextRequest) {
       } else {
         petCloudinaryId = 'non-cloudinary';
       }
+      console.log('🔗 Pet image URL processed:', { petImageUrl: petImageUrl.substring(0, 50) + '...', petCloudinaryId });
     } else if (petPhoto) {
       // Upload new pet photo
       console.log('📤 Uploading pet photo to Cloudinary...');
