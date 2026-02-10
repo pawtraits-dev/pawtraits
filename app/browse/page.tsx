@@ -51,7 +51,7 @@ const dataCache = {
   products: null as Product[] | null,
   pricing: null as ProductPricing[] | null,
   lastCacheTime: 0,
-  cacheTimeout: 60000 // 1 minute
+  cacheTimeout: 10000 // 10 seconds (reduced from 60s for faster updates)
 };
 
 function BrowsePageContent() {
@@ -217,6 +217,17 @@ function BrowsePageContent() {
           fetch('/api/public/products').then(res => res.json()),
           fetch('/api/public/pricing').then(res => res.json())
         ]);
+
+        console.log('[BROWSE] Images loaded:', {
+          totalImages: imagesData?.images?.length || 0,
+          publicImages: imagesData?.images?.filter((img: any) => img.is_public !== false).length || 0,
+          recentImages: imagesData?.images?.slice(0, 5).map((img: any) => ({
+            id: img.id.substring(0, 8),
+            description: img.description?.substring(0, 30),
+            is_public: img.is_public,
+            created_at: img.created_at
+          }))
+        });
 
         // Cache the data
         dataCache.breeds = breedsData;
