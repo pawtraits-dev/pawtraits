@@ -432,7 +432,8 @@ export default function CustomisePage() {
       return;
     }
 
-    // Navigate to custom portrait purchase page
+    // Navigate to dedicated custom portrait purchase page
+    // This ensures the custom image (not catalog image) is displayed throughout checkout
     router.push(`/shop/custom-portrait/${customImage.id}`);
   }
 
