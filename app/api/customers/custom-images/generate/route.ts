@@ -313,7 +313,7 @@ export async function POST(request: NextRequest) {
 
     if (petId) {
       // Use existing pet
-      console.log('🐕 Fetching pet data for petId:', petId, 'customerId:', customer.id);
+      console.log('🐕 Fetching pet data for petId:', petId, 'userId:', user.id);
       const { data: pet, error: petError } = await supabase
         .from('pets')
         .select(`
@@ -326,13 +326,13 @@ export async function POST(request: NextRequest) {
           coats (id, name, description)
         `)
         .eq('id', petId)
-        .eq('customer_id', customer.id)
+        .eq('user_id', user.id)
         .single();
 
       if (petError || !pet) {
-        console.error('❌ Pet lookup failed:', { petError, hasPet: !!pet, petId, customerId: customer.id });
+        console.error('❌ Pet lookup failed:', { petError, hasPet: !!pet, petId, userId: user.id });
         return NextResponse.json(
-          { error: 'Pet not found', details: petError?.message || 'Pet does not exist or does not belong to customer' },
+          { error: 'Pet not found', details: petError?.message || 'Pet does not exist or does not belong to user' },
           { status: 404 }
         );
       }
