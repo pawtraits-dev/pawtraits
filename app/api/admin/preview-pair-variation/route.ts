@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { CloudinaryImageService } from '@/lib/cloudinary';
+import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
 
 const geminiService = new GeminiVariationService();
 const cloudinaryService = new CloudinaryImageService();
+const promptBuilder = new VariationPromptBuilder();
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -52,8 +54,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Build subject replacement prompt for pair
-    const customPrompt = buildPairSubjectReplacementPrompt(compositionPromptTemplate, metadata);
+    // 3. Build subject replacement prompt for pair using shared service
+    const customPrompt = promptBuilder.buildSubjectReplacementPrompt({
+      compositionTemplate: compositionPromptTemplate,
+      metadata
+    });
     console.log('📝 [ADMIN PAIR PREVIEW API] Prompt length:', customPrompt.length, 'characters');
 
     // 4. Prepare image data for Gemini (remove data URL prefixes)
@@ -202,77 +207,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * Build pair subject replacement prompt for Gemini
- * Based on public pair endpoint prompt structure with composition template integration
- */
-function buildPairSubjectReplacementPrompt(
-  compositionTemplate?: string,
-  metadata?: {
-    breedName?: string;
-    themeName?: string;
-    styleName?: string;
-    formatName?: string;
-  }
-): string {
-  const preservationRequirements = compositionTemplate || `- The EXACT background from the reference image
-- The EXACT composition, framing, and camera angle
-- The EXACT lighting setup, shadows, and highlights
-- The EXACT props, objects, and scenic elements
-- The EXACT color palette and mood
-- The EXACT artistic style, brushwork, and texture
-- The EXACT positions and poses of the two subjects (same locations in frame, same relative positioning)`;
-
-  return `CRITICAL INSTRUCTION: MODIFY THE REFERENCE IMAGE, DO NOT CREATE A NEW IMAGE
-
-You are given a reference portrait image showing TWO subjects. Your task is to MODIFY this EXACT image by REPLACING ONLY the two subjects with the subjects from the two uploaded photos.
-
-PRESERVATION REQUIREMENTS (THESE MUST REMAIN IDENTICAL):
-${preservationRequirements}
-
-REPLACEMENT REQUIREMENTS (ONLY THIS CHANGES):
-- Replace the two original subjects with the subjects from the two uploaded photos
-- First uploaded photo → replaces first subject position
-- Second uploaded photo → replaces second subject position
-- Each new subject must have the EXACT physical appearance from their uploaded photo (coloring, markings, facial features, fur/hair patterns, distinctive characteristics)
-
-CRITICAL POSE AND POSITION TRANSFORMATION:
-- EACH new subject MUST adopt the EXACT SAME POSE as the corresponding original subject in the reference image
-- First subject: Match the pose, body position, head tilt, and orientation of the first original subject
-- Second subject: Match the pose, body position, head tilt, and orientation of the second original subject
-- If reference shows sitting subjects, both new subjects must sit in the same positions
-- If reference shows standing subjects, both new subjects must stand in the same positions
-- Match head tilt, ear position, leg placement, body orientation, and spatial relationship EXACTLY
-- MAINTAIN the EXACT relative positioning between the two subjects (distance apart, which is in front/behind, interaction)
-- DO NOT use the poses from the uploaded pet photos - poses MUST match the reference image poses
-- The uploaded photos are ONLY for the pets' physical appearances (colors, markings) - NOT for poses or backgrounds
-- ANALYZE the apparent size relationship in the reference and maintain REALISTIC RELATIVE PROPORTIONS
-
-CRITICAL STYLE TRANSFORMATION:
-- Both subjects must be rendered in the EXACT SAME artistic medium as the reference
-- If reference is oil painting, paint both subjects in oil paint style with visible brushstrokes
-- If reference is watercolor, render both as watercolor with soft edges and color bleeds
-- If reference is digital art, match the digital art style exactly for both subjects
-- If reference is photograph, render both as photographic style
-- DO NOT make the subjects look like the uploaded photos' styles - transform them to match the reference style
-- The uploaded photos are REFERENCES for appearance only - final renders MUST match the reference artistic style
-- Match the lighting, shadows, and highlights of the reference portrait exactly for both subjects
-- Ensure both subjects integrate seamlessly into the reference scene with consistent lighting
-
-Reference Portrait Metadata:
-- Theme: ${metadata?.themeName || 'original theme'}
-- Style: ${metadata?.styleName || 'original style'}
-- Format: ${metadata?.formatName || 'original format'}
-
-CRITICAL VERIFICATION:
-- If someone compared your output to the reference image, the ONLY differences should be:
-  1. The subjects' physical appearances (colors, markings, breed characteristics)
-- Everything else MUST be IDENTICAL:
-  1. Each subject's pose and body position (head angle, legs, ears, tail)
-  2. Spatial positions in frame (where each subject is located)
-  3. Relative positioning between subjects (distance, interaction, hierarchy)
-  4. Background, composition, lighting, style, props
-- DO NOT use the poses from the uploaded photos - USE THE POSES FROM THE REFERENCE
-- DO NOT use the styles from the uploaded photos - USE THE STYLE FROM THE REFERENCE
-- This is a dual subject REPLACEMENT task with pose and style transformation, NOT a new image generation task`;
-}

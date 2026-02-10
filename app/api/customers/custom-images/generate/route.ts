@@ -3,7 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { v2 as cloudinary } from 'cloudinary';
-import { GoogleGenAI } from '@google/genai';
+import { GeminiVariationService } from '@/lib/gemini-variation-service';
+import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
 import fetch from 'node-fetch';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 
@@ -15,6 +16,8 @@ cloudinary.config({
 });
 
 const cloudinaryService = new CloudinaryImageService();
+const geminiService = new GeminiVariationService();
+const promptBuilder = new VariationPromptBuilder();
 
 // Helper function to fetch image and convert to base64
 async function imageUrlToBase64(imageUrl: string): Promise<string> {
@@ -49,7 +52,7 @@ async function generateCustomImage(
   customImageId: string,
   catalogImageUrl: string,
   petImageUrl: string,
-  catalogPrompt: string,
+  variationPromptTemplate: string | undefined,
   themeName: string,
   styleName: string,
   catalogBreedName: string,
@@ -59,7 +62,6 @@ async function generateCustomImage(
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  const geminiApiKey = process.env.GEMINI_API_KEY!;
 
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false }
@@ -67,57 +69,60 @@ async function generateCustomImage(
 
   try {
     // Fetch both images and convert to base64
-    console.log('📥 Fetching images...');
+    console.log('📥 Fetching catalog image from:', catalogImageUrl.substring(0, 80) + '...');
     const catalogImageBase64 = await imageUrlToBase64(catalogImageUrl);
+    console.log('✅ Catalog image fetched, size:', catalogImageBase64.length, 'bytes');
+
+    console.log('📥 Fetching pet image from:', petImageUrl.substring(0, 80) + '...');
     const petImageBase64 = await imageUrlToBase64(petImageUrl);
+    console.log('✅ Pet image fetched, size:', petImageBase64.length, 'bytes');
 
-    // Initialize Gemini AI
-    const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-
-    // Create prompt for pet substitution
-    const breedInfo = customerPetBreedName ? ` (a ${customerPetBreedName})` : '';
-    const generationPrompt = `You are an expert pet portrait artist. Using the composition, theme, style, and pose from the first image (the reference catalog image), create a new portrait featuring the pet from the second image${breedInfo}.
-
-**Reference Image (First):** A ${themeName} ${styleName} portrait of a ${catalogBreedName}. This defines the composition, pose, background, lighting, and artistic style you should match.
-
-**Pet to Feature (Second):** The customer's pet that should be the subject of the new portrait.
-
-**Instructions:**
-1. Analyze the composition of the reference image: pose, angle, background, lighting, artistic style
-2. Identify the customer's pet characteristics from the second image: breed, coat color, markings, facial features
-3. Generate a NEW portrait that:
-   - Features the customer's pet from the second image
-   - Uses the EXACT same composition, pose, and angle as the reference image
-   - Maintains the ${themeName} theme and ${styleName} artistic style
-   - Keeps the same background, lighting, and overall mood
-   - Preserves the coat color and markings of the customer's pet accurately
-   - Matches the professional quality and detail of the reference image
-
-Create a beautiful, cohesive portrait that looks like it was professionally created for this specific pet in this specific style.`;
-
-    console.log('🤖 Calling Gemini API for generation...');
-
-    // Call Gemini with both images
-    const prompt = [
-      { text: generationPrompt },
-      {
-        inlineData: {
-          mimeType: "image/png",
-          data: catalogImageBase64,
-        },
-      },
-      {
-        inlineData: {
-          mimeType: "image/png",
-          data: petImageBase64,
-        },
-      },
-    ];
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-image-preview",
-      contents: prompt,
+    // Build prompt using shared service (same as admin)
+    console.log('🤖 Building prompt with variation template...');
+    const generationPrompt = promptBuilder.buildSubjectReplacementPrompt({
+      compositionTemplate: variationPromptTemplate,
+      metadata: {
+        breedName: customerPetBreedName || catalogBreedName,
+        themeName: themeName,
+        styleName: styleName,
+        formatName: 'portrait'
+      }
     });
+
+    console.log('📝 Using variation prompt template:', !!variationPromptTemplate);
+    console.log('🤖 Calling Gemini API with model: gemini-3-pro-image-preview');
+    const startTime = Date.now();
+
+    // Prepare image data (remove data URL prefixes if present)
+    const catalogImageData = catalogImageBase64.startsWith('data:')
+      ? catalogImageBase64.split(',')[1]
+      : catalogImageBase64;
+    const petImageData = petImageBase64.startsWith('data:')
+      ? petImageBase64.split(',')[1]
+      : petImageBase64;
+
+    // Call Gemini via service (same model as admin)
+    const response = await geminiService.ai.models.generateContent({
+      model: "gemini-3-pro-image-preview",
+      contents: [
+        { text: generationPrompt },
+        {
+          inlineData: {
+            mimeType: "image/png",
+            data: catalogImageData,
+          },
+        },
+        {
+          inlineData: {
+            mimeType: "image/png",
+            data: petImageData,
+          },
+        },
+      ],
+    });
+
+    const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`✅ Gemini API call completed in ${elapsedSeconds}s`);
 
     if (!response.candidates?.[0]?.content?.parts) {
       throw new Error('No image generated from Gemini');
@@ -258,6 +263,7 @@ export async function POST(request: NextRequest) {
         style_id,
         breed_id,
         prompt_text,
+        generation_parameters,
         breeds (id, name),
         themes (id, name),
         styles (id, name)
@@ -286,8 +292,15 @@ export async function POST(request: NextRequest) {
       hasCloudinaryId: !!catalogImage.cloudinary_public_id,
       hasPublicUrl: !!catalogImage.public_url,
       theme: catalogImage.themes?.name,
-      style: catalogImage.styles?.name
+      style: catalogImage.styles?.name,
+      hasGenerationParams: !!catalogImage.generation_parameters
     });
+
+    // Extract variation prompt template from Claude analysis
+    const variationPromptTemplate = catalogImage.generation_parameters?.variation_prompt_template;
+    if (!variationPromptTemplate) {
+      console.warn('⚠️ No variation_prompt_template found in catalog image. Using fallback prompt.');
+    }
 
     // Generate Cloudinary URL if we have the public_id
     let catalogImageUrl = catalogImage.public_url;
@@ -455,7 +468,7 @@ export async function POST(request: NextRequest) {
       customImage.id,
       catalogImageUrl,
       petImageUrl,
-      catalogImage.prompt_text || '',
+      variationPromptTemplate,
       catalogImage.themes?.name || 'Custom',
       catalogImage.styles?.name || 'Portrait',
       catalogImage.breeds?.name || 'Pet',
