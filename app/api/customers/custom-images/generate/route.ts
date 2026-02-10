@@ -322,7 +322,7 @@ export async function POST(request: NextRequest) {
           breed_id,
           coat_id,
           primary_photo_url,
-          breeds (id, name, display_name),
+          breeds (id, name),
           coats (id, name, description)
         `)
         .eq('id', petId)
