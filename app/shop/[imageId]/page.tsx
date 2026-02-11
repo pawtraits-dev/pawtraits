@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, Star, Heart, Share2, Tag, MapPin, QrCode, UserPlus, Wand2, Sparkles, Camera } from 'lucide-react';
+import { ShoppingCart, Star, Heart, Share2, Tag, MapPin, QrCode, UserPlus, Wand2, Sparkles, Camera, Paintbrush } from 'lucide-react';
 // Removed direct database service imports - using API endpoints instead
 import type { ImageCatalogWithDetails } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
@@ -352,25 +352,25 @@ function QRLandingPageContent() {
             )}
 
             {/* Put My Pet in This Pic CTA */}
-            <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50">
+            <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
               <CardContent className="pt-6">
                 <div className="flex items-start space-x-4">
-                  <div className="p-3 bg-blue-600 rounded-lg flex-shrink-0">
-                    <Camera className="w-8 h-8 text-white" />
+                  <div className="p-3 bg-purple-600 rounded-lg flex-shrink-0">
+                    <Paintbrush className="w-8 h-8 text-white" />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-xl font-bold text-gray-900 mb-2">
                       Put My Pet in This Pic!
                     </h3>
                     <p className="text-gray-700 mb-4">
-                      Love this style? Upload a photo of your pet and we'll transform it to match this artistic portrait! Our AI will recreate this exact look with your pet's unique features.
+                      Love this style? Let our in-house artist Pawcasso paint your pet into the picture!
                     </p>
                     <Button
                       onClick={() => router.push(`/customise/${image.id}`)}
                       className="bg-purple-600 hover:bg-purple-700 w-full sm:w-auto"
                       size="lg"
                     >
-                      <Camera className="w-5 h-5 mr-2" />
+                      <Paintbrush className="w-5 h-5 mr-2" />
                       Create My Pet's Portrait
                     </Button>
                     <p className="text-xs text-gray-500 mt-2">
@@ -381,96 +381,8 @@ function QRLandingPageContent() {
               </CardContent>
             </Card>
 
-            {/* Digital Download Section */}
-            <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
-              <CardContent className="pt-6">
-                <div className="flex items-start space-x-4">
-                  <div className="p-3 bg-blue-600 rounded-lg flex-shrink-0">
-                    <Download className="w-8 h-8 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">
-                      Get the Digital Download
-                    </h3>
-                    <p className="text-gray-700 mb-4">
-                      High-resolution digital file perfect for sharing on social media, setting as wallpaper, or printing at home. Buy multiple images and save with bundle pricing!
-                    </p>
-                    <ul className="space-y-2 mb-4">
-                      <li className="flex items-center text-sm text-gray-600">
-                        <Sparkles className="w-4 h-4 mr-2 text-blue-600" />
-                        High-resolution JPG format
-                      </li>
-                      <li className="flex items-center text-sm text-gray-600">
-                        <Sparkles className="w-4 h-4 mr-2 text-blue-600" />
-                        Personal use license included
-                      </li>
-                      <li className="flex items-center text-sm text-gray-600">
-                        <Sparkles className="w-4 h-4 mr-2 text-blue-600" />
-                        Bundle pricing: More images = More savings!
-                      </li>
-                      <li className="flex items-center text-sm text-gray-600">
-                        <Sparkles className="w-4 h-4 mr-2 text-blue-600" />
-                        7-day download access
-                      </li>
-                    </ul>
-                    <DigitalDownloadButton
-                      imageId={image.id}
-                      imageUrl={image.public_url || image.image_url || ''}
-                      imageTitle={image.description?.split('\n')[0] || 'Pet Portrait'}
-                      variant="default"
-                      className="bg-blue-600 hover:bg-blue-700"
-                    />
-                    <p className="text-xs text-gray-500 mt-2">
-                      2 images £17.49 • 3 images £22.49 • Save up to 49%!
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Customize Section - Visible to All, Redirects Non-Customers to Sign Up */}
-            <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
-              <CardContent className="pt-6">
-                <div className="flex items-start space-x-4">
-                  <div className="p-3 bg-purple-600 rounded-lg">
-                    <Wand2 className="w-8 h-8 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">
-                      Not quite right?
-                    </h3>
-                    <p className="text-gray-700 mb-4">
-                      If this beautiful {image.breed_name || 'portrait'} isn't perfect in every way (hard to believe, but who are we to judge), why not let Pawcasso get creative:
-                    </p>
-                    <ul className="space-y-2 mb-4">
-                      <li className="flex items-center text-sm text-gray-600">
-                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                        Choose another breed
-                      </li>
-                      <li className="flex items-center text-sm text-gray-600">
-                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                        Try another colour coat
-                      </li>
-                      <li className="flex items-center text-sm text-gray-600">
-                        <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                        Pull another outfit from our extensive wardrobe
-                      </li>
-                    </ul>
-                    <Button
-                      onClick={handleCustomize}
-                      className="bg-purple-600 hover:bg-purple-700"
-                      size="lg"
-                    >
-                      <Wand2 className="w-5 h-5 mr-2" />
-                      Customize This Portrait
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Product Details */}
-            <Card>
+            {/* Product Details - Physical and Digital Products */}
+            <Card className="border-2 border-purple-200">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Pawsome Products</span>
@@ -511,10 +423,38 @@ function QRLandingPageContent() {
                   </div>
                 )}
 
+                {/* Digital Download */}
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3 mb-3">
+                    <div className="p-2 bg-purple-600 rounded-lg flex-shrink-0">
+                      <Download className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900 mb-1">
+                        Digital Download
+                      </h4>
+                      <p className="text-sm text-gray-700 mb-2">
+                        High-resolution digital file perfect for sharing on social media or printing at home.
+                      </p>
+                    </div>
+                  </div>
+                  <DigitalDownloadButton
+                    imageId={image.id}
+                    imageUrl={image.public_url || image.image_url || ''}
+                    imageTitle={image.description?.split('\n')[0] || 'Pet Portrait'}
+                    variant="default"
+                    className="bg-purple-600 hover:bg-purple-700 w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    Bundle pricing: 2 images £17.49 • 3 images £22.49 • Save up to 49%!
+                  </p>
+                </div>
 
-                {/* Products */}
+                <Separator />
+
+                {/* Physical Products */}
                 <div className="space-y-3">
-                  <h4 className="font-semibold">Popular Products</h4>
+                  <h4 className="font-semibold">Physical Products</h4>
                   {products
                     .filter(product =>
                       product.is_active &&
