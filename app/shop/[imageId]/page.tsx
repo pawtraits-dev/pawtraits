@@ -11,7 +11,6 @@ import { ShoppingCart, Star, Heart, Share2, Tag, MapPin, QrCode, UserPlus, Wand2
 import type { ImageCatalogWithDetails } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
-import ProductSelectionModal from '@/components/ProductSelectionModal';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ShareModal from '@/components/share-modal';
@@ -46,7 +45,6 @@ function QRLandingPageContent() {
   const [pricing, setPricing] = useState<ProductPricing[]>([]);
   const [loading, setLoading] = useState(true);
   const [trackingComplete, setTrackingComplete] = useState(false);
-  const [showProductModal, setShowProductModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(10); // 10% default
   const [likedImage, setLikedImage] = useState(false);
@@ -458,7 +456,6 @@ function QRLandingPageContent() {
                   {products
                     .filter(product =>
                       product.is_active &&
-                      product.is_featured &&
                       (!image.format_id || product.format_id === image.format_id)
                     )
                     .sort((a, b) => {
@@ -468,7 +465,6 @@ function QRLandingPageContent() {
                       const priceB = countryPricing.find(p => p.product_id === b.id)?.sale_price || 0;
                       return priceA - priceB;
                     })
-                    .slice(0, 3)
                     .map((product) => {
                       const countryPricing = getCountryPricing(pricing);
                       const productPricing = countryPricing.find(p => p.product_id === product.id);
@@ -511,15 +507,6 @@ function QRLandingPageContent() {
                   })}
                 </div>
 
-                {/* View all products */}
-                <Button
-                  variant="outline"
-                  onClick={() => setShowProductModal(true)}
-                  className="w-full"
-                >
-                  View All Product Options
-                </Button>
-
               </CardContent>
             </Card>
           </div>
@@ -528,17 +515,6 @@ function QRLandingPageContent() {
       </div>
 
       {/* Modals */}
-      {showProductModal && image && (
-        <ProductSelectionModal
-          image={image}
-          products={products}
-          pricing={getCountryPricing(pricing)}
-          isOpen={showProductModal}
-          onClose={() => setShowProductModal(false)}
-          onAddToBasket={handleAddToCart}
-        />
-      )}
-
       {showShareModal && image && (
         <ShareModal
           isOpen={showShareModal}
