@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Filter, Star, Eye, Download, Tag, Calendar, User, Trash2, X, EyeOff, Wand2, Copy, Wrench } from 'lucide-react';
+import { Search, Filter, Star, Eye, Download, Tag, Calendar, User, Trash2, X, EyeOff, Wand2, Copy, Wrench, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
 import { AdminSupabaseService } from '@/lib/admin-supabase';

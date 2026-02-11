@@ -52,6 +52,9 @@ export default function CustomisePage() {
   const { toast } = useToast();
   const imageId = params.imageId as string;
 
+  // Cloudinary base URL for progress graphics
+  const CLOUDINARY_BASE = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dnhzfz8xv'}/image/upload`;
+
   const [catalogImage, setCatalogImage] = useState<CatalogImage | null>(null);
   const [pets, setPets] = useState<Pet[]>([]);
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
@@ -720,7 +723,7 @@ export default function CustomisePage() {
                       {/* Progress Graphic */}
                       <div className="relative w-full max-w-md mx-auto mb-6">
                         <img
-                          src={`/assets/images/pawcasso-progress-${currentProgressGraphic + 1}.png`}
+                          src={`${CLOUDINARY_BASE}/pawcasso-progress-${currentProgressGraphic + 1}.png`}
                           alt={`Pawcasso progress ${currentProgressGraphic + 1}`}
                           className="w-full h-auto rounded-lg"
                         />
