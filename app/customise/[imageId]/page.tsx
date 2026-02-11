@@ -554,7 +554,7 @@ export default function CustomisePage() {
                         src={catalogImage.imageUrl}
                         alt={catalogImage.description || 'Catalog image'}
                         fill
-                        className="object-cover"
+                        className="object-contain"
                       />
                     </div>
                   )}
