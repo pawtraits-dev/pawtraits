@@ -350,6 +350,15 @@ export default function AdminCatalogPage() {
             </p>
           </div>
           <div className="flex gap-3">
+            <Link href="/admin/catalog/upload">
+              <Button
+                variant="default"
+                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700"
+              >
+                <Upload className="w-4 h-4" />
+                Upload
+              </Button>
+            </Link>
             <Button
               onClick={handleFixGelatoUrls}
               disabled={fixingGelatoUrls}

@@ -63,6 +63,7 @@ export default function CustomisePage() {
   const [hasRated, setHasRated] = useState(false);
   const [progressMessages, setProgressMessages] = useState<string[]>([]);
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+  const [currentProgressGraphic, setCurrentProgressGraphic] = useState(0);
 
   // Helper function to get aspect ratio style
   const getAspectRatioStyle = (aspectRatio?: string) => {
@@ -160,106 +161,17 @@ export default function CustomisePage() {
   }
 
   async function loadProgressMessages() {
-    try {
-      // Use the CUSTOMER'S pet information, not the catalog reference
-      let petName = 'your pet';
-      let breedName = 'Pet';
-      let coatColor = 'unique';
-      let breedDescription = 'personality-rich';
-      let physicalTraits = '';
+    // Use simple, direct progress messages with pet's name and breed
+    const petName = selectedPet?.name || 'your pet';
+    const breedName = selectedPet?.breed_name || 'unique';
 
-      if (selectedPet) {
-        // Using existing pet - we have name, breed, and coat info
-        petName = selectedPet.name || 'your pet';
-        breedName = selectedPet.breed_name || 'Pet';
-        coatColor = selectedPet.coat_name || selectedPet.coat_hex_color || 'unique';
-
-        // NEW: Use AI-detected characteristics if available
-        if (selectedPet.ai_analysis_data) {
-          const aiData = selectedPet.ai_analysis_data;
-
-          // Use detected personality traits if available
-          if (aiData.personality_detected && aiData.personality_detected.length > 0) {
-            breedDescription = aiData.personality_detected.join(', ');
-            console.log('✨ Using AI-detected personality:', breedDescription);
-          }
-
-          // Use detected physical characteristics for richer prompts
-          if (aiData.physical_characteristics) {
-            const physical = aiData.physical_characteristics;
-            const traits = [];
-
-            if (physical.pose) traits.push(`${physical.pose} pose`);
-            if (physical.gaze) traits.push(`${physical.gaze} gaze`);
-            if (physical.expression) traits.push(`${physical.expression} expression`);
-
-            if (traits.length > 0) {
-              physicalTraits = traits.join(', ');
-              console.log('✨ Using AI-detected physical traits:', physicalTraits);
-            }
-          }
-
-          // Use AI-detected breed/coat if manual selection wasn't available
-          if (!breedName || breedName === 'Pet') {
-            breedName = aiData.breed_detected || breedName;
-          }
-          if (!coatColor || coatColor === 'unique') {
-            coatColor = aiData.coat_detected || coatColor;
-          }
-        }
-
-        // Fallback to manually entered traits if no AI data
-        if (!breedDescription || breedDescription === 'personality-rich') {
-          if (selectedPet.personality_traits && selectedPet.personality_traits.length > 0) {
-            breedDescription = selectedPet.personality_traits.join(', ');
-          }
-        }
-
-        console.log('🎨 Generating progress messages for:', petName, breedName, coatColor,
-                    physicalTraits ? `with traits: ${physicalTraits}` : '');
-      } else if (uploadedFile) {
-        // Uploaded photo - use generic but still personalized
-        petName = 'your pet';
-        breedName = 'adorable companion';
-        coatColor = 'beautiful';
-        console.log('🎨 Generating progress messages for uploaded pet photo');
-      }
-
-      const themeName = catalogImage?.theme?.name || 'Portrait';
-      const styleName = catalogImage?.style?.name || 'Artistic';
-
-      const response = await fetch('/api/customers/generate-progress-messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          petName,           // ADD: Customer's pet name
-          breedName,         // CHANGED: Customer's pet breed, not catalog breed
-          themeName,         // Catalog theme (the style/setting)
-          styleName,         // Catalog style (artistic style)
-          themeDescription: catalogImage?.theme?.displayName,
-          coatColor,         // CHANGED: Customer's pet coat, not generic
-          breedDescription,  // Customer's pet personality
-          physicalTraits     // NEW: AI-detected physical characteristics (pose, gaze, expression)
-        })
-      });
-
-      if (response.ok) {
-        const { messages } = await response.json();
-        setProgressMessages(messages || []);
-        setCurrentMessageIndex(0);
-      }
-    } catch (error) {
-      console.error('Failed to load progress messages:', error);
-      // Use fallback messages
-      const fallbackName = selectedPet?.name || 'your pet';
-      setProgressMessages([
-        `Pawcasso is preparing his studio for ${fallbackName}... 🎨`,
-        `Selecting the perfect colors and brushes for ${fallbackName}... 🖌️`,
-        `Capturing ${fallbackName}'s unique personality... ✨`,
-        `Adding those special finishing touches for ${fallbackName}... 🐾`,
-        `Almost there! Creating something amazing for ${fallbackName}... 👨‍🎨`
-      ]);
-    }
+    setProgressMessages([
+      `Pawcasso is studying his Muse, ${petName}`,
+      `Pawcasso is hard at work capturing that ${breedName} personality`,
+      `Pawcasso is putting the final touches in place, ready for the big reveal!`
+    ]);
+    setCurrentMessageIndex(0);
+    setCurrentProgressGraphic(0);
   }
 
   async function handleRating(stars: number) {
@@ -291,14 +203,17 @@ export default function CustomisePage() {
     }
   }
 
-  // Cycle through progress messages every 18 seconds
+  // Cycle through progress messages and graphics every 10 seconds
   useEffect(() => {
     if (generating && progressMessages.length > 0) {
       const interval = setInterval(() => {
         setCurrentMessageIndex((prev) =>
           (prev + 1) % progressMessages.length
         );
-      }, 12000); // 18 seconds per message
+        setCurrentProgressGraphic((prev) =>
+          (prev + 1) % 3 // Cycle through 3 graphics
+        );
+      }, 10000); // 10 seconds per message/graphic
 
       return () => clearInterval(interval);
     }
@@ -506,44 +421,46 @@ export default function CustomisePage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left: Original Image */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Original Portrait</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {catalogImage && (
-                  <div
-                    className="relative w-full rounded-lg overflow-hidden bg-gray-100"
-                    style={getAspectRatioStyle(catalogImage.format?.aspectRatio)}
-                  >
-                    <Image
-                      src={catalogImage.imageUrl}
-                      alt={catalogImage.description || 'Catalog image'}
-                      fill
-                      className="object-cover"
-                    />
+        <div className={`grid grid-cols-1 ${!generating && (!customImage || customImage.status === 'failed') ? 'lg:grid-cols-2' : ''} gap-8`}>
+          {/* Left: Original Image - Hidden during generation */}
+          {!generating && (!customImage || customImage.status === 'failed') && (
+            <div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Original Portrait</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {catalogImage && (
+                    <div
+                      className="relative w-full rounded-lg overflow-hidden bg-gray-100"
+                      style={getAspectRatioStyle(catalogImage.format?.aspectRatio)}
+                    >
+                      <Image
+                        src={catalogImage.imageUrl}
+                        alt={catalogImage.description || 'Catalog image'}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className="mt-4 space-y-2 text-sm text-gray-600">
+                    {catalogImage?.theme && (
+                      <p><strong>Theme:</strong> {catalogImage.theme.name}</p>
+                    )}
+                    {catalogImage?.style && (
+                      <p><strong>Style:</strong> {catalogImage.style.name}</p>
+                    )}
+                    {catalogImage?.breed && (
+                      <p><strong>Original Breed:</strong> {catalogImage.breed.name}</p>
+                    )}
                   </div>
-                )}
-                <div className="mt-4 space-y-2 text-sm text-gray-600">
-                  {catalogImage?.theme && (
-                    <p><strong>Theme:</strong> {catalogImage.theme.name}</p>
-                  )}
-                  {catalogImage?.style && (
-                    <p><strong>Style:</strong> {catalogImage.style.name}</p>
-                  )}
-                  {catalogImage?.breed && (
-                    <p><strong>Original Breed:</strong> {catalogImage.breed.name}</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Right: Pet Selection / Generation / Result */}
-          <div className="space-y-6">
+          <div className={`space-y-6 ${generating || (customImage && customImage.status !== 'failed') ? 'mx-auto max-w-2xl' : ''}`}>
             {!customImage || customImage.status === 'failed' ? (
               <>
                 {/* Pet Selection */}
@@ -720,17 +637,17 @@ export default function CustomisePage() {
                               Rate this portrait to help us improve Pawcasso's skills
                             </p>
                             <div className="flex gap-2 justify-center">
-                              {[1, 2, 3, 4, 5].map((star) => (
+                              {[1, 2, 3, 4, 5].map((heartNum) => (
                                 <button
-                                  key={star}
-                                  onClick={() => handleRating(star)}
+                                  key={heartNum}
+                                  onClick={() => handleRating(heartNum)}
                                   className={`text-3xl transition-all hover:scale-110 ${
-                                    star <= rating
-                                      ? 'text-yellow-500'
-                                      : 'text-gray-300 hover:text-yellow-400'
+                                    heartNum <= rating
+                                      ? 'text-purple-600'
+                                      : 'text-purple-300 hover:text-purple-400'
                                   }`}
                                 >
-                                  ⭐
+                                  ❤️
                                 </button>
                               ))}
                             </div>
@@ -783,7 +700,17 @@ export default function CustomisePage() {
                     </>
                   ) : (
                     <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                      {/* Progress Graphic */}
+                      <div className="relative w-full max-w-md mx-auto mb-6">
+                        <Image
+                          src={`/assets/images/pawcasso-progress-${currentProgressGraphic + 1}.png`}
+                          alt={`Pawcasso progress ${currentProgressGraphic + 1}`}
+                          width={400}
+                          height={400}
+                          className="w-full h-auto rounded-lg"
+                        />
+                      </div>
+
                       {progressMessages.length > 0 ? (
                         <>
                           <p className="text-lg text-gray-700 font-medium mb-2">
