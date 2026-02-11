@@ -34,10 +34,8 @@ async function uploadBase64ToCloudinary(base64Data: string, folder: string): Pro
     {
       folder: folder,
       resource_type: 'image',
-      transformation: [
-        { width: 1024, height: 1024, crop: 'limit' },
-        { quality: 'auto', fetch_format: 'auto' }
-      ]
+      // No transformation - preserve full resolution from Gemini
+      // Gemini typically outputs 1536x1536 or higher resolution images
     }
   );
 
