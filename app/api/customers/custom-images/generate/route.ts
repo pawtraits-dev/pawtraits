@@ -56,10 +56,12 @@ async function generateCustomImage(
   themeName: string,
   styleName: string,
   catalogBreedName: string,
+  aspectRatio: string | undefined,
   customerPetBreedName?: string,
   aiAnalysisData?: any
 ): Promise<void> {
   console.log('🎨 Starting custom image generation for:', customImageId);
+  console.log('📐 Target aspect ratio:', aspectRatio || 'default (1:1)');
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -117,6 +119,13 @@ async function generateCustomImage(
       ? petImageBase64.split(',')[1]
       : petImageBase64;
 
+    // Prepare generation config with aspect ratio if available
+    const generationConfig: any = {};
+    if (aspectRatio) {
+      generationConfig.aspectRatio = aspectRatio.replace(':', '/'); // Convert "16:9" to "16/9"
+      console.log('🎨 Using aspect ratio:', aspectRatio, '→', generationConfig.aspectRatio);
+    }
+
     // Call Gemini via service (same model as admin)
     const response = await geminiService.ai.models.generateContent({
       model: "gemini-3-pro-image-preview",
@@ -135,6 +144,7 @@ async function generateCustomImage(
           },
         },
       ],
+      generationConfig: Object.keys(generationConfig).length > 0 ? generationConfig : undefined,
     });
 
     const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -287,11 +297,13 @@ export async function POST(request: NextRequest) {
         theme_id,
         style_id,
         breed_id,
+        format_id,
         prompt_text,
         generation_parameters,
         breeds (id, name),
         themes (id, name),
-        styles (id, name)
+        styles (id, name),
+        formats (id, name, aspect_ratio)
       `)
       .eq('id', catalogImageId)
       .single();
@@ -318,6 +330,8 @@ export async function POST(request: NextRequest) {
       hasPublicUrl: !!catalogImage.public_url,
       theme: catalogImage.themes?.name,
       style: catalogImage.styles?.name,
+      format: catalogImage.formats?.name,
+      aspectRatio: catalogImage.formats?.aspect_ratio,
       hasGenerationParams: !!catalogImage.generation_parameters
     });
 
@@ -499,6 +513,7 @@ export async function POST(request: NextRequest) {
       catalogImage.themes?.name || 'Custom',
       catalogImage.styles?.name || 'Portrait',
       catalogImage.breeds?.name || 'Pet',
+      catalogImage.formats?.aspect_ratio, // Pass aspect ratio from format
       petData?.breeds?.name,
       petData?.ai_analysis_data // NEW: Pass AI analysis data
     ).catch(async (error) => {
