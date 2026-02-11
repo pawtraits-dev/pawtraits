@@ -283,8 +283,8 @@ export default function CustomisePage() {
           return prev; // Stay on last message
         });
         setCurrentProgressGraphic((prev) => {
-          // Progress to next graphic, but don't go beyond the last one (index 2)
-          if (prev < 2) {
+          // Progress to next graphic, but don't go beyond the last one (index 3 for 4 images)
+          if (prev < 3) {
             return prev + 1;
           }
           return prev; // Stay on last graphic
@@ -932,13 +932,22 @@ export default function CustomisePage() {
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      {/* Progress Graphic */}
-                      <div className="relative w-full max-w-md mx-auto mb-6">
-                        <img
-                          src={PROGRESS_IMAGES[currentProgressGraphic]}
-                          alt={`Pawcasso progress ${currentProgressGraphic + 1}`}
-                          className="w-full h-auto rounded-lg"
-                        />
+                      {/* Progress Graphic Carousel */}
+                      <div className="relative w-full max-w-md mx-auto mb-6 overflow-hidden">
+                        <div
+                          className="flex transition-transform duration-700 ease-in-out"
+                          style={{ transform: `translateX(-${currentProgressGraphic * 100}%)` }}
+                        >
+                          {PROGRESS_IMAGES.map((image, index) => (
+                            <div key={index} className="w-full flex-shrink-0">
+                              <img
+                                src={image}
+                                alt={`Pawcasso progress ${index + 1}`}
+                                className="w-full h-auto rounded-lg"
+                              />
+                            </div>
+                          ))}
+                        </div>
                       </div>
 
                       {/* Loading Spinner */}
@@ -946,14 +955,22 @@ export default function CustomisePage() {
                         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600"></div>
                       </div>
 
+                      {/* Progress Message Carousel */}
                       {progressMessages.length > 0 ? (
-                        <>
-                          <div className="mx-auto max-w-md px-4">
-                            <p className="text-lg text-gray-700 font-['var(--font-life-savers)'] leading-relaxed">
-                              {progressMessages[currentMessageIndex]}
-                            </p>
+                        <div className="mx-auto max-w-md px-4 overflow-hidden">
+                          <div
+                            className="flex transition-transform duration-700 ease-in-out"
+                            style={{ transform: `translateX(-${currentMessageIndex * 100}%)` }}
+                          >
+                            {progressMessages.map((message, index) => (
+                              <div key={index} className="w-full flex-shrink-0">
+                                <p className="text-lg text-gray-700 font-['var(--font-life-savers)'] leading-relaxed">
+                                  {message}
+                                </p>
+                              </div>
+                            ))}
                           </div>
-                        </>
+                        </div>
                       ) : (
                         <>
                           <p className="text-gray-600">
