@@ -7,6 +7,7 @@ import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
 import fetch from 'node-fetch';
 import { CloudinaryImageService } from '@/lib/cloudinary';
+import { buildSizeInstruction } from '@/lib/breed-size-mapping';
 
 // Configure Cloudinary
 cloudinary.config({
@@ -56,7 +57,8 @@ async function generateCustomImage(
   catalogBreedName: string,
   aspectRatio: string | undefined,
   customerPetBreedName?: string,
-  aiAnalysisData?: any
+  aiAnalysisData?: any,
+  sizeInstruction?: string // NEW: Relative size instruction for multi-subject
 ): Promise<void> {
   console.log('🎨 Starting custom image generation for:', customImageId);
   console.log('📐 Target aspect ratio:', aspectRatio || 'default (1:1)');
@@ -106,6 +108,7 @@ async function generateCustomImage(
     const generationPrompt = promptBuilder.buildSubjectReplacementPrompt({
       compositionTemplate: variationPromptTemplate,
       aspectRatio: aspectRatio, // Pass aspect ratio as direct parameter
+      sizeInstruction: sizeInstruction, // NEW: Relative size instruction for multi-subject
       metadata: {
         breedName: customerPetBreedName || catalogBreedName,
         themeName: themeName,
@@ -448,9 +451,11 @@ export async function POST(request: NextRequest) {
             name,
             breed_id,
             coat_id,
+            weight,
+            animal_type,
             primary_photo_url,
             ai_analysis_data,
-            breeds (id, name),
+            breeds (id, name, slug),
             coats (id, name, description)
           `)
           .eq('id', petId)
@@ -530,6 +535,20 @@ export async function POST(request: NextRequest) {
       petNames: petsData.map(p => p?.name || 'Uploaded Pet').join(', ')
     });
 
+    // Calculate relative size instruction for multi-subject images
+    let sizeInstruction: string | undefined;
+    if (petImageUrls.length > 1) {
+      const petSizeData = petsData.map(pet => ({
+        name: pet?.name || 'Pet',
+        breedSlug: pet?.breeds?.slug,
+        weight: pet?.weight ? Number(pet.weight) : undefined,
+        animalType: (pet?.animal_type || 'dog') as 'dog' | 'cat'
+      }));
+
+      sizeInstruction = buildSizeInstruction(petSizeData);
+      console.log('📏 Size instruction generated:', sizeInstruction);
+    }
+
     // Create custom image record in database (use first pet for backward compatibility)
     const firstPet = petsData[0];
     const firstPetId = petIds[0];
@@ -594,7 +613,8 @@ export async function POST(request: NextRequest) {
       catalogImage.breeds?.name || 'Pet',
       catalogImage.formats?.aspect_ratio, // Pass aspect ratio from format
       firstPet?.breeds?.name,
-      firstPet?.ai_analysis_data // NEW: Pass AI analysis data from first pet
+      firstPet?.ai_analysis_data, // Pass AI analysis data from first pet
+      sizeInstruction // NEW: Pass relative size instruction for multi-subject
     ).catch(async (error) => {
       console.error('❌ Error in background generation:', error);
       // Update record with error status

@@ -15,12 +15,13 @@
 export interface VariationPromptOptions {
   compositionTemplate?: string;  // From Claude AI analysis (stored in catalog)
   aspectRatio?: string;  // Direct aspect ratio value (e.g., "16:9", "1:1", "3:2")
+  sizeInstruction?: string;  // NEW: Relative size requirements for multi-subject portraits
   metadata: {
     breedName?: string;
     themeName?: string;
     styleName?: string;
     formatName?: string;
-    petCharacteristics?: {  // NEW: AI-detected characteristics from pet photo analysis
+    petCharacteristics?: {  // AI-detected characteristics from pet photo analysis
       pose?: string;
       gaze?: string;
       expression?: string;
@@ -39,7 +40,7 @@ export class VariationPromptBuilder {
    * @returns Structured prompt for Gemini API
    */
   buildSubjectReplacementPrompt(options: VariationPromptOptions): string {
-    const { compositionTemplate, aspectRatio, metadata } = options;
+    const { compositionTemplate, aspectRatio, sizeInstruction, metadata } = options;
 
     // Use Claude-generated template if available, otherwise use fallback
     const preservationRequirements = compositionTemplate || `- The EXACT background from the reference image
@@ -121,6 +122,7 @@ ${preservationRequirements}
 
 REPLACEMENT REQUIREMENT (ONLY THIS CHANGES):
 ${replacementDetails}
+${sizeInstruction ? `\n${sizeInstruction}` : ''}
 
 CRITICAL POSE AND POSITION TRANSFORMATION:
 - The new subject MUST adopt the EXACT SAME POSE as the original subject in the reference image

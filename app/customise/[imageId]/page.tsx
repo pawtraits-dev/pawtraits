@@ -214,15 +214,30 @@ export default function CustomisePage() {
   async function loadProgressMessages() {
     // Use simple, direct progress messages with pet's name and breed
     const firstPet = selectedPets[0];
+    const secondPet = selectedPets[1];
     const petName = firstPet?.name || 'your pet';
-    const breedName = firstPet?.breed_name || 'unique';
+    const firstBreedName = firstPet?.breed_name || 'unique';
+    const secondBreedName = secondPet?.breed_name;
 
-    setProgressMessages([
-      `Pawcasso is contemplating his canvas`,
-      `Pawcasso is pcaturing the essence of his Muse, ${petName}`,
-      `Pawcasso is hard at work capturing that ${breedName} personality`,
-      `Pawcasso is putting the final touches in place, ready for the big reveal!`
-    ]);
+    // Customize messages based on single vs multi-subject
+    if (catalogImage?.isMultiSubject && secondPet) {
+      setProgressMessages([
+        `Pawcasso is contemplating his canvas`,
+        `Pawcasso is capturing the essence of ${petName} the ${firstBreedName}`,
+        secondBreedName
+          ? `Pawcasso is balancing the ${firstBreedName} with the ${secondBreedName} perfectly`
+          : `Pawcasso is composing the perfect multi-pet portrait`,
+        `Pawcasso is putting the final touches in place, ready for the big reveal!`
+      ]);
+    } else {
+      setProgressMessages([
+        `Pawcasso is contemplating his canvas`,
+        `Pawcasso is capturing the essence of his Muse, ${petName}`,
+        `Pawcasso is hard at work capturing that ${firstBreedName} personality`,
+        `Pawcasso is putting the final touches in place, ready for the big reveal!`
+      ]);
+    }
+
     setCurrentMessageIndex(0);
     setCurrentProgressGraphic(0);
   }
