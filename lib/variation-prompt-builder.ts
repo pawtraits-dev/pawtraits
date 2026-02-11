@@ -14,6 +14,7 @@
 
 export interface VariationPromptOptions {
   compositionTemplate?: string;  // From Claude AI analysis (stored in catalog)
+  aspectRatio?: string;  // Direct aspect ratio value (e.g., "16:9", "1:1", "3:2")
   metadata: {
     breedName?: string;
     themeName?: string;
@@ -38,7 +39,7 @@ export class VariationPromptBuilder {
    * @returns Structured prompt for Gemini API
    */
   buildSubjectReplacementPrompt(options: VariationPromptOptions): string {
-    const { compositionTemplate, metadata } = options;
+    const { compositionTemplate, aspectRatio, metadata } = options;
 
     // Use Claude-generated template if available, otherwise use fallback
     const preservationRequirements = compositionTemplate || `- The EXACT background from the reference image
@@ -70,9 +71,50 @@ export class VariationPromptBuilder {
       }
     }
 
-    return `CRITICAL INSTRUCTION: MODIFY THE REFERENCE IMAGE, DO NOT CREATE A NEW IMAGE
+    // Parse aspect ratio to determine orientation
+    let orientationInstructions = '';
+    let orientationType = '';
+    if (aspectRatio) {
+      const [width, height] = aspectRatio.split(':').map(Number);
+      if (width > height) {
+        orientationType = 'LANDSCAPE';
+        orientationInstructions = `\n🎯 LANDSCAPE ORIENTATION: Output must be ${aspectRatio} (width:height)`;
+      } else if (height > width) {
+        orientationType = 'PORTRAIT';
+        orientationInstructions = `\n🎯 PORTRAIT ORIENTATION: Output must be ${aspectRatio} (width:height)`;
+      } else {
+        orientationType = 'SQUARE';
+        orientationInstructions = `\n🎯 SQUARE FORMAT: Output must be ${aspectRatio} (width = height)`;
+      }
+    }
 
-You are given a reference portrait image. Your task is to MODIFY this EXACT image by REPLACING ONLY the subject with the subject from the uploaded photo.
+    return `CRITICAL INSTRUCTION: MODIFY THE REFERENCE IMAGE, DO NOT CREATE A NEW IMAGE
+${aspectRatio ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 MANDATORY OUTPUT FORMAT: ${aspectRatio}
+🎯 THIS IS THE ONLY ACCEPTABLE ASPECT RATIO: ${aspectRatio}
+🎯 DO NOT USE ANY OTHER ASPECT RATIO${orientationInstructions}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+` : ''}
+You are given TWO images:
+1. REFERENCE IMAGE (FIRST IMAGE): The portrait composition, background, style, lighting, dimensions, and aspect ratio to preserve
+2. SUBJECT PHOTO (SECOND IMAGE): ONLY use this for the pet's physical appearance (coloring, markings, facial features)
+
+Your task is to MODIFY the REFERENCE IMAGE (first image) by REPLACING ONLY the subject with the pet from the SUBJECT PHOTO (second image).
+
+CRITICAL DIMENSIONS AND FORMAT:
+${aspectRatio ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ REQUIRED ASPECT RATIO: ${aspectRatio}
+⚠️ OUTPUT MUST BE ${aspectRatio} FORMAT
+⚠️ ${orientationType} orientation is mandatory
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+` : ''}- The output image MUST have the EXACT SAME aspect ratio as the REFERENCE IMAGE (first image)${aspectRatio ? ` which is ${aspectRatio}` : ''}
+- The output image MUST have the EXACT SAME width and height proportion as the REFERENCE IMAGE (first image)
+- DO NOT use the aspect ratio or dimensions from the SUBJECT PHOTO (second image)
+- IGNORE the background, composition, and framing of the SUBJECT PHOTO completely
+- The REFERENCE IMAGE's aspect ratio${aspectRatio ? ` (${aspectRatio})` : ''} is THE ONLY CORRECT aspect ratio for the output
+${aspectRatio ? `- If the reference image is ${aspectRatio}, the output MUST be ${aspectRatio} - no exceptions` : ''}
 
 PRESERVATION REQUIREMENTS (THESE MUST REMAIN IDENTICAL):
 ${preservationRequirements}
@@ -99,10 +141,21 @@ CRITICAL STYLE TRANSFORMATION:
 - The uploaded photo is a REFERENCE for appearance only - the final render MUST match the reference artistic style
 - Match the lighting, shadows, and highlights of the reference portrait exactly
 
+FINAL VERIFICATION CHECKLIST:
+${aspectRatio ? `✓ ⚠️ CRITICAL: Output aspect ratio is EXACTLY ${aspectRatio}
+✓ ⚠️ CRITICAL: Output is NOT the aspect ratio from the pet photo
+✓ ⚠️ CRITICAL: Output matches reference image aspect ratio of ${aspectRatio}
+` : ''}✓ Output dimensions and aspect ratio EXACTLY match the reference image (first image)${aspectRatio ? ` (${aspectRatio})` : ''}
+✓ Background, composition, and framing are IDENTICAL to reference image
+✓ Only the subject has been replaced with the pet from the uploaded photo
+✓ The pet adopts the pose, position, and artistic style of the reference
+✓ NO elements from the uploaded photo's background or composition appear in the output
+
 Reference Portrait Metadata:
 - Theme: ${metadata?.themeName || 'original theme'}
 - Style: ${metadata?.styleName || 'original style'}
 - Format: ${metadata?.formatName || 'original format'}
+${aspectRatio ? `- **ASPECT RATIO: ${aspectRatio}** ⚠️ THIS IS MANDATORY` : ''}
 - Target Breed: ${metadata?.breedName || 'original breed'}
 
 CRITICAL VERIFICATION:
@@ -111,9 +164,21 @@ CRITICAL VERIFICATION:
 - Everything else MUST be IDENTICAL:
   1. Pose and body position (head angle, legs, ears, tail)
   2. Spatial position in frame (where the subject is located)
-  3. Background, composition, lighting, style, props
+  3. Background, composition, lighting, style, props${aspectRatio ? `
+  4. **ASPECT RATIO (MUST BE ${aspectRatio})**` : ''}
 - DO NOT use the pose from the uploaded photo - USE THE POSE FROM THE REFERENCE
-- DO NOT use the style from the uploaded photo - USE THE STYLE FROM THE REFERENCE
-- This is a subject REPLACEMENT task with pose and style transformation, NOT a new image generation task`;
+- DO NOT use the style from the uploaded photo - USE THE STYLE FROM THE REFERENCE${aspectRatio ? `
+- DO NOT use the aspect ratio from the uploaded photo - USE ${aspectRatio} FROM THE REFERENCE` : ''}
+- This is a subject REPLACEMENT task with pose and style transformation, NOT a new image generation task${aspectRatio && orientationType ? `
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 FINAL OUTPUT REQUIREMENTS - ASPECT RATIO MUST BE ${aspectRatio}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ Output aspect ratio: ${aspectRatio} (NOT the pet photo's aspect ratio)
+✓ Orientation: ${orientationType}
+✓ Format: ${aspectRatio} width:height ratio
+✓ Reference image format: ${aspectRatio}
+✓ Generated image format: ${aspectRatio} (MUST MATCH)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━` : ''}`;
   }
 }

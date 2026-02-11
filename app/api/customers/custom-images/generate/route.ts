@@ -82,6 +82,10 @@ async function generateCustomImage(
 
     // Build prompt using shared service (same as admin)
     console.log('🤖 Building prompt with variation template...');
+    if (aspectRatio) {
+      console.log('🎯 CRITICAL: Aspect ratio requirement:', aspectRatio);
+      console.log('🎯 Generated output MUST match this aspect ratio:', aspectRatio);
+    }
 
     // Extract AI-detected characteristics if available
     let petCharacteristics = undefined;
@@ -98,6 +102,7 @@ async function generateCustomImage(
 
     const generationPrompt = promptBuilder.buildSubjectReplacementPrompt({
       compositionTemplate: variationPromptTemplate,
+      aspectRatio: aspectRatio, // Pass aspect ratio as direct parameter
       metadata: {
         breedName: customerPetBreedName || catalogBreedName,
         themeName: themeName,
@@ -108,6 +113,10 @@ async function generateCustomImage(
     });
 
     console.log('📝 Using variation prompt template:', !!variationPromptTemplate);
+    if (aspectRatio) {
+      console.log('🎯 Aspect ratio mentioned in prompt:', (generationPrompt.match(new RegExp(aspectRatio.replace(':', '\\:'), 'g')) || []).length, 'times');
+      console.log('🎯 Prompt includes aspect ratio emphasis:', generationPrompt.includes('⚠️'));
+    }
     console.log('🤖 Calling Gemini API with model: gemini-3-pro-image-preview');
     const startTime = Date.now();
 
@@ -334,6 +343,26 @@ export async function POST(request: NextRequest) {
       aspectRatio: catalogImage.formats?.aspect_ratio,
       hasGenerationParams: !!catalogImage.generation_parameters
     });
+
+    // CRITICAL: Log aspect ratio for debugging
+    if (catalogImage.formats?.aspect_ratio) {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🎯 ASPECT RATIO FROM DATABASE:', catalogImage.formats.aspect_ratio);
+      console.log('🎯 FORMAT NAME:', catalogImage.formats.name);
+      const [w, h] = catalogImage.formats.aspect_ratio.split(':').map(Number);
+      if (w > h) {
+        console.log('🎯 ORIENTATION: LANDSCAPE');
+        console.log(`🎯 OUTPUT MUST BE: ${catalogImage.formats.aspect_ratio} (width:height)`);
+      } else if (h > w) {
+        console.log('🎯 ORIENTATION: PORTRAIT');
+        console.log(`🎯 OUTPUT MUST BE: ${catalogImage.formats.aspect_ratio} (width:height)`);
+      } else {
+        console.log('🎯 ORIENTATION: SQUARE');
+        console.log(`🎯 OUTPUT MUST BE: ${catalogImage.formats.aspect_ratio} (width:height)`);
+      }
+      console.log('🎯 THIS IS THE ONLY ACCEPTABLE FORMAT FOR THE GENERATED IMAGE');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    }
 
     // Extract variation prompt template from Claude analysis
     const variationPromptTemplate = catalogImage.generation_parameters?.variation_prompt_template;
