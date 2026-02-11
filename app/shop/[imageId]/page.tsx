@@ -366,8 +366,8 @@ function QRLandingPageContent() {
                       Love this style? Upload a photo of your pet and we'll transform it to match this artistic portrait! Our AI will recreate this exact look with your pet's unique features.
                     </p>
                     <Button
-                      onClick={() => router.push(`/create?id=${image.id}`)}
-                      className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+                      onClick={() => router.push(`/customise/${image.id}`)}
+                      className="bg-purple-600 hover:bg-purple-700 w-full sm:w-auto"
                       size="lg"
                     >
                       <Camera className="w-5 h-5 mr-2" />

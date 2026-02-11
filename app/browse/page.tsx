@@ -1151,18 +1151,6 @@ function BrowsePageContent() {
                             </div>
                           )}
                         </div>
-
-                        {/* Customize Button - Visible to All, Redirects Non-Customers to Sign Up */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCustomize(image);
-                          }}
-                          className="p-2 rounded-full transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-lg"
-                          title="Customize this image"
-                        >
-                          <Wand2 className="w-4 h-4" />
-                        </button>
                       </div>
                     </div>
 
@@ -1225,11 +1213,11 @@ function BrowsePageContent() {
 
                       <div className="space-y-2">
                         <Button
-                          className="w-full bg-blue-600 hover:bg-blue-700"
+                          className="w-full bg-purple-600 hover:bg-purple-700"
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            router.push(`/create?id=${image.id}`);
+                            router.push(`/customise/${image.id}`);
                           }}
                         >
                           <Camera className="w-4 h-4 mr-2" />
