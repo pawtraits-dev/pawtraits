@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 import { MultiSubjectEditor } from '@/components/admin/MultiSubjectEditor';
 import { CompositionAnalysisPanel } from '@/components/admin/CompositionAnalysisPanel';
 import { PreviewVariationPanel } from '@/components/admin/PreviewVariationPanel';
+import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
 
 interface SubjectIdentification {
   subjectOrder: number;
@@ -150,6 +151,9 @@ export default function CatalogUploadPage() {
 
   // Saving state
   const [isSaving, setIsSaving] = useState(false);
+
+  // Prompt preview state
+  const [showPromptPreview, setShowPromptPreview] = useState(false);
 
   // Load metadata options on mount
   useEffect(() => {
@@ -714,6 +718,87 @@ export default function CatalogUploadPage() {
               formatName: formats.find(f => f.id === selectedFormat)?.name
             }}
           />
+
+          {/* Gemini Prompt Preview */}
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Gemini Generation Prompt Preview</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowPromptPreview(!showPromptPreview)}
+                >
+                  {showPromptPreview ? 'Hide' : 'Show'} Prompt
+                </Button>
+              </div>
+              <p className="text-sm text-gray-600 mt-2">
+                Preview the exact prompt that will be sent to Gemini for image generation
+              </p>
+            </CardHeader>
+            {showPromptPreview && (
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Aspect Ratio Display */}
+                  {selectedFormat && (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <div className="space-y-1">
+                          <p className="font-semibold">Selected Format:</p>
+                          <p className="text-lg">
+                            {formats.find(f => f.id === selectedFormat)?.name || 'None'}
+                            {formats.find(f => f.id === selectedFormat)?.aspect_ratio && (
+                              <span className="ml-2 font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                {formats.find(f => f.id === selectedFormat)?.aspect_ratio}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Generated Prompt */}
+                  <div>
+                    <Label className="text-sm font-medium">Full Gemini Prompt:</Label>
+                    <pre className="mt-2 p-4 bg-gray-900 text-gray-100 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap max-h-96 overflow-y-auto">
+                      {(() => {
+                        const promptBuilder = new VariationPromptBuilder();
+                        const selectedFormatData = formats.find(f => f.id === selectedFormat);
+
+                        return promptBuilder.buildSubjectReplacementPrompt({
+                          compositionTemplate: analysis?.variationPromptTemplate,
+                          aspectRatio: selectedFormatData?.aspect_ratio,
+                          metadata: {
+                            breedName: breeds.find(b => b.id === subjects[0]?.breedId)?.name || '[Breed]',
+                            themeName: themes.find(t => t.id === selectedTheme)?.name || '[Theme]',
+                            styleName: styles.find(s => s.id === selectedStyle)?.name || '[Style]',
+                            formatName: selectedFormatData?.name || '[Format]',
+                          }
+                        });
+                      })()}
+                    </pre>
+                  </div>
+
+                  {/* Aspect Ratio Highlighting */}
+                  {selectedFormat && formats.find(f => f.id === selectedFormat)?.aspect_ratio && (
+                    <Alert className="bg-yellow-50 border-yellow-200">
+                      <AlertCircle className="h-4 w-4 text-yellow-600" />
+                      <AlertDescription>
+                        <p className="text-sm font-semibold text-yellow-900">
+                          🎯 Aspect Ratio Requirement: {formats.find(f => f.id === selectedFormat)?.aspect_ratio}
+                        </p>
+                        <p className="text-xs text-yellow-800 mt-1">
+                          This aspect ratio appears multiple times throughout the prompt to ensure Gemini generates the correct format.
+                        </p>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              </CardContent>
+            )}
+          </Card>
 
           {/* Metadata Section */}
           <Card className="mb-6">
