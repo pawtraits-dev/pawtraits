@@ -59,6 +59,8 @@ export default function CustomisePage() {
     'https://res.cloudinary.com/dnhzfz8xv/image/upload/v1770800876/pawcasso-progress-3_sxffsu.png'
   ];
 
+  const FAIL_IMAGE = 'https://res.cloudinary.com/dnhzfz8xv/image/upload/v1770809160/pawcasso-progress-fail_nusyud.png';
+
   const [catalogImage, setCatalogImage] = useState<CatalogImage | null>(null);
   const [pets, setPets] = useState<Pet[]>([]);
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
@@ -212,16 +214,24 @@ export default function CustomisePage() {
     }
   }
 
-  // Cycle through progress messages and graphics every 10 seconds
+  // Progress through messages and graphics sequentially (1→2→3, no cycling)
   useEffect(() => {
     if (generating && progressMessages.length > 0) {
       const interval = setInterval(() => {
-        setCurrentMessageIndex((prev) =>
-          (prev + 1) % progressMessages.length
-        );
-        setCurrentProgressGraphic((prev) =>
-          (prev + 1) % 3 // Cycle through 3 graphics
-        );
+        setCurrentMessageIndex((prev) => {
+          // Progress to next message, but don't go beyond the last one
+          if (prev < progressMessages.length - 1) {
+            return prev + 1;
+          }
+          return prev; // Stay on last message
+        });
+        setCurrentProgressGraphic((prev) => {
+          // Progress to next graphic, but don't go beyond the last one (index 2)
+          if (prev < 2) {
+            return prev + 1;
+          }
+          return prev; // Stay on last graphic
+        });
       }, 10000); // 10 seconds per message/graphic
 
       return () => clearInterval(interval);
@@ -241,6 +251,8 @@ export default function CustomisePage() {
     try {
       setGenerating(true);
       setError(null);
+      setCurrentMessageIndex(0); // Reset to start
+      setCurrentProgressGraphic(0); // Reset to start
 
       // Load progress messages before starting generation
       await loadProgressMessages();
@@ -668,7 +680,7 @@ export default function CustomisePage() {
                                   className={`text-3xl transition-all hover:scale-110 ${
                                     heartNum <= rating
                                       ? 'text-purple-600'
-                                      : 'text-purple-300 hover:text-purple-400'
+                                      : 'text-purple-200 hover:text-purple-300'
                                   }`}
                                 >
                                   ❤️
@@ -722,6 +734,23 @@ export default function CustomisePage() {
                         </Button>
                       </div>
                     </>
+                  ) : customImage.status === 'failed' ? (
+                    <div className="text-center py-8">
+                      {/* Fail Image */}
+                      <div className="relative w-full max-w-md mx-auto mb-6">
+                        <img
+                          src={FAIL_IMAGE}
+                          alt="Generation failed"
+                          className="w-full h-auto rounded-lg"
+                        />
+                      </div>
+                      <p className="text-lg text-red-600 font-medium mb-2">
+                        Oops! Something went wrong
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {error || 'Please try again'}
+                      </p>
+                    </div>
                   ) : (
                     <div className="text-center py-8">
                       {/* Progress Graphic */}
@@ -731,6 +760,26 @@ export default function CustomisePage() {
                           alt={`Pawcasso progress ${currentProgressGraphic + 1}`}
                           className="w-full h-auto rounded-lg"
                         />
+                      </div>
+
+                      {/* Three Logo Spinners */}
+                      <div className="flex items-center justify-center gap-6 mb-6">
+                        {[0, 1, 2].map((index) => (
+                          <div
+                            key={index}
+                            className={`relative w-12 h-12 ${
+                              currentProgressGraphic === index ? 'animate-spin' : 'opacity-30'
+                            }`}
+                            style={{ animationDuration: '2s' }}
+                          >
+                            <Image
+                              src="/assets/logos/pawrtraits-logo.svg"
+                              alt="Pawtraits logo"
+                              fill
+                              className="object-contain"
+                            />
+                          </div>
+                        ))}
                       </div>
 
                       {progressMessages.length > 0 ? (
