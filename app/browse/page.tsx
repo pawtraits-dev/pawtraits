@@ -462,7 +462,7 @@ function BrowsePageContent() {
     }
 
     // Filter by animal type based on active tab (if no specific breed/theme selected)
-    if (!selectedBreedId && !selectedThemeId && activeTab !== 'themes') {
+    if (!selectedBreedId && !selectedThemeId && (activeTab === 'dogs' || activeTab === 'cats')) {
       const animalType = activeTab === 'dogs' ? 'dog' : 'cat';
       filteredImages = filteredImages.filter(img =>
         img.breed?.animal_type === animalType ||
