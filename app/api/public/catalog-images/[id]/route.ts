@@ -40,6 +40,7 @@ export async function GET(
         theme_id,
         style_id,
         format_id,
+        generation_parameters,
         breed:breeds(
           id,
           name,
@@ -102,6 +103,10 @@ export async function GET(
       hasCloudinaryId: !!catalogImage.cloudinary_public_id
     });
 
+    // Extract multi-subject information from generation_parameters
+    const isMultiSubject = catalogImage.generation_parameters?.is_multi_subject || false;
+    const subjectCount = catalogImage.generation_parameters?.subjects?.length || 1;
+
     // Format response
     const response = {
       id: catalogImage.id,
@@ -110,6 +115,8 @@ export async function GET(
       thumbnailUrl,
       prompt: catalogImage.prompt_text,
       description: catalogImage.description,
+      isMultiSubject,
+      subjectCount,
       breed: catalogImage.breed ? {
         id: catalogImage.breed.id,
         name: catalogImage.breed.name,

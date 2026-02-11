@@ -49,7 +49,7 @@ async function uploadBase64ToCloudinary(base64Data: string, folder: string): Pro
 async function generateCustomImage(
   customImageId: string,
   catalogImageUrl: string,
-  petImageUrl: string,
+  petImageUrls: string[], // Changed to array for multi-subject support
   variationPromptTemplate: string | undefined,
   themeName: string,
   styleName: string,
@@ -69,14 +69,19 @@ async function generateCustomImage(
   });
 
   try {
-    // Fetch both images and convert to base64
+    // Fetch catalog image
     console.log('📥 Fetching catalog image from:', catalogImageUrl.substring(0, 80) + '...');
     const catalogImageBase64 = await imageUrlToBase64(catalogImageUrl);
     console.log('✅ Catalog image fetched, size:', catalogImageBase64.length, 'bytes');
 
-    console.log('📥 Fetching pet image from:', petImageUrl.substring(0, 80) + '...');
-    const petImageBase64 = await imageUrlToBase64(petImageUrl);
-    console.log('✅ Pet image fetched, size:', petImageBase64.length, 'bytes');
+    // Fetch all pet images (support for multi-subject)
+    const petImageBase64Array: string[] = [];
+    for (let i = 0; i < petImageUrls.length; i++) {
+      console.log(`📥 Fetching pet ${i + 1} image from:`, petImageUrls[i].substring(0, 80) + '...');
+      const petImageBase64 = await imageUrlToBase64(petImageUrls[i]);
+      petImageBase64Array.push(petImageBase64);
+      console.log(`✅ Pet ${i + 1} image fetched, size:`, petImageBase64.length, 'bytes');
+    }
 
     // Build prompt using shared service (same as admin)
     console.log('🤖 Building prompt with variation template...');
@@ -122,9 +127,10 @@ async function generateCustomImage(
     const catalogImageData = catalogImageBase64.startsWith('data:')
       ? catalogImageBase64.split(',')[1]
       : catalogImageBase64;
-    const petImageData = petImageBase64.startsWith('data:')
-      ? petImageBase64.split(',')[1]
-      : petImageBase64;
+
+    const petImageDataArray = petImageBase64Array.map(base64 =>
+      base64.startsWith('data:') ? base64.split(',')[1] : base64
+    );
 
     // Prepare generation config with aspect ratio if available
     const generationConfig: any = {};
@@ -133,24 +139,34 @@ async function generateCustomImage(
       console.log('🎨 Using aspect ratio:', aspectRatio, '→', generationConfig.aspectRatio);
     }
 
+    // Build contents array with catalog image + all pet images
+    const contents: any[] = [
+      { text: generationPrompt },
+      {
+        inlineData: {
+          mimeType: "image/png",
+          data: catalogImageData,
+        },
+      },
+    ];
+
+    // Add all pet images to contents
+    petImageDataArray.forEach((petData, index) => {
+      contents.push({
+        inlineData: {
+          mimeType: "image/png",
+          data: petData,
+        },
+      });
+      console.log(`✅ Added pet ${index + 1} to Gemini contents array`);
+    });
+
+    console.log(`🎨 Generating with ${petImageDataArray.length} pet image(s)`);
+
     // Call Gemini via service (same model as admin)
     const response = await geminiService.ai.models.generateContent({
       model: "gemini-3-pro-image-preview",
-      contents: [
-        { text: generationPrompt },
-        {
-          inlineData: {
-            mimeType: "image/png",
-            data: catalogImageData,
-          },
-        },
-        {
-          inlineData: {
-            mimeType: "image/png",
-            data: petImageData,
-          },
-        },
-      ],
+      contents,
       generationConfig: Object.keys(generationConfig).length > 0 ? generationConfig : undefined,
     });
 
@@ -203,7 +219,8 @@ async function generateCustomImage(
         generated_at: new Date().toISOString(),
         generation_metadata: {
           catalog_image_url: catalogImageUrl,
-          pet_image_url: petImageUrl,
+          pet_image_urls: petImageUrls, // Store all pet images for multi-subject
+          subject_count: petImageUrls.length,
           theme: themeName,
           style: styleName,
           model: 'gemini-3-pro-image-preview',
@@ -255,14 +272,40 @@ export async function POST(request: NextRequest) {
     // Parse FormData
     const formData = await request.formData();
     const catalogImageId = formData.get('catalogImageId') as string;
-    const petId = formData.get('petId') as string | null;
-    const petPhoto = formData.get('petPhoto') as File | null;
+
+    // Check for multi-subject support (petId1, petId2, etc. OR petPhoto1, petPhoto2, etc.)
+    const petIds: (string | null)[] = [];
+    const petPhotos: (File | null)[] = [];
+
+    // Try to get multi-subject pets first (petId1, petId2, etc.)
+    for (let i = 1; i <= 5; i++) { // Support up to 5 subjects
+      const petId = formData.get(`petId${i}`) as string | null;
+      const petPhoto = formData.get(`petPhoto${i}`) as File | null;
+
+      if (petId || petPhoto) {
+        petIds.push(petId);
+        petPhotos.push(petPhoto);
+        console.log(`📦 Found subject ${i}:`, { petId, hasPetPhoto: !!petPhoto });
+      }
+    }
+
+    // Fallback to single pet (backward compatibility)
+    if (petIds.length === 0 && petPhotos.length === 0) {
+      const petId = formData.get('petId') as string | null;
+      const petPhoto = formData.get('petPhoto') as File | null;
+
+      if (petId || petPhoto) {
+        petIds.push(petId);
+        petPhotos.push(petPhoto);
+        console.log('📦 Using single pet (backward compatible):', { petId, hasPetPhoto: !!petPhoto });
+      }
+    }
 
     console.log('📦 FormData received:', {
       catalogImageId,
-      petId,
-      hasPetPhoto: !!petPhoto,
-      petPhotoSize: petPhoto?.size
+      subjectCount: petIds.length,
+      petIds,
+      petPhotoCount: petPhotos.filter(p => p !== null).length
     });
 
     if (!catalogImageId) {
@@ -272,9 +315,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!petId && !petPhoto) {
+    if (petIds.length === 0 || petIds.every(id => !id) && petPhotos.every(photo => !photo)) {
       return NextResponse.json(
-        { error: 'Either pet ID or pet photo is required' },
+        { error: 'At least one pet ID or pet photo is required' },
         { status: 400 }
       );
     }
@@ -386,123 +429,132 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let petData: any = null;
-    let petImageUrl: string = '';
-    let petCloudinaryId: string = '';
+    // Process all pets (multi-subject support)
+    const petImageUrls: string[] = [];
+    const petCloudinaryIds: string[] = [];
+    const petsData: any[] = [];
 
-    if (petId) {
-      // Use existing pet
-      console.log('🐕 Fetching pet data for petId:', petId, 'userId:', user.id);
-      const { data: pet, error: petError } = await supabase
-        .from('pets')
-        .select(`
-          id,
-          name,
-          breed_id,
-          coat_id,
-          primary_photo_url,
-          ai_analysis_data,
-          breeds (id, name),
-          coats (id, name, description)
-        `)
-        .eq('id', petId)
-        .eq('user_id', user.id)
-        .single();
+    for (let i = 0; i < petIds.length; i++) {
+      const petId = petIds[i];
+      const petPhoto = petPhotos[i];
 
-      if (petError || !pet) {
-        console.error('❌ Pet lookup failed:', { petError, hasPet: !!pet, petId, userId: user.id });
-        return NextResponse.json(
-          { error: 'Pet not found', details: petError?.message || 'Pet does not exist or does not belong to user' },
-          { status: 404 }
-        );
-      }
+      if (petId) {
+        // Use existing pet
+        console.log(`🐕 Fetching pet data for subject ${i + 1}, petId:`, petId, 'userId:', user.id);
+        const { data: pet, error: petError } = await supabase
+          .from('pets')
+          .select(`
+            id,
+            name,
+            breed_id,
+            coat_id,
+            primary_photo_url,
+            ai_analysis_data,
+            breeds (id, name),
+            coats (id, name, description)
+          `)
+          .eq('id', petId)
+          .eq('user_id', user.id)
+          .single();
 
-      console.log('✅ Pet found:', { petId: pet.id, petName: pet.name, hasPhotoUrl: !!pet.primary_photo_url });
-      petData = pet;
-      petImageUrl = pet.primary_photo_url;
-
-      // Extract Cloudinary ID from URL if it's a Cloudinary URL
-      if (petImageUrl.includes('cloudinary.com')) {
-        const urlParts = petImageUrl.split('/');
-        const uploadIndex = urlParts.indexOf('upload');
-        if (uploadIndex !== -1 && uploadIndex + 2 < urlParts.length) {
-          petCloudinaryId = urlParts.slice(uploadIndex + 2).join('/').split('.')[0];
-        } else {
-          petCloudinaryId = 'unknown';
+        if (petError || !pet) {
+          console.error(`❌ Pet lookup failed for subject ${i + 1}:`, { petError, hasPet: !!pet, petId, userId: user.id });
+          return NextResponse.json(
+            { error: `Pet ${i + 1} not found`, details: petError?.message || 'Pet does not exist or does not belong to user' },
+            { status: 404 }
+          );
         }
-      } else {
-        petCloudinaryId = 'non-cloudinary';
-      }
-      console.log('🔗 Pet image URL processed:', { petImageUrl: petImageUrl.substring(0, 50) + '...', petCloudinaryId });
-    } else if (petPhoto) {
-      // Upload new pet photo
-      console.log('📤 Uploading pet photo to Cloudinary...');
 
-      const arrayBuffer = await petPhoto.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+        console.log(`✅ Pet ${i + 1} found:`, { petId: pet.id, petName: pet.name, hasPhotoUrl: !!pet.primary_photo_url });
+        petsData.push(pet);
+        petImageUrls.push(pet.primary_photo_url);
 
-      // Upload to Cloudinary
-      const uploadResult = await new Promise<any>((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          {
-            folder: 'customer-custom-pets',
-            resource_type: 'image',
-            transformation: [
-              { width: 1024, height: 1024, crop: 'limit' },
-              { quality: 'auto', fetch_format: 'auto' }
-            ]
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
+        // Extract Cloudinary ID from URL if it's a Cloudinary URL
+        if (pet.primary_photo_url.includes('cloudinary.com')) {
+          const urlParts = pet.primary_photo_url.split('/');
+          const uploadIndex = urlParts.indexOf('upload');
+          if (uploadIndex !== -1 && uploadIndex + 2 < urlParts.length) {
+            const cloudinaryId = urlParts.slice(uploadIndex + 2).join('/').split('.')[0];
+            petCloudinaryIds.push(cloudinaryId);
+          } else {
+            petCloudinaryIds.push('unknown');
           }
-        );
-        uploadStream.end(buffer);
-      });
+        } else {
+          petCloudinaryIds.push('non-cloudinary');
+        }
+      } else if (petPhoto) {
+        // Upload new pet photo
+        console.log(`📤 Uploading pet photo for subject ${i + 1} to Cloudinary...`);
 
-      petImageUrl = uploadResult.secure_url;
-      petCloudinaryId = uploadResult.public_id;
+        const arrayBuffer = await petPhoto.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
 
-      console.log('✅ Pet photo uploaded:', petCloudinaryId);
+        // Upload to Cloudinary
+        const uploadResult = await new Promise<any>((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            {
+              folder: 'customer-custom-pets',
+              resource_type: 'image',
+              transformation: [
+                { width: 1024, height: 1024, crop: 'limit' },
+                { quality: 'auto', fetch_format: 'auto' }
+              ]
+            },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
+          uploadStream.end(buffer);
+        });
 
-      // For uploaded photos, we don't have breed/coat info yet
-      // TODO: Add AI analysis to detect breed/coat from uploaded photo
+        petImageUrls.push(uploadResult.secure_url);
+        petCloudinaryIds.push(uploadResult.public_id);
+        petsData.push(null); // No pet data for uploaded photos
+
+        console.log(`✅ Pet photo ${i + 1} uploaded:`, uploadResult.public_id);
+      }
     }
 
-    // Validate that we have pet image data before proceeding
-    if (!petImageUrl || !petCloudinaryId) {
-      console.error('❌ Missing pet image data:', { petImageUrl, petCloudinaryId });
+    // Validate that we have pet image data
+    if (petImageUrls.length === 0 || petCloudinaryIds.length === 0) {
+      console.error('❌ No pet images processed:', { urlCount: petImageUrls.length, idCount: petCloudinaryIds.length });
       return NextResponse.json(
-        { error: 'Failed to process pet image' },
+        { error: 'Failed to process pet images' },
         { status: 400 }
       );
     }
 
     console.log('✅ Pet image data validated:', {
-      hasUrl: !!petImageUrl,
-      hasCloudinaryId: !!petCloudinaryId,
-      petName: petData?.name || 'Uploaded Pet'
+      subjectCount: petImageUrls.length,
+      petNames: petsData.map(p => p?.name || 'Uploaded Pet').join(', ')
     });
 
-    // Create custom image record in database
+    // Create custom image record in database (use first pet for backward compatibility)
+    const firstPet = petsData[0];
+    const firstPetId = petIds[0];
+
     const { data: customImage, error: insertError } = await supabase
       .from('customer_custom_images')
       .insert({
         customer_id: customer.id,
         customer_email: customer.email,
         catalog_image_id: catalogImageId,
-        pet_id: petId || null,
-        pet_name: petData?.name || 'Uploaded Pet',
-        pet_breed_id: petData?.breed_id || null,
-        pet_coat_id: petData?.coat_id || null,
-        pet_image_url: petImageUrl,
-        pet_cloudinary_id: petCloudinaryId,
+        pet_id: firstPetId || null,
+        pet_name: firstPet?.name || 'Uploaded Pet',
+        pet_breed_id: firstPet?.breed_id || null,
+        pet_coat_id: firstPet?.coat_id || null,
+        pet_image_url: petImageUrls[0],
+        pet_cloudinary_id: petCloudinaryIds[0],
         status: 'pending',
         is_public: true, // Make shareable by default
         metadata: {
           catalog_theme: catalogImage.themes?.name,
           catalog_style: catalogImage.styles?.name,
           catalog_breed: catalogImage.breeds?.name,
+          subject_count: petImageUrls.length,
+          all_pet_ids: petIds.filter(id => id !== null),
+          all_pet_names: petsData.map(p => p?.name || 'Uploaded Pet'),
         }
       })
       .select(`
@@ -535,14 +587,14 @@ export async function POST(request: NextRequest) {
     generateCustomImage(
       customImage.id,
       catalogImageUrl,
-      petImageUrl,
+      petImageUrls, // Pass array of pet image URLs for multi-subject support
       variationPromptTemplate,
       catalogImage.themes?.name || 'Custom',
       catalogImage.styles?.name || 'Portrait',
       catalogImage.breeds?.name || 'Pet',
       catalogImage.formats?.aspect_ratio, // Pass aspect ratio from format
-      petData?.breeds?.name,
-      petData?.ai_analysis_data // NEW: Pass AI analysis data
+      firstPet?.breeds?.name,
+      firstPet?.ai_analysis_data // NEW: Pass AI analysis data from first pet
     ).catch(async (error) => {
       console.error('❌ Error in background generation:', error);
       // Update record with error status

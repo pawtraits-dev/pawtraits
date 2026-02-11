@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowLeft, Upload, Sparkles, Share2, Check, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, Upload, Sparkles, Share2, Check, ShoppingCart, AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
@@ -37,6 +37,8 @@ interface CatalogImage {
   style?: { name: string; displayName: string };
   breed?: { name: string; displayName: string };
   format?: { id: string; name: string; aspectRatio: string };
+  isMultiSubject?: boolean;
+  subjectCount?: number;
 }
 
 interface CustomImage {
@@ -55,6 +57,7 @@ export default function CustomisePage() {
   // Cloudinary URLs for progress graphics (with specific version and public IDs)
   const PROGRESS_IMAGES = [
     'https://res.cloudinary.com/dnhzfz8xv/image/upload/v1770800877/pawcasso-progress-1_selbwy.png',
+    'https://res.cloudinary.com/dnhzfz8xv/image/upload/v1770811121/pawcasso-progress-4_epyie9.png',
     'https://res.cloudinary.com/dnhzfz8xv/image/upload/v1770800877/pawcasso-progress-2_m14aix.png',
     'https://res.cloudinary.com/dnhzfz8xv/image/upload/v1770800876/pawcasso-progress-3_sxffsu.png'
   ];
@@ -63,9 +66,11 @@ export default function CustomisePage() {
 
   const [catalogImage, setCatalogImage] = useState<CatalogImage | null>(null);
   const [pets, setPets] = useState<Pet[]>([]);
-  const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+
+  // Multi-subject support: array of selected pets/uploads (one per subject)
+  const [selectedPets, setSelectedPets] = useState<(Pet | null)[]>([null]);
+  const [uploadedFiles, setUploadedFiles] = useState<(File | null)[]>([null]);
+  const [uploadPreviews, setUploadPreviews] = useState<(string | null)[]>([null]);
   const [generating, setGenerating] = useState(false);
   const [customImage, setCustomImage] = useState<CustomImage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,9 +109,17 @@ export default function CustomisePage() {
         hasImageUrl: !!imageData.imageUrl,
         imageUrl: imageData.imageUrl,
         theme: imageData.theme?.name,
-        style: imageData.style?.name
+        style: imageData.style?.name,
+        isMultiSubject: imageData.isMultiSubject,
+        subjectCount: imageData.subjectCount
       });
       setCatalogImage(imageData);
+
+      // Initialize arrays for multi-subject support
+      const subjectCount = imageData.subjectCount || 1;
+      setSelectedPets(Array(subjectCount).fill(null));
+      setUploadedFiles(Array(subjectCount).fill(null));
+      setUploadPreviews(Array(subjectCount).fill(null));
 
       // Fetch user's pets
       console.log('🐕 Fetching user pets...');
@@ -130,7 +143,7 @@ export default function CustomisePage() {
     }
   }
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>, subjectIndex: number = 0) {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -154,30 +167,59 @@ export default function CustomisePage() {
       return;
     }
 
-    setUploadedFile(file);
-    setSelectedPet(null); // Clear pet selection if uploading
+    setUploadedFiles(prev => {
+      const updated = [...prev];
+      updated[subjectIndex] = file;
+      return updated;
+    });
+
+    setSelectedPets(prev => {
+      const updated = [...prev];
+      updated[subjectIndex] = null;
+      return updated;
+    });
 
     // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
-      setUploadPreview(reader.result as string);
+      setUploadPreviews(prev => {
+        const updated = [...prev];
+        updated[subjectIndex] = reader.result as string;
+        return updated;
+      });
     };
     reader.readAsDataURL(file);
   }
 
-  function handlePetSelect(pet: Pet) {
-    setSelectedPet(pet);
-    setUploadedFile(null);
-    setUploadPreview(null);
+  function handlePetSelect(pet: Pet, subjectIndex: number = 0) {
+    setSelectedPets(prev => {
+      const updated = [...prev];
+      updated[subjectIndex] = pet;
+      return updated;
+    });
+
+    setUploadedFiles(prev => {
+      const updated = [...prev];
+      updated[subjectIndex] = null;
+      return updated;
+    });
+
+    setUploadPreviews(prev => {
+      const updated = [...prev];
+      updated[subjectIndex] = null;
+      return updated;
+    });
   }
 
   async function loadProgressMessages() {
     // Use simple, direct progress messages with pet's name and breed
-    const petName = selectedPet?.name || 'your pet';
-    const breedName = selectedPet?.breed_name || 'unique';
+    const firstPet = selectedPets[0];
+    const petName = firstPet?.name || 'your pet';
+    const breedName = firstPet?.breed_name || 'unique';
 
     setProgressMessages([
-      `Pawcasso is studying his Muse, ${petName}`,
+      `Pawcasso is contemplating his canvas`,
+      `Pawcasso is pcaturing the essence of his Muse, ${petName}`,
       `Pawcasso is hard at work capturing that ${breedName} personality`,
       `Pawcasso is putting the final touches in place, ready for the big reveal!`
     ]);
@@ -239,10 +281,15 @@ export default function CustomisePage() {
   }, [generating, progressMessages.length]);
 
   async function handleGenerate() {
-    if (!selectedPet && !uploadedFile) {
+    // Validate all subjects have a pet selected or file uploaded
+    const allSubjectsFilled = selectedPets.every((pet, idx) => pet !== null || uploadedFiles[idx] !== null);
+
+    if (!allSubjectsFilled) {
       toast({
-        title: 'Select a pet',
-        description: 'Please select one of your pets or upload a photo',
+        title: 'Select all pets',
+        description: catalogImage?.isMultiSubject
+          ? `Please select or upload ${catalogImage.subjectCount} pet photos`
+          : 'Please select a pet or upload a photo',
         variant: 'destructive'
       });
       return;
@@ -260,12 +307,29 @@ export default function CustomisePage() {
       const formData = new FormData();
       formData.append('catalogImageId', imageId);
 
-      if (selectedPet) {
-        formData.append('petId', selectedPet.pet_id);
-        console.log('🐕 Using existing pet:', selectedPet.pet_id, selectedPet.name);
-      } else if (uploadedFile) {
-        formData.append('petPhoto', uploadedFile);
-        console.log('📤 Uploading new pet photo:', uploadedFile.name, uploadedFile.size);
+      if (catalogImage?.isMultiSubject) {
+        // Multi-subject: add each pet or upload
+        selectedPets.forEach((pet, index) => {
+          if (pet) {
+            formData.append(`petId${index + 1}`, pet.pet_id);
+            console.log(`🐕 Using existing pet for subject ${index + 1}:`, pet.pet_id, pet.name);
+          } else if (uploadedFiles[index]) {
+            formData.append(`petPhoto${index + 1}`, uploadedFiles[index]!);
+            console.log(`📤 Uploading new pet photo for subject ${index + 1}:`, uploadedFiles[index]!.name);
+          }
+        });
+      } else {
+        // Single subject: backward compatible
+        const pet = selectedPets[0];
+        const file = uploadedFiles[0];
+
+        if (pet) {
+          formData.append('petId', pet.pet_id);
+          console.log('🐕 Using existing pet:', pet.pet_id, pet.name);
+        } else if (file) {
+          formData.append('petPhoto', file);
+          console.log('📤 Uploading new pet photo:', file.name, file.size);
+        }
       }
 
       console.log('🚀 Calling generate endpoint:', '/api/customers/custom-images/generate');
@@ -308,7 +372,7 @@ export default function CustomisePage() {
 
   async function pollForCompletion(customImageId: string) {
     console.log('🎯 pollForCompletion called with ID:', customImageId);
-    const maxAttempts = 60; // 2 minutes (2 second intervals)
+    const maxAttempts = 30; // 1 minutes (2 second intervals)
     let attempts = 0;
 
     const poll = setInterval(async () => {
@@ -338,8 +402,8 @@ export default function CustomisePage() {
             if (data.status === 'complete') {
               console.log('✅ Generation complete!', data);
               toast({
-                title: 'Image ready!',
-                description: 'Your custom Pawtrait is ready!'
+                title: 'VOILA!',
+                description: 'Your Pawtrait is ready!'
               });
             } else {
               console.error('❌ Generation failed:', data.error_message);
@@ -500,112 +564,214 @@ export default function CustomisePage() {
             {!customImage || customImage.status === 'failed' ? (
               <>
                 {/* Pet Selection */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Choose Your Pet</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {pets.length > 0 ? (
-                      <div className="grid grid-cols-2 gap-4">
-                        {pets.map((pet) => (
-                          <button
-                            key={pet.pet_id}
-                            onClick={() => handlePetSelect(pet)}
-                            className={`relative p-4 border-2 rounded-lg transition-all ${
-                              selectedPet?.pet_id === pet.pet_id
-                                ? 'border-purple-600 bg-purple-50'
-                                : 'border-gray-200 hover:border-purple-300'
-                            }`}
-                          >
-                            {pet.primary_photo_url && (
-                              <div className="relative aspect-square w-full mb-2 rounded-lg overflow-hidden">
+                {catalogImage?.isMultiSubject ? (
+                  // Multi-subject: Show N slots
+                  <div className="space-y-6">
+                    <Alert>
+                      <AlertDescription>
+                        This portrait has {catalogImage.subjectCount} subjects.
+                        Please select or upload {catalogImage.subjectCount} pet photos.
+                      </AlertDescription>
+                    </Alert>
+
+                    {Array.from({ length: catalogImage.subjectCount }).map((_, index) => (
+                      <Card key={index}>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            Subject {index + 1}
+                            {index === 0 && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">Primary</span>}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {/* Pet selection grid for this subject */}
+                          {pets.length > 0 && (
+                            <div className="grid grid-cols-2 gap-4">
+                              {pets.map((pet) => (
+                                <button
+                                  key={pet.pet_id}
+                                  onClick={() => handlePetSelect(pet, index)}
+                                  className={`relative p-4 border-2 rounded-lg transition-all ${
+                                    selectedPets[index]?.pet_id === pet.pet_id
+                                      ? 'border-purple-600 bg-purple-50'
+                                      : 'border-gray-200 hover:border-purple-300'
+                                  }`}
+                                >
+                                  {pet.primary_photo_url && (
+                                    <div className="relative aspect-square w-full mb-2 rounded-lg overflow-hidden">
+                                      <Image
+                                        src={pet.primary_photo_url}
+                                        alt={pet.name}
+                                        fill
+                                        className="object-cover"
+                                      />
+                                    </div>
+                                  )}
+                                  <p className="font-semibold text-center">{pet.name}</p>
+                                  {selectedPets[index]?.pet_id === pet.pet_id && (
+                                    <div className="absolute top-2 right-2 bg-purple-600 rounded-full p-1">
+                                      <Check className="w-4 h-4 text-white" />
+                                    </div>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Upload option for this subject */}
+                          <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                              <div className="w-full border-t border-gray-300"></div>
+                            </div>
+                            <div className="relative flex justify-center text-sm">
+                              <span className="px-2 bg-white text-gray-500">or</span>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block">
+                              <div className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                                uploadedFiles[index] ? 'border-purple-600 bg-purple-50' : 'border-gray-300 hover:border-purple-400'
+                              }`}>
+                                <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                                <p className="text-sm text-gray-600">
+                                  {uploadedFiles[index] ? 'Photo uploaded!' : `Upload photo for subject ${index + 1}`}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Max 10MB, JPG/PNG
+                                </p>
+                              </div>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleFileSelect(e, index)}
+                                className="hidden"
+                              />
+                            </label>
+
+                            {uploadPreviews[index] && (
+                              <div className="mt-4 relative w-32 h-32 mx-auto rounded-lg overflow-hidden border-2 border-purple-600">
                                 <Image
-                                  src={pet.primary_photo_url}
-                                  alt={pet.name}
+                                  src={uploadPreviews[index]!}
+                                  alt="Upload preview"
                                   fill
                                   className="object-cover"
                                 />
                               </div>
                             )}
-                            <p className="font-semibold text-center">{pet.name}</p>
-                            {selectedPet?.pet_id === pet.pet_id && (
-                              <div className="absolute top-2 right-2 bg-purple-600 rounded-full p-1">
-                                <Check className="w-4 h-4 text-white" />
-                              </div>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-600 text-center py-4">
-                        No pets found. Upload a photo below or{' '}
-                        <Link href="/customer/pets" className="text-purple-600 hover:underline">
-                          add your pet
-                        </Link>{' '}
-                        first.
-                      </p>
-                    )}
-
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-gray-300"></div>
-                      </div>
-                      <div className="relative flex justify-center text-sm">
-                        <span className="px-2 bg-white text-gray-500">or</span>
-                      </div>
-                    </div>
-
-                    {/* Upload New Photo */}
-                    <div>
-                      <label className="block">
-                        <div className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                          uploadedFile ? 'border-purple-600 bg-purple-50' : 'border-gray-300 hover:border-purple-400'
-                        }`}>
-                          <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                          <p className="text-sm text-gray-600">
-                            {uploadedFile ? 'Photo uploaded!' : 'Upload a photo of your pet'}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Max 10MB, JPG/PNG
-                          </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  // Single subject: Show existing UI
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Choose Your Pet</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {pets.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-4">
+                          {pets.map((pet) => (
+                            <button
+                              key={pet.pet_id}
+                              onClick={() => handlePetSelect(pet, 0)}
+                              className={`relative p-4 border-2 rounded-lg transition-all ${
+                                selectedPets[0]?.pet_id === pet.pet_id
+                                  ? 'border-purple-600 bg-purple-50'
+                                  : 'border-gray-200 hover:border-purple-300'
+                              }`}
+                            >
+                              {pet.primary_photo_url && (
+                                <div className="relative aspect-square w-full mb-2 rounded-lg overflow-hidden">
+                                  <Image
+                                    src={pet.primary_photo_url}
+                                    alt={pet.name}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                </div>
+                              )}
+                              <p className="font-semibold text-center">{pet.name}</p>
+                              {selectedPets[0]?.pet_id === pet.pet_id && (
+                                <div className="absolute top-2 right-2 bg-purple-600 rounded-full p-1">
+                                  <Check className="w-4 h-4 text-white" />
+                                </div>
+                              )}
+                            </button>
+                          ))}
                         </div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileSelect}
-                          className="hidden"
-                        />
-                      </label>
-
-                      {uploadPreview && (
-                        <div className="mt-4 relative aspect-square w-full max-w-xs mx-auto rounded-lg overflow-hidden">
-                          <Image
-                            src={uploadPreview}
-                            alt="Upload preview"
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
+                      ) : (
+                        <p className="text-gray-600 text-center py-4">
+                          No pets found. Upload a photo below or{' '}
+                          <Link href="/customer/pets" className="text-purple-600 hover:underline">
+                            add your pet
+                          </Link>{' '}
+                          first.
+                        </p>
                       )}
-                    </div>
-                  </CardContent>
-                </Card>
+
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-gray-300"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                          <span className="px-2 bg-white text-gray-500">or</span>
+                        </div>
+                      </div>
+
+                      {/* Upload New Photo */}
+                      <div>
+                        <label className="block">
+                          <div className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                            uploadedFiles[0] ? 'border-purple-600 bg-purple-50' : 'border-gray-300 hover:border-purple-400'
+                          }`}>
+                            <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                            <p className="text-sm text-gray-600">
+                              {uploadedFiles[0] ? 'Photo uploaded!' : 'Upload a photo of your pet'}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Max 10MB, JPG/PNG
+                            </p>
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleFileSelect(e, 0)}
+                            className="hidden"
+                          />
+                        </label>
+
+                        {uploadPreviews[0] && (
+                          <div className="mt-4 relative aspect-square w-full max-w-xs mx-auto rounded-lg overflow-hidden">
+                            <Image
+                              src={uploadPreviews[0]}
+                              alt="Upload preview"
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Generate Button */}
                 <Button
                   onClick={handleGenerate}
-                  disabled={generating || (!selectedPet && !uploadedFile)}
+                  disabled={generating || (!selectedPets.some(p => p !== null) && !uploadedFiles.some(f => f !== null))}
                   className="w-full bg-purple-600 hover:bg-purple-700 text-white py-6 text-lg"
                 >
                   {generating ? (
                     <>
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Generating Your Portrait...
+                      Generating Your Pawtrait...
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-5 h-5 mr-2" />
-                      Generate Custom Portrait
+                      Generate Custom Pawtrait
                     </>
                   )}
                 </Button>
@@ -621,9 +787,6 @@ export default function CustomisePage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Your Custom Pawtrait</CardTitle>
-                  <p className="text-sm text-gray-600 mt-2">
-                    Your personalized Pawtrait is ready! Purchase to download the high-resolution version without watermark.
-                  </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {customImage.status === 'complete' && customImage.generated_image_url ? (
@@ -656,9 +819,9 @@ export default function CustomisePage() {
                       {/* Purchase CTA Section */}
                       <Alert className="border-blue-200 bg-blue-50">
                         <ShoppingCart className="h-4 w-4 text-blue-600" />
-                        <AlertTitle className="text-blue-900">Love your portrait?</AlertTitle>
+                        <AlertTitle className="text-blue-900">Love your Pawtrait?</AlertTitle>
                         <AlertDescription className="text-blue-800">
-                          Purchase to get the full high-resolution version without watermark, perfect for printing or sharing!
+                          Purchase a high resolution download, or choose from a range of museum quality prints
                         </AlertDescription>
                       </Alert>
 
@@ -670,7 +833,7 @@ export default function CustomisePage() {
                               How does it look?
                             </h4>
                             <p className="text-sm text-purple-700 mb-3">
-                              Rate this portrait to help us improve Pawcasso's skills
+                              Rate this Partrait to help us improve Pawcasso's skills
                             </p>
                             <div className="flex gap-2 justify-center">
                               {[1, 2, 3, 4, 5].map((heartNum) => (
@@ -723,9 +886,10 @@ export default function CustomisePage() {
                         <Button
                           onClick={() => {
                             setCustomImage(null);
-                            setSelectedPet(null);
-                            setUploadedFile(null);
-                            setUploadPreview(null);
+                            const subjectCount = catalogImage?.subjectCount || 1;
+                            setSelectedPets(Array(subjectCount).fill(null));
+                            setUploadedFiles(Array(subjectCount).fill(null));
+                            setUploadPreviews(Array(subjectCount).fill(null));
                           }}
                           variant="outline"
                           className="w-full"
@@ -762,24 +926,9 @@ export default function CustomisePage() {
                         />
                       </div>
 
-                      {/* Three Logo Spinners */}
-                      <div className="flex items-center justify-center gap-6 mb-6">
-                        {[0, 1, 2].map((index) => (
-                          <div
-                            key={index}
-                            className={`relative w-12 h-12 ${
-                              currentProgressGraphic === index ? 'animate-spin' : 'opacity-30'
-                            }`}
-                            style={{ animationDuration: '2s' }}
-                          >
-                            <Image
-                              src="/assets/logos/pawrtraits-logo.svg"
-                              alt="Pawtraits logo"
-                              fill
-                              className="object-contain"
-                            />
-                          </div>
-                        ))}
+                      {/* Loading Spinner */}
+                      <div className="flex items-center justify-center mb-6">
+                        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600"></div>
                       </div>
 
                       {progressMessages.length > 0 ? (
@@ -787,9 +936,7 @@ export default function CustomisePage() {
                           <p className="text-lg text-gray-700 font-medium mb-2">
                             {progressMessages[currentMessageIndex]}
                           </p>
-                          <p className="text-sm text-gray-500">
-                            This shouldn't take too long - good things come to those who wait!
-                          </p>
+
                         </>
                       ) : (
                         <>
@@ -797,9 +944,7 @@ export default function CustomisePage() {
                             {customImage.status === 'pending' && 'Preparing your Pawtrait...'}
                             {customImage.status === 'generating' && 'Generating your Pawtrait...'}
                           </p>
-                          <p className="text-sm text-gray-500 mt-2">
-                            This shouldn't take too long - good things come to those who wait!
-                          </p>
+
                         </>
                       )}
                     </div>
