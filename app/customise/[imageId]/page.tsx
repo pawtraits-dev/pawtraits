@@ -719,11 +719,9 @@ export default function CustomisePage() {
                     <div className="text-center py-8">
                       {/* Progress Graphic */}
                       <div className="relative w-full max-w-md mx-auto mb-6">
-                        <Image
+                        <img
                           src={`/assets/images/pawcasso-progress-${currentProgressGraphic + 1}.png`}
                           alt={`Pawcasso progress ${currentProgressGraphic + 1}`}
-                          width={400}
-                          height={400}
                           className="w-full h-auto rounded-lg"
                         />
                       </div>
