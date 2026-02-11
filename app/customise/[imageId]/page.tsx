@@ -536,9 +536,9 @@ export default function CustomisePage() {
           </p>
         </div>
 
-        <div className={`grid grid-cols-1 ${!generating && (!customImage || customImage.status === 'failed') ? 'lg:grid-cols-2' : ''} gap-8`}>
+        <div className={`grid grid-cols-1 ${!generating && !customImage ? 'lg:grid-cols-2' : ''} gap-8`}>
           {/* Left: Original Image - Hidden during generation */}
-          {!generating && (!customImage || customImage.status === 'failed') && (
+          {!generating && !customImage && (
             <div>
               <Card>
                 <CardHeader>
@@ -575,8 +575,8 @@ export default function CustomisePage() {
           )}
 
           {/* Right: Pet Selection / Generation / Result */}
-          <div className={`space-y-6 ${generating || (customImage && customImage.status !== 'failed') ? 'mx-auto max-w-2xl' : ''}`}>
-            {!customImage || customImage.status === 'failed' ? (
+          <div className={`space-y-6 ${generating || customImage ? 'mx-auto max-w-2xl' : ''}`}>
+            {!customImage ? (
               <>
                 {/* Pet Selection */}
                 {catalogImage?.isMultiSubject ? (
@@ -948,10 +948,11 @@ export default function CustomisePage() {
 
                       {progressMessages.length > 0 ? (
                         <>
-                          <p className="text-lg text-gray-700 font-medium mb-2">
-                            {progressMessages[currentMessageIndex]}
-                          </p>
-
+                          <div className="mx-auto max-w-md px-4">
+                            <p className="text-lg text-gray-700 font-['var(--font-life-savers)'] leading-relaxed">
+                              {progressMessages[currentMessageIndex]}
+                            </p>
+                          </div>
                         </>
                       ) : (
                         <>
