@@ -923,12 +923,23 @@ export default function CustomisePage() {
                           className="w-full h-auto rounded-lg"
                         />
                       </div>
-                      <p className="text-lg text-red-600 font-medium mb-2">
-                        Oops! Something went wrong
+                      <p className="text-lg text-gray-700 font-['var(--font-life-savers)'] leading-relaxed mb-6 px-4 max-w-md mx-auto">
+                        Pawcasso is a perfectionist, and he's not happy with his work. He'd love a second chance to please you.
                       </p>
-                      <p className="text-sm text-gray-500">
-                        {error || 'Please try again'}
-                      </p>
+                      <Button
+                        onClick={() => {
+                          setCustomImage(null);
+                          setError(null);
+                          const subjectCount = catalogImage?.subjectCount || 1;
+                          setSelectedPets(Array(subjectCount).fill(null));
+                          setUploadedFiles(Array(subjectCount).fill(null));
+                          setUploadPreviews(Array(subjectCount).fill(null));
+                        }}
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                        size="lg"
+                      >
+                        Try Again
+                      </Button>
                     </div>
                   ) : (
                     <div className="text-center py-8">
