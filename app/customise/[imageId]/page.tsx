@@ -480,7 +480,7 @@ export default function CustomisePage() {
           <UserAwareNavigation />
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-200 border-t-purple-600 mx-auto mb-4"></div>
               <p className="text-gray-600">Loading...</p>
             </div>
           </div>
@@ -780,7 +780,7 @@ export default function CustomisePage() {
                 >
                   {generating ? (
                     <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
                       Generating Your Pawtrait...
                     </>
                   ) : (
@@ -963,7 +963,7 @@ export default function CustomisePage() {
 
                       {/* Loading Spinner */}
                       <div className="flex items-center justify-center mb-6">
-                        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600"></div>
+                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-purple-200 border-t-purple-600"></div>
                       </div>
 
                       {/* Progress Message Carousel */}
