@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ArrowLeft, Upload, Sparkles, Share2, Check, ShoppingCart } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
 
 interface Pet {
   pet_id: string;  // Note: RPC function returns 'pet_id', not 'id'
@@ -374,10 +375,13 @@ export default function CustomisePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+      <div className="min-h-screen bg-gray-50">
+        <UserAwareNavigation />
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
         </div>
       </div>
     );
@@ -385,25 +389,31 @@ export default function CustomisePage() {
 
   if (error && !catalogImage) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardContent className="pt-6">
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-            <Button onClick={() => router.push('/browse')} className="mt-4 w-full">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Gallery
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gray-50">
+        <UserAwareNavigation />
+        <div className="flex items-center justify-center h-64 px-4">
+          <Card className="max-w-md">
+            <CardContent className="pt-6">
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+              <Button onClick={() => router.push('/browse')} className="mt-4 w-full">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Gallery
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50">
+      {/* Global Navigation */}
+      <UserAwareNavigation />
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <Link
