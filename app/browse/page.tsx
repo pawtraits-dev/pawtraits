@@ -1076,8 +1076,187 @@ function BrowsePageContent() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
 
-          {/* Breed Cards (All/Dogs/Cats) */}
-          {(activeTab === 'all' || activeTab === 'dogs' || activeTab === 'cats') && (
+          {/* Image Cards (All Tab) */}
+          {activeTab === 'all' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              {getFilteredImages().map((image) => {
+                const isLiked = likedImages.has(image.id);
+                const isShared = sharedImages.has(image.id);
+                const isPurchased = purchasedImages.has(image.id);
+                const productInfo = getImageProductInfo(image.id);
+
+                return (
+                  <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
+                    <div
+                      className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
+                      onClick={() => router.push(`/shop/${image.id}`)}
+                    >
+                      <CatalogImage
+                        imageId={image.id}
+                        alt={image.description || 'Generated image'}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        fallbackUrl={image.image_url || image.public_url}
+                      />
+
+                      {/* Like, Share, Customize, and Purchase status overlay */}
+                      <div className="absolute top-2 right-2 flex flex-col gap-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLike(image.id);
+                            }}
+                            className={`p-2 rounded-full transition-all ${
+                              isLiked
+                                ? 'bg-red-500 text-white'
+                                : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
+                            }`}
+                            title={isLiked ? 'Unlike' : 'Like'}
+                          >
+                            <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShare(image);
+                            }}
+                            className={`p-2 rounded-full transition-all ${
+                              isShared
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
+                            }`}
+                            title={isShared ? 'Shared' : 'Share'}
+                          >
+                            <Share2 className="w-4 h-4" />
+                          </button>
+
+                          {/* Partner QR Code Sharing Button */}
+                          {userProfile?.user_type === 'partner' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleQRShare(image);
+                              }}
+                              className="p-2 rounded-full transition-all bg-white bg-opacity-80 text-gray-700 hover:bg-green-500 hover:text-white"
+                              title="Generate QR Code for Client"
+                            >
+                              <QrCode className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {isPurchased && (
+                            <div className="bg-green-500 text-white p-2 rounded-full" title="Purchased">
+                              <ShoppingCart className="w-4 h-4 fill-current" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Customize Button - Visible to All, Redirects Non-Customers to Sign Up */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCustomize(image);
+                          }}
+                          className="p-2 rounded-full transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-lg"
+                          title="Customize this image"
+                        >
+                          <Wand2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <CardContent className="p-4">
+                      {image.description && (
+                        <p className="text-sm text-gray-900 font-medium line-clamp-2 mb-2">
+                          {image.description.split('\n')[0].replace(/\*\*(.*?)\*\*/g, '$1')}
+                        </p>
+                      )}
+
+                      <div className="space-y-1 mb-3">
+                        {image.breed_name && image.breed_id && (
+                          <div>
+                            <Badge
+                              variant="secondary"
+                              className="text-xs cursor-pointer hover:bg-blue-200 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedBreedId(image.breed_id);
+                                setSelectedThemeId('');
+                                setSearchTerm('');
+                              }}
+                            >
+                              {image.breed_name}
+                            </Badge>
+                          </div>
+                        )}
+                        {image.theme_name && image.theme_id && (
+                          <div>
+                            <Badge
+                              variant="secondary"
+                              className="text-xs cursor-pointer hover:bg-purple-200 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedThemeId(image.theme_id);
+                                setSelectedBreedId('');
+                                setSearchTerm('');
+                                setActiveTab('themes');
+                              }}
+                            >
+                              {image.theme_name}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Country-aware pricing */}
+                      {productInfo.lowestPrice && (
+                        <div className="mb-3">
+                          <p className="text-sm font-medium text-green-600">
+                            from {formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol)}
+                          </p>
+                          {productInfo.productCount > 1 && (
+                            <p className="text-xs text-gray-500">
+                              {productInfo.productCount} size{productInfo.productCount > 1 ? 's' : ''} available
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <Button
+                          className="w-full bg-blue-600 hover:bg-blue-700"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/create?id=${image.id}`);
+                          }}
+                        >
+                          <Camera className="w-4 h-4 mr-2" />
+                          Put My Pet in This Pic
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/shop/${image.id}`);
+                          }}
+                        >
+                          <ShoppingCart className="w-4 h-4 mr-2" />
+                          View Details
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Breed Cards (Dogs/Cats) */}
+          {(activeTab === 'dogs' || activeTab === 'cats') && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {currentBreeds.map((breed) => {
                 const imageCount = getBreedImageCount(breed.id);
@@ -1218,19 +1397,27 @@ function BrowsePageContent() {
           )}
 
           {/* Empty states */}
-          {(activeTab === 'all' || activeTab === 'dogs' || activeTab === 'cats') && currentBreeds.length === 0 && (
+          {activeTab === 'all' && getFilteredImages().length === 0 && (
             <div className="text-center py-12">
-              {activeTab === 'all' ? (
-                <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              ) : activeTab === 'dogs' ? (
+              <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-600">
+                No pawtraits available yet. Check back soon!
+              </p>
+              <p className="text-gray-500 text-sm mt-2">Fresh pawtraits are added regularly!</p>
+            </div>
+          )}
+
+          {(activeTab === 'dogs' || activeTab === 'cats') && currentBreeds.length === 0 && (
+            <div className="text-center py-12">
+              {activeTab === 'dogs' ? (
                 <Dog className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               ) : (
                 <Cat className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               )}
               <p className="text-gray-600">
                 {searchTerm
-                  ? `No ${activeTab === 'all' ? 'pet' : activeTab} breeds match your search "${searchTerm}"`
-                  : activeTab === 'all' ? 'Pet breeds coming soon...' : `${activeTab === 'dogs' ? 'Dog' : 'Cat'} breeds coming soon...`
+                  ? `No ${activeTab} breeds match your search "${searchTerm}"`
+                  : `${activeTab === 'dogs' ? 'Dog' : 'Cat'} breeds coming soon...`
                 }
               </p>
               {searchTerm && (
