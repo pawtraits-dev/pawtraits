@@ -269,3 +269,78 @@ export function generateProductSku(mediumSlug: string, formatName: string, sizeC
   }
   return sku;
 }
+
+// ============================================================
+// Mug Product Types
+// ============================================================
+
+export interface MugColour {
+  id: string;
+  name: string;
+  slug: string;
+  hex: string;       // e.g. 'FDD26E' (no hash)
+  text_hex: string;  // contrast text ON mug body
+  overlay_hex: string; // text colour IN composite image
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface MugCatalogEntry {
+  id: string;
+  type: 'zodiac' | 'breed';
+  slug: string;
+  name: string;
+  sub_heading: string;
+  description: string;
+  description_short?: string;
+  catalog_image_url: string;
+  catalog_image_public_id: string;
+  animal_type?: 'dog' | 'cat' | 'both';
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MugGeneration {
+  id: string;
+  customer_id?: string;
+  session_id?: string;
+  mug_catalog_id?: string;
+  mug_colour_id?: string;
+  pet_name: string;
+  pet_photo_url: string;
+  pet_photo_public_id: string;
+  personalised_image_url?: string;
+  personalised_image_public_id?: string;
+  composite_preview_url?: string;
+  composite_print_url?: string;
+  status: 'pending' | 'generating' | 'complete' | 'failed' | 'purchased';
+  gemini_prompt?: string;
+  error_message?: string;
+  generation_time_ms?: number;
+  created_at: string;
+  updated_at: string;
+  // Joined fields (admin view)
+  mug_catalog?: MugCatalogEntry;
+  mug_colour?: MugColour;
+}
+
+export interface MugCatalogCreate {
+  type: 'zodiac' | 'breed';
+  slug: string;
+  name: string;
+  sub_heading: string;
+  description: string;
+  description_short?: string;
+  catalog_image_url: string;
+  catalog_image_public_id: string;
+  animal_type?: 'dog' | 'cat' | 'both';
+  is_active?: boolean;
+  sort_order?: number;
+}
+
+export interface MugCatalogUpdate extends Partial<MugCatalogCreate> {
+  id: string;
+}

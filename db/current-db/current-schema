@@ -370,6 +370,39 @@ CREATE TABLE public.customer_credits (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT customer_credits_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.customer_custom_images (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  customer_id uuid,
+  customer_email text NOT NULL,
+  catalog_image_id uuid,
+  pet_id uuid,
+  pet_name text,
+  pet_breed_id uuid,
+  pet_coat_id uuid,
+  pet_image_url text NOT NULL,
+  pet_cloudinary_id text NOT NULL,
+  generated_image_url text,
+  generated_cloudinary_id text,
+  generation_prompt text,
+  generation_metadata jsonb,
+  is_public boolean DEFAULT false,
+  share_token text UNIQUE,
+  share_count integer DEFAULT 0,
+  last_shared_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  generated_at timestamp with time zone,
+  status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'generating'::text, 'complete'::text, 'failed'::text])),
+  error_message text,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  rating integer CHECK (rating >= 1 AND rating <= 5),
+  CONSTRAINT customer_custom_images_pkey PRIMARY KEY (id),
+  CONSTRAINT customer_custom_images_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
+  CONSTRAINT customer_custom_images_catalog_image_id_fkey FOREIGN KEY (catalog_image_id) REFERENCES public.image_catalog(id),
+  CONSTRAINT customer_custom_images_pet_id_fkey FOREIGN KEY (pet_id) REFERENCES public.pets(id),
+  CONSTRAINT customer_custom_images_pet_breed_id_fkey FOREIGN KEY (pet_breed_id) REFERENCES public.breeds(id),
+  CONSTRAINT customer_custom_images_pet_coat_id_fkey FOREIGN KEY (pet_coat_id) REFERENCES public.coats(id)
+);
 CREATE TABLE public.customer_customization_credits (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   customer_id uuid NOT NULL UNIQUE,
@@ -510,6 +543,16 @@ CREATE TABLE public.data_protection_events (
   CONSTRAINT data_protection_events_pkey PRIMARY KEY (id),
   CONSTRAINT data_protection_events_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id),
   CONSTRAINT data_protection_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.digital_bundle_tiers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  quantity integer NOT NULL UNIQUE CHECK (quantity > 0),
+  price_gbp integer NOT NULL CHECK (price_gbp > 0),
+  discount_percentage numeric NOT NULL DEFAULT 0.00 CHECK (discount_percentage >= 0::numeric AND discount_percentage <= 100::numeric),
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT digital_bundle_tiers_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.format_theme_combinations (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -1069,8 +1112,15 @@ CREATE TABLE public.pet_photos (
   is_primary boolean DEFAULT false,
   description text,
   created_at timestamp with time zone DEFAULT now(),
+  ai_analysis jsonb,
+  ai_analyzed_at timestamp with time zone,
+  detected_breed_id uuid,
+  detected_coat_id uuid,
+  ai_confidence_score numeric,
   CONSTRAINT pet_photos_pkey PRIMARY KEY (id),
-  CONSTRAINT pet_photos_pet_id_fkey FOREIGN KEY (pet_id) REFERENCES public.pets(id)
+  CONSTRAINT pet_photos_pet_id_fkey FOREIGN KEY (pet_id) REFERENCES public.pets(id),
+  CONSTRAINT pet_photos_detected_breed_id_fkey FOREIGN KEY (detected_breed_id) REFERENCES public.breeds(id),
+  CONSTRAINT pet_photos_detected_coat_id_fkey FOREIGN KEY (detected_coat_id) REFERENCES public.coats(id)
 );
 CREATE TABLE public.pets (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -1091,6 +1141,7 @@ CREATE TABLE public.pets (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   animal_type text NOT NULL DEFAULT 'dog'::text CHECK (animal_type = ANY (ARRAY['dog'::text, 'cat'::text])),
+  ai_analysis_data jsonb,
   CONSTRAINT pets_pkey PRIMARY KEY (id),
   CONSTRAINT pets_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT pets_breed_id_fkey FOREIGN KEY (breed_id) REFERENCES public.breeds(id),

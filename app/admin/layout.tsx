@@ -35,7 +35,8 @@ import {
   UserPlus,
   Mail,
   MessageSquare,
-  Send
+  Send,
+  Coffee
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -117,6 +118,14 @@ const navigationSections = [
       { name: 'Costs', href: '/admin/financial/costs', icon: TrendingUp },
       { name: 'Profit', href: '/admin/financial/profit', icon: PieChart },
       { name: 'Commissions', href: '/admin/financial/commissions', icon: Target },
+    ]
+  },
+  {
+    title: 'Mugs',
+    items: [
+      { name: 'Mug Catalog', href: '/admin/mugs/catalog', icon: Coffee },
+      { name: 'Mug Colours', href: '/admin/mugs/colours', icon: Palette },
+      { name: 'Mug Generations', href: '/admin/mugs/generations', icon: BarChart3 },
     ]
   },
   {

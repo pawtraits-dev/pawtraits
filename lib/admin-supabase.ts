@@ -1,7 +1,10 @@
-import type { 
+import type {
   Media, MediaCreate, MediaUpdate,
   Product, ProductCreate, ProductUpdate,
-  Format
+  Format,
+  MugColour,
+  MugCatalogEntry, MugCatalogCreate, MugCatalogUpdate,
+  MugGeneration
 } from './product-types';
 
 // Admin-specific Supabase service that uses API endpoints with service role
@@ -382,6 +385,109 @@ export class AdminSupabaseService {
     } catch (error) {
       console.error('Error updating template:', error);
       return null;
+    }
+  }
+
+  // ===== MUG CATALOG METHODS =====
+
+  async getMugCatalog(activeOnly: boolean = false): Promise<MugCatalogEntry[]> {
+    try {
+      const response = await fetch(`/api/admin/mugs/catalog?activeOnly=${activeOnly}`);
+      if (!response.ok) return [];
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting mug catalog:', error);
+      return [];
+    }
+  }
+
+  async getMugCatalogEntry(id: string): Promise<MugCatalogEntry | null> {
+    try {
+      const response = await fetch(`/api/admin/mugs/catalog?id=${id}`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) ? data[0] : data;
+    } catch (error) {
+      console.error('Error getting mug catalog entry:', error);
+      return null;
+    }
+  }
+
+  async createMugCatalogEntry(data: MugCatalogCreate): Promise<MugCatalogEntry | null> {
+    try {
+      const response = await fetch('/api/admin/mugs/catalog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch (error) {
+      console.error('Error creating mug catalog entry:', error);
+      return null;
+    }
+  }
+
+  async updateMugCatalogEntry(data: MugCatalogUpdate): Promise<MugCatalogEntry | null> {
+    try {
+      const response = await fetch('/api/admin/mugs/catalog', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating mug catalog entry:', error);
+      return null;
+    }
+  }
+
+  async deleteMugCatalogEntry(id: string): Promise<boolean> {
+    try {
+      const response = await fetch(`/api/admin/mugs/catalog?id=${id}`, {
+        method: 'DELETE'
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Error deleting mug catalog entry:', error);
+      return false;
+    }
+  }
+
+  // ===== MUG COLOURS METHODS =====
+
+  async getMugColours(activeOnly: boolean = true): Promise<MugColour[]> {
+    try {
+      const response = await fetch(`/api/admin/mugs/colours?activeOnly=${activeOnly}`);
+      if (!response.ok) return [];
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting mug colours:', error);
+      return [];
+    }
+  }
+
+  // ===== MUG GENERATIONS METHODS =====
+
+  async getMugGenerations(filters?: {
+    status?: string;
+    type?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<MugGeneration[]> {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.status) params.set('status', filters.status);
+      if (filters?.type) params.set('type', filters.type);
+      if (filters?.startDate) params.set('startDate', filters.startDate);
+      if (filters?.endDate) params.set('endDate', filters.endDate);
+      const response = await fetch(`/api/admin/mugs/generations?${params.toString()}`);
+      if (!response.ok) return [];
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting mug generations:', error);
+      return [];
     }
   }
 }
