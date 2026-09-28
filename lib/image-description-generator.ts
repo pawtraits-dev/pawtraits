@@ -5,6 +5,23 @@ const anthropic = new Anthropic({
   apiKey: process.env.CLAUDE_API_KEY!,
 });
 
+type ClaudeImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+
+/**
+ * Detect the real image type from its magic bytes. Claude rejects images whose
+ * declared media_type doesn't match the bytes (e.g. Gemini returns JPEG even when
+ * the upstream code labels it PNG), so never trust the filename/MIME label.
+ */
+function detectImageMediaType(base64: string, fallback: string = 'image/jpeg'): ClaudeImageMediaType {
+  const b = Buffer.from(base64.slice(0, 32), 'base64');
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+  if (b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  if (b.toString('ascii', 0, 3) === 'GIF') return 'image/gif';
+  return (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(fallback)
+    ? fallback : 'image/jpeg') as ClaudeImageMediaType;
+}
+
 export class ImageDescriptionGenerator {
   private buildDescriptionPrompt(breed?: string, traits?: string[]): string {
     const breedInfo = breed ? `
@@ -47,6 +64,7 @@ Now write a fun description for this image in exactly that style, incorporating 
     try {
       const prompt = this.buildDescriptionPrompt(breed, traits);
       
+      const imageData = await this.imageToBase64(imageUrl);
       const response = await anthropic.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 500,
@@ -58,8 +76,8 @@ Now write a fun description for this image in exactly that style, incorporating 
                 type: "image",
                 source: {
                   type: "base64",
-                  media_type: "image/jpeg",
-                  data: await this.imageToBase64(imageUrl)
+                  media_type: detectImageMediaType(imageData),
+                  data: imageData
                 }
               },
               {
@@ -183,11 +201,11 @@ Now write a fun description for this image in exactly that style, incorporating 
         processedFileType: processedFile.type
       });
       
-      // Determine media type from processed file type (not original)
-      let mediaType = 'image/jpeg';
-      if (processedFile.type === 'image/png') mediaType = 'image/png';
-      else if (processedFile.type === 'image/webp') mediaType = 'image/webp';
-      else if (processedFile.type === 'image/gif') mediaType = 'image/gif';
+      // Determine media type from the actual bytes — the declared file type can be wrong
+      const mediaType = detectImageMediaType(base64, processedFile.type);
+      if (mediaType !== processedFile.type) {
+        console.log(`Media type corrected: declared ${processedFile.type}, actual ${mediaType}`);
+      }
       
       const response = await anthropic.messages.create({
         model: "claude-haiku-4-5-20251001",
@@ -200,7 +218,7 @@ Now write a fun description for this image in exactly that style, incorporating 
                 type: "image",
                 source: {
                   type: "base64",
-                  media_type: mediaType as any,
+                  media_type: mediaType,
                   data: base64
                 }
               },
