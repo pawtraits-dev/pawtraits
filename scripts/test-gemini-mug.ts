@@ -22,6 +22,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import * as dotenv from 'dotenv';
 import { buildMugPreviewUrl } from '../lib/cloudinary-mug';
 import type { MugColour, MugCatalogEntry } from '../lib/product-types';
+import { GEMINI_IMAGE_MODELS } from '../lib/gemini-models';
 
 dotenv.config({ path: '.env.local' });
 
@@ -118,7 +119,7 @@ async function main() {
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
   const geminiResponse = await ai.models.generateContent({
-    model: 'gemini-2.0-flash-preview-image-generation',
+    model: GEMINI_IMAGE_MODELS.flash,
     contents: [
       {
         role: 'user',
@@ -129,7 +130,7 @@ async function main() {
         ],
       },
     ],
-    generationConfig: { responseModalities: ['image', 'text'] },
+    config: { responseModalities: ['IMAGE', 'TEXT'] },
   } as any);
 
   const elapsedMs = Date.now() - startTime;

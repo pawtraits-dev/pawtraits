@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
+import { GEMINI_IMAGE_MODELS } from '@/lib/gemini-models';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -186,7 +187,7 @@ export async function POST(request: NextRequest) {
         testType,
         timestamp: new Date().toISOString(),
         imageSizeKB: Math.round(imageSizeBytes / 1024),
-        geminiModel: 'gemini-2.5-flash-image-preview'
+        geminiModel: GEMINI_IMAGE_MODELS.flash
       }
     });
     

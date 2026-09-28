@@ -8,6 +8,7 @@ import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
 import fetch from 'node-fetch';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 import { buildSizeInstruction } from '@/lib/breed-size-mapping';
+import { GEMINI_IMAGE_MODELS, toGeminiAspectRatio } from '@/lib/gemini-models';
 
 // Configure Cloudinary
 cloudinary.config({
@@ -123,7 +124,7 @@ async function generateCustomImage(
       console.log('🎯 Aspect ratio mentioned in prompt:', (generationPrompt.match(new RegExp(aspectRatio.replace(':', '\\:'), 'g')) || []).length, 'times');
       console.log('🎯 Prompt includes aspect ratio emphasis:', generationPrompt.includes('⚠️'));
     }
-    console.log('🤖 Calling Gemini API with model: gemini-3-pro-image-preview');
+    console.log(`🤖 Calling Gemini API with model: ${GEMINI_IMAGE_MODELS.pro}`);
     const startTime = Date.now();
 
     // Prepare image data (remove data URL prefixes if present)
@@ -136,10 +137,10 @@ async function generateCustomImage(
     );
 
     // Prepare generation config with aspect ratio if available
-    const generationConfig: any = {};
+    // NB: @google/genai takes `config.imageConfig` — the old `generationConfig` key was silently ignored
+    const geminiAspectRatio = toGeminiAspectRatio(aspectRatio);
     if (aspectRatio) {
-      generationConfig.aspectRatio = aspectRatio.replace(':', '/'); // Convert "16:9" to "16/9"
-      console.log('🎨 Using aspect ratio:', aspectRatio, '→', generationConfig.aspectRatio);
+      console.log('🎨 Using aspect ratio:', aspectRatio, '→', geminiAspectRatio ?? '(unsupported, model default)');
     }
 
     // Build contents array with catalog image + all pet images
@@ -168,9 +169,12 @@ async function generateCustomImage(
 
     // Call Gemini via service (same model as admin)
     const response = await geminiService.ai.models.generateContent({
-      model: "gemini-3-pro-image-preview",
+      model: GEMINI_IMAGE_MODELS.pro,
       contents,
-      generationConfig: Object.keys(generationConfig).length > 0 ? generationConfig : undefined,
+      config: {
+        responseModalities: ['IMAGE', 'TEXT'],
+        ...(geminiAspectRatio ? { imageConfig: { aspectRatio: geminiAspectRatio } } : {}),
+      },
     });
 
     const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -226,7 +230,7 @@ async function generateCustomImage(
           subject_count: petImageUrls.length,
           theme: themeName,
           style: styleName,
-          model: 'gemini-3-pro-image-preview',
+          model: GEMINI_IMAGE_MODELS.pro,
           full_size_url: generatedImageUrl  // Keep full-size URL in metadata
         }
       })

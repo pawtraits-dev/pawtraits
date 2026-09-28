@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
+import { GEMINI_IMAGE_MODELS } from '@/lib/gemini-models';
 
 const geminiService = new GeminiVariationService();
 const cloudinaryService = new CloudinaryImageService();
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const response = await geminiService.ai.models.generateContent({
-        model: "gemini-3-pro-image-preview",
+        model: GEMINI_IMAGE_MODELS.pro,
         contents: [
           { text: customPrompt },
           {
@@ -170,7 +171,7 @@ export async function POST(request: NextRequest) {
         fullSizeUrl, // Admin can download full quality
         metadata: {
           generationTimeMs: geminiDuration,
-          geminiModel: 'gemini-3-pro-image-preview',
+          geminiModel: GEMINI_IMAGE_MODELS.pro,
           promptUsed: customPrompt, // Admin can see exact prompt
           cloudinaryPublicId: uploadResult.public_id,
           ...metadata
@@ -190,7 +191,7 @@ export async function POST(request: NextRequest) {
           error: 'Gemini generation failed',
           message: geminiError.message || 'AI generation service error',
           details: {
-            geminiModel: 'gemini-3-pro-image-preview',
+            geminiModel: GEMINI_IMAGE_MODELS.pro,
             errorType: geminiError.name,
             errorMessage: geminiError.message,
             duration: Date.now() - geminiStartTime

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { PublicRateLimiter, getClientIp } from '@/lib/public-rate-limiter';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { CloudinaryImageService } from '@/lib/cloudinary';
+import { GEMINI_IMAGE_MODELS } from '@/lib/gemini-models';
 
 // Use service role client to bypass RLS
 const supabaseServiceRole = createClient(
@@ -177,7 +178,7 @@ CRITICAL VERIFICATION:
 
     try {
       const response = await geminiService.ai.models.generateContent({
-        model: "gemini-3-pro-image-preview",
+        model: GEMINI_IMAGE_MODELS.pro,
         contents: [
           { text: customPrompt },
           {
