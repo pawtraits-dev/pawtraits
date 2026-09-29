@@ -6,6 +6,7 @@ import { createGelatoService } from '@/lib/gelato-service';
 import { sendMessage } from '@/lib/messaging/message-service';
 import { loadCartSnapshot, createOrderItems } from '@/lib/orders/order-items';
 import { grantEntitlementsForOrder, signDownload } from '@/lib/orders/entitlements';
+import { isStallProductId } from '@/lib/cart/items';
 import { ensureCustomerAccount, createClaimToken, sendAccountReadyEmail } from '@/lib/guest/account';
 import { sendMetaPurchase } from '@/lib/tracking/meta-capi';
 import { FulfillmentRouter } from '@/lib/fulfillment/fulfillment-router';
@@ -274,11 +275,15 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     // Basket snapshot (server-side copy written at checkout) — also tells us guest/stall details
     const snapshot = await loadCartSnapshot(supabase, paymentIntent.id, metadata);
     const isGuestCheckout = !orderingUserProfile;
-    const isStallCollect = metadata.salesChannel === 'stall_online_payment' || snapshot.fulfillment === 'collect';
+    // Stall sales: some or all items were handed over at the stall. Only when *nothing* needs
+    // posting is the whole order "collected"; mixed baskets still go through fulfilment.
+    const hasStallItems = metadata.salesChannel === 'stall_online_payment' || snapshot.items.some(i => isStallProductId(i.productId));
+    const isStallCollect = snapshot.fulfillment === 'collect';
     const guestFields = {
       ...(isGuestCheckout ? { is_guest_checkout: true } : {}),
       ...(snapshot.guestSessionId ? { guest_session_id: snapshot.guestSessionId } : {}),
-      ...(isStallCollect ? { sales_channel: 'stall_online_payment', fulfillment_type: 'collected', fulfillment_status: 'fulfilled', status: 'completed' } : {}),
+      ...(hasStallItems ? { sales_channel: 'stall_online_payment' } : {}),
+      ...(isStallCollect ? { fulfillment_type: 'collected', fulfillment_status: 'fulfilled', status: 'completed' } : {}),
     };
 
     // Sticker QR attribution (only set when present, so orders still work if the
@@ -385,6 +390,11 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     } else {
       // Route order to appropriate fulfillment service(s)
       await routeOrderFulfillment(order, paymentIntent, supabase, metadata);
+      // Take-home items in a mixed basket aren't handled by any fulfilment service —
+      // grant their downloads too (idempotent: existing entitlements are left alone)
+      if (hasStallItems) {
+        await grantEntitlementsForOrder(supabase, order, orderItems, guestAccount?.customerId ?? orderingUserProfile?.customer_id ?? null);
+      }
     }
 
     // Send order confirmation email to customer
@@ -1964,6 +1974,13 @@ async function sendOrderConfirmationEmail(
       title: `Download portrait ${i + 1}`,
       url: `${baseUrl}/api/downloads/${d.id}?t=${signDownload(d.id)}`,
     }));
+    // Free digital copy with every print bought on the website
+    const { data: gifts } = await supabase
+      .from('digital_entitlements')
+      .select('status')
+      .eq('order_id', order.id)
+      .eq('source', 'welcome_gift');
+    const giftStatus = !gifts?.length ? null : gifts.some((g: any) => g.status === 'available') ? 'available' : 'locked';
     const isCollected = order.fulfillment_type === 'collected';
     let stallName: string | null = null;
     if (isCollected && order.pos_location_id) {
@@ -1999,6 +2016,9 @@ async function sendOrderConfirmationEmail(
         order_url: orderUrl,
         payment_intent_id: order.payment_intent_id,
         download_links: downloadLinks.length ? downloadLinks : null,
+        gift_available: giftStatus === 'available',
+        gift_locked: giftStatus === 'locked',
+        downloads_url: `${baseUrl}/customer/downloads`,
         is_collected: isCollected,
         stall_name: stallName,
         unsubscribe_url: `${baseUrl}/preferences/unsubscribe`

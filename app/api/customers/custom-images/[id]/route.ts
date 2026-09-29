@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { data: customImage, error } = await serviceClient()
       .from('customer_custom_images')
-      .select('id, customer_email, guest_session_id, catalog_image_id, generated_image_url, share_token, status, error_message, created_at, generated_at, rating')
+      .select('id, customer_email, guest_session_id, catalog_image_id, pet_name, generated_image_url, share_token, status, error_message, created_at, generated_at, rating')
       .eq('id', id)
       .maybeSingle();
 

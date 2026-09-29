@@ -100,3 +100,24 @@ Sticker scan /S/1123M/CAMDEN ──► /customise/[id]?src=qr&size=M
 
 - `npx tsx scripts/test-qr-stickers.ts` (22 checks)
 - `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:1 SUPABASE_SERVICE_ROLE_KEY=x npx tsx scripts/test-guest-checkout.ts` (14 checks)
+
+## 9. Free digital copy with every website print (in-person data capture)
+
+**Goal:** get in-person buyers to pay on the website, so we capture their details for marketing, rather than paying cash or by card reader.
+
+- **The offer:** every physical print bought through the website comes with a **free high-resolution digital download** of the same design. That includes prints delivered by post and prints taken home from a stall. Controlled by `app_settings.welcome_gift_enabled`, which is on by default.
+- **Digital-only** is still for sale on its own.
+- **Card-reader and cash sales don't qualify.** They create no order, so there's no entitlement.
+- **Unlocking:**
+  - Existing account holders get the download immediately. The confirmation email links to *My downloads*.
+  - Guests unlock it from the "account ready" email. That confirms the email address and creates the account.
+- **No double charging:**
+  - In the buy panel, choosing any print turns the download option into "included free".
+  - The basket flags a paid download of a design that's also in the basket as a print, with one-tap removal.
+  - Server-side, `grantEntitlementsForOrder` never grants a gift for a design that was also bought as a download.
+- **Where the offer is shown:**
+  - Buy panel: a banner plus a "Free digital copy included" chip on every print option.
+  - Basket and checkout lines: "+ free digital copy".
+  - The customise page's buy button.
+  - The confirmation email.
+  - The default sticker text: "Buy it on your phone and get a free digital copy".

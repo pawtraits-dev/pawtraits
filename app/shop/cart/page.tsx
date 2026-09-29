@@ -12,6 +12,7 @@ import { formatPrice } from "@/lib/product-types"
 import { useUserRouting } from "@/hooks/use-user-routing"
 // Removed getSupabaseClient import - using API endpoints for auth checks
 import { extractDescriptionTitle } from '@/lib/utils'
+import { describeCartItem, isStallProductId, includesFreeDigital, redundantDigitalLines } from '@/lib/cart/items'
 import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider } from '@/lib/country-context'
 import { BundlePricingDisplay } from '@/components/BundlePricingDisplay'
@@ -163,10 +164,17 @@ function ShoppingCartPageContent() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
+            {redundantDigitalLines(items as any[]).map((line: any) => (
+              <div key={`dup-${line.id}`} className="flex flex-col gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 sm:flex-row sm:items-center sm:justify-between">
+                <span>Good news — your print already includes the digital download of this design for free.</span>
+                <Button size="sm" variant="outline" onClick={() => removeFromCart(line.id)} className="shrink-0">Remove paid download</Button>
+              </div>
+            ))}
             {items.map((item) => (
               <Card key={item.id} className="shadow-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-start space-x-4">
+                <CardContent className="p-4 sm:p-6">
+                  {/* Mobile: image + details side by side, price/controls on their own row; desktop: one row */}
+                  <div className="flex flex-wrap items-start gap-4 sm:flex-nowrap">
                     {/* Product Image */}
                     <div className="flex-shrink-0">
                       <Image
@@ -174,21 +182,21 @@ function ShoppingCartPageContent() {
                         alt={item.imageTitle}
                         width={120}
                         height={120}
-                        className="rounded-lg object-cover"
+                        className="h-20 w-20 rounded-lg object-cover sm:h-[120px] sm:w-[120px]"
                       />
                     </div>
 
                     {/* Product Details */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-1">{extractDescriptionTitle(item.imageTitle) || item.imageTitle}</h3>
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 line-clamp-2">{extractDescriptionTitle(item.imageTitle) || item.imageTitle}</h3>
                       <div className="text-sm text-gray-600 space-y-1">
-                        <p>{item.product?.format?.name || 'Format'} {item.product?.medium?.name || 'Medium'}</p>
-                        <p>{item.product?.size_name || 'Size'} ({item.product?.width_cm || 0} x {item.product?.height_cm || 0}cm)</p>
+                        <p>{describeCartItem(item as any)}</p>
+                        {includesFreeDigital(item as any) && <p className="text-xs font-medium text-green-700">🎁 + free digital copy</p>}
                       </div>
                     </div>
 
                     {/* Price and Controls */}
-                    <div className="flex flex-col items-end space-y-4">
+                    <div className="flex w-full items-center justify-between gap-3 border-t pt-3 sm:w-auto sm:flex-col sm:items-end sm:justify-start sm:border-0 sm:pt-0 sm:space-y-4">
                       <p className="text-xl font-bold text-gray-900">
                         {item.pricing && item.pricing.sale_price ?
                           formatPrice(item.pricing.sale_price, item.pricing.currency_code, item.pricing.currency_symbol) :
@@ -196,7 +204,10 @@ function ShoppingCartPageContent() {
                         }
                       </p>
 
-                      {/* Quantity Controls */}
+                      {/* Quantity Controls (a take-home print is the one physical print in their hand) */}
+                      {isStallProductId(item.productId) ? (
+                        <span className="text-xs text-gray-500">1 · in your hand</span>
+                      ) : (
                       <div className="flex items-center space-x-2">
                         <Button
                           variant="outline"
@@ -216,6 +227,7 @@ function ShoppingCartPageContent() {
                           <Plus className="w-4 h-4" />
                         </Button>
                       </div>
+                      )}
 
                       {/* Remove Button */}
                       <Button
@@ -225,7 +237,7 @@ function ShoppingCartPageContent() {
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="w-4 h-4 mr-1" />
-                        Remove from Basket
+                        Remove
                       </Button>
                     </div>
                   </div>

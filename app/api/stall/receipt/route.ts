@@ -1,11 +1,13 @@
 /**
  * GET /api/stall/receipt?pi=pi_...
- * Proof-of-payment screen data. Checks Stripe directly, so it shows PAID the moment the
- * payment succeeds (even before the order webhook has finished).
+ * Proof-of-payment screen data for stall sales. Checks Stripe directly (shows PAID the
+ * moment the payment succeeds, before the order webhook finishes) and lists the
+ * take-home prints from the basket snapshot.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { retrievePaymentIntent } from '@/lib/stripe-server';
 import { serviceClient } from '@/lib/qr/server';
+import { isStallProductId, stallSizeFromProductId } from '@/lib/cart/items';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,23 +20,36 @@ export async function GET(request: NextRequest) {
   if (pi?.metadata?.salesChannel !== 'stall_online_payment') return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const supabase = serviceClient();
-  const [{ data: image }, { data: loc }, { data: order }] = await Promise.all([
-    supabase.from('image_catalog').select('public_url, description, stock_ref').eq('id', pi.metadata.item1_id).maybeSingle(),
-    supabase.from('stock_locations').select('name, code').eq('id', pi.metadata.posLocationId).maybeSingle(),
+  const [{ data: snapshot }, { data: loc }, { data: order }] = await Promise.all([
+    supabase.from('pending_checkouts').select('cart').eq('payment_intent_id', piId).maybeSingle(),
+    pi.metadata.posLocationId
+      ? supabase.from('stock_locations').select('name, code').eq('id', pi.metadata.posLocationId).maybeSingle()
+      : Promise.resolve({ data: null }),
     supabase.from('orders').select('order_number').eq('payment_intent_id', piId).maybeSingle(),
   ]);
 
+  const cart: any[] = Array.isArray(snapshot?.cart) ? snapshot!.cart : [];
+  const takeHome = cart.filter(i => isStallProductId(i.productId));
+  const imageIds = takeHome.map(i => i.imageId);
+  const { data: images } = imageIds.length
+    ? await supabase.from('image_catalog').select('id, public_url, stock_ref').in('id', imageIds)
+    : { data: [] as any[] };
+  const byId = new Map((images ?? []).map((i: any) => [i.id, i]));
+
   return NextResponse.json({
-    status: pi.status,                       // 'succeeded' | 'processing' | 'requires_payment_method' ...
+    status: pi.status,
     paid: pi.status === 'succeeded',
     amountPence: pi.amount,
     paidAt: pi.created * 1000,
     firstName: (pi.metadata.customerName || '').split(' ')[0],
-    size: pi.metadata.stallSize,
-    stockRef: image?.stock_ref ?? pi.metadata.stockRef,
-    imageUrl: image?.public_url ?? null,
-    title: image?.description ?? 'Pawtraits print',
-    stallName: loc?.name ?? null,
+    takeHome: takeHome.map(i => ({
+      title: i.imageTitle,
+      size: stallSizeFromProductId(i.productId),
+      stockRef: byId.get(i.imageId)?.stock_ref ?? null,
+      imageUrl: byId.get(i.imageId)?.public_url ?? null,
+    })),
+    deliveredCount: cart.length - takeHome.length,
+    stallName: (loc as any)?.name ?? null,
     orderNumber: order?.order_number ?? null,
     last4: pi.id.slice(-6).toUpperCase(),
   }, { headers: { 'Cache-Control': 'no-store' } });

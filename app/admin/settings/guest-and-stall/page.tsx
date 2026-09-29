@@ -95,7 +95,11 @@ export default function GuestAndStallSettingsPage() {
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={!!draft.welcome_gift_enabled}
               onChange={e => { setDraft({ ...draft, welcome_gift_enabled: e.target.checked }); save('welcome_gift_enabled', e.target.checked); }} />
-            <span><span className="font-medium">Free digital download</span> when a guest activates their new account (applies to online and stall orders)</span>
+            <span>
+              <span className="font-medium">Free digital download with every print bought on the website</span> — online and at the stall.
+              Account holders get it straight away; guests unlock it from the “account ready” email, which confirms their email address.
+              Card-reader and cash sales don’t qualify, which is the nudge to pay on the website.
+            </span>
           </label>
         </CardContent>
       </Card>

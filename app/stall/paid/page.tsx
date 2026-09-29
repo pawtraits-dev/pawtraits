@@ -9,9 +9,11 @@ import Link from 'next/link';
 import { track } from '@/lib/tracking/events';
 
 interface Receipt {
-  paid: boolean; status: string; amountPence: number; paidAt: number; firstName: string; size: string;
-  stockRef: string | number; imageUrl: string | null; title: string; stallName: string | null; orderNumber: string | null; last4: string;
+  paid: boolean; status: string; amountPence: number; paidAt: number; firstName: string;
+  takeHome: Array<{ title: string; size: 'S' | 'M' | 'L' | null; stockRef: number | null; imageUrl: string | null }>;
+  deliveredCount: number; stallName: string | null; orderNumber: string | null; last4: string;
 }
+const SIZE: Record<string, string> = { S: 'Small', M: 'Medium', L: 'Large' };
 
 export default function StallPaidPage() {
   const [pi, setPi] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export default function StallPaidPage() {
       setReceipt(d);
       if (d.paid && !tracked.current) {
         tracked.current = true;
-        track.purchase(d.orderNumber || pi, pi, d.amountPence / 100, [{ id: String(d.stockRef), name: d.title, variant: `stall_${d.size}`, price: d.amountPence / 100 }]);
+        track.purchase(d.orderNumber || pi, pi, d.amountPence / 100, d.takeHome.map(t => ({ id: String(t.stockRef ?? ''), name: t.title, variant: `stall_${t.size}` })));
       }
       if (!stop && (!d.paid || !d.orderNumber)) setTimeout(load, 2500);
     };
@@ -61,18 +63,30 @@ export default function StallPaidPage() {
       <div className="relative mx-auto flex min-h-[100dvh] max-w-md flex-col items-center px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-10 text-center">
         <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white text-5xl text-green-600 shadow-xl">✓</div>
         <h1 className="mt-5 text-4xl font-extrabold tracking-tight">PAID</h1>
-        <p className="mt-1 text-lg">£{(receipt.amountPence / 100).toFixed(2)} · {receipt.size && `${{ S: 'Small', M: 'Medium', L: 'Large' }[receipt.size as 'S' | 'M' | 'L']} print`}</p>
+        <p className="mt-1 text-lg">£{(receipt.amountPence / 100).toFixed(2)} · {receipt.takeHome.length} print{receipt.takeHome.length === 1 ? '' : 's'} to take home</p>
         <p className="mt-3 font-mono text-3xl tabular-nums">{now.toLocaleTimeString('en-GB')}</p>
         <p className="text-sm opacity-90">{now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
 
-        <div className="mt-6 flex w-full items-center gap-3 rounded-2xl bg-white/15 p-3 text-left">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {receipt.imageUrl && <img src={receipt.imageUrl} alt="" className="h-20 w-16 rounded-lg object-cover" />}
-          <div className="text-sm">
-            <p className="font-semibold">Ref {receipt.stockRef}-{receipt.size}</p>
-            <p className="opacity-90">{receipt.orderNumber ? `Order ${receipt.orderNumber}` : `Payment …${receipt.last4}`}</p>
-            {receipt.stallName && <p className="opacity-90">{receipt.stallName}</p>}
+        <div className="mt-6 w-full space-y-2">
+          {receipt.takeHome.map((t, i) => (
+            <div key={i} className="flex items-center gap-3 rounded-2xl bg-white/15 p-3 text-left">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {t.imageUrl && <img src={t.imageUrl} alt="" className="h-16 w-12 rounded-lg object-cover" />}
+              <div className="text-sm">
+                <p className="font-semibold">Ref {t.stockRef ?? '—'}-{t.size} · {t.size ? SIZE[t.size] : ''}</p>
+                <p className="opacity-90 line-clamp-1">{t.title}</p>
+              </div>
+            </div>
+          ))}
+          <div className="flex justify-between rounded-2xl bg-white/10 px-3 py-2 text-left text-sm">
+            <span>{receipt.orderNumber ? `Order ${receipt.orderNumber}` : `Payment …${receipt.last4}`}</span>
+            {receipt.stallName && <span className="opacity-90">{receipt.stallName}</span>}
           </div>
+          {receipt.deliveredCount > 0 && (
+            <p className="rounded-2xl bg-white/10 px-3 py-2 text-left text-sm">
+              + {receipt.deliveredCount} more item{receipt.deliveredCount === 1 ? '' : 's'} on {receipt.deliveredCount === 1 ? 'its' : 'their'} way to you (prints are delivered, downloads are emailed)
+            </p>
+          )}
         </div>
 
         <p className="mt-6 rounded-xl bg-white px-4 py-3 text-lg font-bold text-green-700">Show this screen to the stallholder 👋</p>

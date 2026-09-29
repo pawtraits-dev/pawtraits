@@ -5,6 +5,8 @@ import { checkoutValidation } from '@/lib/checkout-validation';
 import { QR_ATTRIBUTION_COOKIE, VISITOR_COOKIE, decodeAttribution, validVisitorId } from '@/lib/qr/attribution';
 import { CONSENT_COOKIE, parseConsent } from '@/lib/tracking/consent';
 import { serviceClient } from '@/lib/qr/server';
+import { isStallProductId, stallSizeFromProductId } from '@/lib/cart/items';
+import { getStallOffer } from '@/lib/stall/offer';
 
 interface CreatePaymentIntentRequest {
   amount: number; // in pence
@@ -242,6 +244,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Stall "take it home now" prints: only after a fresh stall-sticker scan, one each, at the
+    // admin-set stall price (never the browser's price)
+    const stallItems = (body.cartItems || []).filter(i => isStallProductId(i.productId));
+    for (const item of stallItems) {
+      const offer = await getStallOffer(request, item.imageId, null);
+      if (!offer.available) {
+        return NextResponse.json({ error: 'Take-home prints can only be paid for at the stall, after scanning the sticker on the back. Please remove it from your basket to continue.', code: 'STALL_ITEM_UNAVAILABLE' }, { status: 400 });
+      }
+      if (stallSizeFromProductId(item.productId) !== offer.size || item.quantity !== 1 || item.unitPrice !== offer.pricePence) {
+        return NextResponse.json({ error: 'The price of a take-home print has changed — please remove it from your basket and add it again.', code: 'STALL_ITEM_STALE' }, { status: 409 });
+      }
+    }
+    if (stallItems.length) metadata.salesChannel = 'stall_online_payment';
+
     if (body.customerPhone) metadata.customerPhone = String(body.customerPhone).slice(0, 30);
     if (body.marketingOptIn) metadata.marketingOptIn = 'true';
 
@@ -283,7 +299,9 @@ export async function POST(request: NextRequest) {
           productId: i.productId, imageId: i.imageId, imageTitle: i.imageTitle,
           quantity: i.quantity, unitPrice: i.unitPrice, originalPrice: i.originalPrice,
         })),
-        fulfillment: body.digitalOnly ? 'digital' : 'ship',
+        fulfillment: stallItems.length && stallItems.length === (body.cartItems || []).length ? 'collect'
+          : stallItems.length && body.digitalOnly ? 'collect'
+          : body.digitalOnly ? 'digital' : 'ship',
         guest_session_id: validVisitorId(request.cookies.get(VISITOR_COOKIE)?.value),
         consent,
         client: consent?.marketing ? {

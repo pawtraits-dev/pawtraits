@@ -294,6 +294,22 @@
       </div>
       {{/if}}
 
+      {{#if gift_available}}
+      <!-- Free digital copy (account holders: ready now) -->
+      <div class="info-box">
+        <h3>🎁 Your free digital copy</h3>
+        <p>Every print bought on our website comes with a high-resolution digital download of the design. Yours is ready:</p>
+        <p><a href="{{downloads_url}}">Open My downloads</a></p>
+      </div>
+      {{/if}}
+      {{#if gift_locked}}
+      <!-- Free digital copy (guests: unlocked from the account email) -->
+      <div class="info-box">
+        <h3>🎁 A free digital copy is waiting for you</h3>
+        <p>Every print bought on our website comes with a high-resolution digital download. Look out for our next email — one tap unlocks it (no password needed).</p>
+      </div>
+      {{/if}}
+
       {{#if is_collected}}
       <!-- Stall collection -->
       <div class="info-box">

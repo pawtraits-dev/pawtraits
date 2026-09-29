@@ -20,6 +20,7 @@ import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider, useCountryPricing } from '@/lib/country-context'
 import { Elements } from '@stripe/react-stripe-js'
 import { track } from '@/lib/tracking/events'
+import { describeCartItem, itemNeedsShipping, isStallProductId, includesFreeDigital } from '@/lib/cart/items'
 import { getStripe } from '@/lib/stripe-client'
 import StripePaymentForm from '@/components/StripePaymentForm'
 import { checkoutValidation } from '@/lib/checkout-validation'
@@ -59,8 +60,9 @@ function CheckoutPageContent() {
   const router = useRouter()
   const { userProfile, loading: userLoading } = useUserRouting()
   const isGuest = !userLoading && !userProfile
-  // Downloads-only basket: no address or shipping step
-  const isDigitalOnly = items.length > 0 && items.every((item: any) => item.product?.product_type === 'digital_download')
+  // Nothing to post (downloads and/or prints taken home from the stall): no address or shipping step
+  const isDigitalOnly = items.length > 0 && !items.some((item: any) => itemNeedsShipping(item))
+  const hasTakeHomeItems = items.some((item: any) => isStallProductId(item.productId))
 
   const stripePromise = getStripe()
 
@@ -368,7 +370,8 @@ function CheckoutPageContent() {
         credentials: 'include',
         body: JSON.stringify({
           shippingAddress,
-          cartItems: items.map(item => ({
+          // Only items we post: take-home prints and downloads don't affect shipping
+          cartItems: items.filter((item: any) => itemNeedsShipping(item)).map(item => ({
             gelatoProductUid: item.gelatoProductUid,
             quantity: item.quantity,
             printSpecs: item.printSpecs
@@ -546,26 +549,29 @@ function CheckoutPageContent() {
       });
     } catch (error) {
       console.error('Error creating Customer PaymentIntent:', error);
-      alert('Failed to set up payment. Please try again.');
+      alert(error instanceof Error && error.message ? error.message : 'Failed to set up payment. Please try again.');
       setCurrentStep(1); // Go back to shipping step
     }
   };
 
   // Handle successful payment completion
   const handlePaymentSuccess = async (paymentIntent: any) => {
+    // Bought take-home prints at the stall? Show the big PAID screen for the stallholder
+    const destination = hasTakeHomeItems
+      ? `/stall/paid?payment_intent=${paymentIntent.id}`
+      : `/shop/order-confirmation?payment_intent=${paymentIntent.id}`
     try {
       console.log('Customer payment succeeded:', paymentIntent.id);
 
       // Clear cart
       await clearCart();
 
-      // Redirect to order confirmation
-      router.push(`/shop/order-confirmation?payment_intent=${paymentIntent.id}`);
+      router.push(destination);
 
     } catch (error) {
       console.error('Error handling customer payment success:', error);
       // Still redirect to confirmation since payment succeeded
-      router.push(`/shop/order-confirmation?payment_intent=${paymentIntent.id}`);
+      router.push(destination);
     }
   };
 
@@ -591,11 +597,17 @@ function CheckoutPageContent() {
     }
   }
 
-  const steps = [
-    { number: 1, title: "Address", completed: currentStep > 1 },
-    { number: 2, title: "Shipping", completed: currentStep > 2 },
-    { number: 3, title: "Payment", completed: false },
-  ]
+  // Nothing to post → just "Your details" then "Payment"
+  const steps = isDigitalOnly
+    ? [
+        { number: 1, title: "Your details", completed: currentStep > 1 },
+        { number: 3, title: "Payment", completed: false },
+      ]
+    : [
+        { number: 1, title: "Address", completed: currentStep > 1 },
+        { number: 2, title: "Shipping", completed: currentStep > 2 },
+        { number: 3, title: "Payment", completed: false },
+      ]
 
   // Show loading state while user profile is loading
   if (userLoading) {
@@ -644,7 +656,7 @@ function CheckoutPageContent() {
                         : "bg-gray-200 text-gray-600"
                   }`}
                 >
-                  {step.completed ? "✓" : step.number}
+                  {step.completed ? "✓" : index + 1}
                 </div>
                 <span
                   className={`ml-2 text-sm font-medium ${
@@ -671,7 +683,7 @@ function CheckoutPageContent() {
             {currentStep === 1 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Shipping Information</CardTitle>
+                  <CardTitle>{isDigitalOnly ? 'Your details' : 'Shipping Information'}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleShippingSubmit} className="space-y-6">
@@ -724,7 +736,7 @@ function CheckoutPageContent() {
                             placeholder="you@example.com"
                           />
                           {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
-                          <p className="text-xs text-gray-500">For your receipt{isDigitalOnly ? ' and download link' : ' and delivery updates'}. We’ll set up a free account with it so you can find your order later — no password needed.</p>
+                          <p className="text-xs text-gray-500">For your receipt{hasTakeHomeItems ? '' : isDigitalOnly ? ' and download link' : ' and delivery updates'}. We’ll set up a free account with it so you can find your order later — no password needed.</p>
                           <label className="flex items-start gap-3 pt-1 text-sm text-gray-700">
                             <input type="checkbox" checked={marketingOptIn} onChange={(e) => setMarketingOptIn(e.target.checked)} className="mt-0.5 h-5 w-5 accent-purple-600" />
                             <span>Send me the occasional new design and offer (unsubscribe any time)</span>
@@ -1048,8 +1060,8 @@ function CheckoutPageContent() {
                         {extractDescriptionTitle(item.imageTitle) || item.imageTitle}
                       </h4>
                       <div className="text-xs text-gray-600 mt-1 space-y-0.5">
-                        <p>{item.product?.format?.name || 'Format'} {item.product?.medium?.name || 'Medium'}</p>
-                        <p>{item.product?.size_name || 'Size'} ({item.product?.width_cm || 0} x {item.product?.height_cm || 0}cm)</p>
+                        <p>{describeCartItem(item as any)}</p>
+                        {includesFreeDigital(item as any) && <p className="text-green-700 font-medium">🎁 + free digital copy</p>}
                       </div>
                     </div>
 

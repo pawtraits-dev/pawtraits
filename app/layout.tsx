@@ -6,6 +6,7 @@ import EnvironmentIndicator from '@/components/EnvironmentIndicator';
 import { Analytics } from '@vercel/analytics/react';
 import TrackingScripts from '@/components/tracking/TrackingScripts';
 import ConsentBanner from '@/components/tracking/ConsentBanner';
+import { Toaster } from '@/components/ui/toaster';
 
 const inter = Inter({ subsets: ['latin'] });
 const margarine = Margarine({ 
@@ -66,6 +67,8 @@ export default function RootLayout({
           </HybridCartProvider>
         </div>
         <ConsentBanner />
+        {/* Toasts were never mounted before, so every toast() call in the app was invisible */}
+        <Toaster />
       </body>
     </html>
   );

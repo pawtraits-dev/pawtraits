@@ -55,7 +55,7 @@ export async function generateStickerSheet(labels: StickerLabel[], opts: Sticker
   const perPage = layout.columns * layout.rows;
   const start = Math.min(Math.max(1, Math.floor(opts.startPosition ?? 1)), perPage) - 1;
   const cta = opts.cta ?? 'Scan to put YOUR pet in this picture';
-  const subCta = opts.subCta ?? 'Any breed · any size · made just for you';
+  const subCta = opts.subCta ?? 'Buy it on your phone and get a free digital copy';
 
   const pdf = await PDFDocument.create();
   pdf.setTitle('Pawtraits sticker sheet');

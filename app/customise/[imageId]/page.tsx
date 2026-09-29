@@ -11,15 +11,18 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Camera, ImagePlus, Sparkles, ShoppingBag, Share2, RotateCcw, Check, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
 import StickyActionBar from '@/components/customise/StickyActionBar';
+import BasketBar from '@/components/customise/BasketBar';
 import { preparePetPhoto } from '@/lib/client/resize-photo';
 import { track } from '@/lib/tracking/events';
+import BuyOptionsSheet, { type BuyTarget } from '@/components/customise/BuyOptionsSheet';
+import { customPortraitTitle } from '@/lib/cart/items';
 
 interface Pet {
   pet_id: string;
@@ -43,6 +46,7 @@ interface CatalogImage {
 
 interface CustomImage {
   id: string;
+  pet_name?: string | null;
   generated_image_url: string | null;
   share_token: string | null;
   status: 'pending' | 'generating' | 'complete' | 'failed';
@@ -84,7 +88,6 @@ const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' };
 
 export default function CustomisePage() {
   const params = useParams();
-  const router = useRouter();
   const { toast } = useToast();
   const imageId = params.imageId as string;
 
@@ -104,6 +107,7 @@ export default function CustomisePage() {
   const [progressIndex, setProgressIndex] = useState(0);
   const [rating, setRating] = useState(0);
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
+  const [buySheet, setBuySheet] = useState<'catalog' | 'custom' | null>(null);
   const photoSectionRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -122,6 +126,7 @@ export default function CustomisePage() {
       }
     }
     if (qs.get('start') === 'photo') setStep('photo');
+    if (qs.get('buy') === '1') setBuySheet('catalog');
 
     (async () => {
       try {
@@ -276,19 +281,27 @@ export default function CustomisePage() {
   }
 
   // ---- buy ----
+  // Both open the buy sheet (all sizes & prices, checkout now / add to basket)
   function buyThisPrint() {
     if (!catalogImage) return;
-    if (stallOffer?.available) {
-      track.buyThisPrintClicked({ id: catalogImage.id, name: catalogImage.description, variant: stallOffer.size, price: (stallOffer.pricePence || 0) / 100 }, 'stall');
-      router.push(`/stall/buy/${catalogImage.id}${stallOffer.size ? `?size=${stallOffer.size}` : ''}`);
-    } else {
-      track.buyThisPrintClicked({ id: catalogImage.id, name: catalogImage.description }, 'online');
-      router.push(`/shop/${catalogImage.id}`);
-    }
+    track.buyThisPrintClicked({ id: catalogImage.id, name: catalogImage.description, variant: stallOffer?.size, price: (stallOffer?.pricePence || 0) / 100 }, stallOffer?.available ? 'stall' : 'online');
+    setBuySheet('catalog');
   }
   function buyCustom() {
-    if (customImage) router.push(`/shop/custom-portrait/${customImage.id}`);
+    if (customImage) setBuySheet('custom');
   }
+
+  const buyTarget: BuyTarget | null = !catalogImage ? null : buySheet === 'custom' && customImage
+    ? {
+        kind: 'custom', imageId: customImage.id, catalogImageId: catalogImage.id,
+        imageUrl: customImage.generated_image_url || catalogImage.imageUrl,
+        title: customPortraitTitle(customImage.pet_name, catalogImage.theme?.displayName || catalogImage.theme?.name),
+        formatId: catalogImage.format?.id, themeName: catalogImage.theme?.name,
+      }
+    : {
+        kind: 'catalog', imageId: catalogImage.id, catalogImageId: catalogImage.id, imageUrl: catalogImage.imageUrl,
+        title: catalogImage.description || 'Pawtraits print', formatId: catalogImage.format?.id, themeName: catalogImage.theme?.name,
+      };
 
   // ---- render ----
   if (loading) {
@@ -356,6 +369,7 @@ export default function CustomisePage() {
 
             {/* Both choices pinned to the bottom of the screen on phones (always visible, thumb-reachable) */}
             <StickyActionBar>
+              <BasketBar />
               <button onClick={startCustomise}
                 className="flex min-h-16 w-full items-center gap-3 rounded-2xl bg-purple-600 px-4 py-2.5 text-left text-white shadow-lg active:scale-[0.99] transition">
                 <span className="text-2xl" aria-hidden>🐾</span>
@@ -370,7 +384,7 @@ export default function CustomisePage() {
                 <span className="flex-1 leading-tight">
                   <span className="block text-base font-semibold">Buy this print</span>
                   <span className="block text-xs text-purple-700">
-                    {stallOffer?.available ? 'Take it home now · pay on your phone' : 'Choose size & finish · delivered'}
+                    {stallOffer?.available ? `The one in your hand · free digital copy` : 'Sizes & prices · free digital copy with prints'}
                   </span>
                 </span>
                 {stallOffer?.available && (
@@ -500,6 +514,7 @@ export default function CustomisePage() {
             </div>
 
             <StickyActionBar>
+              <BasketBar />
               <button onClick={buyCustom} className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 text-lg font-semibold text-white shadow-lg">
                 <ShoppingBag className="h-5 w-5" /> Buy this portrait
               </button>
@@ -537,6 +552,15 @@ export default function CustomisePage() {
           </div>
         )}
       </div>
+      {buyTarget && (
+        <BuyOptionsSheet
+          open={!!buySheet}
+          onClose={() => setBuySheet(null)}
+          target={buyTarget}
+          stallOffer={buySheet === 'catalog' ? stallOffer : null}
+          scannedSize={scannedSize}
+        />
+      )}
     </Shell>
   );
 }
