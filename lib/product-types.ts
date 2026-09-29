@@ -389,3 +389,60 @@ export interface QrLocationDaily {
   orders: number;
   revenue_pence: number;
 }
+
+export interface StockLocationCreate {
+  code: string;
+  name: string;
+  location_type: StockLocationType;
+  address?: string | null;
+  notes?: string | null;
+  at_market_discount_pct?: number;
+}
+
+export interface StockLocationUpdate extends Partial<Omit<StockLocation, 'id' | 'code' | 'created_at' | 'updated_at'>> {
+  id: string; // code is immutable — it is printed on stickers
+}
+
+export interface ImageQrInfo {
+  imageId: string;
+  stockRef: number;
+  size: 'S' | 'M' | 'L' | null;
+  locationCode: string | null;
+  url: string;
+}
+
+export interface StickerImage {
+  id: string;
+  stock_ref: number;
+  description: string | null;
+  public_url: string | null;
+  is_public: boolean;
+}
+
+export interface StickerSheetRequest {
+  items: Array<{ imageId: string; size?: 'S' | 'M' | 'L'; quantity: number }>;
+  locationCode?: string;
+  startPosition?: number;
+  showGuides?: boolean;
+  includeThumbnails?: boolean;
+  cta?: string;
+  subCta?: string;
+}
+
+export interface QrReportLocationRow {
+  location_code: string;
+  scans: number;
+  unique_visitors: number;
+  orders: number;
+  revenue_pence: number;
+}
+
+export interface QrReport {
+  from: string;
+  to: string;
+  locations: QrReportLocationRow[];
+  daily: QrLocationDaily[];
+  topImages: Array<{ stock_ref: number; image_id: string | null; scans: number; orders: number }>;
+}
+
+export type AppSettingsMap = Record<string, { value: any; description: string | null; updated_at: string | null }>;

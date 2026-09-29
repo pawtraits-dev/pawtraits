@@ -6,10 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { MapPin, Plus } from 'lucide-react';
 import type { StockLocation, StockLocationType } from '@/lib/product-types';
+import { AdminSupabaseService } from '@/lib/admin-supabase';
 
 const TYPES: StockLocationType[] = ['stall', 'studio', 'partner', 'other'];
 
 export default function StockLocationsPage() {
+  const adminService = new AdminSupabaseService();
   const [locations, setLocations] = useState<StockLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,10 +20,9 @@ export default function StockLocationsPage() {
 
   async function load() {
     setLoading(true);
-    const res = await fetch('/api/admin/stock/locations');
-    const data = await res.json();
-    if (!res.ok) setError(data.error || 'Failed to load locations');
-    else setLocations(data);
+    const result = await adminService.getStockLocations();
+    if (result.ok) setLocations(result.data);
+    else setError(result.error);
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
@@ -29,22 +30,16 @@ export default function StockLocationsPage() {
   async function create(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true); setError(null);
-    const res = await fetch('/api/admin/stock/locations', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
-    });
-    const data = await res.json();
+    const result = await adminService.createStockLocation(form);
     setSaving(false);
-    if (!res.ok) { setError(data.error); return; }
+    if (!result.ok) { setError(result.error); return; }
     setForm({ code: '', name: '', location_type: 'stall', address: '', notes: '' });
     load();
   }
 
   async function toggleActive(l: StockLocation) {
-    const res = await fetch('/api/admin/stock/locations', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: l.id, is_active: !l.is_active }),
-    });
-    if (res.ok) load(); else setError((await res.json()).error);
+    const result = await adminService.updateStockLocation({ id: l.id, is_active: !l.is_active });
+    if (result.ok) load(); else setError(result.error);
   }
 
   return (

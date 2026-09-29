@@ -5,28 +5,28 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { BarChart3 } from 'lucide-react';
+import { AdminSupabaseService } from '@/lib/admin-supabase';
+import type { QrReport } from '@/lib/product-types';
 
-interface LocationRow { location_code: string; scans: number; unique_visitors: number; orders: number; revenue_pence: number }
-interface ImageRow { stock_ref: number; image_id: string | null; scans: number; orders: number }
 
 const gbp = (p: number) => `£${(p / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pct = (a: number, b: number) => (b ? `${((a / b) * 100).toFixed(1)}%` : '—');
 
 export default function QrReportPage() {
+  const adminService = new AdminSupabaseService();
   const today = new Date().toISOString().slice(0, 10);
   const [from, setFrom] = useState(new Date(Date.now() - 29 * 864e5).toISOString().slice(0, 10));
   const [to, setTo] = useState(today);
-  const [data, setData] = useState<{ locations: LocationRow[]; topImages: ImageRow[] } | null>(null);
+  const [data, setData] = useState<QrReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function load() {
     setLoading(true); setError(null);
-    const res = await fetch(`/api/admin/stock/qr-report?from=${from}&to=${to}`);
-    const d = await res.json();
+    const result = await adminService.getQrReport(from, to);
     setLoading(false);
-    if (!res.ok) { setError(d.error); return; }
-    setData(d);
+    if (!result.ok) { setError(result.error); return; }
+    setData(result.data);
   }
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 

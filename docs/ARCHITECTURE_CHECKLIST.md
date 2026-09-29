@@ -48,7 +48,12 @@
 ## 👤 User Type Patterns
 
 ### **Admin Routes (`/admin/*`)**
-- [ ] Uses `AdminSupabaseService` methods
+- [ ] Uses `AdminSupabaseService` methods (no `fetch('/api/admin/...')` in pages/components)
+- [ ] New methods where the UI must show the server's reason (validation, conflicts, "run the
+      migration") return `AdminResult<T>` — `{ ok: true, data } | { ok: false, error, status }` —
+      via the `adminRequest()` helper in `lib/admin-supabase.ts`. Older methods keep `null`/`[]`.
+- [ ] URLs the browser loads directly (e.g. `<img src>` for QR codes, download links) come from a
+      service helper such as `getImageQrUrl()`, not hand-built `/api/admin/...` strings
 - [ ] No direct API calls to customer endpoints
 - [ ] Admin-only navigation components
 

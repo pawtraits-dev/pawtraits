@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Copy, Download, QrCode, Printer, ExternalLink } from 'lucide-react';
 import type { StockLocation } from '@/lib/product-types';
+import { AdminSupabaseService } from '@/lib/admin-supabase';
 
 /** Sticker QR for one catalogue image — shown in the admin catalogue image modal. */
 export default function ImageQrPanel({ imageId }: { imageId: string }) {
+  const adminService = useMemo(() => new AdminSupabaseService(), []);
   const [size, setSize] = useState('');
   const [loc, setLoc] = useState('');
   const [locations, setLocations] = useState<StockLocation[]>([]);
@@ -16,25 +18,19 @@ export default function ImageQrPanel({ imageId }: { imageId: string }) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetch('/api/admin/stock/locations?activeOnly=true')
-      .then(r => (r.ok ? r.json() : []))
-      .then(setLocations)
-      .catch(() => setLocations([]));
-  }, []);
+    adminService.getStockLocations(true).then(r => setLocations(r.ok ? r.data : []));
+  }, [adminService]);
 
-  const qs = new URLSearchParams({ ...(size ? { size } : {}), ...(loc ? { loc } : {}) }).toString();
-  const base = `/api/admin/qr/${imageId}`;
+  const qrOpts = { size: size || undefined, locationCode: loc || undefined };
+  const qrUrl = (format: 'svg' | 'png', download = false) => adminService.getImageQrUrl(imageId, { format, download, ...qrOpts });
 
   useEffect(() => {
     setError(null);
-    fetch(`${base}?format=json${qs ? `&${qs}` : ''}`)
-      .then(async r => {
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || 'Failed to load QR');
-        setInfo({ stockRef: d.stockRef, url: d.url });
-      })
-      .catch(e => { setInfo(null); setError(e.message); });
-  }, [base, qs]);
+    adminService.getImageQrInfo(imageId, { size: size || undefined, locationCode: loc || undefined }).then(r => {
+      if (r.ok) setInfo({ stockRef: r.data.stockRef, url: r.data.url });
+      else { setInfo(null); setError(r.error); }
+    });
+  }, [adminService, imageId, size, loc]);
 
   const copy = async () => {
     if (!info) return;
@@ -58,7 +54,7 @@ export default function ImageQrPanel({ imageId }: { imageId: string }) {
         <div className="flex gap-4 items-start">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={`${base}?format=svg${qs ? `&${qs}` : ''}`}
+            src={qrUrl('svg')}
             alt="Sticker QR code"
             className="w-40 h-40 border rounded bg-white shrink-0"
           />
@@ -96,10 +92,10 @@ export default function ImageQrPanel({ imageId }: { imageId: string }) {
           </a>
         </Button>
         <Button size="sm" variant="outline" asChild disabled={!info}>
-          <a href={`${base}?format=svg&download=1${qs ? `&${qs}` : ''}`}><Download className="w-3 h-3 mr-1" /> SVG</a>
+          <a href={qrUrl('svg', true)}><Download className="w-3 h-3 mr-1" /> SVG</a>
         </Button>
         <Button size="sm" variant="outline" asChild disabled={!info}>
-          <a href={`${base}?format=png&download=1${qs ? `&${qs}` : ''}`}><Download className="w-3 h-3 mr-1" /> PNG</a>
+          <a href={qrUrl('png', true)}><Download className="w-3 h-3 mr-1" /> PNG</a>
         </Button>
         <Button size="sm" variant="outline" asChild>
           <Link href={`/admin/stock/stickers?add=${imageId}${size ? `&size=${size}` : ''}${loc ? `&loc=${loc}` : ''}`}>

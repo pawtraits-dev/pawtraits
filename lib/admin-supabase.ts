@@ -4,8 +4,37 @@ import type {
   Format,
   MugColour,
   MugCatalogEntry, MugCatalogCreate, MugCatalogUpdate,
-  MugGeneration
+  MugGeneration,
+  StockLocation, StockLocationCreate, StockLocationUpdate,
+  ImageQrInfo, StickerImage, StickerSheetRequest, QrReport, AppSettingsMap
 } from './product-types';
+
+/**
+ * Result wrapper for admin methods whose callers must show the server's reason to the
+ * user (validation errors, "code already exists", "run the migration"...). Existing
+ * methods keep the null/[] convention; new stock/QR/settings methods use this.
+ */
+export type AdminResult<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
+
+async function adminRequest<T>(url: string, init?: RequestInit): Promise<AdminResult<T>> {
+  try {
+    const response = await fetch(url, { credentials: 'include', ...init });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { ok: false, error: body?.error || `Request failed (${response.status})`, status: response.status };
+    }
+    return { ok: true, data: body as T };
+  } catch (error) {
+    console.error(`Admin request failed: ${url}`, error);
+    return { ok: false, error: error instanceof Error ? error.message : 'Network error' };
+  }
+}
+
+const jsonInit = (method: string, body: unknown): RequestInit => ({
+  method,
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
 
 // Admin-specific Supabase service that uses API endpoints with service role
 export class AdminSupabaseService {
@@ -490,5 +519,70 @@ export class AdminSupabaseService {
       return [];
     }
   }
-}
 
+  // ===== STOCK LOCATION METHODS (docs/specs/qr-stickers.md) =====
+
+  async getStockLocations(activeOnly: boolean = false): Promise<AdminResult<StockLocation[]>> {
+    return adminRequest<StockLocation[]>(`/api/admin/stock/locations${activeOnly ? '?activeOnly=true' : ''}`);
+  }
+
+  async createStockLocation(data: StockLocationCreate): Promise<AdminResult<StockLocation>> {
+    return adminRequest<StockLocation>('/api/admin/stock/locations', jsonInit('POST', data));
+  }
+
+  async updateStockLocation(data: StockLocationUpdate): Promise<AdminResult<StockLocation>> {
+    return adminRequest<StockLocation>('/api/admin/stock/locations', jsonInit('PATCH', data));
+  }
+
+  // ===== STICKER QR METHODS =====
+
+  async getImageQrInfo(imageId: string, opts: { size?: string; locationCode?: string } = {}): Promise<AdminResult<ImageQrInfo>> {
+    return adminRequest<ImageQrInfo>(this.getImageQrUrl(imageId, { ...opts, format: 'json' }));
+  }
+
+  /** URL of the QR image itself (for <img src> / download links — the browser fetches it with the admin cookie). */
+  getImageQrUrl(imageId: string, opts: { format: 'svg' | 'png' | 'json'; size?: string; locationCode?: string; download?: boolean }): string {
+    const params = new URLSearchParams({ format: opts.format });
+    if (opts.size) params.set('size', opts.size);
+    if (opts.locationCode) params.set('loc', opts.locationCode);
+    if (opts.download) params.set('download', '1');
+    return `/api/admin/qr/${encodeURIComponent(imageId)}?${params.toString()}`;
+  }
+
+  async findStickerImages(query: { refs?: number[]; ids?: string[] }): Promise<AdminResult<StickerImage[]>> {
+    const params = new URLSearchParams();
+    if (query.refs?.length) params.set('refs', query.refs.join(','));
+    if (query.ids?.length) params.set('ids', query.ids.join(','));
+    return adminRequest<StickerImage[]>(`/api/admin/stock/stickers?${params.toString()}`);
+  }
+
+  /** Builds the A4 sticker sheet PDF. Returns the file and its suggested name. */
+  async generateStickerSheet(request: StickerSheetRequest): Promise<AdminResult<{ blob: Blob; filename: string }>> {
+    try {
+      const response = await fetch('/api/admin/stock/stickers', { credentials: 'include', ...jsonInit('POST', request) });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        return { ok: false, error: body?.error || `Failed to generate sticker sheet (${response.status})`, status: response.status };
+      }
+      const filename = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'stickers.pdf';
+      return { ok: true, data: { blob: await response.blob(), filename } };
+    } catch (error) {
+      console.error('Error generating sticker sheet:', error);
+      return { ok: false, error: error instanceof Error ? error.message : 'Network error' };
+    }
+  }
+
+  async getQrReport(from: string, to: string): Promise<AdminResult<QrReport>> {
+    return adminRequest<QrReport>(`/api/admin/stock/qr-report?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+  }
+
+  // ===== APP SETTINGS METHODS (guest previews, stall pricing) =====
+
+  async getAppSettings(): Promise<AdminResult<AppSettingsMap>> {
+    return adminRequest<AppSettingsMap>('/api/admin/settings/app');
+  }
+
+  async updateAppSetting(key: string, value: unknown): Promise<AdminResult<{ ok: true }>> {
+    return adminRequest<{ ok: true }>('/api/admin/settings/app', jsonInit('PATCH', { key, value }));
+  }
+}

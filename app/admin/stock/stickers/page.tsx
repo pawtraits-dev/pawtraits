@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Printer, Plus, Trash2, FileDown } from 'lucide-react';
-import type { StockLocation } from '@/lib/product-types';
+import type { StockLocation, StickerSheetRequest } from '@/lib/product-types';
+import { AdminSupabaseService } from '@/lib/admin-supabase';
 
 interface Row { imageId: string; stockRef: number; description: string | null; thumb: string | null; size: string; quantity: number }
 
 export default function StickerSheetPage() {
+  const adminService = new AdminSupabaseService();
   const [rows, setRows] = useState<Row[]>([]);
   const [locations, setLocations] = useState<StockLocation[]>([]);
   const [locationCode, setLocationCode] = useState('');
@@ -22,20 +24,20 @@ export default function StickerSheetPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/admin/stock/locations?activeOnly=true').then(r => (r.ok ? r.json() : [])).then(setLocations).catch(() => {});
+    adminService.getStockLocations(true).then(r => { if (r.ok) setLocations(r.data); });
     // Arrived from the catalogue QR panel: ?add=<imageId>&size=M&loc=CAMDEN
     const qs = new URLSearchParams(window.location.search);
     const add = qs.get('add');
     if (qs.get('loc')) setLocationCode(qs.get('loc')!.toUpperCase());
-    if (add) addImages(`ids=${encodeURIComponent(add)}`, qs.get('size')?.toUpperCase() || '');
+    if (add) addImages({ ids: [add] }, qs.get('size')?.toUpperCase() || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function addImages(query: string, size = '') {
+  async function addImages(query: { refs?: number[]; ids?: string[] }, size = '') {
     setError(null);
-    const res = await fetch(`/api/admin/stock/stickers?${query}`);
-    const data = await res.json();
-    if (!res.ok) { setError(data.error); return; }
+    const result = await adminService.findStickerImages(query);
+    if (!result.ok) { setError(result.error); return; }
+    const data = result.data;
     if (!data.length) { setError('No matching images found'); return; }
     setRows(prev => {
       const next = [...prev];
@@ -50,7 +52,7 @@ export default function StickerSheetPage() {
     e.preventDefault();
     const refs = refInput.split(/[\s,]+/).map(s => s.replace(/[^0-9]/g, '')).filter(Boolean);
     if (!refs.length) return;
-    addImages(`refs=${refs.join(',')}`);
+    addImages({ refs: refs.map(Number) });
     setRefInput('');
   }
 
@@ -61,18 +63,14 @@ export default function StickerSheetPage() {
   async function generate() {
     setBusy(true); setError(null);
     try {
-      const res = await fetch('/api/admin/stock/stickers', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: rows.map(r => ({ imageId: r.imageId, size: r.size || undefined, quantity: r.quantity })),
-          locationCode: locationCode || undefined, startPosition, showGuides, includeThumbnails, cta: cta || undefined,
-        }),
+      const result = await adminService.generateStickerSheet({
+        items: rows.map(r => ({ imageId: r.imageId, size: (r.size || undefined) as StickerSheetRequest['items'][number]['size'], quantity: r.quantity })),
+        locationCode: locationCode || undefined, startPosition, showGuides, includeThumbnails, cta: cta || undefined,
       });
-      if (!res.ok) { setError((await res.json()).error || 'Failed to generate'); return; }
-      const blob = await res.blob();
+      if (!result.ok) { setError(result.error); return; }
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'stickers.pdf';
+      a.href = URL.createObjectURL(result.data.blob);
+      a.download = result.data.filename;
       a.click();
       URL.revokeObjectURL(a.href);
     } finally {

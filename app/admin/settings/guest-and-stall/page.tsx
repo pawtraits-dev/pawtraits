@@ -5,32 +5,30 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Settings } from 'lucide-react';
+import { AdminSupabaseService } from '@/lib/admin-supabase';
+import type { AppSettingsMap } from '@/lib/product-types';
 
-type SettingsMap = Record<string, { value: any; description: string | null; updated_at: string | null }>;
 
 export default function GuestAndStallSettingsPage() {
-  const [settings, setSettings] = useState<SettingsMap | null>(null);
+  const adminService = new AdminSupabaseService();
+  const [settings, setSettings] = useState<AppSettingsMap | null>(null);
   const [draft, setDraft] = useState<Record<string, any>>({});
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
 
   async function load() {
-    const res = await fetch('/api/admin/settings/app');
-    const data = await res.json();
-    if (!res.ok) { setMsg({ type: 'err', text: data.error }); return; }
-    setSettings(data);
-    setDraft(Object.fromEntries(Object.entries(data).map(([k, v]: any) => [k, v.value])));
+    const result = await adminService.getAppSettings();
+    if (!result.ok) { setMsg({ type: 'err', text: result.error }); return; }
+    setSettings(result.data);
+    setDraft(Object.fromEntries(Object.entries(result.data).map(([k, v]) => [k, v.value])));
   }
   useEffect(() => { load(); }, []);
 
   async function save(key: string, value: any) {
     setSaving(key); setMsg(null);
-    const res = await fetch('/api/admin/settings/app', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value }),
-    });
-    const data = await res.json();
+    const result = await adminService.updateAppSetting(key, value);
     setSaving(null);
-    if (!res.ok) { setMsg({ type: 'err', text: data.error }); return; }
+    if (!result.ok) { setMsg({ type: 'err', text: result.error }); return; }
     setMsg({ type: 'ok', text: 'Saved — takes effect within a minute.' });
     load();
   }

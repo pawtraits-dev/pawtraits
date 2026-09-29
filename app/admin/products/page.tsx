@@ -271,7 +271,6 @@ export default function ProductsPage() {
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All types</SelectItem>
                   <SelectItem value="physical_print">Physical Print</SelectItem>
                   <SelectItem value="digital_download">Digital Download</SelectItem>
                 </SelectContent>
@@ -348,6 +347,7 @@ export default function ProductsPage() {
                 variant="outline"
                 onClick={() => {
                   setSearchTerm('');
+                  setProductTypeFilter('');
                   setMediumFilter('');
                   setFormatFilter('');
                   setStockStatusFilter('');
