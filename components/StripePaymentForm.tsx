@@ -73,7 +73,7 @@ export default function StripePaymentForm({
       const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: `${window.location.origin}/customer/order-confirmation`,
+          return_url: `${window.location.origin}/shop/order-confirmation`, // works for guests too
           receipt_email: customerDetails.email,
         },
         redirect: 'if_required', // Only redirect if required by payment method

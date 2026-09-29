@@ -161,6 +161,7 @@ export type BreedCoatUpdate = Partial<BreedCoatCreate>;
 
 // Image catalog types
 export interface ImageCatalog {
+  stock_ref?: number; // short public ref used in sticker QR codes
   id: string;
   filename: string;
   original_filename: string;

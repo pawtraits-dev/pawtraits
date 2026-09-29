@@ -1,7 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { v2 as cloudinary } from 'cloudinary';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
@@ -9,6 +7,12 @@ import fetch from 'node-fetch';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 import { buildSizeInstruction } from '@/lib/breed-size-mapping';
 import { GEMINI_IMAGE_MODELS, toGeminiAspectRatio } from '@/lib/gemini-models';
+import { getRequester, setGuestCookie, clientIp } from '@/lib/guest/access';
+import { hashIp } from '@/lib/qr/attribution';
+import { getSetting } from '@/lib/app-settings';
+
+// Generation continues after the response (via after()); give it room to finish.
+export const maxDuration = 300;
 
 // Configure Cloudinary
 cloudinary.config({
@@ -253,20 +257,12 @@ export async function POST(request: NextRequest) {
   });
 
   try {
-    // Authenticate user using cookie-based auth
-    const cookieStore = await cookies();
-    const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore });
-
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-
-    console.log('🎨 Custom image generation: Authenticated user:', user.email);
+    // Signed-in customer OR anonymous guest (pt_vid device cookie)
+    const requester = await getRequester(request, { createGuest: true });
+    const user = requester.user;
+    const isGuest = !user;
+    const ipHash = hashIp(clientIp(request));
+    console.log('🎨 Custom image generation:', isGuest ? `guest ${requester.guestId}` : `user ${user!.email}`);
 
     // Use service role client for database operations
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -329,18 +325,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get customer record
-    const { data: customer, error: customerError } = await supabase
-      .from('customers')
-      .select('id, email')
-      .eq('email', user.email)
-      .single();
-
-    if (customerError || !customer) {
-      return NextResponse.json(
-        { error: 'Customer profile not found' },
-        { status: 404 }
-      );
+    let customer: { id: string; email: string } | null = null;
+    if (!isGuest) {
+      const { data: customerRow, error: customerError } = await supabase
+        .from('customers')
+        .select('id, email')
+        .eq('email', user!.email)
+        .single();
+      if (customerError || !customerRow) {
+        return NextResponse.json({ error: 'Customer profile not found' }, { status: 404 });
+      }
+      customer = customerRow;
+    } else {
+      // Guests can only upload photos (saved pets need an account)
+      if (petIds.some(id => !!id)) {
+        return NextResponse.json({ error: 'Please upload a photo of your pet' }, { status: 400 });
+      }
+      // Daily free-preview limits (admin-controlled): per device, with a high per-IP backstop
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const [deviceLimit, ipLimit] = await Promise.all([
+        getSetting('guest_preview_daily_limit'),
+        getSetting('guest_preview_ip_daily_limit'),
+      ]);
+      const { count: deviceCount } = await supabase
+        .from('customer_custom_images')
+        .select('id', { count: 'exact', head: true })
+        .eq('guest_session_id', requester.guestId!)
+        .is('customer_id', null)
+        .gte('created_at', since);
+      let ipCount = 0;
+      if (ipHash) {
+        const { count } = await supabase
+          .from('customer_custom_images')
+          .select('id', { count: 'exact', head: true })
+          .eq('ip_hash', ipHash)
+          .is('customer_id', null)
+          .gte('created_at', since);
+        ipCount = count ?? 0;
+      }
+      if ((deviceCount ?? 0) >= deviceLimit || ipCount >= ipLimit) {
+        console.warn('🚫 Guest preview limit reached', { guestId: requester.guestId, deviceCount, ipCount, deviceLimit, ipLimit });
+        return setGuestCookie(NextResponse.json({
+          error: "You've used today's free previews. Create a free account (or come back tomorrow) to make more.",
+          code: 'GUEST_LIMIT_REACHED',
+          limit: deviceLimit,
+        }, { status: 429 }), requester);
+      }
     }
 
     // Get catalog image details
@@ -447,7 +477,7 @@ export async function POST(request: NextRequest) {
 
       if (petId) {
         // Use existing pet
-        console.log(`🐕 Fetching pet data for subject ${i + 1}, petId:`, petId, 'userId:', user.id);
+        console.log(`🐕 Fetching pet data for subject ${i + 1}, petId:`, petId, 'userId:', user?.id);
         const { data: pet, error: petError } = await supabase
           .from('pets')
           .select(`
@@ -463,11 +493,11 @@ export async function POST(request: NextRequest) {
             coats (id, name, description)
           `)
           .eq('id', petId)
-          .eq('user_id', user.id)
+          .eq('user_id', user!.id)
           .single();
 
         if (petError || !pet) {
-          console.error(`❌ Pet lookup failed for subject ${i + 1}:`, { petError, hasPet: !!pet, petId, userId: user.id });
+          console.error(`❌ Pet lookup failed for subject ${i + 1}:`, { petError, hasPet: !!pet, petId, userId: user?.id });
           return NextResponse.json(
             { error: `Pet ${i + 1} not found`, details: petError?.message || 'Pet does not exist or does not belong to user' },
             { status: 404 }
@@ -560,8 +590,10 @@ export async function POST(request: NextRequest) {
     const { data: customImage, error: insertError } = await supabase
       .from('customer_custom_images')
       .insert({
-        customer_id: customer.id,
-        customer_email: customer.email,
+        customer_id: customer?.id ?? null,
+        customer_email: customer?.email ?? null,
+        guest_session_id: requester.guestId,   // device that made it (guests and signed-in)
+        ip_hash: ipHash,
         catalog_image_id: catalogImageId,
         pet_id: firstPetId || null,
         pet_name: firstPet?.name || 'Uploaded Pet',
@@ -606,30 +638,32 @@ export async function POST(request: NextRequest) {
       .update({ status: 'generating' })
       .eq('id', customImage.id);
 
-    // Start generation process in background (don't await)
-    generateCustomImage(
-      customImage.id,
-      catalogImageUrl,
-      petImageUrls, // Pass array of pet image URLs for multi-subject support
-      variationPromptTemplate,
-      catalogImage.themes?.name || 'Custom',
-      catalogImage.styles?.name || 'Portrait',
-      catalogImage.breeds?.name || 'Pet',
-      catalogImage.formats?.aspect_ratio, // Pass aspect ratio from format
-      firstPet?.breeds?.name,
-      firstPet?.ai_analysis_data, // Pass AI analysis data from first pet
-      sizeInstruction // NEW: Pass relative size instruction for multi-subject
-    ).catch(async (error) => {
-      console.error('❌ Error in background generation:', error);
-      // Update record with error status
-      await supabase
-        .from('customer_custom_images')
-        .update({
-          status: 'failed',
-          error_message: error instanceof Error ? error.message : 'Generation failed'
-        })
-        .eq('id', customImage.id);
-    });
+    // Run generation after the response is sent; after() keeps the function alive until it finishes
+    after(() =>
+      generateCustomImage(
+        customImage.id,
+        catalogImageUrl,
+        petImageUrls, // Pass array of pet image URLs for multi-subject support
+        variationPromptTemplate,
+        catalogImage.themes?.name || 'Custom',
+        catalogImage.styles?.name || 'Portrait',
+        catalogImage.breeds?.name || 'Pet',
+        catalogImage.formats?.aspect_ratio, // Pass aspect ratio from format
+        firstPet?.breeds?.name,
+        firstPet?.ai_analysis_data, // Pass AI analysis data from first pet
+        sizeInstruction // NEW: Pass relative size instruction for multi-subject
+      ).catch(async (error) => {
+        console.error('❌ Error in background generation:', error);
+        // Update record with error status
+        await supabase
+          .from('customer_custom_images')
+          .update({
+            status: 'failed',
+            error_message: error instanceof Error ? error.message : 'Generation failed'
+          })
+          .eq('id', customImage.id);
+      })
+    );
 
     const response = {
       ...customImage,
@@ -637,7 +671,7 @@ export async function POST(request: NextRequest) {
     };
     console.log('🚀 Returning response:', JSON.stringify(response));
 
-    return NextResponse.json(response);
+    return setGuestCookie(NextResponse.json(response), requester);
 
   } catch (error) {
     console.error('❌ Error in custom image generation:', error);

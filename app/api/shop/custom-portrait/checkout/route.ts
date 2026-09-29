@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import { QR_ATTRIBUTION_COOKIE, decodeAttribution } from '@/lib/qr/attribution';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2024-12-18.acacia'
@@ -103,6 +104,11 @@ export async function POST(request: NextRequest) {
         custom_image_id: customImageId,
         customer_email: user.email,
         catalog_image_id: customImage.catalog_image_id || '',
+        // Sticker QR attribution (recorded for when digital orders are persisted)
+        ...(() => {
+          const qr = decodeAttribution(request.cookies.get(QR_ATTRIBUTION_COOKIE)?.value);
+          return qr ? { qrScanId: qr.scanId, ...(qr.locationId ? { posLocationId: qr.locationId } : {}) } : {};
+        })(),
       },
       customer_email: user.email,
     });

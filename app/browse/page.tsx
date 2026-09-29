@@ -300,11 +300,7 @@ function BrowsePageContent() {
   };
 
   const handleCustomize = (image: ImageCatalogWithDetails) => {
-    // Check if user is authenticated and is a customer
-    if (!userProfile || userProfile.user_type !== 'customer') {
-      router.push('/signup/user');
-      return;
-    }
+    // Guests can customise too (free previews, no sign-up) — account is created at checkout
     // Navigate to customise page instead of opening modal
     router.push(`/customise/${image.id}`);
   };

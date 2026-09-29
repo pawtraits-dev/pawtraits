@@ -1,426 +1,205 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+/**
+ * Buy a customised portrait — mobile-first. Works for guests. Digital download and prints
+ * all go in the same basket and the same checkout.
+ */
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Download, ShoppingCart, Check, Printer } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowLeft, Check, Download, Truck } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
-import type { Product, ProductPricing } from '@/lib/product-types';
-import { formatPrice } from '@/lib/product-types';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
+import { CountryProvider } from '@/lib/country-context';
+import StickyActionBar from '@/components/customise/StickyActionBar';
+import { track } from '@/lib/tracking/events';
 
-interface CustomImage {
-  id: string;
-  generated_image_url: string;
-  share_token: string;
-  status: string;
-  catalog_image_id: string;
-  pet_id: string | null;
+interface CustomImage { id: string; catalog_image_id: string; generated_image_url: string | null; status: string }
+interface CatalogImage { id: string; description: string; format?: { id: string; name: string; aspectRatio: string }; theme?: { name: string } }
+interface ProductRow {
+  id: string; name: string; product_type: string; size_code?: string; size_name?: string; width_cm?: number; height_cm?: number;
+  media_name?: string; media_description?: string; gelato_sku?: string;
+  pricing: { id: string; sale_price: number; discount_price?: number | null; is_on_sale?: boolean; currency_code: string; currency_symbol: string; product_id: string; country_code: string };
 }
 
-interface CatalogImage {
-  id: string;
-  description: string;
-  imageUrl: string;
-  format?: { id: string; name: string; aspectRatio: string };
-}
+const money = (p: ProductRow['pricing']) => {
+  const v = p.is_on_sale && p.discount_price ? p.discount_price : p.sale_price;
+  return `${p.currency_symbol || '£'}${(v / 100).toFixed(v % 100 === 0 ? 0 : 2)}`;
+};
 
 export default function CustomPortraitPurchasePage() {
-  const params = useParams();
+  const { id } = useParams() as { id: string };
   const router = useRouter();
   const { toast } = useToast();
   const { addToCart } = useHybridCart();
-  const customImageId = params.id as string;
 
   const [customImage, setCustomImage] = useState<CustomImage | null>(null);
   const [catalogImage, setCatalogImage] = useState<CatalogImage | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [pricing, setPricing] = useState<ProductPricing[]>([]);
+  const [products, setProducts] = useState<ProductRow[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [addingToCart, setAddingToCart] = useState(false);
-  const [purchasingDigital, setPurchasingDigital] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [scannedSize, setScannedSize] = useState<string | null>(null);
 
   useEffect(() => {
-    loadData();
-  }, [customImageId]);
-
-  async function loadData() {
-    try {
-      setLoading(true);
-
-      // Load custom image
-      const customRes = await fetch(`/api/customers/custom-images/${customImageId}`, {
-        credentials: 'include'
-      });
-
-      if (!customRes.ok) {
-        throw new Error('Custom portrait not found');
-      }
-
-      const customData = await customRes.json();
-      setCustomImage(customData);
-
-      // Load catalog image to get format
-      const catalogRes = await fetch(`/api/public/catalog-images/${customData.catalog_image_id}`);
-      if (catalogRes.ok) {
-        const catalogData = await catalogRes.json();
-        setCatalogImage(catalogData);
-
-        // Load products for this format
-        if (catalogData.format?.id) {
-          await loadProducts(catalogData.format.id);
+    try { setScannedSize(sessionStorage.getItem('pt_qr_size')); } catch { /* ignore */ }
+    (async () => {
+      try {
+        const cRes = await fetch(`/api/customers/custom-images/${id}`, { credentials: 'include' });
+        if (!cRes.ok) throw new Error('We couldn’t find that portrait on this device. If you made it on another phone, open it there.');
+        const c: CustomImage = await cRes.json();
+        setCustomImage(c);
+        const catRes = await fetch(`/api/public/catalog-images/${c.catalog_image_id}`);
+        const cat: CatalogImage = await catRes.json();
+        setCatalogImage(cat);
+        if (cat.format?.id) {
+          const pRes = await fetch(`/api/public/format-products?formatId=${cat.format.id}&country=GB`);
+          const pData = await pRes.json();
+          setProducts(pData.products || []);
+          const digital = (pData.products || []).find((p: ProductRow) => p.product_type === 'digital_download');
+          if (digital) setSelected(new Set([digital.id])); // sensible default: the download
         }
+      } catch (e: any) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Error loading data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  }
+    })();
+  }, [id]);
 
-  async function loadProducts(formatId: string) {
+  const digital = products.filter(p => p.product_type === 'digital_download');
+  const prints = products.filter(p => p.product_type !== 'digital_download');
+  const printsByMedia = useMemo(() => prints.reduce<Record<string, ProductRow[]>>((acc, p) => {
+    (acc[p.media_name || 'Prints'] ||= []).push(p); return acc;
+  }, {}), [prints]);
+
+  const selectedProducts = products.filter(p => selected.has(p.id));
+  const total = selectedProducts.reduce((t, p) => t + (p.pricing.is_on_sale && p.pricing.discount_price ? p.pricing.discount_price : p.pricing.sale_price), 0);
+
+  const toggle = (pid: string) => setSelected(prev => {
+    const n = new Set(prev); n.has(pid) ? n.delete(pid) : n.add(pid); return n;
+  });
+
+  async function addSelected() {
+    if (!customImage || !catalogImage || !selectedProducts.length) return;
+    setAdding(true);
     try {
-      const productsRes = await fetch(`/api/shop/products?formatId=${formatId}`);
-      const pricingRes = await fetch(`/api/shop/pricing?formatId=${formatId}`);
-
-      if (productsRes.ok) {
-        const productsData = await productsRes.json();
-        setProducts(productsData.products || []);
+      for (const p of selectedProducts) {
+        await addToCart({
+          productId: p.id,
+          imageId: customImage.id,
+          imageUrl: customImage.generated_image_url || '',
+          imageTitle: `${catalogImage.description || 'Pawtrait'} (Custom Portrait)`,
+          product: p as any,
+          pricing: p.pricing as any,
+          quantity: 1,
+          gelatoProductUid: p.gelato_sku,
+          printSpecs: p.width_cm ? { width_cm: p.width_cm, height_cm: p.height_cm || p.width_cm, medium: p.media_name || '', format: catalogImage.format?.name || '' } : undefined,
+        } as any);
       }
-
-      if (pricingRes.ok) {
-        const pricingData = await pricingRes.json();
-        setPricing(pricingData.pricing || []);
-      }
-    } catch (err) {
-      console.error('Error loading products:', err);
-    }
-  }
-
-  function getProductPricing(product: Product): ProductPricing | null {
-    return pricing.find(p => p.product_id === product.id) || null;
-  }
-
-  async function handleAddToCart(product: Product) {
-    if (!customImage || !catalogImage) return;
-
-    const productPricing = getProductPricing(product);
-    if (!productPricing) {
-      toast({
-        title: 'Pricing error',
-        description: 'Could not load pricing for this product',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    setAddingToCart(true);
-
-    try {
-      // CRITICAL: Use custom image URL and ID, not catalog image
-      await addToCart({
-        productId: product.id,
-        imageId: customImage.id, // Custom image ID
-        imageUrl: customImage.generated_image_url, // Custom image URL
-        imageTitle: catalogImage.description + ' (Custom Portrait)',
-        product,
-        pricing: productPricing,
-        quantity: 1,
-      });
-
-      toast({
-        title: 'Added to cart!',
-        description: `${product.media_name} ${product.width_cm}×${product.height_cm}cm added to cart`
-      });
-
-      // Navigate to cart
+      track.addToCart(selectedProducts.map(p => ({
+        id: catalogImage.id, name: catalogImage.description, category: catalogImage.theme?.name,
+        variant: p.product_type === 'digital_download' ? 'custom_digital' : `custom_${p.size_code || p.name}`,
+        price: (p.pricing.is_on_sale && p.pricing.discount_price ? p.pricing.discount_price : p.pricing.sale_price) / 100,
+      })));
       router.push('/shop/cart');
-    } catch (err) {
-      console.error('Add to cart error:', err);
-      toast({
-        title: 'Failed to add to cart',
-        description: err instanceof Error ? err.message : 'Please try again',
-        variant: 'destructive'
-      });
+    } catch (e: any) {
+      toast({ title: 'Couldn’t add to basket', description: e.message, variant: 'destructive' });
     } finally {
-      setAddingToCart(false);
+      setAdding(false);
     }
   }
-
-  async function handlePurchaseDigital() {
-    if (!customImage) return;
-
-    setPurchasingDigital(true);
-
-    try {
-      const response = await fetch('/api/shop/custom-portrait/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          customImageId: customImage.id,
-          catalogImageId: customImage.catalog_image_id
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create checkout');
-      }
-
-      const { checkoutUrl } = await response.json();
-      window.location.href = checkoutUrl;
-    } catch (err) {
-      console.error('Purchase error:', err);
-      toast({
-        title: 'Purchase failed',
-        description: err instanceof Error ? err.message : 'Please try again',
-        variant: 'destructive'
-      });
-      setPurchasingDigital(false);
-    }
-  }
-
-  const getAspectRatioStyle = (aspectRatio?: string) => {
-    if (!aspectRatio) return { aspectRatio: '1 / 1' };
-    return { aspectRatio: aspectRatio.replace(':', ' / ') };
-  };
-
-  if (loading) {
-    return (
-      <div className="p-6 max-w-6xl mx-auto">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !customImage) {
-    return (
-      <div className="p-6 max-w-6xl mx-auto">
-        <Alert variant="destructive">
-          <AlertDescription>{error || 'Custom portrait not found'}</AlertDescription>
-        </Alert>
-        <Button
-          onClick={() => router.back()}
-          variant="outline"
-          className="mt-4"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Go Back
-        </Button>
-      </div>
-    );
-  }
-
-  // Group products by media type
-  const productsByMedia = products.reduce((acc, product) => {
-    const media = product.media_name || 'Other';
-    if (!acc[media]) acc[media] = [];
-    acc[media].push(product);
-    return acc;
-  }, {} as Record<string, Product[]>);
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center space-x-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.back()}
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Purchase Your Custom Portrait</h1>
-          <p className="text-gray-600 mt-1">
-            Choose digital download or select a print product
-          </p>
-        </div>
-      </div>
+    <CountryProvider>
+      <div className="min-h-[100dvh] bg-gray-50">
+        <UserAwareNavigation />
+        <div className="mx-auto max-w-xl px-4 pt-3 md:pt-6">
+          <button onClick={() => router.back()} className="inline-flex items-center gap-1 py-2 text-sm text-gray-600"><ArrowLeft className="h-4 w-4" /> Back</button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left: Portrait Preview */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Your Custom Portrait</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div
-                className="relative w-full rounded-lg overflow-hidden bg-gray-100"
-                style={getAspectRatioStyle(catalogImage?.format?.aspectRatio)}
-              >
-                <Image
-                  src={customImage.generated_image_url}
-                  alt="Custom portrait"
-                  fill
-                  className="object-contain"
-                />
-                <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded text-xs">
-                  Preview • Watermarked
+          {loading && <div className="animate-pulse"><div className="aspect-square rounded-2xl bg-gray-200" /><div className="mt-4 h-20 rounded-2xl bg-gray-200" /></div>}
+          {error && (
+            <div className="py-12 text-center">
+              <p className="text-gray-800">{error}</p>
+              <Link href="/browse" className="mt-6 inline-flex h-12 items-center rounded-xl bg-purple-600 px-6 font-semibold text-white">Browse designs</Link>
+            </div>
+          )}
+
+          {!loading && customImage && (
+            <>
+              <div className="flex gap-4 rounded-2xl bg-white p-3 shadow-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {customImage.generated_image_url && <img src={customImage.generated_image_url} alt="Your portrait" className="h-28 w-24 rounded-xl object-cover" />}
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-purple-700">Your custom portrait</p>
+                  <p className="font-semibold text-gray-900 line-clamp-2">{catalogImage?.description}</p>
+                  <p className="mt-1 text-xs text-gray-500">Final files have no watermark.</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Right: Purchase Options */}
-        <div className="lg:col-span-2">
-          <Tabs defaultValue="digital" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="digital">
-                <Download className="w-4 h-4 mr-2" />
-                Digital Download
-              </TabsTrigger>
-              <TabsTrigger value="prints">
-                <Printer className="w-4 h-4 mr-2" />
-                Physical Prints
-              </TabsTrigger>
-            </TabsList>
+              <h1 className="mt-6 text-xl font-bold text-gray-900">How would you like it?</h1>
+              <p className="text-sm text-gray-600">Pick as many as you like.</p>
 
-            <TabsContent value="digital" className="space-y-4 mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Digital Download - High Resolution</CardTitle>
-                  <p className="text-sm text-gray-600 mt-2">
-                    Perfect for sharing online or printing at home
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-lg font-semibold text-gray-900">Custom Portrait</span>
-                      <span className="text-2xl font-bold text-blue-600">£9.99</span>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      One-time purchase • Instant download
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-gray-900">What's included:</h4>
-                    <ul className="space-y-2">
-                      {[
-                        'High-resolution image (4K quality)',
-                        'No watermark',
-                        'Instant download after purchase',
-                        'Perfect for printing or sharing',
-                        'Lifetime access to your download'
-                      ].map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                          <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <Button
-                    onClick={handlePurchaseDigital}
-                    disabled={purchasingDigital}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                    size="lg"
-                  >
-                    {purchasingDigital ? (
-                      <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingCart className="w-4 h-4 mr-2" />
-                        Buy Digital Download - £9.99
-                      </>
-                    )}
-                  </Button>
-
-                  <p className="text-xs text-gray-500 text-center">
-                    Secure checkout powered by Stripe
-                  </p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="prints" className="space-y-4 mt-6">
-              {Object.keys(productsByMedia).length > 0 ? (
-                <div className="space-y-6">
-                  {Object.entries(productsByMedia).map(([media, mediaProducts]) => (
-                    <Card key={media}>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Printer className="w-5 h-5" />
-                          {media}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {mediaProducts.map((product) => {
-                            const productPricing = getProductPricing(product);
-                            return (
-                              <div
-                                key={product.id}
-                                className="border rounded-lg p-4 hover:border-purple-300 transition-colors"
-                              >
-                                <div className="flex justify-between items-start mb-2">
-                                  <div>
-                                    <h4 className="font-semibold text-gray-900">
-                                      {product.width_cm} × {product.height_cm} cm
-                                    </h4>
-                                    <p className="text-sm text-gray-600">{product.media_description}</p>
-                                  </div>
-                                  {productPricing && (
-                                    <span className="text-lg font-bold text-purple-600">
-                                      {formatPrice(productPricing.retail_price, productPricing.currency_code)}
-                                    </span>
-                                  )}
-                                </div>
-                                <Button
-                                  onClick={() => handleAddToCart(product)}
-                                  disabled={!productPricing || addingToCart}
-                                  className="w-full mt-2"
-                                  variant="outline"
-                                >
-                                  {addingToCart ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600 mr-2"></div>
-                                      Adding...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <ShoppingCart className="w-4 h-4 mr-2" />
-                                      Add to Cart
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </CardContent>
-                    </Card>
+              {digital.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {digital.map(p => (
+                    <OptionRow key={p.id} checked={selected.has(p.id)} onClick={() => toggle(p.id)}
+                      icon={<Download className="h-5 w-5" />} title="Digital download"
+                      subtitle="High-resolution file · instant · perfect for phones and socials" price={money(p.pricing)} />
                   ))}
                 </div>
-              ) : (
-                <Alert>
-                  <AlertDescription>
-                    No print products available for this format yet. Choose digital download or contact support.
-                  </AlertDescription>
-                </Alert>
               )}
-            </TabsContent>
-          </Tabs>
+
+              {Object.entries(printsByMedia).map(([media, rows]) => (
+                <div key={media} className="mt-5">
+                  <p className="mb-2 flex items-center gap-1 text-sm font-semibold text-gray-800"><Truck className="h-4 w-4" /> {media} · delivered</p>
+                  <div className="space-y-2">
+                    {rows.map(p => (
+                      <OptionRow key={p.id} checked={selected.has(p.id)} onClick={() => toggle(p.id)}
+                        title={`${p.size_name || ''} ${p.width_cm ? `${p.width_cm}×${p.height_cm} cm` : p.name}`.trim()}
+                        subtitle={scannedSize && p.size_code === scannedSize ? 'Same size as the print you scanned' : p.media_description}
+                        highlight={!!scannedSize && p.size_code === scannedSize}
+                        price={money(p.pricing)} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {!products.length && <p className="mt-6 text-sm text-gray-600">No products are set up for this format yet.</p>}
+
+              <StickyActionBar>
+                <button onClick={addSelected} disabled={!selectedProducts.length || adding}
+                  className="flex h-14 w-full items-center justify-between rounded-2xl bg-purple-600 px-5 text-lg font-semibold text-white shadow-lg disabled:bg-purple-300">
+                  <span>{adding ? 'Adding…' : selectedProducts.length ? `Add ${selectedProducts.length} to basket` : 'Choose an option'}</span>
+                  {selectedProducts.length > 0 && <span>£{(total / 100).toFixed(2)}</span>}
+                </button>
+                <p className="text-center text-xs text-gray-500">No account needed — checkout as a guest.</p>
+              </StickyActionBar>
+            </>
+          )}
         </div>
       </div>
-    </div>
+    </CountryProvider>
+  );
+}
+
+function OptionRow({ checked, onClick, icon, title, subtitle, price, highlight }: {
+  checked: boolean; onClick: () => void; icon?: React.ReactNode; title: string; subtitle?: string | null; price: string; highlight?: boolean;
+}) {
+  return (
+    <button onClick={onClick} aria-pressed={checked}
+      className={`flex w-full items-center gap-3 rounded-2xl border-2 bg-white p-4 text-left transition ${checked ? 'border-purple-600 ring-2 ring-purple-100' : highlight ? 'border-purple-300' : 'border-gray-200'}`}>
+      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 ${checked ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-300'}`}>
+        {checked && <Check className="h-4 w-4" />}
+      </span>
+      {icon && <span className="text-purple-700">{icon}</span>}
+      <span className="flex-1">
+        <span className="block font-semibold text-gray-900">{title}</span>
+        {subtitle && <span className={`block text-xs ${highlight ? 'text-purple-700 font-medium' : 'text-gray-500'}`}>{subtitle}</span>}
+      </span>
+      <span className="font-bold text-gray-900">{price}</span>
+    </button>
   );
 }

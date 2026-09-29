@@ -13,6 +13,7 @@ import { SupabaseService } from '@/lib/supabase';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 import type { ImageCatalogWithDetails, Breed, Theme, Style, Format, AnimalType, BreedCoatDetail, Outfit } from '@/lib/types';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
+import ImageQrPanel from '@/components/admin/ImageQrPanel';
 import { extractDescriptionTitle } from '@/lib/utils';
 import ImageVariantGenerationModal from '@/components/ImageVariantGenerationModal';
 import { VariationsSelector } from '@/components/VariationsSelector';
@@ -1136,6 +1137,9 @@ function ImageDetailModal({
                 </div>
               )}
             </div>
+
+            {/* Sticker QR code */}
+            <ImageQrPanel imageId={image.id} />
 
             {/* Metadata */}
             <div className="grid grid-cols-2 gap-4 pt-4 border-t">

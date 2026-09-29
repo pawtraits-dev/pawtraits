@@ -4,6 +4,8 @@ import './globals.css';
 import { HybridCartProvider } from '@/lib/hybrid-cart-context';
 import EnvironmentIndicator from '@/components/EnvironmentIndicator';
 import { Analytics } from '@vercel/analytics/react';
+import TrackingScripts from '@/components/tracking/TrackingScripts';
+import ConsentBanner from '@/components/tracking/ConsentBanner';
 
 const inter = Inter({ subsets: ['latin'] });
 const margarine = Margarine({ 
@@ -39,6 +41,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  viewportFit: 'cover', // lets sticky bottom CTAs respect the iPhone home indicator (safe-area insets)
 };
 
 export default function RootLayout({
@@ -56,11 +59,13 @@ export default function RootLayout({
       <body className={`${inter.className} ${margarine.variable} ${lifeSavers.variable}`}>
         <EnvironmentIndicator />
         <Analytics />
+        <TrackingScripts />
         <div id="root">
           <HybridCartProvider>
             {children}
           </HybridCartProvider>
         </div>
+        <ConsentBanner />
       </body>
     </html>
   );

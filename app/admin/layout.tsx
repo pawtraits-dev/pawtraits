@@ -36,7 +36,9 @@ import {
   Mail,
   MessageSquare,
   Send,
-  Coffee
+  Coffee,
+  MapPin,
+  Printer
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -78,6 +80,15 @@ const navigationSections = [
       { name: 'Pricing', href: '/admin/pricing', icon: DollarSign },
       { name: 'Pricing Management', href: '/admin/pricing-management', icon: Settings },
       { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
+    ]
+  },
+  {
+    title: 'Stock & Stalls',
+    items: [
+      { name: 'Locations', href: '/admin/stock/locations', icon: MapPin },
+      { name: 'Sticker Sheets', href: '/admin/stock/stickers', icon: Printer },
+      { name: 'Sticker QR Report', href: '/admin/stock/qr-report', icon: QrCode },
+      { name: 'Guest & Stall Settings', href: '/admin/settings/guest-and-stall', icon: Settings },
     ]
   },
   {

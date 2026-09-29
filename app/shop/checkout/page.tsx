@@ -19,6 +19,7 @@ import { useUserRouting } from "@/hooks/use-user-routing"
 import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider, useCountryPricing } from '@/lib/country-context'
 import { Elements } from '@stripe/react-stripe-js'
+import { track } from '@/lib/tracking/events'
 import { getStripe } from '@/lib/stripe-client'
 import StripePaymentForm from '@/components/StripePaymentForm'
 import { checkoutValidation } from '@/lib/checkout-validation'
@@ -26,6 +27,9 @@ import { extractDescriptionTitle } from '@/lib/utils'
 
 function CheckoutPageContent() {
   const [currentStep, setCurrentStep] = useState(1)
+  // Guest checkout (no account needed — one is created after payment)
+  const [marketingOptIn, setMarketingOptIn] = useState(false)
+  const [beganCheckoutTracked, setBeganCheckoutTracked] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const { selectedCountry, getCountryPricing } = useCountryPricing()
   const [shippingData, setShippingData] = useState({
@@ -54,6 +58,10 @@ function CheckoutPageContent() {
   const { items, totalItems, totalPrice, clearCart } = useHybridCart()
   const router = useRouter()
   const { userProfile, loading: userLoading } = useUserRouting()
+  const isGuest = !userLoading && !userProfile
+  // Downloads-only basket: no address or shipping step
+  const isDigitalOnly = items.length > 0 && items.every((item: any) => item.product?.product_type === 'digital_download')
+
   const stripePromise = getStripe()
 
   // Note: Shipping costs will be calculated via Gelato API at checkout time
@@ -303,6 +311,14 @@ function CheckoutPageContent() {
   }
 
   const validateShipping = () => {
+    if (isDigitalOnly) {
+      const newErrors: Record<string, string> = {}
+      if (!shippingData.firstName?.trim()) newErrors.firstName = 'First name is required'
+      if (!shippingData.lastName?.trim()) newErrors.lastName = 'Last name is required'
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(shippingData.email?.trim() || '')) newErrors.email = 'Please enter a valid email address'
+      setErrors(newErrors)
+      return Object.keys(newErrors).length === 0
+    }
     // Use the shared checkout validation service
     const addressValidation = checkoutValidation.validateAddress(shippingData, []);
 
@@ -394,6 +410,22 @@ function CheckoutPageContent() {
 
   const handleShippingSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!beganCheckoutTracked) {
+      track.beginCheckout(items.map((item: any) => ({ id: item.imageId, name: item.imageTitle, variant: item.product?.size_code || item.product?.product_type, price: item.pricing.sale_price / 100, quantity: item.quantity })))
+      setBeganCheckoutTracked(true)
+    }
+    if (isDigitalOnly) {
+      if (!validateShipping()) return
+      setSelectedShippingOption(null)
+      setIsProcessing(true)
+      try {
+        await createPaymentIntent()
+        setCurrentStep(3)
+      } finally {
+        setIsProcessing(false)
+      }
+      return
+    }
     // Step 1: Validate shipping address and fetch shipping options
     await fetchShippingOptions();
   }
@@ -451,6 +483,8 @@ function CheckoutPageContent() {
         customerName: customerName,
         userType: userProfile?.user_type || 'customer',
         shippingAddress: shippingData,
+        marketingOptIn: isGuest ? marketingOptIn : undefined,
+        digitalOnly: isDigitalOnly || undefined,
         shippingOption: selectedShippingOption,
         cartItems: items.map(item => ({
           productId: item.productId,
@@ -576,85 +610,17 @@ function CheckoutPageContent() {
     )
   }
 
-  // Redirect to signup/login if user is not authenticated
-  console.log('🔍 CHECKOUT - Auth check:', {
-    userLoading,
-    userProfile: userProfile ? {
-      id: userProfile.id,
-      email: userProfile.email,
-      user_type: userProfile.user_type
-    } : null
-  });
-
-  if (!userLoading && !userProfile) {
-    console.log('❌ CHECKOUT - User not authenticated, showing sign-in prompt');
-    const returnUrl = encodeURIComponent('/shop/checkout')
-    return (
-      <>
-        <UserAwareNavigation />
-        <div className="min-h-screen bg-gray-50 py-8">
-          <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8">
-            <Card className="text-center">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-center space-x-2">
-                  <Shield className="w-6 h-6 text-purple-600" />
-                  <span>Sign In Required</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <p className="text-gray-600">
-                    Please create an account or sign in to complete your purchase.
-                  </p>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-900 mb-2">Why do I need an account?</h4>
-                    <ul className="text-sm text-blue-800 space-y-1 text-left">
-                      <li>• Track your orders and delivery status</li>
-                      <li>• Save your shipping information</li>
-                      <li>• Access your order history</li>
-                      <li>• Receive updates about your portraits</li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Link href={`/signup?returnTo=${returnUrl}`} className="block">
-                    <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3">
-                      Create Account & Continue
-                    </Button>
-                  </Link>
-
-                  <div className="flex items-center">
-                    <div className="flex-1 border-t border-gray-300"></div>
-                    <span className="px-3 text-sm text-gray-500">or</span>
-                    <div className="flex-1 border-t border-gray-300"></div>
-                  </div>
-
-                  <Link href={`/auth/login?returnTo=${returnUrl}`} className="block">
-                    <Button variant="outline" className="w-full py-3">
-                      Sign In to Existing Account
-                    </Button>
-                  </Link>
-                </div>
-
-                <div className="text-center">
-                  <Link href="/shop/cart" className="text-sm text-gray-600 hover:text-purple-600">
-                    ← Back to Cart
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </>
-    )
-  }
 
   return (
     <>
       <UserAwareNavigation />
       <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        {isGuest && (
+          <div className="mb-4 rounded-xl border border-purple-100 bg-purple-50 px-4 py-3 text-sm text-purple-900">
+            Checking out as a guest — no account needed. <Link href={`/auth/login?returnTo=${encodeURIComponent('/shop/checkout')}`} className="font-medium underline">Already have one? Sign in</Link>
+          </div>
+        )}
         {/* Header */}
         <div className="mb-8">
           <Link href="/shop/cart" className="flex items-center text-gray-600 hover:text-purple-600 mb-4">
@@ -721,10 +687,11 @@ function CheckoutPageContent() {
                         <Label htmlFor="firstName">First Name *</Label>
                         <Input
                           id="firstName"
+                          autoComplete="given-name"
                           value={shippingData.firstName}
                           onChange={(e) => handleInputChange("firstName", e.target.value)}
                           className={errors.firstName ? "border-red-500" : ""}
-                          placeholder="John"
+                          placeholder="Jane"
                         />
                         {errors.firstName && <p className="text-sm text-red-600">{errors.firstName}</p>}
                       </div>
@@ -732,32 +699,59 @@ function CheckoutPageContent() {
                         <Label htmlFor="lastName">Last Name *</Label>
                         <Input
                           id="lastName"
+                          autoComplete="family-name"
                           value={shippingData.lastName}
                           onChange={(e) => handleInputChange("lastName", e.target.value)}
                           className={errors.lastName ? "border-red-500" : ""}
-                          placeholder="Doe"
+                          placeholder="Smith"
                         />
                         {errors.lastName && <p className="text-sm text-red-600">{errors.lastName}</p>}
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="email">Email Address</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={shippingData.email}
-                        readOnly
-                        className="bg-gray-50 text-gray-700 cursor-not-allowed"
-                        placeholder="Loading from your account..."
-                      />
-                      <p className="text-xs text-gray-500">Using email from your account</p>
+                      <Label htmlFor="email">Email Address{isGuest ? ' *' : ''}</Label>
+                      {isGuest ? (
+                        <>
+                          <Input
+                            id="email"
+                            type="email"
+                            inputMode="email"
+                            autoComplete="email"
+                            value={shippingData.email}
+                            onChange={(e) => handleInputChange("email", e.target.value)}
+                            className={`h-12 text-base ${errors.email ? "border-red-500" : ""}`}
+                            placeholder="you@example.com"
+                          />
+                          {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
+                          <p className="text-xs text-gray-500">For your receipt{isDigitalOnly ? ' and download link' : ' and delivery updates'}. We’ll set up a free account with it so you can find your order later — no password needed.</p>
+                          <label className="flex items-start gap-3 pt-1 text-sm text-gray-700">
+                            <input type="checkbox" checked={marketingOptIn} onChange={(e) => setMarketingOptIn(e.target.checked)} className="mt-0.5 h-5 w-5 accent-purple-600" />
+                            <span>Send me the occasional new design and offer (unsubscribe any time)</span>
+                          </label>
+                        </>
+                      ) : (
+                        <>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={shippingData.email}
+                            readOnly
+                            className="bg-gray-50 text-gray-700 cursor-not-allowed"
+                            placeholder="Loading from your account..."
+                          />
+                          <p className="text-xs text-gray-500">Using email from your account</p>
+                        </>
+                      )}
                     </div>
+
+                    {!isDigitalOnly && (<>
 
                     <div className="space-y-2">
                       <Label htmlFor="addressLine1">Address Line 1 *</Label>
                       <Input
                         id="addressLine1"
+                        autoComplete="address-line1"
                         value={shippingData.addressLine1}
                         onChange={(e) => {
                           handleInputChange("addressLine1", e.target.value);
@@ -765,7 +759,7 @@ function CheckoutPageContent() {
                           handleInputChange("address", e.target.value);
                         }}
                         className={errors.addressLine1 ? "border-red-500" : ""}
-                        placeholder="123 Main Street"
+                        placeholder="12 Mill Lane"
                       />
                       {errors.addressLine1 && <p className="text-sm text-red-600">{errors.addressLine1}</p>}
                     </div>
@@ -774,6 +768,7 @@ function CheckoutPageContent() {
                       <Label htmlFor="addressLine2">Address Line 2 (Optional)</Label>
                       <Input
                         id="addressLine2"
+                        autoComplete="address-line2"
                         value={shippingData.addressLine2}
                         onChange={(e) => handleInputChange("addressLine2", e.target.value)}
                         placeholder="Apartment, suite, etc."
@@ -785,10 +780,11 @@ function CheckoutPageContent() {
                         <Label htmlFor="city">City *</Label>
                         <Input
                           id="city"
+                          autoComplete="address-level2"
                           value={shippingData.city}
                           onChange={(e) => handleInputChange("city", e.target.value)}
                           className={errors.city ? "border-red-500" : ""}
-                          placeholder="San Francisco"
+                          placeholder="London"
                         />
                         {errors.city && <p className="text-sm text-red-600">{errors.city}</p>}
                       </div>
@@ -796,10 +792,11 @@ function CheckoutPageContent() {
                         <Label htmlFor="postcode">Postcode *</Label>
                         <Input
                           id="postcode"
+                          autoComplete="postal-code"
                           value={shippingData.postcode}
                           onChange={(e) => handleInputChange("postcode", e.target.value)}
                           className={errors.postcode ? "border-red-500" : ""}
-                          placeholder="94102"
+                          placeholder="NW6 1AA"
                         />
                         {errors.postcode && <p className="text-sm text-red-600">{errors.postcode}</p>}
                       </div>
@@ -832,11 +829,12 @@ function CheckoutPageContent() {
                       </Select>
                       {errors.country && <p className="text-sm text-red-600">{errors.country}</p>}
                     </div>
+                    </>)}
 
                     <Button
                       type="submit"
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3"
-                      disabled={loadingShipping}
+                      className="w-full h-14 text-lg bg-purple-600 hover:bg-purple-700 text-white"
+                      disabled={loadingShipping || isProcessing}
                     >
                       {loadingShipping ? (
                         <>
@@ -845,7 +843,7 @@ function CheckoutPageContent() {
                         </>
                       ) : (
                         <>
-                          Continue to Shipping Options
+                          {isDigitalOnly ? 'Continue to Payment' : 'Continue to Shipping Options'}
                           <ArrowRight className="w-4 h-4 ml-2" />
                         </>
                       )}

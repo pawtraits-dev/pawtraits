@@ -283,6 +283,25 @@
         </div>
       </div>
 
+      {{#if download_links}}
+      <!-- Digital downloads -->
+      <div class="info-box">
+        <h3>⬇️ Your downloads</h3>
+        {{#each download_links}}
+        <p><a href="{{this.url}}">{{this.title}}</a></p>
+        {{/each}}
+        <p style="font-size: 13px; color: #6b7280;">Full-resolution files. Links work for 30 days, and they’re always in your account under “My downloads”.</p>
+      </div>
+      {{/if}}
+
+      {{#if is_collected}}
+      <!-- Stall collection -->
+      <div class="info-box">
+        <h3>🛍️ Yours to take home</h3>
+        <p>You paid on your phone at our stall{{#if stall_name}} ({{stall_name}}){{/if}}, so your print went home with you. Nothing more to wait for — except the compliments.</p>
+      </div>
+      {{else}}
+      {{#if shipping_address_line_1}}
       <!-- Shipping Address -->
       <div class="info-box">
         <h3>📦 Delivering Cuteness To</h3>
@@ -336,9 +355,12 @@
         </div>
       </div>
 
+      {{/if}}
+      {{/if}}
+
       <!-- CTA Button -->
       <div style="text-align: center;">
-        <a href="{{order_url}}" class="button">Track Your Masterpiece</a>
+        <a href="{{order_url}}" class="button">{{#if is_collected}}View Your Order{{else}}Track Your Masterpiece{{/if}}</a>
       </div>
 
       <!-- Support Info -->

@@ -212,8 +212,15 @@ export class FulfillmentRouter {
       .from('orders')
       .update({
         fulfillment_status: overallStatus,
+        // Keep the Gelato order id on the order so Gelato status webhooks can find it
+        ...(trackingInfo.provider === 'gelato' && trackingInfo.providerOrderId
+          ? { gelato_order_id: trackingInfo.providerOrderId, gelato_status: 'pending' }
+          : {}),
+        ...(noneFulfilled || !allSuccessful
+          ? { error_message: results.filter(r => !r.success).map(r => r.error).join(' | ').slice(0, 1000) }
+          : {}),
         updated_at: new Date().toISOString()
-      })
+      } as any)
       .eq('id', orderId);
 
     if (error) {

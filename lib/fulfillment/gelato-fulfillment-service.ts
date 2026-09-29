@@ -32,7 +32,8 @@ export class GelatoFulfillmentService implements FulfillmentService {
    * Check if this service can handle the order item
    */
   canFulfill(orderItem: OrderItem): boolean {
-    const productData = orderItem.product_data as any;
+    const raw = orderItem.product_data as any;
+    const productData = typeof raw === 'string' ? safeJson(raw) : raw; // legacy rows stored JSON strings
 
     // Check if it's a physical print with Gelato fulfillment
     const isPhysicalPrint =
@@ -66,7 +67,27 @@ export class GelatoFulfillmentService implements FulfillmentService {
       // Use existing Gelato service to create order
       // Note: The GelatoService.createOrder method expects the full order object
       // and internally handles all order items that have gelato_sku
-      const gelatoOrderId = await this.gelato.createOrder(order);
+      // Build the Gelato v4 payload (previously the raw DB order was passed, which Gelato rejects)
+      const imageUrls: Record<string, string> = {};
+      const normalisedItems = gelatoItems.map((item: any) => ({
+        ...item,
+        product_data: typeof item.product_data === 'string' ? safeJson(item.product_data) : item.product_data,
+      }));
+      for (const item of normalisedItems) {
+        if (!item.print_image_url) {
+          throw new Error(`Order item ${item.id} (image ${item.image_id}) has no print file URL — not sending to Gelato`);
+        }
+        if (!item.product_data?.gelato_sku) {
+          throw new Error(`Order item ${item.id} has no Gelato product (gelato_sku)`);
+        }
+        imageUrls[item.image_id] = item.print_image_url;
+      }
+      const payload = this.gelato.mapOrderToGelato(order, normalisedItems, imageUrls);
+      // itemReferenceId must be unique per line — the same image can appear in two sizes
+      payload.items = payload.items.map((gi: any, i: number) => ({ ...gi, itemReferenceId: normalisedItems[i].id || `${gi.itemReferenceId}_${i}` }));
+
+      const created = await this.gelato.createOrder(payload);
+      const gelatoOrderId = created?.id;
 
       if (!gelatoOrderId) {
         throw new Error('Gelato order creation failed - no order ID returned');
@@ -189,4 +210,9 @@ export class GelatoFulfillmentService implements FulfillmentService {
       return false;
     }
   }
+}
+
+
+function safeJson(v: string): any {
+  try { return JSON.parse(v); } catch { return undefined; }
 }

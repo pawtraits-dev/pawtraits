@@ -19,6 +19,7 @@ import type {
   FulfillmentError
 } from './base-fulfillment-service';
 import { FulfillmentErrorCode } from './base-fulfillment-service';
+import { grantEntitlementsForOrder } from '@/lib/orders/entitlements';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -65,58 +66,20 @@ export class DigitalDownloadService implements FulfillmentService {
    * Fulfill digital download order
    */
   async fulfill(order: Order, orderItems: OrderItem[]): Promise<FulfillmentResult> {
-    console.log('🔽 [Digital Download] Starting fulfillment for order:', order.order_number);
-
+    // Entitlement model (docs/specs/guest-checkout.md): downloads are served from
+    // /api/downloads/[id] after an ownership check, never from guessable URLs.
     try {
-      // Filter items this service can handle
-      const digitalItems = orderItems.filter(item => this.canFulfill(item));
-
-      if (digitalItems.length === 0) {
-        console.log('🔽 [Digital Download] No digital items to fulfill');
-        return { success: true, fulfillmentId: null };
-      }
-
-      console.log(`🔽 [Digital Download] Processing ${digitalItems.length} digital items`);
-
-      // Generate download URLs for each item (including multi-image products)
-      const allDownloadResults: DownloadUrlInfo[] = [];
-
-      for (const item of digitalItems) {
-        const itemResults = await this.generateDownloadUrlsForItem(item, order);
-        allDownloadResults.push(...itemResults);
-      }
-
-      // Update order_items with download URLs
-      await this.updateOrderItemsWithDownloads(digitalItems, allDownloadResults);
-
-      // Update order status
-      await this.updateOrderStatus(order.id, 'fulfilled');
-
-      // Create fulfillment tracking record
-      await this.createFulfillmentTrackingRecord(order.id, allDownloadResults);
-
-      // TODO: Send download email to customer (integrate with email service)
-      console.log('📧 [Digital Download] Email integration pending - customer should receive download links');
-
-      console.log('✅ [Digital Download] Fulfillment complete');
-
+      const o = order as any;
+      const { data: customer } = await this.supabase
+        .from('customers').select('id').eq('email', (o.customer_email || '').toLowerCase()).maybeSingle();
+      const result = await grantEntitlementsForOrder(this.supabase as any, o, orderItems as any[], ((customer as any)?.id as string) ?? null);
       return {
         success: true,
-        fulfillmentId: `digital_${order.id}`,
-        trackingInfo: {
-          downloadUrls: allDownloadResults,
-          expiresAt: this.calculateExpiryDate(7),
-          provider: 'digital_download'
-        }
+        fulfillmentId: `entitlements_${o.id}`,
+        trackingInfo: { provider: 'digital_download', purchased: result.purchased, gifts: result.gifts },
       };
-
     } catch (error: any) {
-      console.error('❌ [Digital Download] Fulfillment failed:', error);
-      return {
-        success: false,
-        error: error.message,
-        errorDetails: error
-      };
+      return { success: false, error: error.message, errorDetails: { code: FulfillmentErrorCode.UNKNOWN, originalError: error } };
     }
   }
 

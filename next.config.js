@@ -9,6 +9,10 @@ const nextConfig = {
     // Configure static export to skip problematic pages
     trailingSlash: false,
     output: 'standalone',
+    // Email templates are read from disk at runtime (lib/messaging/message-service.ts)
+    outputFileTracingIncludes: {
+      '/api/**/*': ['./lib/messaging/templates/**/*.html'],
+    },
     transpilePackages: [],
     images: {
       remotePatterns: [

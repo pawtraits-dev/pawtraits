@@ -388,23 +388,31 @@ export async function GET(request: NextRequest) {
     const orderId = searchParams.get('orderId');
     const paymentIntent = searchParams.get('paymentIntent');
     
-    // For customer order history requests (no specific order lookup params), 
-    // get email from authenticated session instead of query parameter
+    // Who is asking? (Order history and order-number lookups expose names/addresses,
+    // so they are tied to the signed-in user — previously ?email= returned anyone's orders.)
+    const { createRouteHandlerClient } = await import('@supabase/auth-helpers-nextjs');
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    const authSupabase = createRouteHandlerClient({ cookies: () => cookieStore } as any);
+    const { data: { user: sessionUser } } = await authSupabase.auth.getUser();
+    const sessionEmail = sessionUser?.email?.toLowerCase() || null;
+    let isAdmin = false;
+    let sessionPartnerId: string | null = null;
+    if (sessionUser) {
+      const { data: prof } = await supabase.from('user_profiles').select('user_type, partner_id').eq('user_id', sessionUser.id).maybeSingle();
+      isAdmin = prof?.user_type === 'admin';
+      sessionPartnerId = prof?.partner_id ?? null;
+    }
+
     let customerEmail = email;
-    if (!orderNumber && !orderId && !paymentIntent && !email) {
-      const { createRouteHandlerClient } = await import('@supabase/auth-helpers-nextjs');
-      const { cookies } = await import('next/headers');
-      const cookieStore = cookies();
-      const authSupabase = createRouteHandlerClient({ cookies: () => cookieStore });
-      
-      const { data: { user }, error: userError } = await authSupabase.auth.getUser();
-      if (userError || !user?.email) {
-        return NextResponse.json(
-          { error: 'Authentication required' },
-          { status: 401 }
-        );
+    if (!orderNumber && !orderId && !paymentIntent) {
+      if (!sessionEmail) {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
       }
-      customerEmail = user.email;
+      if (email && email.toLowerCase() !== sessionEmail && !isAdmin) {
+        return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+      }
+      customerEmail = email || sessionEmail;
     }
 
     // If searching by order number, ID, or payment intent (for confirmation page)
@@ -438,6 +446,16 @@ export async function GET(request: NextRequest) {
         throw error;
       }
 
+      // Payment-intent lookups (confirmation page straight after paying) are unguessable;
+      // order number/id lookups only return personal details to the owner or an admin.
+      const o: any = orders;
+      const owns = (!!sessionEmail && [o.customer_email, o.client_email].filter(Boolean).some((e: string) => e.toLowerCase() === sessionEmail))
+        || (!!sessionPartnerId && o.placed_by_partner_id === sessionPartnerId);
+      if (!paymentIntent && !owns && !isAdmin) {
+        const { customer_email, client_email, client_name, shipping_address, shipping_address_line_1, shipping_address_line_2,
+          shipping_postcode, shipping_first_name, shipping_last_name, metadata, ...safe } = o;
+        return NextResponse.json({ ...safe, shipping_first_name: shipping_first_name || null, redacted: true });
+      }
       return NextResponse.json(orders);
     }
 

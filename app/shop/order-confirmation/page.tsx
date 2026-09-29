@@ -15,6 +15,7 @@ import Image from "next/image"
 import { extractDescriptionTitle } from '@/lib/utils'
 import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider } from '@/lib/country-context'
+import { track } from '@/lib/tracking/events'
 
 interface OrderItem {
   id: string
@@ -66,7 +67,8 @@ function OrderConfirmationContent() {
     }
   }, [orderId, orderNumber, paymentIntent])
 
-  const fetchOrderDetails = async () => {
+  const fetchOrderDetails = async (attempt = 0): Promise<void> => {
+    let retrying = false
     try {
       let apiUrl = '/api/shop/orders?'
 
@@ -80,6 +82,12 @@ function OrderConfirmationContent() {
 
       const response = await fetch(apiUrl)
       if (!response.ok) {
+        // Straight after payment the order can take a few seconds to be created by the webhook
+        if (response.status === 404 && paymentIntent && attempt < 10) {
+          retrying = true
+          setTimeout(() => fetchOrderDetails(attempt + 1), 1500)
+          return
+        }
         if (response.status === 404) {
           setError('Order not found')
         } else {
@@ -89,6 +97,16 @@ function OrderConfirmationContent() {
       }
       const order = await response.json()
       setOrder(order)
+
+      // Ads/analytics purchase (once per payment; eventID matches the server-side Meta event)
+      try {
+        const pi = order?.payment_intent_id
+        if (pi && !sessionStorage.getItem(`pt_tracked_${pi}`)) {
+          sessionStorage.setItem(`pt_tracked_${pi}`, '1')
+          track.purchase(order.order_number, pi, (order.total_amount || 0) / 100,
+            (order.order_items || []).map((i: any) => ({ id: i.image_id, name: i.image_title, price: (i.unit_price || 0) / 100, quantity: i.quantity })))
+        }
+      } catch { /* storage unavailable */ }
       
       // Record purchases in user interactions
       if (order && order.order_items) {
@@ -109,7 +127,7 @@ function OrderConfirmationContent() {
       console.error('Error fetching order:', err)
       setError('Failed to load order details')
     } finally {
-      setLoading(false)
+      if (!retrying) setLoading(false)
     }
   }
 
@@ -178,6 +196,12 @@ function OrderConfirmationContent() {
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 inline-block">
             <p className="text-green-800 font-medium">Order #{order.order_number}</p>
           </div>
+          {(order as any).is_guest_checkout && (
+            <div className="mx-auto mt-4 max-w-md rounded-2xl bg-purple-50 border border-purple-100 p-4 text-left text-sm text-purple-900">
+              <p className="font-semibold">🎁 Check your inbox</p>
+              <p className="mt-1">We’ve emailed your receipt, plus a one-tap link to your new Pawtraits account{(order as any).fulfillment_type === 'digital' ? ' where your download is waiting' : ' — with a free digital copy of your portrait inside'}.</p>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

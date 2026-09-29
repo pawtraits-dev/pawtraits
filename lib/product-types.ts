@@ -344,3 +344,48 @@ export interface MugCatalogCreate {
 export interface MugCatalogUpdate extends Partial<MugCatalogCreate> {
   id: string;
 }
+// ===== QR STICKERS & STOCK LOCATIONS (docs/specs/qr-stickers.md) =====
+
+export type StockLocationType = 'studio' | 'stall' | 'partner' | 'other';
+
+export interface StockLocation {
+  id: string;
+  code: string; // ^[A-Z0-9]{2,8}$ — printed in sticker QR codes
+  name: string;
+  location_type: StockLocationType;
+  partner_id?: string | null;
+  at_market_discount_pct: number;
+  address?: string | null;
+  notes?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QrScan {
+  id: string;
+  image_id: string | null;
+  stock_ref: number;
+  size_code: 'S' | 'M' | 'L' | null;
+  location_id: string | null;
+  location_code: string | null;
+  visitor_id: string;
+  is_repeat: boolean;
+  is_bot: boolean;
+  user_agent?: string | null;
+  referer?: string | null;
+  ip_hash?: string | null;
+  order_id?: string | null;
+  converted_at?: string | null;
+  created_at: string;
+}
+
+export interface QrLocationDaily {
+  location_id: string | null;
+  location_code: string;
+  day: string;
+  scans: number;
+  unique_visitors: number;
+  orders: number;
+  revenue_pence: number;
+}

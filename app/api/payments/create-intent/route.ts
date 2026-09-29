@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createPaymentIntent } from '@/lib/stripe-server';
 import { getSupabaseClient } from '@/lib/supabase-client';
 import { checkoutValidation } from '@/lib/checkout-validation';
+import { QR_ATTRIBUTION_COOKIE, VISITOR_COOKIE, decodeAttribution, validVisitorId } from '@/lib/qr/attribution';
+import { CONSENT_COOKIE, parseConsent } from '@/lib/tracking/consent';
+import { serviceClient } from '@/lib/qr/server';
 
 interface CreatePaymentIntentRequest {
   amount: number; // in pence
@@ -59,6 +62,10 @@ interface CreatePaymentIntentRequest {
     name: string;
     email: string;
   };
+  // Guest checkout extras
+  customerPhone?: string;
+  marketingOptIn?: boolean;
+  digitalOnly?: boolean;
 }
 
 export async function POST(request: NextRequest) {
@@ -174,6 +181,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Sticker QR attribution (point-of-sale location) — read from the signed cookie set by /s/*
+    const qrAttribution = decodeAttribution(request.cookies.get(QR_ATTRIBUTION_COOKIE)?.value);
+    if (qrAttribution) {
+      metadata.qrScanId = qrAttribution.scanId;
+      if (qrAttribution.locationId) metadata.posLocationId = qrAttribution.locationId;
+      console.log('🏷️ QR attribution attached:', { scanId: qrAttribution.scanId, locationId: qrAttribution.locationId });
+    }
+
     // Add reward redemption if provided (customer orders only)
     if (body.rewardRedemption && body.rewardRedemption > 0 && orderType === 'customer') {
       metadata.rewardRedemption = body.rewardRedemption.toString();
@@ -227,6 +242,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    if (body.customerPhone) metadata.customerPhone = String(body.customerPhone).slice(0, 30);
+    if (body.marketingOptIn) metadata.marketingOptIn = 'true';
+
+    // Server-side price floor: the browser sends prices, so check them against the catalogue.
+    // Blatant underpayment is HELD (not sent to Gelato) for manual review rather than blocked,
+    // so legitimate bundle/referral discounts can never stop a sale.
+    const priceCheck = await checkPriceFloor(body);
+    metadata.priceCheck = priceCheck.status;
+    if (priceCheck.status !== 'ok') {
+      console.warn('💷 Price check', priceCheck.status, { amount: body.amount, floor: priceCheck.floor, email: body.customerEmail });
+    }
+
     // Create PaymentIntent
     const paymentIntent = await createPaymentIntent({
       amount: body.amount,
@@ -244,6 +271,32 @@ export async function POST(request: NextRequest) {
       customerEmail: body.customerEmail,
       status: paymentIntent.status,
     });
+
+    // Server-side basket snapshot: the webhook builds order_items from this (all items,
+    // not just the 3 that fit in Stripe metadata) and uses the consent/client info for ads
+    try {
+      const consent = parseConsent(request.cookies.get(CONSENT_COOKIE)?.value);
+      await serviceClient().from('pending_checkouts').upsert({
+        payment_intent_id: paymentIntent.id,
+        customer_email: body.customerEmail.toLowerCase(),
+        cart: (body.cartItems || []).map(i => ({
+          productId: i.productId, imageId: i.imageId, imageTitle: i.imageTitle,
+          quantity: i.quantity, unitPrice: i.unitPrice, originalPrice: i.originalPrice,
+        })),
+        fulfillment: body.digitalOnly ? 'digital' : 'ship',
+        guest_session_id: validVisitorId(request.cookies.get(VISITOR_COOKIE)?.value),
+        consent,
+        client: consent?.marketing ? {
+          ip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+          ua: request.headers.get('user-agent'),
+          fbp: request.cookies.get('_fbp')?.value ?? null,
+          fbc: request.cookies.get('_fbc')?.value ?? null,
+          url: request.headers.get('referer'),
+        } : null,
+      }, { onConflict: 'payment_intent_id' });
+    } catch (snapshotError) {
+      console.error('⚠️ Failed to store basket snapshot (webhook will fall back to metadata):', snapshotError);
+    }
 
     return NextResponse.json({
       success: true,
@@ -339,5 +392,45 @@ export async function GET(request: NextRequest) {
       { error: 'Failed to retrieve payment intent' },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Compare what the browser says the goods cost with the lowest current catalogue price.
+ *  ok         → at or above the floor (after declared discounts)
+ *  low        → below, but within 50% (could be a bundle deal) — logged only
+ *  suspicious → under half the catalogue price — order is held for review
+ */
+async function checkPriceFloor(body: CreatePaymentIntentRequest): Promise<{ status: 'ok' | 'low' | 'suspicious' | 'unchecked'; floor: number }> {
+  try {
+    const items = (body.cartItems || []).filter(i => /^[0-9a-f-]{36}$/i.test(i.productId));
+    if (!items.length) return { status: 'unchecked', floor: 0 };
+    const currency = (body.currency || 'gbp').toUpperCase();
+    const { data: prices } = await serviceClient()
+      .from('product_pricing')
+      .select('product_id, sale_price, discount_price, is_on_sale, currency_code')
+      .in('product_id', Array.from(new Set(items.map(i => i.productId))))
+      .eq('is_current', true);
+    const min = new Map<string, number>();
+    for (const p of prices ?? []) {
+      if ((p.currency_code || '').toUpperCase() !== currency) continue;
+      const v = p.is_on_sale && p.discount_price ? p.discount_price : p.sale_price;
+      if (!min.has(p.product_id) || v < min.get(p.product_id)!) min.set(p.product_id, v);
+    }
+    let floor = 0;
+    for (const i of items) {
+      const m = min.get(i.productId);
+      if (m === undefined) return { status: 'unchecked', floor: 0 };
+      floor += m * i.quantity;
+    }
+    const declaredDiscounts = (body.referralDiscount || 0) + (body.rewardRedemption || 0) + (body.partnerDiscount || 0);
+    const shipping = body.shippingOption?.price || 0;
+    const paidForGoods = body.amount - shipping + declaredDiscounts;
+    if (paidForGoods >= floor) return { status: 'ok', floor };
+    if (paidForGoods >= floor * 0.5) return { status: 'low', floor };
+    return { status: 'suspicious', floor };
+  } catch (e) {
+    console.warn('Price check failed', e);
+    return { status: 'unchecked', floor: 0 };
   }
 }

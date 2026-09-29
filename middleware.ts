@@ -33,6 +33,14 @@ const dlpMiddleware = createDLPMiddleware({
 })
 
 export async function middleware(req: NextRequest) {
+  // Sticker QR codes are printed in UPPER CASE (/S/1123M/CAMDEN) for a smaller QR;
+  // routes are case-sensitive, so rewrite to the /s handler before anything else.
+  if (req.nextUrl.pathname.startsWith('/S/')) {
+    const url = req.nextUrl.clone()
+    url.pathname = '/s/' + req.nextUrl.pathname.slice(3)
+    return NextResponse.rewrite(url)
+  }
+
   const res = NextResponse.next()
   
   // Create a Supabase client configured to use cookies
@@ -71,12 +79,12 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest): void 
   // Content Security Policy - More permissive for Next.js while maintaining security
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://maps.googleapis.com https://vercel.live`,
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://maps.googleapis.com https://vercel.live https://www.googletagmanager.com https://connect.facebook.net https://challenges.cloudflare.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https://res.cloudinary.com https://lh3.googleusercontent.com https://images.unsplash.com https://*.supabase.co https://pawtraits.pics https://www.pawtraits.pics",
-    "connect-src 'self' https://api.stripe.com https://upload.stripe.com https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://api.cloudinary.com https://res.cloudinary.com https://vercel.live wss://ws-us3.pusher.com",
-    "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
+    "img-src 'self' data: blob: https://www.googletagmanager.com https://*.google-analytics.com https://*.g.doubleclick.net https://www.google.com https://www.google.co.uk https://www.facebook.com https://res.cloudinary.com https://lh3.googleusercontent.com https://images.unsplash.com https://*.supabase.co https://pawtraits.pics https://www.pawtraits.pics",
+    "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://www.facebook.com https://connect.facebook.net https://api.stripe.com https://upload.stripe.com https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://api.cloudinary.com https://res.cloudinary.com https://vercel.live wss://ws-us3.pusher.com",
+    "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://td.doubleclick.net https://www.googletagmanager.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -91,7 +99,7 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest): void 
     'X-Content-Type-Options': 'nosniff',
     'X-XSS-Protection': '1; mode=block',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(self)',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(self "https://js.stripe.com")', // Stripe iframe needs payment for Apple/Google Pay
     'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
     'X-DNS-Prefetch-Control': 'off',
     'X-Download-Options': 'noopen',

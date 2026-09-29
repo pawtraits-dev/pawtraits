@@ -24,7 +24,8 @@ import {
   Search,
   Grid3X3,
   Share2,
-  Bell
+  Bell,
+  Download
 } from 'lucide-react';
 import Image from 'next/image';
 import { getSupabaseClient } from '@/lib/supabase-client';
@@ -47,6 +48,7 @@ const navigationItems = [
   { name: 'My Gallery', href: '/customer/gallery', icon: ImageIcon },
   { name: 'My Pets', href: '/customer/pets', icon: Heart },
   { name: 'My Orders', href: '/customer/orders', icon: Package },
+  { name: 'My Downloads', href: '/customer/downloads', icon: Download },
   { name: 'Inbox', href: '/customer/inbox', icon: Bell },
   { name: 'Cart', href: '/shop/cart', icon: ShoppingCart },
   { name: 'Share & Earn', href: '/referrals', icon: Share2 },

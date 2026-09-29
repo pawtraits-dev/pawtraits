@@ -22,6 +22,7 @@ import { useUserRouting } from '@/hooks/use-user-routing';
 import ReactMarkdown from 'react-markdown';
 import { DigitalDownloadButton } from '@/components/DigitalDownloadButton';
 import { Download } from 'lucide-react';
+import { track } from '@/lib/tracking/events';
 
 function QRLandingPageContent() {
   const params = useParams();
@@ -214,16 +215,14 @@ function QRLandingPageContent() {
       discountCode: partnerId ? discountCode : undefined
     });
 
+    track.addToCart([{ id: image.id, name: image.description || 'Pet Portrait', variant: product?.size_code || product?.name, price: (finalPricing?.sale_price || 0) / 100, quantity }]);
+
     // After adding to cart, always redirect to cart page first
     router.push('/shop/cart');
   };
 
   const handleCustomize = () => {
-    // Check if user is authenticated and is a customer
-    if (!userProfile || userProfile.user_type !== 'customer') {
-      router.push('/signup/user');
-      return;
-    }
+    // Guests can customise too (free previews, no sign-up) — account is created at checkout
     // Navigate to customise page instead of opening modal
     if (image) {
       router.push(`/customise/${image.id}`);

@@ -4,6 +4,10 @@ import { constructWebhookEvent } from '@/lib/stripe-server';
 import { createClient } from '@supabase/supabase-js';
 import { createGelatoService } from '@/lib/gelato-service';
 import { sendMessage } from '@/lib/messaging/message-service';
+import { loadCartSnapshot, createOrderItems } from '@/lib/orders/order-items';
+import { grantEntitlementsForOrder, signDownload } from '@/lib/orders/entitlements';
+import { ensureCustomerAccount, createClaimToken, sendAccountReadyEmail } from '@/lib/guest/account';
+import { sendMetaPurchase } from '@/lib/tracking/meta-capi';
 import { FulfillmentRouter } from '@/lib/fulfillment/fulfillment-router';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -24,6 +28,9 @@ console.log('Webhook secret configured:', {
 // Disable body parsing for this route to preserve raw body
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+// Order creation now includes item creation, account set-up and Gelato — allow time
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
@@ -165,6 +172,14 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       return;
     }
 
+    // Idempotency: Stripe retries webhooks — never create a second order for the same payment
+    const { data: alreadyProcessed } = await supabase
+      .from('orders').select('id').eq('payment_intent_id', paymentIntent.id).limit(1);
+    if (alreadyProcessed && alreadyProcessed.length) {
+      console.log('↩️ Order already exists for', paymentIntent.id, '- skipping duplicate webhook');
+      return;
+    }
+
     // Check if this looks like a print order (has shipping data)
     const hasShippingData = metadata.shippingAddress || metadata.shippingAddressLine1;
 
@@ -256,16 +271,56 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       }),
     };
 
+    // Basket snapshot (server-side copy written at checkout) — also tells us guest/stall details
+    const snapshot = await loadCartSnapshot(supabase, paymentIntent.id, metadata);
+    const isGuestCheckout = !orderingUserProfile;
+    const isStallCollect = metadata.salesChannel === 'stall_online_payment' || snapshot.fulfillment === 'collect';
+    const guestFields = {
+      ...(isGuestCheckout ? { is_guest_checkout: true } : {}),
+      ...(snapshot.guestSessionId ? { guest_session_id: snapshot.guestSessionId } : {}),
+      ...(isStallCollect ? { sales_channel: 'stall_online_payment', fulfillment_type: 'collected', fulfillment_status: 'fulfilled', status: 'completed' } : {}),
+    };
+
+    // Sticker QR attribution (only set when present, so orders still work if the
+    // qr-stickers migration hasn't been applied in an environment)
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const qrScanId = UUID_RE.test(metadata.qrScanId || '') ? metadata.qrScanId : null;
+    const posLocationId = UUID_RE.test(metadata.posLocationId || '') ? metadata.posLocationId : null;
+    const qrFields = {
+      ...(qrScanId ? { qr_scan_id: qrScanId } : {}),
+      ...(posLocationId ? { pos_location_id: posLocationId } : {}),
+      ...guestFields,
+    };
+
     // Insert order into database
-    const { data: order, error: orderError } = await supabase
+    let { data: order, error: orderError } = await supabase
       .from('orders')
-      .insert(orderData)
+      .insert({ ...orderData, ...qrFields })
       .select()
       .single();
+
+    // Never lose an order over attribution/guest fields: retry without them if they caused the failure
+    if (orderError && Object.keys(qrFields).length > 0) {
+      console.error('⚠️ Order insert with QR attribution failed, retrying without:', orderError);
+      ({ data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert(orderData)
+        .select()
+        .single());
+    }
 
     if (orderError) {
       console.error('Failed to create order from payment:', orderError);
       return;
+    }
+
+    if (qrScanId && order?.qr_scan_id) {
+      const { error: scanUpdateError } = await supabase
+        .from('qr_scans')
+        .update({ order_id: order.id, converted_at: new Date().toISOString() })
+        .eq('id', qrScanId)
+        .is('order_id', null);
+      if (scanUpdateError) console.error('⚠️ Failed to mark QR scan converted:', scanUpdateError);
     }
 
     console.log('✅ Order created successfully:', {
@@ -287,11 +342,91 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     // Pass pre-discount subtotal for commission calculations (partners earn on pre-discount amount)
     await handleSimplifiedCommissions(supabase, order, orderingUserProfile, customerEmail, preDiscountSubtotal, metadata);
 
-    // Route order to appropriate fulfillment service(s)
-    await routeOrderFulfillment(order, paymentIntent, supabase, metadata);
+    // Create order line items from the server-side basket (this step was lost in Feb 2026,
+    // which left paid orders with no items and nothing sent to Gelato)
+    let orderItems: any[] = [];
+    try {
+      orderItems = await createOrderItems(supabase, order, snapshot.items);
+    } catch (itemsError) {
+      console.error('❌ CRITICAL: order items could not be created for', order.id, itemsError);
+      await supabase.from('orders').update({ error_message: 'Order items could not be created — check webhook logs', updated_at: new Date().toISOString() }).eq('id', order.id);
+    }
+
+    // Guest checkout → create their account now (before fulfilment, so downloads attach to it)
+    let guestAccount: Awaited<ReturnType<typeof ensureCustomerAccount>> | null = null;
+    if (isGuestCheckout && customerEmail) {
+      try {
+        const [first, ...rest] = (metadata.customerName || '').trim().split(/\s+/);
+        guestAccount = await ensureCustomerAccount(supabase, {
+          email: customerEmail,
+          firstName: order.shipping_first_name || first || null,
+          lastName: order.shipping_last_name || rest.join(' ') || null,
+          phone: metadata.customerPhone || null,
+          marketingConsent: metadata.marketingOptIn === 'true',
+          guestSessionId: snapshot.guestSessionId,
+        });
+        console.log('👤 Guest account', guestAccount.created ? 'created' : 'already existed', { email: customerEmail, userId: guestAccount.userId });
+      } catch (accountError) {
+        console.error('❌ Guest account creation failed (order is fine):', accountError);
+      }
+    }
+
+    if (metadata.priceCheck === 'suspicious') {
+      // Paid far below catalogue price — possible tampering. Don't print; flag for review.
+      console.error('🚨 Order HELD for review (price below catalogue):', order.id, order.order_number);
+      await supabase.from('orders').update({
+        status: 'on_hold', fulfillment_status: 'pending',
+        error_message: 'HELD: amount paid is far below catalogue price — check before fulfilling',
+        updated_at: new Date().toISOString(),
+      }).eq('id', order.id);
+    } else if (isStallCollect) {
+      // Handed over at the stall: no Gelato; just grant downloads
+      await grantEntitlementsForOrder(supabase, order, orderItems, guestAccount?.customerId ?? orderingUserProfile?.customer_id ?? null);
+    } else {
+      // Route order to appropriate fulfillment service(s)
+      await routeOrderFulfillment(order, paymentIntent, supabase, metadata);
+    }
 
     // Send order confirmation email to customer
     await sendOrderConfirmationEmail(supabase, order, paymentIntent, metadata);
+
+    // Guest: second email with sign-in link + free download
+    if (guestAccount && customerEmail) {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawtraits.pics';
+        const token = await createClaimToken(supabase, { userId: guestAccount.userId, customerId: guestAccount.customerId, email: customerEmail, orderId: order.id });
+        await sendAccountReadyEmail(supabase, {
+          email: customerEmail,
+          firstName: order.shipping_first_name || (metadata.customerName || '').split(' ')[0] || null,
+          orderId: order.id,
+          orderNumber: order.order_number,
+          claimToken: token,
+          userProfileId: guestAccount.userProfileId,
+          baseUrl,
+        });
+      } catch (emailError) {
+        console.error('❌ Account-ready email failed:', emailError);
+      }
+    }
+
+    // Server-side Purchase for Meta (only with marketing consent captured at checkout)
+    if (snapshot.consent?.marketing) {
+      await sendMetaPurchase({
+        eventId: paymentIntent.id,
+        email: customerEmail,
+        phone: metadata.customerPhone || null,
+        firstName: order.shipping_first_name || null,
+        lastName: order.shipping_last_name || null,
+        postcode: order.shipping_postcode || null,
+        country: 'gb',
+        valuePounds: paymentIntent.amount / 100,
+        contentIds: orderItems.map((i: any) => i.image_id),
+        fbp: snapshot.client?.fbp, fbc: snapshot.client?.fbc,
+        clientIp: snapshot.client?.ip, userAgent: snapshot.client?.ua, sourceUrl: snapshot.client?.url,
+      });
+    }
+
+    await supabase.from('pending_checkouts').update({ consumed_at: new Date().toISOString() }).eq('payment_intent_id', paymentIntent.id);
 
     // TODO: Notify admin of new order
     // TODO: Update inventory if applicable
@@ -1818,6 +1953,24 @@ async function sendOrderConfirmationEmail(
         : 'http://localhost:3000');
     const orderUrl = `${baseUrl}/orders/${order.id}`;
 
+    // Purchased downloads: signed links so guests can download before activating their account
+    const { data: purchasedDownloads } = await supabase
+      .from('digital_entitlements')
+      .select('id, custom_image_id, catalog_image_id')
+      .eq('order_id', order.id)
+      .eq('source', 'purchase')
+      .eq('status', 'available');
+    const downloadLinks = (purchasedDownloads || []).map((d: any, i: number) => ({
+      title: `Download portrait ${i + 1}`,
+      url: `${baseUrl}/api/downloads/${d.id}?t=${signDownload(d.id)}`,
+    }));
+    const isCollected = order.fulfillment_type === 'collected';
+    let stallName: string | null = null;
+    if (isCollected && order.pos_location_id) {
+      const { data: loc } = await supabase.from('stock_locations').select('name').eq('id', order.pos_location_id).maybeSingle();
+      stallName = loc?.name ?? null;
+    }
+
     // Send email via messaging service
     await sendMessage({
       templateKey: 'order_confirmation',
@@ -1845,6 +1998,9 @@ async function sendOrderConfirmationEmail(
         estimated_delivery: estimatedDelivery,
         order_url: orderUrl,
         payment_intent_id: order.payment_intent_id,
+        download_links: downloadLinks.length ? downloadLinks : null,
+        is_collected: isCollected,
+        stall_name: stallName,
         unsubscribe_url: `${baseUrl}/preferences/unsubscribe`
       },
       priority: 'high'

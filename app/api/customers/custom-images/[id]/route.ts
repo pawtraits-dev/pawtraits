@@ -1,100 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { serviceClient } from '@/lib/qr/server';
+import { getRequester, canAccessCustomImage } from '@/lib/guest/access';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export const dynamic = 'force-dynamic';
+
+/**
+ * GET /api/customers/custom-images/[id]
+ * Status/result of a customised portrait. Works for signed-in customers (by email)
+ * and for guests on the device that created it (pt_vid cookie).
+ */
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    console.log('🔍 [CUSTOM IMAGE POLL] Fetching custom image:', id);
-
-    // Authenticate user using cookie-based auth
-    const cookieStore = await cookies();
-    const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore });
-
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-
-    if (authError || !user) {
-      console.error('❌ [CUSTOM IMAGE POLL] Auth failed:', authError);
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+    const requester = await getRequester(request);
+    if (!requester.user && !requester.guestId) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    console.log('✅ [CUSTOM IMAGE POLL] User authenticated:', user.email);
-
-    // Use service role client for database operations
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
-
-    // Get custom image record
-    const { data: customImage, error: fetchError } = await supabase
+    const { data: customImage, error } = await serviceClient()
       .from('customer_custom_images')
-      .select(`
-        id,
-        customer_email,
-        generated_image_url,
-        share_token,
-        status,
-        error_message,
-        created_at,
-        generated_at
-      `)
+      .select('id, customer_email, guest_session_id, catalog_image_id, generated_image_url, share_token, status, error_message, created_at, generated_at, rating')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
-    console.log('📊 [CUSTOM IMAGE POLL] Query result:', {
-      found: !!customImage,
-      error: fetchError?.message,
-      recordEmail: customImage?.customer_email,
-      userEmail: user.email,
-      status: customImage?.status,
-      hasImageUrl: !!customImage?.generated_image_url
-    });
-
-    if (fetchError || !customImage) {
-      console.error('❌ [CUSTOM IMAGE POLL] Record not found:', fetchError);
-      return NextResponse.json(
-        { error: 'Custom image not found', details: fetchError?.message },
-        { status: 404 }
-      );
+    // 404 (not 403) for someone else's image, so ids can't be probed
+    if (error || !customImage || !canAccessCustomImage(customImage, requester)) {
+      return NextResponse.json({ error: 'Custom image not found' }, { status: 404 });
     }
 
-    // Verify user owns this custom image
-    if (customImage.customer_email !== user.email) {
-      console.error('❌ [CUSTOM IMAGE POLL] Email mismatch:', {
-        recordEmail: customImage.customer_email,
-        userEmail: user.email
-      });
-      return NextResponse.json(
-        { error: 'Unauthorized access to this custom image' },
-        { status: 403 }
-      );
-    }
-
-    console.log('✅ [CUSTOM IMAGE POLL] Returning record:', {
-      status: customImage.status,
-      hasImageUrl: !!customImage.generated_image_url
-    });
-
-    return NextResponse.json(customImage);
-
+    const { guest_session_id: _g, customer_email: _e, ...safe } = customImage;
+    return NextResponse.json(safe, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    console.error('❌ Error fetching custom image status:', error);
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    console.error('custom-image GET failed', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
