@@ -113,7 +113,8 @@ function ExpressButtons({ goodsTotalPence, needsShipping, allowedCountries, defa
           // a card is saved in the wallet (the sheet lets the customer add one). With the default
           // 'auto' the buttons were hidden for anyone without a saved card, so checkout fell back to the form.
           paymentMethods: { applePay: 'always', googlePay: 'always', link: 'auto' },
-          layout: { maxColumns: 1, maxRows: 3, overflow: 'never' },
+          // NB: overflow: 'never' makes Stripe hang silently (no ready event) — keep 'auto'
+          layout: { maxColumns: 1, maxRows: 3, overflow: 'auto' },
         } as any}
         onReady={(e: any) => onAvailability?.(
           !!e.availablePaymentMethods && Object.values(e.availablePaymentMethods).some(Boolean),
