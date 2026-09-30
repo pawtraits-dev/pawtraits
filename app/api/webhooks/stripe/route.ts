@@ -244,7 +244,8 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       shipping_first_name: metadata.shippingFirstName || '',
       shipping_last_name: metadata.shippingLastName || '',
       shipping_address: metadata.shippingAddress || '', // Keep for backward compatibility
-      shipping_address_line_1: metadata.shippingAddressLine1 || metadata.shippingAddress || '',
+      // NULL (not '') when there's no address — digital-only orders; the table rejects empty strings
+      shipping_address_line_1: metadata.shippingAddressLine1 || metadata.shippingAddress || null,
       shipping_address_line_2: metadata.shippingAddressLine2 || null,
       shipping_city: metadata.shippingCity || '',
       shipping_postcode: metadata.shippingPostcode || '',
