@@ -506,9 +506,10 @@ function CheckoutPageContent() {
 
   // Goods total after discounts/rewards, before delivery (pence)
   const goodsTotalPence = Math.round((subtotal - discount - rewardRedemption) * 100)
-  // A guest with a referral code needs their email checked for the first-order discount
-  // before we know the price, so they use the form below.
-  const showExpress = items.length > 0 && goodsTotalPence >= 50 && !(isGuest && referralCode)
+  // Express is always offered. A guest's referral discount needs their email checking first, so until
+  // it's confirmed the wallet charges full price and we point them to the form to claim the discount.
+  const showExpress = items.length > 0 && goodsTotalPence >= 50
+  const referralDiscountPending = isGuest && !!referralCode && !(referralValidation as any)?.discount?.eligible
   const expressFirst = currentStep === 1 && showExpress && walletAvailable === true && !cardFormOpen
 
   // Shared by the card form and Apple Pay / Google Pay / Link
@@ -739,7 +740,7 @@ function CheckoutPageContent() {
               <pre className="mb-4 whitespace-pre-wrap rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
 {`Express checkout debug
 step: ${currentStep}  items: ${items.length}  goods: ${goodsTotalPence}p
-guest: ${isGuest}  referral code: ${referralCode || 'none'}${isGuest && referralCode ? '  → hidden: guest with referral code uses the form' : ''}
+guest: ${isGuest}  referral code: ${referralCode || 'none'}${referralDiscountPending ? '  → express at full price; discount via the form' : ''}
 shown: ${showExpress}  wallet available: ${String(walletAvailable)}
 ${walletInfo || 'Stripe has not reported yet'}
 blocked: ${blocked.length ? blocked.join(' | ') : 'nothing'}
@@ -768,6 +769,14 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                       onSuccess={handlePaymentSuccess}
                       onAvailability={(ok, info) => { setWalletAvailable(ok); setWalletInfo(info || null) }}
                     />
+                    {referralDiscountPending && (
+                      <p className="text-xs text-gray-600">
+                        Have a referral discount?{' '}
+                        {expressFirst
+                          ? <button type="button" onClick={() => setCardFormOpen(true)} className="font-medium text-purple-700 underline">Enter your email to apply it</button>
+                          : 'Enter your email in the form below to apply it before paying.'}
+                      </p>
+                    )}
                     {isGuest && (
                       <label className="flex items-start gap-3 pt-1 text-sm text-gray-700">
                         <input type="checkbox" checked={marketingOptIn} onChange={(e) => setMarketingOptIn(e.target.checked)} className="mt-0.5 h-5 w-5 accent-purple-600" />
