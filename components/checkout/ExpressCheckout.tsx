@@ -53,8 +53,8 @@ interface Props {
   createIntent: (payer: ExpressPayer) => Promise<{ clientSecret: string }>
   onStart?: () => void
   onSuccess: (paymentIntent: any) => void
-  /** Called with false when no wallet is available on this device */
-  onAvailability?: (available: boolean) => void
+  /** Called with false when no wallet is available on this device (info: what Stripe reported, for ?debugwallet) */
+  onAvailability?: (available: boolean, info?: string) => void
 }
 
 function splitName(full: string | undefined | null, fallbackEmail: string) {
@@ -115,8 +115,11 @@ function ExpressButtons({ goodsTotalPence, needsShipping, allowedCountries, defa
           paymentMethods: { applePay: 'always', googlePay: 'always', link: 'auto' },
           layout: { maxColumns: 1, maxRows: 3, overflow: 'never' },
         } as any}
-        onReady={(e: any) => onAvailability?.(!!e.availablePaymentMethods && Object.values(e.availablePaymentMethods).some(Boolean))}
-        onLoadError={() => onAvailability?.(false)}
+        onReady={(e: any) => onAvailability?.(
+          !!e.availablePaymentMethods && Object.values(e.availablePaymentMethods).some(Boolean),
+          `Stripe offered: ${JSON.stringify(e.availablePaymentMethods ?? null)}`
+        )}
+        onLoadError={(e: any) => onAvailability?.(false, `Stripe load error: ${e?.error?.message || e?.error?.type || 'unknown'}`)}
         onClick={(e: any) => {
           setError(null)
           if (needsShipping && !quotes.current.length) {

@@ -65,6 +65,12 @@ function CheckoutPageContent() {
   const [applyRewards, setApplyRewards] = useState(false)
   const [loadingRewards, setLoadingRewards] = useState(false)
   const [walletAvailable, setWalletAvailable] = useState<boolean | null>(null)
+  // Add ?debugwallet to the checkout URL to see why Apple Pay / Google Pay isn't showing (phones have no console)
+  const [walletInfo, setWalletInfo] = useState<string | null>(null)
+  const [debugWallet, setDebugWallet] = useState(false)
+  useEffect(() => {
+    try { setDebugWallet(new URLSearchParams(window.location.search).has('debugwallet')) } catch {}
+  }, [])
   // When Apple Pay / Google Pay is available it's the main path; the card form opens on request
   const [cardFormOpen, setCardFormOpen] = useState(false)
   const { items, totalItems, totalPrice, clearCart } = useHybridCart()
@@ -719,6 +725,16 @@ function CheckoutPageContent() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2">
+            {debugWallet && (
+              <pre className="mb-4 whitespace-pre-wrap rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+{`Express checkout debug
+step: ${currentStep}  items: ${items.length}  goods: ${goodsTotalPence}p
+guest: ${isGuest}  referral code: ${referralCode || 'none'}${isGuest && referralCode ? '  → hidden: guest with referral code uses the form' : ''}
+shown: ${showExpress}  wallet available: ${String(walletAvailable)}
+${walletInfo || 'Stripe has not reported yet'}
+page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
+              </pre>
+            )}
             {/* Express: Apple Pay / Google Pay / Link — collects email, name, address and delivery in the wallet sheet */}
             {currentStep === 1 && showExpress && (
               <div className={walletAvailable ? 'mb-6' : 'invisible h-0 overflow-hidden'} aria-hidden={!walletAvailable}>
@@ -739,7 +755,7 @@ function CheckoutPageContent() {
                       createIntent={(payer) => requestPaymentIntent({ ...payer, email: userProfile?.email || payer.email, digitalOnly: isDigitalOnly })}
                       onStart={startCheckoutTracking}
                       onSuccess={handlePaymentSuccess}
-                      onAvailability={setWalletAvailable}
+                      onAvailability={(ok, info) => { setWalletAvailable(ok); setWalletInfo(info || null) }}
                     />
                     {isGuest && (
                       <label className="flex items-start gap-3 pt-1 text-sm text-gray-700">

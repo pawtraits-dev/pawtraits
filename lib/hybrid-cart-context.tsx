@@ -336,6 +336,13 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
         body: JSON.stringify(itemData),
       });
 
+      if (response.status === 401) {
+        // Signed-in session has lapsed on the server — keep going as a guest (checkout works without an account)
+        console.warn('Cart: session expired, switching to guest basket');
+        setIsGuest(true);
+        addToGuestCart(itemData);
+        return;
+      }
       if (!response.ok) {
         throw new Error(`Failed to add to cart: ${response.status}`);
       }
