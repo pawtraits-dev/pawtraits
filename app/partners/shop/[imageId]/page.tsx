@@ -1,5 +1,6 @@
 'use client';
 
+import { productMatchesFormat } from '@/lib/products/shape-family';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Download, Share2, ShoppingCart, Heart, Star, Copy, Wand2 } from 'lucide-react';
@@ -176,7 +177,7 @@ export default function PartnerImageDetailPage() {
     }
 
     const availableProducts = products.filter(p =>
-      p.is_active && p.format_id === imageData.format_id
+      p.is_active && productMatchesFormat(p, imageData.format_id)
     );
 
     if (availableProducts.length === 0) {

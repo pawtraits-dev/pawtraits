@@ -1,5 +1,6 @@
 'use client';
 
+import { productMatchesFormat } from '@/lib/products/shape-family';
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -92,7 +93,7 @@ function SharedImagePageClient({ id }: { id: string }) {
               pricingResponse.json()
             ]);
 
-            setProducts(productsData?.filter((p: Product) => p.is_active && p.format_id === imageData.format_id) || []);
+            setProducts(productsData?.filter((p: Product) => p.is_active && productMatchesFormat(p, imageData.format_id)) || []);
             setPricing(pricingData || []);
           }
         }
@@ -111,7 +112,7 @@ function SharedImagePageClient({ id }: { id: string }) {
 
     // Get products that match this image's format and are active
     const availableProducts = products.filter(p => 
-      p.is_active && p.format_id === image.format_id
+      p.is_active && productMatchesFormat(p, image.format_id)
     );
     
     if (availableProducts.length === 0) {

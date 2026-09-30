@@ -1,538 +1,142 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AdminSupabaseService } from '@/lib/admin-supabase';
-import { ChevronUp, ChevronDown, Plus, Edit, Trash2, Search, Filter, Star, Download } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Plus, Download, Pencil, Loader2, AlertTriangle, Check } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { AdminSupabaseService } from '@/lib/admin-supabase';
+import { SHAPE_FAMILIES, familyLabel, orientedSize } from '@/lib/products/shape-family';
+import type { CatalogueProduct } from '@/lib/product-types';
 
-interface Product {
-  id: string;
-  sku: string;
-  name: string;
-  description: string;
-  medium: { id: string; name: string; slug: string };
-  format: { id: string; name: string };
-  size_name: string;
-  size_code: string;
-  width_cm: string;
-  height_cm: string;
-  width_inches: string;
-  height_inches: string;
-  gelato_sku: string;
-  is_active: boolean;
-  is_featured: boolean;
-  stock_status: string;
-  created_at: string;
-  updated_at: string;
-  product_type?: 'physical_print' | 'digital_download' | 'hybrid';
-  fulfillment_method?: string;
-  requires_shipping?: boolean;
-  pricing?: Array<{
-    country_code: string;
-    sale_price: number;
-    currency_symbol: string;
-    profit_margin_percent: number;
-  }>;
-}
+const adminService = new AdminSupabaseService();
+const gbp = (pence: number | null | undefined) => (pence === null || pence === undefined ? '—' : `${pence < 0 ? '−' : ''}£${(Math.abs(pence) / 100).toFixed(2)}`);
 
-interface Medium {
-  id: string;
-  name: string;
-  slug: string;
-  is_active: boolean;
-}
+const GROUPS: Array<{ id: string; label: string; hint: string }> = [
+  ...SHAPE_FAMILIES.map(f => ({ id: f.id, label: f.label, hint: f.hint })),
+  { id: 'legacy', label: 'Single format (legacy)', hint: 'Older products tied to one format. Recreate them above, then delete these.' },
+];
 
-interface Format {
-  id: string;
-  name: string;
-  is_active: boolean;
-}
-
-export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [media, setMedia] = useState<Medium[]>([]);
-  const [formats, setFormats] = useState<Format[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function AdminProductsPage() {
+  const { toast } = useToast();
+  const [products, setProducts] = useState<CatalogueProduct[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
-  // Filtering and sorting state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [productTypeFilter, setProductTypeFilter] = useState(''); // New: product type filter
-  const [mediumFilter, setMediumFilter] = useState('');
-  const [formatFilter, setFormatFilter] = useState('');
-  const [stockStatusFilter, setStockStatusFilter] = useState('');
-  const [featuredFilter, setFeaturedFilter] = useState('');
-  const [sortField, setSortField] = useState<string>('');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [busy, setBusy] = useState<string | null>(null);
 
-  const supabaseService = new AdminSupabaseService();
-
-  useEffect(() => {
-    loadData();
+  const load = useCallback(async () => {
+    const result = await adminService.getCatalogueProducts();
+    if (result.ok) { setProducts(result.data); setError(null); } else setError(result.error);
   }, []);
+  useEffect(() => { load(); }, [load]);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [productsResult, mediaResult, formatsResult] = await Promise.all([
-        supabaseService.getProducts(),
-        supabaseService.getMedia(),
-        supabaseService.getFormats()
-      ]);
-      
-      setProducts(productsResult || []);
-      setMedia(mediaResult || []);
-      setFormats(formatsResult || []);
-    } catch (err) {
-      console.error('Error loading data:', err);
-      setError('Failed to load data');
-    } finally {
-      setLoading(false);
-    }
+  const grouped = useMemo(() => {
+    const out: Record<string, CatalogueProduct[]> = {};
+    for (const p of products || []) (out[p.shape_family || 'legacy'] ||= []).push(p);
+    return out;
+  }, [products]);
+
+  const toggle = async (p: CatalogueProduct) => {
+    setBusy(p.id);
+    const result = await adminService.setCatalogueProductActive(p.id, !p.is_active);
+    setBusy(null);
+    if (!result.ok) { toast({ title: 'Couldn’t update', description: result.error, variant: 'destructive' }); return; }
+    setProducts(list => (list || []).map(x => (x.id === p.id ? result.data : x)));
+    toast({ title: `${p.name} ${result.data.is_active ? 'on sale' : 'hidden from the shop'}` });
   };
 
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
-
-  const getSortIcon = (field: string) => {
-    if (sortField !== field) return null;
-    return sortDirection === 'asc' ? 
-      <ChevronUp className="w-4 h-4 inline ml-1" /> : 
-      <ChevronDown className="w-4 h-4 inline ml-1" />;
-  };
-
-  const handleDelete = async (productId: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
-    
-    try {
-      await supabaseService.deleteProduct(productId);
-      await loadData(); // Reload data
-    } catch (err) {
-      console.error('Error deleting product:', err);
-      alert('Failed to delete product');
-    }
-  };
-
-  // Filter and sort products
-  const filteredAndSortedProducts = products
-    .filter(product => {
-      // Search filter
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        if (!product.name.toLowerCase().includes(searchLower) &&
-            !product.sku.toLowerCase().includes(searchLower) &&
-            !product.gelato_sku?.toLowerCase().includes(searchLower)) {
-          return false;
-        }
-      }
-
-      // Product type filter
-      if (productTypeFilter) {
-        const productType = product.product_type || 'physical_print';
-        if (productType !== productTypeFilter) return false;
-      }
-
-      // Medium filter
-      if (mediumFilter && product.medium.id !== mediumFilter) return false;
-
-      // Format filter
-      if (formatFilter && product.format.id !== formatFilter) return false;
-
-      // Stock status filter
-      if (stockStatusFilter && product.stock_status !== stockStatusFilter) return false;
-
-      // Featured filter
-      if (featuredFilter === 'featured' && !product.is_featured) return false;
-      if (featuredFilter === 'non-featured' && product.is_featured) return false;
-
-      return true;
-    })
-    .sort((a, b) => {
-      if (!sortField) return 0;
-      
-      let aVal: any, bVal: any;
-      
-      switch (sortField) {
-        case 'medium':
-          aVal = a.medium.name;
-          bVal = b.medium.name;
-          break;
-        case 'format':
-          aVal = a.format.name;
-          bVal = b.format.name;
-          break;
-        case 'name':
-          aVal = a.name;
-          bVal = b.name;
-          break;
-        case 'sku':
-          aVal = a.sku;
-          bVal = b.sku;
-          break;
-        case 'size':
-          aVal = a.size_name;
-          bVal = b.size_name;
-          break;
-        case 'price':
-          aVal = a.pricing?.[0]?.sale_price || 0;
-          bVal = b.pricing?.[0]?.sale_price || 0;
-          break;
-        case 'margin':
-          aVal = a.pricing?.[0]?.profit_margin_percent || 0;
-          bVal = b.pricing?.[0]?.profit_margin_percent || 0;
-          break;
-        case 'stock':
-          aVal = a.stock_status;
-          bVal = b.stock_status;
-          break;
-        case 'featured':
-          aVal = a.is_featured ? 1 : 0;
-          bVal = b.is_featured ? 1 : 0;
-          break;
-        default:
-          return 0;
-      }
-      
-      if (typeof aVal === 'string') {
-        return sortDirection === 'asc' 
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
-      }
-      
-      return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-    });
-
-  if (loading) return <div className="p-8">Loading products...</div>;
-  if (error) return <div className="p-8 text-red-600">Error: {error}</div>;
+  const missingPrice = (products || []).filter(p => p.is_active && !p.price_pence).length;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Products</h1>
-          <p className="text-gray-600">Manage your product catalog</p>
+          <p className="text-gray-600 mt-1">What customers can buy, and the UK price. Products are self-printed; a Gelato SKU is optional.</p>
         </div>
-        <div className="flex gap-3">
-          <Link href="/admin/products/digital/new">
-            <Button variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50">
-              <Download className="w-4 h-4 mr-2" />
-              Add Digital Product
-            </Button>
-          </Link>
-          <Link href="/admin/products/new">
-            <Button className="bg-gradient-to-r from-purple-600 to-blue-600">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Physical Product
-            </Button>
-          </Link>
+        <div className="flex gap-2">
+          <Link href="/admin/products/new?type=digital_download"><Button variant="outline"><Download className="w-4 h-4 mr-2" />Digital download</Button></Link>
+          <Link href="/admin/products/new"><Button className="bg-purple-600 hover:bg-purple-700"><Plus className="w-4 h-4 mr-2" />Add product</Button></Link>
         </div>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Filter className="w-5 h-5 mr-2" />
-            Filters & Search
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
-            {/* Search */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search products..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
+      {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {missingPrice > 0 && (
+        <p className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <AlertTriangle className="w-4 h-4" />{missingPrice} product{missingPrice === 1 ? ' is' : 's are'} on sale without a UK price — customers won’t see {missingPrice === 1 ? 'it' : 'them'}.
+        </p>
+      )}
 
-            {/* Product Type Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Product Type</label>
-              <Select value={productTypeFilter} onValueChange={setProductTypeFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="physical_print">Physical Print</SelectItem>
-                  <SelectItem value="digital_download">Digital Download</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      {!products && !error && <div className="py-10 text-gray-500 flex items-center gap-2"><Loader2 className="w-5 h-5 animate-spin" />Loading…</div>}
 
-            {/* Medium Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Medium Type</label>
-              <Select value={mediumFilter} onValueChange={setMediumFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All mediums" />
-                </SelectTrigger>
-                <SelectContent>
-                  {media.filter(m => m.is_active).map(medium => (
-                    <SelectItem key={medium.id} value={medium.id}>
-                      {medium.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      {products && products.length === 0 && (
+        <Card><CardContent className="py-10 text-center text-gray-600">
+          No products yet. Run <code className="text-xs">db/migrations/2026-09-30-product-catalogue.sql</code> to add the starter range (Foamex S/M/L and a digital download), or add one yourself.
+        </CardContent></Card>
+      )}
 
-            {/* Format Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Format</label>
-              <Select value={formatFilter} onValueChange={setFormatFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All formats" />
-                </SelectTrigger>
-                <SelectContent>
-                  {formats.filter(f => f.is_active).map(format => (
-                    <SelectItem key={format.id} value={format.id}>
-                      {format.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Stock Status Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Stock Status</label>
-              <Select value={stockStatusFilter} onValueChange={setStockStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="in_stock">In Stock</SelectItem>
-                  <SelectItem value="low_stock">Low Stock</SelectItem>
-                  <SelectItem value="out_of_stock">Out of Stock</SelectItem>
-                  <SelectItem value="discontinued">Discontinued</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Featured Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Featured</label>
-              <Select value={featuredFilter} onValueChange={setFeaturedFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All products" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="featured">Featured Only</SelectItem>
-                  <SelectItem value="non-featured">Non-Featured Only</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Clear Filters */}
-            <div className="flex items-end">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSearchTerm('');
-                  setProductTypeFilter('');
-                  setMediumFilter('');
-                  setFormatFilter('');
-                  setStockStatusFilter('');
-                  setFeaturedFilter('');
-                  setSortField('');
-                }}
-                className="w-full"
-              >
-                Clear Filters
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Products Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Products ({filteredAndSortedProducts.length})</CardTitle>
-          <CardDescription>Click column headers to sort</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th 
-                    className="text-left p-4 font-medium cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort('medium')}
-                  >
-                    Medium Type {getSortIcon('medium')}
-                  </th>
-                  <th 
-                    className="text-left p-4 font-medium cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort('format')}
-                  >
-                    Format {getSortIcon('format')}
-                  </th>
-                  <th 
-                    className="text-left p-4 font-medium cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort('name')}
-                  >
-                    Product Name {getSortIcon('name')}
-                  </th>
-                  <th 
-                    className="text-left p-4 font-medium cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort('sku')}
-                  >
-                    SKU {getSortIcon('sku')}
-                  </th>
-                  <th 
-                    className="text-left p-4 font-medium cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort('size')}
-                  >
-                    Size {getSortIcon('size')}
-                  </th>
-                  <th 
-                    className="text-right p-4 font-medium cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort('price')}
-                  >
-                    Price {getSortIcon('price')}
-                  </th>
-                  <th
-                    className="text-center p-4 font-medium cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort('stock')}
-                  >
-                    Status {getSortIcon('stock')}
-                  </th>
-                  <th
-                    className="text-center p-4 font-medium cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleSort('featured')}
-                  >
-                    Featured {getSortIcon('featured')}
-                  </th>
-                  <th className="text-right p-4 font-medium">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredAndSortedProducts.map((product) => (
-                  <tr key={product.id} className="border-b hover:bg-gray-50">
-                    <td className="p-4">
-                      <span className="font-medium">{product.medium.name}</span>
-                    </td>
-                    <td className="p-4">
-                      {product.format.name}
-                    </td>
-                    <td className="p-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{product.name || 'Unnamed Product'}</span>
-                          {product.product_type === 'digital_download' && (
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs">
-                              <Download className="w-3 h-3 mr-1" />
-                              Digital
-                            </Badge>
-                          )}
-                          {!product.product_type || product.product_type === 'physical_print' && (
-                            <Badge variant="outline" className="text-xs">
-                              Physical + Digital
-                            </Badge>
-                          )}
-                        </div>
-                        {product.description && (
-                          <div className="text-sm text-gray-600">{product.description.slice(0, 50)}...</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="font-mono text-sm">{product.sku}</div>
-                      {product.gelato_sku && (
-                        <div className="font-mono text-xs text-gray-500">Gelato: {product.gelato_sku.slice(0, 20)}...</div>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <div className="text-sm">
-                        <div>{product.size_name}</div>
-                        <div className="text-gray-600">
-                          {product.width_cm}×{product.height_cm}cm
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4 text-right">
-                      {product.pricing?.[0] && (
-                        <div>
-                          <div className="font-medium">
-                            {product.pricing[0].currency_symbol}{product.pricing[0].sale_price}
-                          </div>
-                          <div className="text-sm text-green-600">
-                            {product.pricing[0].profit_margin_percent}% margin
-                          </div>
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        product.stock_status === 'in_stock' ? 'bg-green-100 text-green-800' :
-                        product.stock_status === 'low_stock' ? 'bg-yellow-100 text-yellow-800' :
-                        product.stock_status === 'out_of_stock' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {product.stock_status.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center">
-                      {product.is_featured ? (
-                        <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 inline" />
-                      ) : (
-                        <span className="text-gray-300">-</span>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-end space-x-2">
-                        <Link href={`/admin/products/${product.id}/edit`}>
-                          <Button variant="outline" size="sm">
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </Link>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(product.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
+      {GROUPS.filter(g => grouped[g.id]?.length).map(group => (
+        <Card key={group.id}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">{group.label}</CardTitle>
+            <p className="text-sm text-gray-500">{group.hint}</p>
+          </CardHeader>
+          <CardContent className="px-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase tracking-wide text-gray-500">
+                    <th className="px-6 py-2 font-medium">Product</th>
+                    <th className="px-3 py-2 font-medium">Size</th>
+                    <th className="px-3 py-2 font-medium text-right">Price</th>
+                    <th className="px-3 py-2 font-medium text-right">Costs</th>
+                    <th className="px-3 py-2 font-medium text-right">Margin</th>
+                    <th className="px-3 py-2 font-medium">Gelato</th>
+                    <th className="px-3 py-2 font-medium">On sale</th>
+                    <th className="px-6 py-2" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            
-            {filteredAndSortedProducts.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                {searchTerm || mediumFilter || formatFilter || stockStatusFilter || featuredFilter ?
-                  'No products match your filters' :
-                  'No products found'
-                }
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                </thead>
+                <tbody>
+                  {grouped[group.id].map(p => (
+                    <tr key={p.id} className={`border-b last:border-0 ${p.is_active ? '' : 'text-gray-400'}`}>
+                      <td className="px-6 py-3">
+                        <div className="font-medium text-gray-900">{p.name}{p.is_featured && <Badge className="ml-2 bg-purple-100 text-purple-800">Featured</Badge>}</div>
+                        <div className="text-xs text-gray-500 font-mono">{p.sku}{p.shape_family ? '' : ` · ${familyLabel(p.shape_family)}`}</div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        {p.product_type === 'digital_download' ? 'Digital file' : (
+                          <>
+                            {p.size_name} <span className="text-gray-500">{orientedSize(p, 'portrait')}</span>
+                            {p.shape_family === 'rect_2x3' && <div className="text-xs text-gray-500">landscape {orientedSize(p, 'landscape')}</div>}
+                          </>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right font-medium">{p.price_pence ? gbp(p.price_pence) : <span className="text-red-600">No price</span>}</td>
+                      <td className="px-3 py-3 text-right text-gray-600">{gbp(p.unit_cost_pence + p.postage_cost_pence)}</td>
+                      <td className={`px-3 py-3 text-right ${p.margin_pence !== null && p.margin_pence < 0 ? 'text-red-600' : ''}`}>
+                        {gbp(p.margin_pence)}{p.margin_percent !== null && <span className="text-xs text-gray-500"> {p.margin_percent}%</span>}
+                      </td>
+                      <td className="px-3 py-3">{p.gelato_sku ? <Check className="w-4 h-4 text-green-600" aria-label="Has Gelato SKU" /> : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-3 py-3">
+                        <Switch checked={p.is_active} disabled={busy === p.id} onCheckedChange={() => toggle(p)} aria-label={`${p.name} on sale`} />
+                      </td>
+                      <td className="px-6 py-3 text-right">
+                        <Link href={`/admin/products/${p.id}/edit`} className="inline-flex items-center text-purple-700 hover:underline"><Pencil className="w-3.5 h-3.5 mr-1" />Edit</Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+
+      <p className="text-xs text-gray-500">
+        Margin = price − unit cost − postage − card fees (estimated at 1.5% + 20p). Take-home prices at the stall are set in <Link href="/admin/settings/guest-and-stall" className="underline">Guest &amp; Stall Settings</Link>.
+      </p>
     </div>
   );
 }

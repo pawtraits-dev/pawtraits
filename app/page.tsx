@@ -1,5 +1,6 @@
 'use client';
 
+import { productMatchesFormat } from '@/lib/products/shape-family';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
@@ -151,7 +152,7 @@ function HomePageContent() {
     }
 
     const availableProducts = (products || []).filter(p => 
-      p.is_active && p.format_id === image.format_id
+      p.is_active && productMatchesFormat(p, image.format_id)
     );
     
     if (availableProducts.length === 0) {

@@ -536,3 +536,57 @@ export type FulfilmentActionRequest =
   | { action: 'mark_printed' | 'mark_packed' | 'undo' | 'use_self_print' | 'send_to_gelato' | 'release' | 'resend_posted_email' | 'rebuild_print_files' }
   | { action: 'mark_posted'; service: PostageServiceId; carrier?: string; trackingCode?: string; trackingUrl?: string; notify?: boolean }
   | { action: 'save_notes'; notes: string };
+
+
+// ===== PRODUCT CATALOGUE (self-print, shape families, UK price) =====
+
+export type ShapeFamilyId = 'rect_2x3' | 'square' | 'wide' | 'any';
+
+export interface CatalogueProductInput {
+  product_type: 'physical_print' | 'digital_download';
+  medium_id: string;
+  shape_family: ShapeFamilyId;
+  size_name: string;
+  size_code: string;
+  width_cm?: number | null;
+  height_cm?: number | null;
+  description?: string | null;
+  price_pence: number;
+  unit_cost_pence?: number;
+  postage_cost_pence?: number;
+  gelato_sku?: string | null;
+  gelato_sku_landscape?: string | null;
+  is_active?: boolean;
+  is_featured?: boolean;
+  display_order?: number;
+}
+
+export interface CatalogueProduct {
+  id: string;
+  sku: string;
+  name: string;
+  description: string | null;
+  medium_id: string;
+  medium: { id: string; name: string; slug: string; description: string | null; category: string | null } | null;
+  format_id: string | null;
+  format_ids: string[];
+  shape_family: ShapeFamilyId | null;
+  size_name: string | null;
+  size_code: string | null;
+  width_cm: number | null;
+  height_cm: number | null;
+  product_type: 'physical_print' | 'digital_download' | 'hybrid';
+  fulfillment_method: string | null;
+  gelato_sku: string | null;
+  gelato_sku_landscape: string | null;
+  is_active: boolean;
+  is_featured: boolean;
+  display_order: number | null;
+  price_pence: number | null;
+  unit_cost_pence: number;
+  postage_cost_pence: number;
+  card_fee_pence: number;
+  margin_pence: number | null;
+  margin_percent: number | null;
+  price_history_count: number;
+}

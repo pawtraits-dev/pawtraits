@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { buildStallCartProduct, SIZE_NAMES, isStallProductId } from '@/lib/cart/items';
 import { track } from '@/lib/tracking/events';
 import { orientationOf, printSizeFor, cropNote, type Orientation } from '@/lib/print/print-geometry';
+import { orientedSize } from '@/lib/products/shape-family';
 
 export interface BuyTarget {
   kind: 'catalog' | 'custom';
@@ -131,7 +132,8 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
           productId: p.id, imageId: target.imageId, imageUrl: target.imageUrl, imageTitle: target.title,
           product: p as any, pricing: p.pricing as any, quantity: 1,
           gelatoProductUid: p.gelato_sku,
-          printSpecs: p.width_cm ? { width_cm: p.width_cm, height_cm: p.height_cm || p.width_cm, medium: p.media_name || p.medium?.name || '', format: p.format?.name || '' } : undefined,
+          // Size as printed for this design (landscape designs print turned)
+          printSpecs: p.width_cm ? (() => { const sz = orientation ? printSizeFor(p.width_cm, p.height_cm || p.width_cm, orientation) : null; return { width_cm: sz ? sz.widthMm / 10 : p.width_cm, height_cm: sz ? sz.heightMm / 10 : (p.height_cm || p.width_cm), medium: p.media_name || p.medium?.name || '', format: p.format?.name || '' }; })() : undefined,
         } as any);
         tracked.push({ id: target.catalogImageId, name: target.title, variant: p.product_type === 'digital_download' ? 'digital' : p.size_code || p.name, price: pence(p.pricing) / 100 });
       }
@@ -223,7 +225,7 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
                       highlight={sameSize && !stallAvailable}
                       thumb={orientation && p.width_cm && p.height_cm ? <ShapeThumb src={target.imageUrl} {...printSizeFor(p.width_cm, p.height_cm, orientation)} /> : undefined}
                       note={orientation ? cropNote(orientation, p.width_cm, p.height_cm) : null}
-                      title={`${p.size_name || ''} ${p.width_cm ? `${p.width_cm}×${p.height_cm} cm` : p.name}`.trim()}
+                      title={`${p.size_name || ''} ${p.width_cm ? orientedSize(p, orientation) : p.name}`.trim()}
                       subtitle={sameSize ? (stallAvailable ? 'Same size as the one in your hand, made fresh and delivered' : 'Same size as the print you scanned') : p.media_description}
                       perk="Free digital copy included"
                       price={gbp(pence(p.pricing))} />

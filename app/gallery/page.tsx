@@ -1,5 +1,6 @@
 'use client';
 
+import { productMatchesFormat } from '@/lib/products/shape-family';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
@@ -140,7 +141,7 @@ function GalleryContent() {
   const loadProductData = async () => {
     try {
       const [productsData, pricingData] = await Promise.all([
-        supabaseService.getProducts(),
+        supabaseService.getPublicProducts(), // via the API: includes format_ids for shape families
         supabaseService.getAllProductPricing()
       ]);
 
@@ -650,7 +651,7 @@ function GalleryContent() {
     }
 
     const availableProducts = (products || []).filter(p =>
-      p.is_active && p.format_id === image.format_id
+      p.is_active && productMatchesFormat(p, image.format_id)
     );
 
     if (availableProducts.length === 0) {

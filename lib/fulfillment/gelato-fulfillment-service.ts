@@ -40,11 +40,11 @@ export class GelatoFulfillmentService implements FulfillmentService {
       productData?.product_type === 'physical_print' ||
       productData?.product_type === undefined; // Legacy products default to physical
 
-    const usesGelato =
-      productData?.fulfillment_method === 'gelato' ||
-      productData?.fulfillment_method === undefined; // Legacy products default to Gelato
+    // Any posted print can go to Gelato if it has a Gelato SKU (self-print products are
+    // fulfillment_method 'manual' but may carry an optional Gelato equivalent)
+    const hasGelatoSku = !!productData?.gelato_sku;
 
-    return isPhysicalPrint && usesGelato;
+    return isPhysicalPrint && hasGelatoSku;
   }
 
   /**
@@ -59,7 +59,7 @@ export class GelatoFulfillmentService implements FulfillmentService {
 
       if (gelatoItems.length === 0) {
         console.log('🖨️ [Gelato Fulfillment] No Gelato items to fulfill');
-        return { success: true, fulfillmentId: null };
+        return { success: false, error: 'None of the prints in this order have a Gelato SKU — add one to the product in /admin/products, or print it yourself' };
       }
 
       console.log(`🖨️ [Gelato Fulfillment] Processing ${gelatoItems.length} Gelato items`);
@@ -78,7 +78,7 @@ export class GelatoFulfillmentService implements FulfillmentService {
           throw new Error(`Order item ${item.id} (image ${item.image_id}) has no print file URL — not sending to Gelato`);
         }
         if (!item.product_data?.gelato_sku) {
-          throw new Error(`Order item ${item.id} has no Gelato product (gelato_sku)`);
+          throw new Error(`Order item ${item.id} has no Gelato product (gelato_sku) — add the Gelato SKU to this product in /admin/products, or print it yourself`);
         }
         imageUrls[item.image_id] = item.print_image_url;
       }
@@ -89,6 +89,10 @@ export class GelatoFulfillmentService implements FulfillmentService {
         ...gi,
         itemReferenceId: normalisedItems[i].id || `${gi.itemReferenceId}_${i}`,
         files: [{ type: 'default', url: normalisedItems[i].print_image_url }],
+        // Landscape designs can use a different Gelato UID when the product has one
+        productUid: normalisedItems[i].print_file_meta?.orientation === 'landscape' && normalisedItems[i].product_data?.gelato_sku_landscape
+          ? normalisedItems[i].product_data.gelato_sku_landscape
+          : gi.productUid,
       }));
 
       // AI-upscaled files are generated on first request (Cloudinary 423s meanwhile) — make sure they exist first

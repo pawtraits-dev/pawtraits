@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { withFormatIds } from '@/lib/products/catalogue';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -26,7 +27,7 @@ export async function GET() {
       throw error;
     }
 
-    return NextResponse.json(data || []);
+    return NextResponse.json(await withFormatIds(supabase, data || []));
   } catch (error: any) {
     console.error('Partner products API error:', error);
     return NextResponse.json(

@@ -1,5 +1,6 @@
 'use client';
 
+import { productMatchesFormat } from '@/lib/products/shape-family';
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
@@ -394,7 +395,7 @@ function BrowsePageContent() {
 
     breedImages.forEach(image => {
       if (image.format_id) {
-        const availableProducts = products.filter(p => p.is_active && p.format_id === image.format_id);
+        const availableProducts = products.filter(p => p.is_active && productMatchesFormat(p, image.format_id));
         availableProducts.forEach(product => {
           const productPricing = countryPricing.find(p => p.product_id === product.id);
           if (productPricing && (lowestPrice === null || productPricing.sale_price < lowestPrice)) {
@@ -540,7 +541,7 @@ function BrowsePageContent() {
     }
 
     const availableProducts = (products || []).filter(p =>
-      p.is_active && p.format_id === image.format_id
+      p.is_active && productMatchesFormat(p, image.format_id)
     );
 
     if (availableProducts.length === 0) {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { withFormatIds } from '@/lib/products/catalogue';
 
 // Use service role client to bypass RLS for public product data
 const supabaseServiceRole = createClient(
@@ -24,7 +25,8 @@ export async function GET() {
       throw error;
     }
 
-    return NextResponse.json(data || []);
+    // format_ids: the formats each product is offered on (shape families span portrait + landscape)
+    return NextResponse.json(await withFormatIds(supabaseServiceRole, [...(data || [])].sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))));
   } catch (error: any) {
     console.error('Public products API error:', error);
     return NextResponse.json(

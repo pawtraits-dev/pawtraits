@@ -1,5 +1,6 @@
 'use client';
 
+import { productMatchesFormat } from '@/lib/products/shape-family';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -79,7 +80,7 @@ export default function ProductSelectionModal({
         p.product_id === product.id && p.country_code === selectedCountry
       );
       // Filter by format_id if available, otherwise show all active products with pricing
-      const formatMatches = !image.format_id || product.format_id === image.format_id;
+      const formatMatches = !image.format_id || productMatchesFormat(product, image.format_id);
       return product.is_active && countryPricing && formatMatches;
     })
     .sort((a, b) => {

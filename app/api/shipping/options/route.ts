@@ -42,14 +42,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validate cart items have Gelato product UIDs
-    const invalidItems = cartItems.filter(item => !item.gelatoProductUid);
-    if (invalidItems.length > 0) {
-      return NextResponse.json(
-        { error: 'Some cart items are missing Gelato product information' },
-        { status: 400 }
-      );
-    }
+    // Self-printed products have no Gelato SKU — that's fine: rates depend only on the country
 
     console.log('🚚 [SHIPPING API] Request validation passed');
     console.log('🚚 [SHIPPING API] Shipping to:', `${shippingAddress.city}, ${shippingAddress.country}`);

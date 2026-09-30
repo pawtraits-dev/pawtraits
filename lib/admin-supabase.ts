@@ -7,7 +7,8 @@ import type {
   MugGeneration,
   StockLocation, StockLocationCreate, StockLocationUpdate,
   ImageQrInfo, StickerImage, StickerSheetRequest, QrReport, AppSettingsMap,
-  FulfilmentQueue, FulfilmentOrder, FulfilmentActionRequest
+  FulfilmentQueue, FulfilmentOrder, FulfilmentActionRequest,
+  CatalogueProduct, CatalogueProductInput
 } from './product-types';
 
 /**
@@ -607,5 +608,32 @@ export class AdminSupabaseService {
   /** URL of the Royal Mail Click & Drop import CSV. */
   getClickAndDropCsvUrl(orderIds: string[]): string {
     return `/api/admin/orders/fulfilment/click-and-drop?ids=${orderIds.map(encodeURIComponent).join(',')}`;
+  }
+
+  // ===== PRODUCT CATALOGUE =====
+
+  /** All products with their UK price, unit costs and margin. */
+  async getCatalogueProducts(): Promise<AdminResult<CatalogueProduct[]>> {
+    return adminRequest<CatalogueProduct[]>('/api/admin/catalogue/products', { cache: 'no-store' });
+  }
+
+  async getCatalogueProduct(id: string): Promise<AdminResult<CatalogueProduct>> {
+    return adminRequest<CatalogueProduct>(`/api/admin/catalogue/products/${encodeURIComponent(id)}`, { cache: 'no-store' });
+  }
+
+  /** Create (no id) or update a product, including its UK price and costs. */
+  async saveCatalogueProduct(input: CatalogueProductInput, id?: string): Promise<AdminResult<CatalogueProduct>> {
+    return id
+      ? adminRequest<CatalogueProduct>(`/api/admin/catalogue/products/${encodeURIComponent(id)}`, jsonInit('PUT', input))
+      : adminRequest<CatalogueProduct>('/api/admin/catalogue/products', jsonInit('POST', input));
+  }
+
+  async setCatalogueProductActive(id: string, isActive: boolean): Promise<AdminResult<CatalogueProduct>> {
+    return adminRequest<CatalogueProduct>(`/api/admin/catalogue/products/${encodeURIComponent(id)}`, jsonInit('PATCH', { is_active: isActive }));
+  }
+
+  /** Deletes the product, or just deactivates it if it has been ordered. */
+  async deleteCatalogueProduct(id: string): Promise<AdminResult<{ deleted: boolean; deactivated: boolean }>> {
+    return adminRequest<{ deleted: boolean; deactivated: boolean }>(`/api/admin/catalogue/products/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 }

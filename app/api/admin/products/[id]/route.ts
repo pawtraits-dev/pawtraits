@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
+import { requireAdmin } from '@/lib/qr/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
-    const productId = decodeURIComponent(params.id);
-    console.log('Admin Product API - Received product ID:', params.id);
-    console.log('Admin Product API - Decoded product ID:', productId);
+    const { id } = await params; // Next 15+: params is a Promise
+    const productId = decodeURIComponent(id);
 
     const adminService = new AdminSupabaseService();
 

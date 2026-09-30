@@ -1,5 +1,6 @@
 'use client';
 
+import { productMatchesFormat } from '@/lib/products/shape-family';
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -359,7 +360,7 @@ export default function PartnerShopPage() {
     }
 
     const availableProducts = products.filter(p => 
-      p.is_active && p.format_id === image.format_id
+      p.is_active && productMatchesFormat(p, image.format_id)
     );
     
     if (availableProducts.length === 0) {

@@ -1,5 +1,6 @@
 'use client';
 
+import { productMatchesFormat } from '@/lib/products/shape-family';
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -455,7 +456,7 @@ function QRLandingPageContent() {
                   {products
                     .filter(product =>
                       product.is_active &&
-                      (!image.format_id || product.format_id === image.format_id)
+                      (!image.format_id || productMatchesFormat(product, image.format_id))
                     )
                     .sort((a, b) => {
                       // Sort by price (low to high)

@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { withFormatIds } from '@/lib/products/catalogue';
+import { requireAdmin } from '@/lib/qr/server';
+import { productMatchesFormat } from '@/lib/products/shape-family';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function GET(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
@@ -62,14 +67,12 @@ export async function GET(request: NextRequest) {
       query = query.eq('medium_id', mediumId);
     }
 
-    if (formatId) {
-      query = query.eq('format_id', formatId);
-    }
-
     const { data, error } = await query;
     if (error) throw error;
 
-    return NextResponse.json(data || []);
+    // Shape-family products span several formats, so filter by format after annotating
+    const annotated = await withFormatIds(supabase, data || []);
+    return NextResponse.json(formatId ? annotated.filter(p => productMatchesFormat(p, formatId)) : annotated);
 
   } catch (error) {
     console.error('Error getting products:', error);
@@ -81,6 +84,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
@@ -134,6 +139,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
@@ -196,6 +203,8 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
