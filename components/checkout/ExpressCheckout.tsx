@@ -109,6 +109,10 @@ function ExpressButtons({ goodsTotalPence, needsShipping, allowedCountries, defa
           buttonHeight: 50,
           buttonType: { applePay: 'buy', googlePay: 'buy' },
           paymentMethodOrder: ['apple_pay', 'google_pay', 'link'],
+          // 'always' shows Apple Pay / Google Pay wherever the browser supports them, even before
+          // a card is saved in the wallet (the sheet lets the customer add one). With the default
+          // 'auto' the buttons were hidden for anyone without a saved card, so checkout fell back to the form.
+          paymentMethods: { applePay: 'always', googlePay: 'always', link: 'auto' },
           layout: { maxColumns: 1, maxRows: 3, overflow: 'never' },
         } as any}
         onReady={(e: any) => onAvailability?.(!!e.availablePaymentMethods && Object.values(e.availablePaymentMethods).some(Boolean))}

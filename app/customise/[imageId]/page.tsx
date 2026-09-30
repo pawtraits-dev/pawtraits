@@ -23,6 +23,7 @@ import { preparePetPhoto } from '@/lib/client/resize-photo';
 import { track } from '@/lib/tracking/events';
 import BuyOptionsSheet, { type BuyTarget } from '@/components/customise/BuyOptionsSheet';
 import { customPortraitTitle } from '@/lib/cart/items';
+import { extractDescriptionTitle } from '@/lib/utils';
 
 interface Pet {
   pet_id: string;
@@ -300,7 +301,7 @@ export default function CustomisePage() {
       }
     : {
         kind: 'catalog', imageId: catalogImage.id, catalogImageId: catalogImage.id, imageUrl: catalogImage.imageUrl,
-        title: catalogImage.description || 'Pawtraits print', formatId: catalogImage.format?.id, themeName: catalogImage.theme?.name,
+        title: extractDescriptionTitle(catalogImage.description) || 'Pawtraits print', formatId: catalogImage.format?.id, themeName: catalogImage.theme?.name,
       };
 
   // ---- render ----

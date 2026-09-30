@@ -61,6 +61,8 @@ function CheckoutPageContent() {
   const [applyRewards, setApplyRewards] = useState(false)
   const [loadingRewards, setLoadingRewards] = useState(false)
   const [walletAvailable, setWalletAvailable] = useState<boolean | null>(null)
+  // When Apple Pay / Google Pay is available it's the main path; the card form opens on request
+  const [cardFormOpen, setCardFormOpen] = useState(false)
   const { items, totalItems, totalPrice, clearCart } = useHybridCart()
   const router = useRouter()
   const { userProfile, loading: userLoading } = useUserRouting()
@@ -487,6 +489,7 @@ function CheckoutPageContent() {
   // A guest with a referral code needs their email checked for the first-order discount
   // before we know the price, so they use the form below.
   const showExpress = items.length > 0 && goodsTotalPence >= 50 && !(isGuest && referralCode)
+  const expressFirst = currentStep === 1 && showExpress && walletAvailable === true && !cardFormOpen
 
   // Shared by the card form and Apple Pay / Google Pay / Link
   const requestPaymentIntent = async (payer: ExpressPayer & { digitalOnly: boolean }) => {
@@ -670,13 +673,13 @@ function CheckoutPageContent() {
           </Link>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Checkout</h1>
           {/* Compact progress on phones — the full stepper doesn't fit */}
-          <p className="sm:hidden mt-1 text-sm text-gray-600">
+          <p className={`sm:hidden mt-1 text-sm text-gray-600 ${expressFirst ? 'hidden' : ''}`}>
             Step {steps.findIndex(st => st.number === currentStep) + 1} of {steps.length} · {steps.find(st => st.number === currentStep)?.title}
           </p>
         </div>
 
-        {/* Progress Steps */}
-        <div className="mb-8 hidden sm:block">
+        {/* Progress Steps (not needed while Apple Pay / Google Pay is the path) */}
+        <div className={`mb-8 hidden ${expressFirst ? '' : 'sm:block'}`}>
           <div className="flex items-center justify-between mb-4">
             {steps.map((step, index) => (
               <div key={step.number} className="flex items-center">
@@ -742,16 +745,23 @@ function CheckoutPageContent() {
                     )}
                   </CardContent>
                 </Card>
-                <div className="flex items-center gap-3 my-6 text-sm text-gray-500">
-                  <div className="h-px flex-1 bg-gray-200" />
-                  or pay by card
-                  <div className="h-px flex-1 bg-gray-200" />
-                </div>
+                {expressFirst ? (
+                  <button type="button" onClick={() => setCardFormOpen(true)}
+                    className="mt-4 w-full rounded-xl border border-gray-300 bg-white py-3 text-sm font-medium text-gray-700 hover:border-purple-400">
+                    Pay by card instead
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-3 my-6 text-sm text-gray-500">
+                    <div className="h-px flex-1 bg-gray-200" />
+                    or pay by card
+                    <div className="h-px flex-1 bg-gray-200" />
+                  </div>
+                )}
               </div>
             )}
 
             {/* Step 1: Shipping Information */}
-            {currentStep === 1 && (
+            {currentStep === 1 && !expressFirst && (
               <Card>
                 <CardHeader>
                   <CardTitle>{isDigitalOnly ? 'Your details' : 'Delivery address'}</CardTitle>
