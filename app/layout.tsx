@@ -21,7 +21,7 @@ const lifeSavers = Life_Savers({
 });
 
 export const metadata: Metadata = {
-  title: 'Pawpraits - Perfect Pet Portraits',
+  title: 'Pawtraits - Perfect Pet Portraits',
   description: 'Fantastic Fun Picture of your Furry Friends.',
   keywords: 'pet portraits, AI art, custom pet art, dog portraits, cat portraits, pet memorial, pet gifts',
   authors: [{ name: 'Pawtraits Team' }],
