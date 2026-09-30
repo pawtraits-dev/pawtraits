@@ -78,8 +78,20 @@ function CheckoutPageContent() {
     const onViolation = (e: SecurityPolicyViolationEvent) =>
       setBlocked(b => [...b, `${e.effectiveDirective}: ${e.blockedURI || '(inline)'}`].slice(-8))
     document.addEventListener('securitypolicyviolation', onViolation)
+    // Stripe.js explains missing wallets in console warnings (e.g. domain not registered) — surface them here
+    const origWarn = console.warn, origError = console.error
+    const capture = (kind: string) => (...args: any[]) => {
+      const text = args.map(a => (typeof a === 'string' ? a : a?.message || '')).join(' ')
+      if (/stripe|apple|google pay|wallet|express|domain|payment/i.test(text)) setBlocked(b => [...b, `${kind}: ${text.slice(0, 300)}`].slice(-8))
+    }
+    console.warn = (...a: any[]) => { capture('warn')(...a); origWarn(...a) }
+    console.error = (...a: any[]) => { capture('error')(...a); origError(...a) }
+    const onErr = (e: ErrorEvent) => setBlocked(b => [...b, `js error: ${e.message}`].slice(-8))
+    const onRej = (e: PromiseRejectionEvent) => setBlocked(b => [...b, `rejected: ${String(e.reason?.message || e.reason).slice(0, 200)}`].slice(-8))
+    window.addEventListener('error', onErr)
+    window.addEventListener('unhandledrejection', onRej)
     const t = setTimeout(() => setWalletInfo(w => w ?? 'No reply from Stripe after 10s — its frame was probably blocked (security policy or a content blocker)'), 10000)
-    return () => { document.removeEventListener('securitypolicyviolation', onViolation); clearTimeout(t) }
+    return () => { document.removeEventListener('securitypolicyviolation', onViolation); window.removeEventListener('error', onErr); window.removeEventListener('unhandledrejection', onRej); console.warn = origWarn; console.error = origError; clearTimeout(t) }
   }, [])
   // When Apple Pay / Google Pay is available it's the main path; the card form opens on request
   const [cardFormOpen, setCardFormOpen] = useState(false)
@@ -743,7 +755,9 @@ step: ${currentStep}  items: ${items.length}  goods: ${goodsTotalPence}p
 guest: ${isGuest}  referral code: ${referralCode || 'none'}${referralDiscountPending ? '  → express at full price; discount via the form' : ''}
 shown: ${showExpress}  wallet available: ${String(walletAvailable)}
 ${walletInfo || 'Stripe has not reported yet'}
-blocked: ${blocked.length ? blocked.join(' | ') : 'nothing'}
+messages: ${blocked.length ? blocked.join(' | ') : 'nothing'}
+stripe key: ${(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '').slice(0, 8)}…  Stripe.js: ${typeof window !== 'undefined' && (window as any).Stripe ? 'loaded' : 'not loaded'}  Apple Pay API: ${typeof window !== 'undefined' && (window as any).ApplePaySession ? ((window as any).ApplePaySession.canMakePayments?.() ? 'yes' : 'present, no cards') : 'no'}
+browser: ${typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 160) : ''}
 basket: ${items.map((i: any) => `${i.product?.sku || i.productId?.slice(0, 8)} type=${i.product?.product_type ?? '?'} ship=${itemNeedsShipping(i)}`).join(' | ')}  digital only: ${isDigitalOnly}
 page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
               </pre>
