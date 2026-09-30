@@ -142,11 +142,10 @@ async function setGbPrice(supabase: SupabaseClient, productId: string, input: Ca
   const postage = input.postage_cost_pence ?? 0;
   if (current && current.sale_price === input.price_pence && (current.product_cost ?? 0) === unitCost && (current.shipping_cost ?? 0) === postage) return;
   const now = new Date().toISOString();
-  if (rows?.length) {
-    await supabase.from('product_pricing').update({ is_current: false, end_date: now, updated_at: now }).eq('product_id', productId).eq('country_code', 'GB').eq('is_current', true);
-  }
   const profit = input.price_pence - unitCost - postage;
-  const { error } = await supabase.from('product_pricing').insert({
+  const pct = (n: number) => Math.max(-99999, Math.min(99999, Math.round(n * 100) / 100));
+  // Add the new price first, then retire the old one — a failed save never leaves the product without a price
+  const { data: added, error } = await supabase.from('product_pricing').insert({
     product_id: productId,
     country_code: 'GB',
     currency_code: 'GBP',
@@ -155,14 +154,20 @@ async function setGbPrice(supabase: SupabaseClient, productId: string, input: Ca
     product_cost: unitCost,
     shipping_cost: postage,
     profit_amount: profit,
-    profit_margin_percent: input.price_pence ? Math.round((profit / input.price_pence) * 10000) / 100 : null,
-    markup_percent: unitCost + postage > 0 ? Math.round((profit / (unitCost + postage)) * 10000) / 100 : null,
+    profit_margin_percent: input.price_pence ? pct((profit / input.price_pence) * 100) : null,
+    markup_percent: unitCost + postage > 0 ? pct((profit / (unitCost + postage)) * 100) : null,
     is_current: true,
     effective_date: now,
     created_by: userId || null,
     notes: 'Set in /admin/products',
-  });
-  if (error) throw new CatalogueError(`Price not saved: ${error.message}`, 500);
+  }).select('id').single();
+  if (error) {
+    throw new CatalogueError(/numeric field overflow/i.test(error.message)
+      ? 'Price not saved: run db/migrations/2026-09-30-pricing-margin-columns.sql in Supabase (the margin columns are too small for high markups).'
+      : `Price not saved: ${error.message}`, 500);
+  }
+  await supabase.from('product_pricing').update({ is_current: false, end_date: now, updated_at: now })
+    .eq('product_id', productId).eq('country_code', 'GB').eq('is_current', true).neq('id', added.id);
 }
 
 export async function createCatalogueProduct(supabase: SupabaseClient, input: CatalogueProductInput, userId?: string | null) {

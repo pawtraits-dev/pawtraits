@@ -46,9 +46,14 @@ Product APIs (`/api/public/products`, `/api/partners/products`, `/api/admin/prod
 - `GelatoFulfillmentService.canFulfill` requires a `gelato_sku` (was: `fulfillment_method = 'gelato'`); landscape lines use `gelato_sku_landscape` when set.
 - Admin product APIs now require an admin (`requireAdmin`).
 
+## Delivery charges
+
+Flat Royal Mail Tracked charge per order, whatever the size or number of prints: **UK £5 · Europe £10 · USA £15** (`lib/shipping/rates.ts`, which also lists the countries we deliver to). `/api/shipping/options` returns that single option; the payment price check uses the server's rate, not the browser's. Product "postage cost" is only for postage the delivery charge doesn't cover — usually 0.
+
+`product_pricing.profit_margin_percent` / `markup_percent` were DECIMAL(5,2), so markups over 999% failed to save — widened by `db/migrations/2026-09-30-pricing-margin-columns.sql`. A new price is now inserted before the old one is retired.
+
 ## Not yet done
 
-- Delivery charges still come from the old Gelato-based estimates in `/api/shipping/options` — to be replaced with your own postage rates.
 - `/admin/pricing` and `/admin/pricing-management` are legacy (multi-country, Gelato cost based).
 
 ## Code

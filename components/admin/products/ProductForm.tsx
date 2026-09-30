@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2, Printer, Download, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
+import { shippingSummary } from '@/lib/shipping/rates';
 import { SHAPE_FAMILIES, type ShapeFamily } from '@/lib/products/shape-family';
 import { cropNote } from '@/lib/print/print-geometry';
 import type { CatalogueProduct, CatalogueProductInput } from '@/lib/product-types';
@@ -254,7 +255,7 @@ export default function ProductForm({ product, initialType }: { product?: Catalo
               <div className="space-y-2">
                 <Label htmlFor="postage_cost">Postage cost</Label>
                 <Input id="postage_cost" inputMode="decimal" value={form.postage_cost} onChange={e => set('postage_cost', e.target.value)} placeholder="0.00" />
-                <p className="text-xs text-gray-500">What you pay (not what you charge)</p>
+                <p className="text-xs text-gray-500">Only postage the delivery charge doesn’t cover — usually 0</p>
               </div>
             )}
           </div>
@@ -264,7 +265,7 @@ export default function ProductForm({ product, initialType }: { product?: Catalo
               <span className="text-gray-500"> after costs and card fees (~{gbp(fees)})</span>
             </div>
           )}
-          <p className="text-xs text-gray-500">Saving a new price keeps the old one in the price history. Delivery charges are separate.</p>
+          <p className="text-xs text-gray-500">Saving a new price keeps the old one in the price history. Delivery is charged per order on top ({shippingSummary()}).</p>
         </CardContent>
       </Card>
 

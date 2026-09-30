@@ -26,9 +26,13 @@ import StripePaymentForm from '@/components/StripePaymentForm'
 import ExpressCheckout, { type ExpressPayer, type ShippingQuote } from '@/components/checkout/ExpressCheckout'
 import { checkoutValidation } from '@/lib/checkout-validation'
 import { extractDescriptionTitle } from '@/lib/utils'
-
 // Countries we deliver to (card form dropdown and Apple Pay / Google Pay address sheet)
-const DELIVERY_COUNTRIES = ['GB', 'US', 'CA', 'AU', 'DE', 'FR', 'ES', 'IT', 'NL', 'BE', 'CH', 'AT', 'DK', 'SE', 'NO', 'IE']
+import { DELIVERY_COUNTRIES } from '@/lib/shipping/rates'
+
+const countryName = (code: string) => {
+  try { return new Intl.DisplayNames(['en-GB'], { type: 'region' }).of(code) || code } catch { return code }
+}
+
 
 function CheckoutPageContent() {
   const [currentStep, setCurrentStep] = useState(1)
@@ -464,7 +468,7 @@ function CheckoutPageContent() {
     }
   }
 
-  // Delivery options for a country (Gelato rates depend only on destination country)
+  // Delivery options for a country (flat Royal Mail Tracked charge by destination — lib/shipping/rates.ts)
   const getShippingQuotes = async (country: string): Promise<ShippingQuote[]> => {
     const response = await fetch('/api/shipping/options', {
       method: 'POST',
@@ -902,22 +906,9 @@ function CheckoutPageContent() {
                           <SelectValue placeholder="Select country" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="GB">United Kingdom</SelectItem>
-                          <SelectItem value="US">United States</SelectItem>
-                          <SelectItem value="CA">Canada</SelectItem>
-                          <SelectItem value="AU">Australia</SelectItem>
-                          <SelectItem value="DE">Germany</SelectItem>
-                          <SelectItem value="FR">France</SelectItem>
-                          <SelectItem value="ES">Spain</SelectItem>
-                          <SelectItem value="IT">Italy</SelectItem>
-                          <SelectItem value="NL">Netherlands</SelectItem>
-                          <SelectItem value="BE">Belgium</SelectItem>
-                          <SelectItem value="CH">Switzerland</SelectItem>
-                          <SelectItem value="AT">Austria</SelectItem>
-                          <SelectItem value="DK">Denmark</SelectItem>
-                          <SelectItem value="SE">Sweden</SelectItem>
-                          <SelectItem value="NO">Norway</SelectItem>
-                          <SelectItem value="IE">Ireland</SelectItem>
+                          {DELIVERY_COUNTRIES.map(code => (
+                            <SelectItem key={code} value={code}>{countryName(code)}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       {errors.country && <p className="text-sm text-red-600">{errors.country}</p>}

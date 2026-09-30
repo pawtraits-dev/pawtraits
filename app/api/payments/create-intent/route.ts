@@ -6,6 +6,7 @@ import { QR_ATTRIBUTION_COOKIE, VISITOR_COOKIE, decodeAttribution, validVisitorI
 import { CONSENT_COOKIE, parseConsent } from '@/lib/tracking/consent';
 import { serviceClient } from '@/lib/qr/server';
 import { isStallProductId, stallSizeFromProductId } from '@/lib/cart/items';
+import { shippingQuoteFor } from '@/lib/shipping/rates';
 import { getStallOffer } from '@/lib/stall/offer';
 
 interface CreatePaymentIntentRequest {
@@ -442,7 +443,9 @@ async function checkPriceFloor(body: CreatePaymentIntentRequest): Promise<{ stat
       floor += m * i.quantity;
     }
     const declaredDiscounts = (body.referralDiscount || 0) + (body.rewardRedemption || 0) + (body.partnerDiscount || 0);
-    const shipping = body.shippingOption?.price || 0;
+    // Delivery is a flat charge by country; don't trust the browser's figure for it
+    const serverShipping = body.shippingOption ? shippingQuoteFor(body.shippingAddress?.country)?.price : undefined;
+    const shipping = serverShipping ?? body.shippingOption?.price ?? 0;
     const paidForGoods = body.amount - shipping + declaredDiscounts;
     if (paidForGoods >= floor) return { status: 'ok', floor };
     if (paidForGoods >= floor * 0.5) return { status: 'low', floor };

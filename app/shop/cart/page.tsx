@@ -16,6 +16,7 @@ import { describeCartItem, isStallProductId, includesFreeDigital, redundantDigit
 import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider } from '@/lib/country-context'
 import { BundlePricingDisplay } from '@/components/BundlePricingDisplay'
+import { shippingSummary } from '@/lib/shipping/rates'
 
 function ShoppingCartPageContent() {
   const { items, totalItems, totalPrice, updateQuantity, removeFromCart, isGuest } = useHybridCart();
@@ -165,7 +166,7 @@ function ShoppingCartPageContent() {
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
             {redundantDigitalLines(items as any[]).map((line: any) => (
-              <div key={`dup-${line.id}`} className="flex flex-col gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 sm:flex-row sm:items-center sm:justify-between">
+              <div key={`dup-${line.id}`} className="flex items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
                 <span>Good news — your print already includes the digital download of this design for free.</span>
                 <Button size="sm" variant="outline" onClick={() => removeFromCart(line.id)} className="shrink-0">Remove paid download</Button>
               </div>
@@ -282,7 +283,7 @@ function ShoppingCartPageContent() {
                 </div>
 
                 <div className="text-sm text-gray-500 text-center">
-                  <p>Shipping costs calculated at checkout</p>
+                  <p>Tracked delivery per order: {shippingSummary()}</p>
                 </div>
 
                 <Link href="/shop/checkout" className="block">

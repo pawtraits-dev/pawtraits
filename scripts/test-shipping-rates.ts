@@ -1,0 +1,12 @@
+import { shippingQuoteFor, shippingSummary, DELIVERY_COUNTRIES } from '../lib/shipping/rates';
+let fail = 0;
+const eq = (name: string, a: unknown, b: unknown) => { const ok = JSON.stringify(a) === JSON.stringify(b); if (!ok) fail++; console.log(`${ok ? '✅' : '❌'} ${name}`, ok ? '' : `got ${JSON.stringify(a)} expected ${JSON.stringify(b)}`); };
+eq('UK £5', shippingQuoteFor('GB')?.price, 500);
+eq('uk lower-case', shippingQuoteFor('gb')?.price, 500);
+eq('France £10', shippingQuoteFor('FR')?.price, 1000);
+eq('Ireland £10', shippingQuoteFor('IE')?.price, 1000);
+eq('USA £15', shippingQuoteFor('US')?.price, 1500);
+eq('Australia not delivered', shippingQuoteFor('AU'), null);
+eq('every delivery country has a rate', DELIVERY_COUNTRIES.every(c => !!shippingQuoteFor(c)), true);
+eq('summary', shippingSummary(), 'UK £5 · Europe £10 · USA £15');
+if (fail) { console.log(`${fail} failed`); process.exit(1); } else console.log('All shipping checks passed');
