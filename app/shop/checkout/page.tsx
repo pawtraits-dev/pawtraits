@@ -68,8 +68,18 @@ function CheckoutPageContent() {
   // Add ?debugwallet to the checkout URL to see why Apple Pay / Google Pay isn't showing (phones have no console)
   const [walletInfo, setWalletInfo] = useState<string | null>(null)
   const [debugWallet, setDebugWallet] = useState(false)
+  const [blocked, setBlocked] = useState<string[]>([])
   useEffect(() => {
-    try { setDebugWallet(new URLSearchParams(window.location.search).has('debugwallet')) } catch {}
+    let on = false
+    try { on = new URLSearchParams(window.location.search).has('debugwallet') } catch {}
+    setDebugWallet(on)
+    if (!on) return
+    // Show anything the security policy blocks (e.g. a Stripe frame)
+    const onViolation = (e: SecurityPolicyViolationEvent) =>
+      setBlocked(b => [...b, `${e.effectiveDirective}: ${e.blockedURI || '(inline)'}`].slice(-8))
+    document.addEventListener('securitypolicyviolation', onViolation)
+    const t = setTimeout(() => setWalletInfo(w => w ?? 'No reply from Stripe after 10s — its frame was probably blocked (security policy or a content blocker)'), 10000)
+    return () => { document.removeEventListener('securitypolicyviolation', onViolation); clearTimeout(t) }
   }, [])
   // When Apple Pay / Google Pay is available it's the main path; the card form opens on request
   const [cardFormOpen, setCardFormOpen] = useState(false)
@@ -732,6 +742,7 @@ step: ${currentStep}  items: ${items.length}  goods: ${goodsTotalPence}p
 guest: ${isGuest}  referral code: ${referralCode || 'none'}${isGuest && referralCode ? '  → hidden: guest with referral code uses the form' : ''}
 shown: ${showExpress}  wallet available: ${String(walletAvailable)}
 ${walletInfo || 'Stripe has not reported yet'}
+blocked: ${blocked.length ? blocked.join(' | ') : 'nothing'}
 page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
               </pre>
             )}

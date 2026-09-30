@@ -79,12 +79,12 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest): void 
   // Content Security Policy - More permissive for Next.js while maintaining security
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://maps.googleapis.com https://vercel.live https://www.googletagmanager.com https://connect.facebook.net https://challenges.cloudflare.com`,
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.js.stripe.com https://pay.google.com https://maps.googleapis.com https://vercel.live https://www.googletagmanager.com https://connect.facebook.net https://challenges.cloudflare.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https://www.googletagmanager.com https://*.google-analytics.com https://*.g.doubleclick.net https://www.google.com https://www.google.co.uk https://www.facebook.com https://res.cloudinary.com https://lh3.googleusercontent.com https://images.unsplash.com https://*.supabase.co https://pawtraits.pics https://www.pawtraits.pics",
-    "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://www.facebook.com https://connect.facebook.net https://api.stripe.com https://upload.stripe.com https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://api.cloudinary.com https://res.cloudinary.com https://vercel.live wss://ws-us3.pusher.com",
-    "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://td.doubleclick.net https://www.googletagmanager.com",
+    "img-src 'self' data: blob: https://www.googletagmanager.com https://*.google-analytics.com https://*.g.doubleclick.net https://www.google.com https://www.google.co.uk https://www.facebook.com https://res.cloudinary.com https://lh3.googleusercontent.com https://images.unsplash.com https://*.stripe.com https://*.supabase.co https://pawtraits.pics https://www.pawtraits.pics",
+    "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://www.facebook.com https://connect.facebook.net https://api.stripe.com https://upload.stripe.com https://*.stripe.com https://*.stripe.network https://*.link.com https://pay.google.com https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://api.cloudinary.com https://res.cloudinary.com https://vercel.live wss://ws-us3.pusher.com",
+    "frame-src 'self' https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://pay.google.com https://*.link.com https://td.doubleclick.net https://www.googletagmanager.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
