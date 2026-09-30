@@ -44,7 +44,7 @@ export default function AdminProductsPage() {
     setBusy(null);
     if (!result.ok) { toast({ title: 'Couldn’t update', description: result.error, variant: 'destructive' }); return; }
     setProducts(list => (list || []).map(x => (x.id === p.id ? result.data : x)));
-    toast({ title: `${p.name} ${result.data.is_active ? 'on sale' : 'hidden from the shop'}` });
+    toast({ title: `${p.name} ${result.data.is_active ? 'now in the shop' : 'hidden from the shop'}` });
   };
 
   const missingPrice = (products || []).filter(p => p.is_active && !p.price_pence).length;
@@ -65,7 +65,7 @@ export default function AdminProductsPage() {
       {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {missingPrice > 0 && (
         <p className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          <AlertTriangle className="w-4 h-4" />{missingPrice} product{missingPrice === 1 ? ' is' : 's are'} on sale without a UK price — customers won’t see {missingPrice === 1 ? 'it' : 'them'}.
+          <AlertTriangle className="w-4 h-4" />{missingPrice} product{missingPrice === 1 ? ' is' : 's are'} in the shop without a UK price — customers won’t see {missingPrice === 1 ? 'it' : 'them'}.
         </p>
       )}
 
@@ -94,7 +94,7 @@ export default function AdminProductsPage() {
                     <th className="px-3 py-2 font-medium text-right">Costs</th>
                     <th className="px-3 py-2 font-medium text-right">Margin</th>
                     <th className="px-3 py-2 font-medium">Gelato</th>
-                    <th className="px-3 py-2 font-medium">On sale</th>
+                    <th className="px-3 py-2 font-medium">In shop</th>
                     <th className="px-6 py-2" />
                   </tr>
                 </thead>
@@ -120,7 +120,7 @@ export default function AdminProductsPage() {
                       </td>
                       <td className="px-3 py-3">{p.gelato_sku ? <Check className="w-4 h-4 text-green-600" aria-label="Has Gelato SKU" /> : <span className="text-gray-300">—</span>}</td>
                       <td className="px-3 py-3">
-                        <Switch checked={p.is_active} disabled={busy === p.id} onCheckedChange={() => toggle(p)} aria-label={`${p.name} on sale`} />
+                        <Switch checked={p.is_active} disabled={busy === p.id} onCheckedChange={() => toggle(p)} aria-label={`${p.name} in shop`} />
                       </td>
                       <td className="px-6 py-3 text-right">
                         <Link href={`/admin/products/${p.id}/edit`} className="inline-flex items-center text-purple-700 hover:underline"><Pencil className="w-3.5 h-3.5 mr-1" />Edit</Link>

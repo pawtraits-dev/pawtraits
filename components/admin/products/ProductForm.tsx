@@ -299,7 +299,7 @@ export default function ProductForm({ product, initialType }: { product?: Catalo
       {/* Visibility */}
       <Card>
         <CardContent className="flex flex-wrap items-center gap-6 pt-6">
-          <label className="flex items-center gap-2 text-sm"><Switch checked={form.is_active} onCheckedChange={v => set('is_active', v)} />On sale</label>
+          <label className="flex items-center gap-2 text-sm"><Switch checked={form.is_active} onCheckedChange={v => set('is_active', v)} />Show in shop</label>
           <label className="flex items-center gap-2 text-sm"><Switch checked={form.is_featured} onCheckedChange={v => set('is_featured', v)} />Featured</label>
           <label className="flex items-center gap-2 text-sm">Sort order
             <Input value={form.display_order} onChange={e => set('display_order', e.target.value)} inputMode="numeric" className="w-20 h-8" />

@@ -32,7 +32,7 @@ Unit and postage costs start at 0 — fill them in on /admin/products to see mar
 
 ## Admin
 
-- **/admin/products** — products grouped by family: price, costs, margin, Gelato tick, on-sale switch; warns if an on-sale product has no price.
+- **/admin/products** — products grouped by family: price, costs, margin, Gelato tick, in-shop switch; warns if an in-shop product has no price.
 - **Add / edit form** — print or digital, material (from /admin/media), family, size name/code, size in cm with a portrait/landscape preview and crop note, price/unit cost/postage with live margin, optional Gelato SKUs, featured and sort order.
 - **Delete** — products with orders or stock are deactivated rather than deleted.
 
@@ -54,7 +54,7 @@ Flat Royal Mail Tracked charge per order, whatever the size or number of prints:
 
 ## Not yet done
 
-- `/admin/pricing` and `/admin/pricing-management` are legacy (multi-country, Gelato cost based).
+- `/admin/pricing` removed (2026-09-30). `/admin/pricing-management` is legacy (multi-country, Gelato cost based).
 
 ## Code
 

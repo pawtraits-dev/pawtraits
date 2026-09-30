@@ -77,7 +77,6 @@ const navigationSections = [
       { name: 'Products', href: '/admin/products', icon: Package },
       { name: 'Countries', href: '/admin/countries', icon: Globe },
       { name: 'Media', href: '/admin/media', icon: Database },
-      { name: 'Pricing', href: '/admin/pricing', icon: DollarSign },
       { name: 'Pricing Management', href: '/admin/pricing-management', icon: Settings },
       { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
     ]
