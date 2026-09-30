@@ -209,6 +209,15 @@ export default function ExpressCheckout(props: Props) {
     appearance: { theme: 'stripe' as const, variables: { colorPrimary: '#9333ea', borderRadius: '10px' } },
   }))
   const stripePromise = useMemo(() => getStripe(), [])
+  // If Stripe.js itself can't load (network, content blocker) the wallet never reports — say so
+  useEffect(() => {
+    let done = false
+    Promise.resolve(stripePromise)
+      .then((s: any) => { if (!done && !s) props.onAvailability?.(false, 'Stripe.js did not load (returned null)') })
+      .catch((e: any) => { if (!done) props.onAvailability?.(false, `Stripe.js failed to load: ${e?.message || e}`) })
+    return () => { done = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stripePromise])
   if (props.goodsTotalPence < 50) return null // Stripe minimum charge
   return (
     <Elements stripe={stripePromise} options={options}>

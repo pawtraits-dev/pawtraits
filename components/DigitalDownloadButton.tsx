@@ -53,27 +53,20 @@ export function DigitalDownloadButton({
       // Find the master bundle product
       const list = Array.isArray(products) ? products : (products?.products ?? []);
       const digital = list.filter((p: any) => p.product_type === 'digital_download' && p.is_active !== false);
-      const bundleProduct = digital.find((p: any) => p.name === 'Digital Download Bundle') || digital.find((p: any) => p.sku === 'DIGITAL') || digital[0];
+      const priced = new Set((Array.isArray(pricing) ? pricing : []).filter((r: any) => r.country_code === 'GB' && r.sale_price > 0).map((r: any) => r.product_id));
+      const withPrice = digital.filter((p: any) => priced.has(p.id));
+      const bundleProduct = withPrice.find((p: any) => p.sku === 'DIGITAL') || withPrice[0] || digital[0];
 
       if (!bundleProduct) {
         throw new Error('Digital download product not configured. Please contact support.');
       }
 
-      // Find pricing for the bundle product
-      let bundleProductPricing = pricing.find((p: any) =>
-        p.product_id === bundleProduct.id
-      );
-
-      if (!bundleProductPricing) {
-        // Use default pricing if not found in database
-        bundleProductPricing = {
-          product_id: bundleProduct.id,
-          price: 999,
-          sale_price: 999,
-          currency_code: 'GBP',
-          currency_symbol: '£',
-          formatted_price: '£9.99'
-        };
+      // Current UK price for the download (never a made-up default)
+      const rows = (Array.isArray(pricing) ? pricing : []).filter((p: any) => p.product_id === bundleProduct.id && p.country_code === 'GB');
+      rows.sort((x: any, y: any) => Number(y.is_current === true) - Number(x.is_current === true));
+      const bundleProductPricing = rows[0];
+      if (!bundleProductPricing?.sale_price) {
+        throw new Error('The digital download has no UK price yet. Please try again later.');
       }
 
       // Add to cart using same pattern as physical products
@@ -92,7 +85,7 @@ export function DigitalDownloadButton({
 
       toast({
         title: 'Added to cart',
-        description: `${imageTitle} digital download added. Bundle pricing applied at checkout.`,
+        description: `${imageTitle} digital download added to your basket.`,
       });
 
       console.log('✅ [Digital Download] Added to cart:', imageTitle);

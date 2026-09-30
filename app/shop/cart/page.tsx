@@ -15,7 +15,6 @@ import { extractDescriptionTitle } from '@/lib/utils'
 import { describeCartItem, isStallProductId, includesFreeDigital, redundantDigitalLines } from '@/lib/cart/items'
 import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider } from '@/lib/country-context'
-import { BundlePricingDisplay } from '@/components/BundlePricingDisplay'
 import { shippingSummary } from '@/lib/shipping/rates'
 
 function ShoppingCartPageContent() {
@@ -246,8 +245,6 @@ function ShoppingCartPageContent() {
               </Card>
             ))}
 
-            {/* Bundle Pricing Display */}
-            <BundlePricingDisplay />
           </div>
 
           {/* Order Summary */}

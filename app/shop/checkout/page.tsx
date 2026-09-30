@@ -27,7 +27,7 @@ import ExpressCheckout, { type ExpressPayer, type ShippingQuote } from '@/compon
 import { checkoutValidation } from '@/lib/checkout-validation'
 import { extractDescriptionTitle } from '@/lib/utils'
 // Countries we deliver to (card form dropdown and Apple Pay / Google Pay address sheet)
-import { DELIVERY_COUNTRIES } from '@/lib/shipping/rates'
+import { DELIVERY_COUNTRIES, shippingSummary } from '@/lib/shipping/rates'
 
 const countryName = (code: string) => {
   try { return new Intl.DisplayNames(['en-GB'], { type: 'region' }).of(code) || code } catch { return code }
@@ -750,7 +750,9 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
             )}
             {/* Express: Apple Pay / Google Pay / Link — collects email, name, address and delivery in the wallet sheet */}
             {currentStep === 1 && showExpress && (
-              <div className={walletAvailable ? 'mb-6' : 'invisible h-0 overflow-hidden'} aria-hidden={!walletAvailable}>
+              // Kept visible while Stripe checks the device (a hidden, zero-height frame may never start on some phones);
+              // collapsed only once Stripe says no wallet is available
+              <div className={walletAvailable === false ? 'invisible h-0 overflow-hidden' : 'mb-6'} aria-hidden={walletAvailable === false}>
                 <Card className="border-purple-200">
                   <CardContent className="pt-6 space-y-3">
                     <div>
@@ -1195,10 +1197,12 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
                   <span className="font-medium">
-                    {selectedShippingOption ? (
+                    {isDigitalOnly ? (
+                      <span className="text-gray-500">None — nothing to post</span>
+                    ) : selectedShippingOption ? (
                       selectedShippingOption.price === 0 ? 'Free' : `£${orderSummary.shipping.toFixed(2)}`
                     ) : (
-                      <span className="text-gray-500">Select shipping option</span>
+                      <span className="text-gray-500">{shippingSummary()}</span>
                     )}
                   </span>
                 </div>
@@ -1261,9 +1265,9 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                   <span>Total</span>
                   <span>£{orderSummary.total.toFixed(2)}</span>
                 </div>
-                {!selectedShippingOption && (
+                {!selectedShippingOption && !isDigitalOnly && (
                   <div className="text-xs text-gray-500 text-center">
-                    Shipping will be added after selecting delivery option
+                    Tracked delivery is added once you enter your address
                   </div>
                 )}
 

@@ -50,7 +50,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(true);
-  const [digitalBundlePricing, setDigitalBundlePricing] = useState<BundlePricing | null>(null);
+  const digitalBundlePricing: BundlePricing | null = null; // bundle pricing retired
 
   // Initialize bundle pricing service once
   const bundlePricingService = useMemo(() => new BundlePricingService(), []);
@@ -547,31 +547,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     }
   }, [bundlePricingService]);
 
-  // Load bundle pricing when items change
-  useEffect(() => {
-    const loadBundlePricing = async () => {
-      try {
-        // Filter digital download items
-        const digitalItems = items.filter(item => {
-          const productData = item.product as any;
-          return productData?.product_type === 'digital_download';
-        });
-
-        if (digitalItems.length > 0) {
-          console.log(`💰 [Bundle Pricing] Calculating pricing for ${digitalItems.length} digital items`);
-          const pricing = await bundlePricingService.calculateBundlePrice(digitalItems.length);
-          setDigitalBundlePricing(pricing);
-        } else {
-          setDigitalBundlePricing(null);
-        }
-      } catch (error) {
-        console.error('❌ [Bundle Pricing] Failed to calculate bundle pricing:', error);
-        setDigitalBundlePricing(null);
-      }
-    };
-
-    loadBundlePricing();
-  }, [items, bundlePricingService]);
+  // Digital downloads are priced like everything else: the product's own price × quantity (no bundle tiers)
 
   // Calculate totals
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -579,13 +555,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
   const totalPrice = useMemo(() => {
     let total = 0;
 
-    // Physical products: use individual pricing
-    const physicalItems = items.filter(item => {
-      const productData = item.product as any;
-      return productData?.product_type !== 'digital_download';
-    });
-
-    for (const item of physicalItems) {
+    for (const item of items) {
       // Safety check for pricing data
       if (!item.pricing) {
         console.warn('Cart item missing pricing data:', {
@@ -613,14 +583,8 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
       total += itemPrice * item.quantity;
     }
 
-    // Digital products: use bundle pricing
-    if (digitalBundlePricing) {
-      total += digitalBundlePricing.total_price;
-      console.log(`💰 [Bundle Pricing] Total price: Physical £${(total - digitalBundlePricing.total_price) / 100} + Digital £${digitalBundlePricing.total_price / 100} = £${total / 100}`);
-    }
-
     return total;
-  }, [items, digitalBundlePricing]);
+  }, [items]);
 
   const value: CartContextType = {
     items,
