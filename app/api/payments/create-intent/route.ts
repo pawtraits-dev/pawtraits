@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
 
     // Add shipping option data to metadata
     if (body.shippingOption) {
-      metadata.shippingMethodUid = body.shippingOption.uid;
+      metadata.shippingMethodUid = String((body.shippingOption as any).uid || (body.shippingOption as any).id || '');
       metadata.shippingMethodName = body.shippingOption.name.substring(0, 50);
       metadata.shippingCost = body.shippingOption.price.toString();
       metadata.shippingCurrency = body.shippingOption.currency;

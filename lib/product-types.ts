@@ -446,3 +446,93 @@ export interface QrReport {
 }
 
 export type AppSettingsMap = Record<string, { value: any; description: string | null; updated_at: string | null }>;
+
+// ===== ORDER FULFILMENT (self-print default, optional Gelato) =====
+
+export type FulfilmentProvider = 'self_print' | 'gelato';
+export type SelfPrintStatus = 'to_print' | 'printed' | 'packed' | 'posted';
+export type FulfilmentStage = 'on_hold' | 'needs_routing' | SelfPrintStatus | 'gelato';
+export type PostageServiceId = 'rm_tracked_48' | 'rm_tracked_24' | 'rm_2nd' | 'rm_1st' | 'rm_special' | 'other';
+
+export interface FulfilmentOrderItem {
+  id: string;
+  image_id: string;
+  image_title: string;
+  image_url: string | null;
+  print_image_url: string | null;
+  /** Same crop as print_image_url plus 1.5 mm bleed, for self-printing onto pre-cut blanks */
+  self_print_file_url?: string | null;
+  print_file_meta?: PrintFileMeta | null;
+  quantity: number;
+  unit_price: number | null;
+  product_data: any;
+}
+
+export interface PrintFileMeta {
+  version: number;
+  uncropped?: boolean;
+  reason?: string;
+  source_px?: [number, number];
+  print_mm?: [number, number];
+  orientation?: 'portrait' | 'landscape' | 'square';
+  output_px?: [number, number];
+  bleed_mm?: number;
+  crop?: { x: number; y: number; width: number; height: number; kept: number; trims: 'none' | 'top_bottom' | 'left_right' };
+  effective_dpi?: number;
+  /** Cloudinary AI upscale (4×) applied because the source was too small */
+  ai_upscaled?: boolean;
+  /** Resolution of the finished file after any upscale (capped at 300) */
+  final_dpi?: number;
+  source?: 'print_master' | 'preview' | 'catalogue';
+  /** 4K re-render for large prints: being made, ready, or failed */
+  print_master?: 'pending' | 'ready' | 'failed';
+  quality?: 'good' | 'ok' | 'low';
+  mismatch?: string | null;
+}
+
+export interface FulfilmentOrder {
+  id: string;
+  order_number: string;
+  status: string;
+  created_at: string;
+  customer_email: string;
+  shipping_first_name: string;
+  shipping_last_name: string;
+  shipping_address: string;
+  shipping_address_line_1?: string | null;
+  shipping_address_line_2?: string | null;
+  shipping_city: string;
+  shipping_postcode: string;
+  shipping_country: string;
+  shipping_amount: number;
+  total_amount: number;
+  metadata?: Record<string, any> | null;
+  fulfillment_type?: string | null;
+  fulfillment_provider?: FulfilmentProvider | null;
+  self_print_status?: SelfPrintStatus | null;
+  printed_at?: string | null;
+  packed_at?: string | null;
+  shipped_at?: string | null;
+  carrier?: string | null;
+  tracking_code?: string | null;
+  tracking_url?: string | null;
+  shipped_email_sent_at?: string | null;
+  fulfillment_notes?: string | null;
+  gelato_order_id?: string | null;
+  gelato_status?: string | null;
+  error_message?: string | null;
+  order_items: FulfilmentOrderItem[];
+  fulfilment_stage: FulfilmentStage | null;
+}
+
+export interface FulfilmentQueue {
+  orders: FulfilmentOrder[];
+  counts: Partial<Record<FulfilmentStage, number>>;
+  defaultProvider: FulfilmentProvider;
+  returnAddress: string;
+}
+
+export type FulfilmentActionRequest =
+  | { action: 'mark_printed' | 'mark_packed' | 'undo' | 'use_self_print' | 'send_to_gelato' | 'release' | 'resend_posted_email' | 'rebuild_print_files' }
+  | { action: 'mark_posted'; service: PostageServiceId; carrier?: string; trackingCode?: string; trackingUrl?: string; notify?: boolean }
+  | { action: 'save_notes'; notes: string };

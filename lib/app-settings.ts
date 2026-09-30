@@ -10,7 +10,12 @@ export const SETTING_DEFAULTS = {
   stall_prices_pence: { S: 2500, M: 3500, L: 5000 } as Record<'S' | 'M' | 'L', number>,
   stall_online_discount_pct: 0,
   welcome_gift_enabled: true,
+  /** Where new paid orders with posted prints go */
+  default_fulfillment_provider: 'self_print' as FulfillmentProvider,
+  /** Printed small under the address label on packing slips ("If undelivered return to: …") */
+  return_address: '' as string,
 };
+export type FulfillmentProvider = 'self_print' | 'gelato';
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 export type SettingValue<K extends SettingKey> = (typeof SETTING_DEFAULTS)[K];
 
@@ -57,6 +62,10 @@ export function validateSetting(key: string, value: unknown): string | null {
       return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 10000 ? null : 'Must be a whole number 0–10000';
     case 'stall_online_discount_pct':
       return typeof value === 'number' && value >= 0 && value <= 100 ? null : 'Must be 0–100';
+    case 'default_fulfillment_provider':
+      return value === 'self_print' || value === 'gelato' ? null : 'Must be "self_print" or "gelato"';
+    case 'return_address':
+      return typeof value === 'string' && value.length <= 160 ? null : 'Must be text, 160 characters max';
     case 'welcome_gift_enabled':
       return typeof value === 'boolean' ? null : 'Must be true or false';
     case 'stall_prices_pence': {

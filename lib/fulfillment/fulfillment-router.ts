@@ -16,23 +16,24 @@ import { createClient } from '@supabase/supabase-js';
 import type { Order, OrderItem } from '@/lib/types';
 import { DigitalDownloadService } from './digital-download-service';
 import { GelatoFulfillmentService } from './gelato-fulfillment-service';
+import { SelfPrintFulfillmentService } from './self-print-fulfillment-service';
+import { getSetting, type FulfillmentProvider } from '@/lib/app-settings';
 import type { FulfillmentService, FulfillmentResult } from './base-fulfillment-service';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export class FulfillmentRouter {
-  private services: FulfillmentService[];
+  private services: FulfillmentService[] = [];
   private supabase: ReturnType<typeof createClient>;
+  private providerOverride?: FulfillmentProvider;
 
-  constructor() {
-    // Register all available fulfillment services
-    this.services = [
-      new DigitalDownloadService(),
-      new GelatoFulfillmentService()
-      // Phase 2: Add ManualFulfillmentService
-      // Phase 3: Add ProdigiService and other providers
-    ];
+  /**
+   * @param provider who makes the posted prints. Defaults to the admin setting
+   *   `default_fulfillment_provider` (self_print unless changed in /admin/orders).
+   */
+  constructor(provider?: FulfillmentProvider) {
+    this.providerOverride = provider;
 
     this.supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
@@ -47,6 +48,13 @@ export class FulfillmentRouter {
     console.log('📦 [Fulfillment Router] Order items:', orderItems.length);
 
     try {
+      const provider = this.providerOverride ?? await getSetting('default_fulfillment_provider');
+      this.services = [
+        new DigitalDownloadService(),
+        provider === 'gelato' ? new GelatoFulfillmentService() : new SelfPrintFulfillmentService(),
+      ];
+      console.log('📦 [Fulfillment Router] Print provider:', provider);
+
       // Determine overall fulfillment type
       const fulfillmentType = this.determineFulfillmentType(orderItems);
       console.log('📦 [Fulfillment Router] Fulfillment type:', fulfillmentType);
@@ -56,25 +64,14 @@ export class FulfillmentRouter {
 
       // Group items by service
       const itemsByService = this.groupItemsByService(orderItems);
-      console.log('📦 [Fulfillment Router] Services needed:', Object.keys(itemsByService));
+      console.log('📦 [Fulfillment Router] Services needed:', Array.from(itemsByService.keys()).map(s => s.constructor.name));
 
       // Process each group with appropriate service
       const results: FulfillmentResult[] = [];
 
-      for (const [serviceName, items] of Object.entries(itemsByService)) {
+      for (const [service, items] of Array.from(itemsByService.entries())) {
+        const serviceName = service.constructor.name;
         console.log(`📦 [Fulfillment Router] Processing ${items.length} items with ${serviceName}`);
-
-        // Find the service instance by name
-        const service = this.services.find(s => s.constructor.name === serviceName);
-
-        if (!service) {
-          console.error(`❌ No service instance found for: ${serviceName}`);
-          results.push({
-            success: false,
-            error: `No fulfillment service found for ${serviceName}`
-          });
-          continue;
-        }
 
         try {
           const result = await service.fulfill(order, items);
@@ -135,20 +132,15 @@ export class FulfillmentRouter {
    * Group order items by fulfillment service
    * Note: Physical products require BOTH Gelato + Digital services
    */
-  private groupItemsByService(orderItems: OrderItem[]): Record<string, OrderItem[]> {
-    const grouped: Record<string, OrderItem[]> = {};
+  private groupItemsByService(orderItems: OrderItem[]): Map<FulfillmentService, OrderItem[]> {
+    // Keyed by instance, not class name (class names aren't reliable after minification)
+    const grouped = new Map<FulfillmentService, OrderItem[]>();
 
     for (const item of orderItems) {
-      // Check each service to see if it can fulfill this item
-      // Physical products will be added to BOTH GelatoFulfillmentService AND DigitalDownloadService
+      // Physical products go to BOTH the print service AND DigitalDownloadService
       for (const service of this.services) {
         if (service.canFulfill(item)) {
-          const serviceName = service.constructor.name;
-
-          if (!grouped[serviceName]) {
-            grouped[serviceName] = [];
-          }
-          grouped[serviceName].push(item);
+          grouped.set(service, [...(grouped.get(service) || []), item]);
         }
       }
     }
@@ -189,8 +181,13 @@ export class FulfillmentRouter {
     const someSuccessful = results.some(r => r.success);
     const noneFulfilled = results.every(r => !r.success);
 
+    const selfPrint = results.find(r => r.success && r.trackingInfo?.provider === 'self_print');
+    const gelato = results.find(r => r.trackingInfo?.provider === 'gelato');
+
     let overallStatus: string;
-    if (allSuccessful) {
+    if (allSuccessful && selfPrint) {
+      overallStatus = 'processing'; // queued to print; becomes fulfilled when posted
+    } else if (allSuccessful) {
       overallStatus = 'fulfilled';
     } else if (someSuccessful) {
       overallStatus = 'partially_fulfilled';
@@ -208,20 +205,28 @@ export class FulfillmentRouter {
       }
     }
 
-    const { error } = await this.supabase
-      .from('orders')
-      .update({
-        fulfillment_status: overallStatus,
-        // Keep the Gelato order id on the order so Gelato status webhooks can find it
-        ...(trackingInfo.provider === 'gelato' && trackingInfo.providerOrderId
-          ? { gelato_order_id: trackingInfo.providerOrderId, gelato_status: 'pending' }
-          : {}),
-        ...(noneFulfilled || !allSuccessful
-          ? { error_message: results.filter(r => !r.success).map(r => r.error).join(' | ').slice(0, 1000) }
-          : {}),
-        updated_at: new Date().toISOString()
-      } as any)
-      .eq('id', orderId);
+    const base: Record<string, any> = {
+      fulfillment_status: overallStatus,
+      // Keep the Gelato order id on the order so Gelato status webhooks can find it
+      ...(gelato?.success && gelato.trackingInfo?.providerOrderId
+        ? { gelato_order_id: gelato.trackingInfo.providerOrderId, gelato_status: 'pending' }
+        : {}),
+      ...(noneFulfilled || !allSuccessful
+        ? { error_message: results.filter(r => !r.success).map(r => r.error).join(' | ').slice(0, 1000) }
+        : {}),
+      updated_at: new Date().toISOString()
+    };
+    const providerFields = {
+      ...(selfPrint ? { fulfillment_provider: 'self_print', self_print_status: 'to_print' } : {}),
+      ...(gelato ? { fulfillment_provider: 'gelato' } : {}),
+    };
+
+    let { error } = await this.supabase.from('orders').update({ ...base, ...providerFields } as any).eq('id', orderId);
+    if (error && /fulfillment_provider|self_print_status/.test(error.message || '')) {
+      // Self-print migration not run yet — still record the rest
+      console.error('⚠️ Self-print columns missing — run db/migrations/2026-09-29-self-print-fulfilment.sql');
+      ({ error } = await this.supabase.from('orders').update(base as any).eq('id', orderId));
+    }
 
     if (error) {
       console.error('⚠️ Failed to update order with fulfillment results:', error);

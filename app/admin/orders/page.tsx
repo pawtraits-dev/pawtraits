@@ -23,6 +23,7 @@ import {
   X
 } from 'lucide-react';
 import { productDescriptionService } from '@/lib/product-utils';
+import FulfilmentQueue from '@/components/admin/orders/FulfilmentQueue';
 
 interface OrderItem {
   id: string;
@@ -305,6 +306,9 @@ export default function AdminOrdersPage() {
           </Button>
         </div>
       </div>
+
+      {/* Self-print / Gelato fulfilment queue */}
+      <FulfilmentQueue />
 
       {/* Filters */}
       <Card>

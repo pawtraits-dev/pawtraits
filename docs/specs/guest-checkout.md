@@ -121,3 +121,12 @@ Sticker scan /S/1123M/CAMDEN ──► /customise/[id]?src=qr&size=M
   - The customise page's buy button.
   - The confirmation email.
   - The default sticker text: "Buy it on your phone and get a free digital copy".
+
+## 10. Express checkout (Apple Pay / Google Pay / Link)
+
+- `components/checkout/ExpressCheckout.tsx` sits at the top of `/shop/checkout` step 1, above "or pay by card".
+- Stripe Express Checkout Element in deferred-intent mode (`mode: 'payment'`): the wallet sheet collects email, name, delivery address and delivery option; the PaymentIntent is created (same `/api/payments/create-intent`) only when the customer authorises, then confirmed with `redirect: 'if_required'`.
+- Delivery rates are quoted per country (`/api/shipping/options` now needs only `country`), because wallets share only country/postcode before authorisation.
+- Hidden when no wallet is available on the device, when the total is under 50p, or for a guest with a referral code (the first-order discount needs their email first, so they use the form).
+- Card path: if only one delivery option exists, the "Shipping" step is skipped.
+- Needs: Apple Pay domain registered in Stripe (Settings → Payment method domains) and Link enabled in Payment methods.

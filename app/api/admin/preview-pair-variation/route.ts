@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
-import { GEMINI_IMAGE_MODELS } from '@/lib/gemini-models';
+import { GEMINI_IMAGE_MODELS, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
+
+// Nano Banana Pro at 2K can take 20–60 s per image
+export const maxDuration = 300;
 
 const geminiService = new GeminiVariationService();
 const cloudinaryService = new CloudinaryImageService();
@@ -97,6 +100,7 @@ export async function POST(request: NextRequest) {
             },
           },
         ],
+        config: geminiImageConfig(ratioOfImage(referenceImageData)), // Pro at 2K, same shape as the reference
       });
 
       const geminiDuration = Date.now() - geminiStartTime;

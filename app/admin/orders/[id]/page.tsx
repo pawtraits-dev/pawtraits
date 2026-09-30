@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +29,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { productDescriptionService } from '@/lib/product-utils';
+import OrderFulfilmentPanel from '@/components/admin/orders/OrderFulfilmentPanel';
 
 interface OrderItem {
   id: string;
@@ -90,7 +92,9 @@ interface Order {
   } | null;
 }
 
-export default function AdminOrderDetailPage({ params }: { params: { id: string } }) {
+export default function AdminOrderDetailPage() {
+  // Next 15+: page params are a Promise; useParams() reads them in a client page
+  const params = useParams<{ id: string }>();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -280,6 +284,9 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Order Status & Tracking */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Fulfilment: self print (default) or Gelato */}
+          <OrderFulfilmentPanel order={order} onChanged={loadOrder} />
+
           {/* Status Timeline */}
           <Card>
             <CardHeader>

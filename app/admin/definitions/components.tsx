@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import AspectRatioSelect from '@/components/admin/AspectRatioSelect';
 
 interface Breed {
   id: string;
@@ -627,13 +628,9 @@ export function FormatForm({ format, onSubmit, onCancel }: {
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Aspect Ratio</label>
-            <input
-              type="text"
+            <AspectRatioSelect
               value={formData.aspect_ratio}
-              onChange={(e) => setFormData({...formData, aspect_ratio: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="16:9"
-              required
+              onChange={(v) => setFormData({...formData, aspect_ratio: v})}
             />
           </div>
         </div>

@@ -6,7 +6,7 @@ import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
 import fetch from 'node-fetch';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 import { buildSizeInstruction } from '@/lib/breed-size-mapping';
-import { GEMINI_IMAGE_MODELS, toGeminiAspectRatio } from '@/lib/gemini-models';
+import { GEMINI_IMAGE_MODELS, toGeminiAspectRatio, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
 import { getRequester, setGuestCookie, clientIp } from '@/lib/guest/access';
 import { hashIp } from '@/lib/qr/attribution';
 import { getSetting } from '@/lib/app-settings';
@@ -177,7 +177,7 @@ async function generateCustomImage(
       contents,
       config: {
         responseModalities: ['IMAGE', 'TEXT'],
-        ...(geminiAspectRatio ? { imageConfig: { aspectRatio: geminiAspectRatio } } : {}),
+        ...geminiImageConfig(aspectRatio || ratioOfImage(catalogImageData)), // 2K, format's shape
       },
     });
 

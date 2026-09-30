@@ -3,7 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 import { PublicRateLimiter, getClientIp } from '@/lib/public-rate-limiter';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { CloudinaryImageService } from '@/lib/cloudinary';
-import { GEMINI_IMAGE_MODELS } from '@/lib/gemini-models';
+import { GEMINI_IMAGE_MODELS, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
+
+// Nano Banana Pro at 2K can take 20–60 s per image
+export const maxDuration = 300;
 
 // Use service role client to bypass RLS
 const supabaseServiceRole = createClient(
@@ -210,6 +213,7 @@ CRITICAL VERIFICATION:
             },
           },
         ],
+        config: geminiImageConfig(ratioOfImage(catalogImageBase64)), // Pro at 2K, same shape as the reference
       });
 
       const geminiDuration = Date.now() - geminiStartTime;

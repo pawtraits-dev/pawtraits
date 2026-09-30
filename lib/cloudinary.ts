@@ -507,6 +507,79 @@ export class CloudinaryImageService {
     }
   }
 
+  /** Pixel size of the stored original (Cloudinary Admin API — call sparingly, e.g. once per order line). */
+  async getSourceDimensions(publicId: string): Promise<{ width: number; height: number } | null> {
+    try {
+      ensureCloudinaryConfig();
+      const result = await cloudinary.api.resource(publicId);
+      return result?.width && result?.height ? { width: result.width, height: result.height } : null;
+    } catch (error) {
+      console.error(`❌ Failed to read dimensions for ${publicId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Print file cropped and sized for one product: an explicit centre crop of the original
+   * (see lib/print/print-geometry.ts planPrint) scaled to the print size at 300 dpi.
+   * Unsigned public PNG so Gelato — and the admin's browser — can fetch it.
+   */
+  getCroppedPrintUrl(
+    publicId: string,
+    plan: { crop: { x: number; y: number; width: number; height: number }; outputPx: { width: number; height: number } },
+    upscale?: { pre: { width: number; height: number } } | null,
+  ): string {
+    ensureCloudinaryConfig();
+    return cloudinary.url(publicId, {
+      secure: true,
+      sign_url: false,
+      type: 'upload',
+      resource_type: 'image',
+      format: 'png',
+      transformation: [
+        { crop: 'crop', x: plan.crop.x, y: plan.crop.y, width: plan.crop.width, height: plan.crop.height },
+        // AI super-resolution (4× each side) when the source is too small for this print
+        ...(upscale ? [{ crop: 'scale', width: upscale.pre.width, height: upscale.pre.height }, { effect: 'upscale' }] : []),
+        { crop: 'scale', width: plan.outputPx.width, height: plan.outputPx.height, quality: 100 },
+      ],
+    });
+  }
+
+  /**
+   * Make sure a derived image exists before someone (Gelato, the admin) fetches it.
+   * Cloudinary answers 423 while an AI upscale is still being generated.
+   */
+  async warmDerived(url: string, maxWaitMs = 45_000): Promise<boolean> {
+    const deadline = Date.now() + maxWaitMs;
+    let delay = 1500;
+    while (Date.now() < deadline) {
+      try {
+        const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(Math.min(30_000, deadline - Date.now())) });
+        if (res.ok) { await res.body?.cancel(); return true; }
+        if (res.status !== 423) { console.warn(`Print file ${res.status}: ${url}`); return false; }
+      } catch (e) {
+        console.warn('Print file warm-up attempt failed', e);
+      }
+      await new Promise(r => setTimeout(r, delay));
+      delay = Math.min(delay * 1.5, 6000);
+    }
+    return false;
+  }
+
+  /** Upload a generated image (base64) — used for 4K print masters. */
+  async uploadPrintMaster(base64: string, publicId: string): Promise<{ publicId: string; width: number; height: number }> {
+    ensureCloudinaryConfig();
+    const dataUri = base64.startsWith('data:') ? base64 : `data:image/png;base64,${base64}`;
+    const result = await cloudinary.uploader.upload(dataUri, {
+      public_id: publicId,
+      folder: 'pawtraits/print-masters',
+      overwrite: true,
+      resource_type: 'image',
+      type: 'upload',
+    });
+    return { publicId: result.public_id, width: result.width, height: result.height };
+  }
+
   /**
    * Get Gelato-compatible print URL (unsigned, no expiry)
    * External print services like Gelato need stable, unsigned URLs

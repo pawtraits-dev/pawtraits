@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Trash2 } from 'lucide-react';
+import AspectRatioSelect from '@/components/admin/AspectRatioSelect';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
 import type { Format, FormatUpdate } from '@/lib/types';
@@ -124,7 +125,7 @@ function EditFormatPageClient({ id }: { id: string }) {
               </div>
               <div>
                 <Label htmlFor="aspect_ratio">Aspect Ratio *</Label>
-                <Input id="aspect_ratio" value={formData.aspect_ratio || ''} onChange={(e) => setFormData({ ...formData, aspect_ratio: e.target.value })} required />
+                <AspectRatioSelect value={formData.aspect_ratio || ''} onChange={(v) => setFormData({ ...formData, aspect_ratio: v })} />
               </div>
               <div>
                 <Label htmlFor="description">Description *</Label>

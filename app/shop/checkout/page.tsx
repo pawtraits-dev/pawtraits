@@ -23,8 +23,12 @@ import { track } from '@/lib/tracking/events'
 import { describeCartItem, itemNeedsShipping, isStallProductId, includesFreeDigital } from '@/lib/cart/items'
 import { getStripe } from '@/lib/stripe-client'
 import StripePaymentForm from '@/components/StripePaymentForm'
+import ExpressCheckout, { type ExpressPayer, type ShippingQuote } from '@/components/checkout/ExpressCheckout'
 import { checkoutValidation } from '@/lib/checkout-validation'
 import { extractDescriptionTitle } from '@/lib/utils'
+
+// Countries we deliver to (card form dropdown and Apple Pay / Google Pay address sheet)
+const DELIVERY_COUNTRIES = ['GB', 'US', 'CA', 'AU', 'DE', 'FR', 'ES', 'IT', 'NL', 'BE', 'CH', 'AT', 'DK', 'SE', 'NO', 'IE']
 
 function CheckoutPageContent() {
   const [currentStep, setCurrentStep] = useState(1)
@@ -56,6 +60,7 @@ function CheckoutPageContent() {
   const [availableRewards, setAvailableRewards] = useState(0) // in pence
   const [applyRewards, setApplyRewards] = useState(false)
   const [loadingRewards, setLoadingRewards] = useState(false)
+  const [walletAvailable, setWalletAvailable] = useState<boolean | null>(null)
   const { items, totalItems, totalPrice, clearCart } = useHybridCart()
   const router = useRouter()
   const { userProfile, loading: userLoading } = useUserRouting()
@@ -397,6 +402,12 @@ function CheckoutPageContent() {
       // Auto-select the first option
       setSelectedShippingOption(options[0]);
 
+      if (options.length === 1) {
+        // Only one way to deliver: nothing to choose, go straight to payment
+        if (await createPaymentIntent(options[0])) setCurrentStep(3);
+        return;
+      }
+
       // Move to step 2 (shipping selection)
       setCurrentStep(2);
 
@@ -411,19 +422,21 @@ function CheckoutPageContent() {
     }
   };
 
+  const startCheckoutTracking = () => {
+    if (beganCheckoutTracked) return
+    track.beginCheckout(items.map((item: any) => ({ id: item.imageId, name: item.imageTitle, variant: item.product?.size_code || item.product?.product_type, price: item.pricing.sale_price / 100, quantity: item.quantity })))
+    setBeganCheckoutTracked(true)
+  }
+
   const handleShippingSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!beganCheckoutTracked) {
-      track.beginCheckout(items.map((item: any) => ({ id: item.imageId, name: item.imageTitle, variant: item.product?.size_code || item.product?.product_type, price: item.pricing.sale_price / 100, quantity: item.quantity })))
-      setBeganCheckoutTracked(true)
-    }
+    startCheckoutTracking()
     if (isDigitalOnly) {
       if (!validateShipping()) return
       setSelectedShippingOption(null)
       setIsProcessing(true)
       try {
-        await createPaymentIntent()
-        setCurrentStep(3)
+        if (await createPaymentIntent(null)) setCurrentStep(3)
       } finally {
         setIsProcessing(false)
       }
@@ -443,114 +456,130 @@ function CheckoutPageContent() {
     setIsProcessing(true);
     try {
       console.log('✅ Shipping option selected, proceeding with payment setup...');
-      await createPaymentIntent()
-      setCurrentStep(3) // Now step 3 since we added shipping selection
+      if (await createPaymentIntent()) setCurrentStep(3)
     } finally {
       setIsProcessing(false)
     }
   }
 
-  // Create PaymentIntent when moving to payment step
-  const createPaymentIntent = async () => {
-    try {
-      const totalAmount = Math.round(total * 100); // Total including shipping, minus discount, in pence
-      const customerName = `${shippingData.firstName} ${shippingData.lastName}`.trim();
-
-      console.log('💰 PaymentIntent calculation:', {
-        subtotal: subtotal,
-        shipping: shipping,
-        discount: discount,
-        rewardRedemption: rewardRedemption,
-        total: total,
-        totalAmountPence: totalAmount,
-        referralValidation: referralValidation
-      });
-
-      // Client-side validation
-      if (totalAmount <= 0) {
-        throw new Error('Cart is empty - cannot create payment');
-      }
-
-      if (!shippingData.email || shippingData.email.trim() === '') {
-        throw new Error('Email is required');
-      }
-
-      if (!customerName || customerName === '') {
-        throw new Error('Name is required');
-      }
-
-      const paymentData = {
-        amount: totalAmount, // Total including shipping in pence
-        currency: 'gbp',
-        customerEmail: shippingData.email.trim(),
-        customerName: customerName,
-        userType: userProfile?.user_type || 'customer',
-        shippingAddress: shippingData,
-        marketingOptIn: isGuest ? marketingOptIn : undefined,
-        digitalOnly: isDigitalOnly || undefined,
-        shippingOption: selectedShippingOption,
-        cartItems: items.map(item => ({
-          productId: item.productId,
-          imageId: item.imageId,
-          imageTitle: item.imageTitle,
-          quantity: item.quantity,
-          unitPrice: item.pricing.sale_price, // in pence
-          totalPrice: item.pricing.sale_price * item.quantity, // in pence
-          // Enhanced Gelato data for order fulfillment
+  // Delivery options for a country (Gelato rates depend only on destination country)
+  const getShippingQuotes = async (country: string): Promise<ShippingQuote[]> => {
+    const response = await fetch('/api/shipping/options', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        shippingAddress: { country },
+        cartItems: items.filter((item: any) => itemNeedsShipping(item)).map(item => ({
           gelatoProductUid: item.gelatoProductUid,
+          quantity: item.quantity,
           printSpecs: item.printSpecs
-        })),
-        // Customer-specific metadata
-        referralCode: referralCode || undefined,
-        // Include discount data for webhook processing
-        discountAmount: discount > 0 ? Math.round(discount * 100) : undefined, // discount amount in pence
-        discountType: discountType || undefined,
-        // Include referral validation data for webhook processing
-        referralDiscount: referralValidation?.valid && referralValidation?.discount?.eligible
-          ? Math.round(discount * 100) // discount amount in pence
-          : undefined,
-        referralType: referralValidation?.referral?.type || undefined,
-        // Include reward redemption data
-        rewardRedemption: applyRewards && rewardRedemption > 0
-          ? Math.round(rewardRedemption * 100) // reward amount in pence
-          : undefined
-      };
+        }))
+      })
+    })
+    if (!response.ok) throw new Error('Delivery is not available to this country')
+    const { shippingOptions: options } = await response.json()
+    return options || []
+  }
 
-      console.log('Creating Customer PaymentIntent with data:', {
-        amount: paymentData.amount,
-        customerEmail: paymentData.customerEmail,
-        customerName: paymentData.customerName,
-        cartItemsCount: paymentData.cartItems.length,
-      });
+  // Goods total after discounts/rewards, before delivery (pence)
+  const goodsTotalPence = Math.round((subtotal - discount - rewardRedemption) * 100)
+  // A guest with a referral code needs their email checked for the first-order discount
+  // before we know the price, so they use the form below.
+  const showExpress = items.length > 0 && goodsTotalPence >= 50 && !(isGuest && referralCode)
 
-      const response = await fetch('/api/payments/create-intent', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+  // Shared by the card form and Apple Pay / Google Pay / Link
+  const requestPaymentIntent = async (payer: ExpressPayer & { digitalOnly: boolean }) => {
+    const option = payer.digitalOnly ? null : (payer.shippingOption || null)
+    const totalAmount = goodsTotalPence + (option?.price || 0)
+    const customerName = `${payer.firstName} ${payer.lastName}`.trim()
+
+    if (totalAmount <= 0) throw new Error('Cart is empty - cannot create payment')
+    if (!payer.email?.trim()) throw new Error('Email is required')
+    if (!customerName) throw new Error('Name is required')
+
+    const paymentData = {
+      amount: totalAmount, // pence, including delivery
+      currency: 'gbp',
+      customerEmail: payer.email.trim(),
+      customerName,
+      customerPhone: payer.phone || undefined,
+      userType: userProfile?.user_type || 'customer',
+      shippingAddress: {
+        firstName: payer.firstName,
+        lastName: payer.lastName,
+        email: payer.email.trim(),
+        address: payer.address?.addressLine1 || '',
+        addressLine1: payer.address?.addressLine1 || '',
+        addressLine2: payer.address?.addressLine2 || '',
+        city: payer.address?.city || '',
+        postcode: payer.address?.postcode || '',
+        country: payer.address?.country || shippingData.country,
+      },
+      marketingOptIn: isGuest ? marketingOptIn : undefined,
+      digitalOnly: payer.digitalOnly || undefined,
+      shippingOption: option,
+      cartItems: items.map(item => ({
+        productId: item.productId,
+        imageId: item.imageId,
+        imageTitle: item.imageTitle,
+        quantity: item.quantity,
+        unitPrice: item.pricing.sale_price, // in pence
+        totalPrice: item.pricing.sale_price * item.quantity, // in pence
+        gelatoProductUid: item.gelatoProductUid,
+        printSpecs: item.printSpecs
+      })),
+      referralCode: referralCode || undefined,
+      discountAmount: discount > 0 ? Math.round(discount * 100) : undefined,
+      discountType: discountType || undefined,
+      referralDiscount: referralValidation?.valid && referralValidation?.discount?.eligible
+        ? Math.round(discount * 100)
+        : undefined,
+      referralType: referralValidation?.referral?.type || undefined,
+      rewardRedemption: applyRewards && rewardRedemption > 0
+        ? Math.round(rewardRedemption * 100)
+        : undefined
+    };
+
+    const response = await fetch('/api/payments/create-intent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(paymentData),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('PaymentIntent creation error:', errorData);
+      throw new Error(errorData.error || errorData.details || 'Failed to create payment intent');
+    }
+    return response.json() as Promise<{ clientSecret: string; paymentIntentId: string }>
+  }
+
+  // Card path: create the PaymentIntent when moving to the payment step
+  const createPaymentIntent = async (optionOverride?: any) => {
+    try {
+      const data = await requestPaymentIntent({
+        email: shippingData.email,
+        firstName: shippingData.firstName,
+        lastName: shippingData.lastName,
+        address: {
+          addressLine1: shippingData.addressLine1 || shippingData.address,
+          addressLine2: shippingData.addressLine2,
+          city: shippingData.city,
+          postcode: shippingData.postcode,
+          country: shippingData.country,
         },
-        credentials: 'include',
-        body: JSON.stringify(paymentData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Customer PaymentIntent creation error:', errorData);
-        throw new Error(errorData.error || errorData.details || 'Failed to create payment intent');
-      }
-
-      const data = await response.json();
+        shippingOption: optionOverride !== undefined ? optionOverride : selectedShippingOption,
+        digitalOnly: isDigitalOnly,
+      })
       setClientSecret(data.clientSecret);
       setPaymentIntentId(data.paymentIntentId);
-
-      console.log('Customer PaymentIntent created:', {
-        id: data.paymentIntentId,
-        amount: data.amount,
-        currency: data.currency,
-      });
+      return true
     } catch (error) {
       console.error('Error creating Customer PaymentIntent:', error);
       alert(error instanceof Error && error.message ? error.message : 'Failed to set up payment. Please try again.');
       setCurrentStep(1); // Go back to shipping step
+      return false
     }
   };
 
@@ -634,16 +663,20 @@ function CheckoutPageContent() {
           </div>
         )}
         {/* Header */}
-        <div className="mb-8">
-          <Link href="/shop/cart" className="flex items-center text-gray-600 hover:text-purple-600 mb-4">
+        <div className="mb-4 sm:mb-8">
+          <Link href="/shop/cart" className="flex items-center text-gray-600 hover:text-purple-600 mb-2 sm:mb-4">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Cart
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Checkout</h1>
+          {/* Compact progress on phones — the full stepper doesn't fit */}
+          <p className="sm:hidden mt-1 text-sm text-gray-600">
+            Step {steps.findIndex(st => st.number === currentStep) + 1} of {steps.length} · {steps.find(st => st.number === currentStep)?.title}
+          </p>
         </div>
 
         {/* Progress Steps */}
-        <div className="mb-8">
+        <div className="mb-8 hidden sm:block">
           <div className="flex items-center justify-between mb-4">
             {steps.map((step, index) => (
               <div key={step.number} className="flex items-center">
@@ -679,11 +712,49 @@ function CheckoutPageContent() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2">
+            {/* Express: Apple Pay / Google Pay / Link — collects email, name, address and delivery in the wallet sheet */}
+            {currentStep === 1 && showExpress && (
+              <div className={walletAvailable ? 'mb-6' : 'invisible h-0 overflow-hidden'} aria-hidden={!walletAvailable}>
+                <Card className="border-purple-200">
+                  <CardContent className="pt-6 space-y-3">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">Express checkout</h2>
+                      <p className="text-sm text-gray-600">
+                        {isDigitalOnly ? 'Pay in one tap — your receipt and download link go to the email in your wallet.' : 'Pay in one tap — your address and delivery are picked in your wallet.'}
+                      </p>
+                    </div>
+                    <ExpressCheckout
+                      goodsTotalPence={goodsTotalPence}
+                      needsShipping={!isDigitalOnly}
+                      allowedCountries={DELIVERY_COUNTRIES}
+                      defaultCountry={DELIVERY_COUNTRIES.includes(shippingData.country) ? shippingData.country : 'GB'}
+                      getShippingQuotes={getShippingQuotes}
+                      createIntent={(payer) => requestPaymentIntent({ ...payer, email: userProfile?.email || payer.email, digitalOnly: isDigitalOnly })}
+                      onStart={startCheckoutTracking}
+                      onSuccess={handlePaymentSuccess}
+                      onAvailability={setWalletAvailable}
+                    />
+                    {isGuest && (
+                      <label className="flex items-start gap-3 pt-1 text-sm text-gray-700">
+                        <input type="checkbox" checked={marketingOptIn} onChange={(e) => setMarketingOptIn(e.target.checked)} className="mt-0.5 h-5 w-5 accent-purple-600" />
+                        <span>Send me the occasional new design and offer (unsubscribe any time)</span>
+                      </label>
+                    )}
+                  </CardContent>
+                </Card>
+                <div className="flex items-center gap-3 my-6 text-sm text-gray-500">
+                  <div className="h-px flex-1 bg-gray-200" />
+                  or pay by card
+                  <div className="h-px flex-1 bg-gray-200" />
+                </div>
+              </div>
+            )}
+
             {/* Step 1: Shipping Information */}
             {currentStep === 1 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>{isDigitalOnly ? 'Your details' : 'Shipping Information'}</CardTitle>
+                  <CardTitle>{isDigitalOnly ? 'Your details' : 'Delivery address'}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleShippingSubmit} className="space-y-6">

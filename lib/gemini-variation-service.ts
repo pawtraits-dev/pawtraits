@@ -1,7 +1,7 @@
 // lib/gemini-variation-service.ts
 import { GoogleGenAI } from "@google/genai";
 import type { Breed, Coat, Outfit, Format, BreedCoatDetail } from '@/lib/types';
-import { GEMINI_IMAGE_MODELS } from '@/lib/gemini-models';
+import { GEMINI_IMAGE_MODELS, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
 
 export interface VariationConfig {
   originalImageData: string; // base64
@@ -68,7 +68,8 @@ export class GeminiVariationService {
         ];
 
         const response = await this.ai.models.generateContent({
-          model: GEMINI_IMAGE_MODELS.flash,
+          config: geminiImageConfig((this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
+          model: GEMINI_IMAGE_MODELS.pro,
           contents: prompt,
         });
 
@@ -127,7 +128,8 @@ export class GeminiVariationService {
         ];
 
         const response = await this.ai.models.generateContent({
-          model: GEMINI_IMAGE_MODELS.flash,
+          config: geminiImageConfig((originalFormat?.aspect_ratio || this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
+          model: GEMINI_IMAGE_MODELS.pro,
           contents: prompt,
         });
 
@@ -192,7 +194,8 @@ export class GeminiVariationService {
         ];
 
         const response = await this.ai.models.generateContent({
-          model: GEMINI_IMAGE_MODELS.flash,
+          config: geminiImageConfig((originalFormat?.aspect_ratio || this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
+          model: GEMINI_IMAGE_MODELS.pro,
           contents: prompt,
         });
 
@@ -262,7 +265,8 @@ export class GeminiVariationService {
         ];
 
         const response = await this.ai.models.generateContent({
-          model: GEMINI_IMAGE_MODELS.flash,
+          config: geminiImageConfig((format.aspect_ratio) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
+          model: GEMINI_IMAGE_MODELS.pro,
           contents: prompt,
         });
 
@@ -350,7 +354,8 @@ export class GeminiVariationService {
 
       const geminiCallStart = Date.now();
       const response = await this.ai.models.generateContent({
-        model: GEMINI_IMAGE_MODELS.flash,
+        config: geminiImageConfig((format?.aspect_ratio) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
+        model: GEMINI_IMAGE_MODELS.pro,
         contents: prompt,
       });
       const geminiCallEnd = Date.now();
@@ -601,6 +606,11 @@ Ensure the ${primaryAnimal.coat.coat_name} coloring is consistent across ALL bod
     return allVariations;
   }
 
+  /** The `--ar` ratio written in a stored prompt, if any (no default — never force square). */
+  private ratioFromPrompt(prompt?: string | null): string | undefined {
+    return prompt?.match(/--ar\s+(\d+:\d+)/)?.[1];
+  }
+
   /**
    * Parse original Midjourney prompt to extract components
    */
@@ -689,7 +699,8 @@ Ensure the ${primaryAnimal.coat.coat_name} coloring is consistent across ALL bod
       
       const geminiCallStart = Date.now();
       const response = await this.ai.models.generateContent({
-        model: GEMINI_IMAGE_MODELS.flash,
+        config: geminiImageConfig((originalFormat?.aspect_ratio || this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
+        model: GEMINI_IMAGE_MODELS.pro,
         contents: prompt,
       });
       const geminiCallEnd = Date.now();

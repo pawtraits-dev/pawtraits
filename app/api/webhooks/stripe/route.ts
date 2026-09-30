@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { headers } from 'next/headers';
 import { constructWebhookEvent } from '@/lib/stripe-server';
 import { createClient } from '@supabase/supabase-js';
@@ -31,7 +31,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // Order creation now includes item creation, account set-up and Gelato — allow time
-export const maxDuration = 60;
+// 4K print masters and AI-upscaled print files are finished after the response (see after() below)
+export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   try {
@@ -352,6 +353,17 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     let orderItems: any[] = [];
     try {
       orderItems = await createOrderItems(supabase, order, snapshot.items);
+      // After Stripe has its reply: 4K re-render for Large custom portraits, and pre-generate
+      // AI-upscaled print files so they open straight away in /admin/orders
+      const lines = orderItems;
+      after(async () => {
+        try {
+          const { finishPrintFiles } = await import('@/lib/print/print-master');
+          await finishPrintFiles(supabase, lines);
+        } catch (e) {
+          console.error('Print file finishing failed (order is fine):', e);
+        }
+      });
     } catch (itemsError) {
       console.error('❌ CRITICAL: order items could not be created for', order.id, itemsError);
       await supabase.from('orders').update({ error_message: 'Order items could not be created — check webhook logs', updated_at: new Date().toISOString() }).eq('id', order.id);

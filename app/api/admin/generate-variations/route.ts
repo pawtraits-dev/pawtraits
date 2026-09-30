@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
 
+// Nano Banana Pro at 2K can take 20–60 s per image
+export const maxDuration = 300;
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 

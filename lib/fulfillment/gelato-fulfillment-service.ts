@@ -84,7 +84,18 @@ export class GelatoFulfillmentService implements FulfillmentService {
       }
       const payload = this.gelato.mapOrderToGelato(order, normalisedItems, imageUrls);
       // itemReferenceId must be unique per line — the same image can appear in two sizes
-      payload.items = payload.items.map((gi: any, i: number) => ({ ...gi, itemReferenceId: normalisedItems[i].id || `${gi.itemReferenceId}_${i}` }));
+      // and each line gets its own file: print files are cropped per size, so M and L of one image differ
+      payload.items = payload.items.map((gi: any, i: number) => ({
+        ...gi,
+        itemReferenceId: normalisedItems[i].id || `${gi.itemReferenceId}_${i}`,
+        files: [{ type: 'default', url: normalisedItems[i].print_image_url }],
+      }));
+
+      // AI-upscaled files are generated on first request (Cloudinary 423s meanwhile) — make sure they exist first
+      const { cloudinaryService } = await import('@/lib/cloudinary');
+      for (const item of normalisedItems) {
+        if (item.print_file_meta?.ai_upscaled) await cloudinaryService.warmDerived(item.print_image_url, 45_000);
+      }
 
       const created = await this.gelato.createOrder(payload);
       const gelatoOrderId = created?.id;

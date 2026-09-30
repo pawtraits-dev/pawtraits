@@ -20,7 +20,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate shipping address structure
-    const requiredFields = ['firstName', 'lastName', 'address1', 'city', 'postalCode', 'country'];
+    // Rates depend only on the destination country, so a country is enough to quote
+    // (Apple Pay / Google Pay only share the country and postcode until the customer pays)
+    const requiredFields = ['country'];
     for (const field of requiredFields) {
       if (!shippingAddress[field] || shippingAddress[field].toString().trim() === '') {
         console.error('🚚 [SHIPPING API] Missing required field:', {

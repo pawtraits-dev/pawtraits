@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft } from 'lucide-react';
+import AspectRatioSelect from '@/components/admin/AspectRatioSelect';
 import Link from 'next/link';
 import type { FormatCreate } from '@/lib/types';
 
@@ -88,12 +89,9 @@ export default function AddFormatPage() {
 
               <div>
                 <Label htmlFor="aspect_ratio">Aspect Ratio *</Label>
-                <Input
-                  id="aspect_ratio"
+                <AspectRatioSelect
                   value={formData.aspect_ratio}
-                  onChange={(e) => setFormData({ ...formData, aspect_ratio: e.target.value })}
-                  placeholder="e.g., 1:1, 16:9, 4:3"
-                  required
+                  onChange={(v) => setFormData({ ...formData, aspect_ratio: v })}
                 />
               </div>
 

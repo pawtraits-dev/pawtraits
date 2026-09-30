@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { readConsent, writeConsent, OPEN_CONSENT_EVENT } from '@/lib/tracking/consent';
 
 /** Mobile-first cookie banner: bottom sheet, big thumb-friendly buttons, equal-weight Accept/Reject. */
@@ -10,6 +11,7 @@ export default function ConsentBanner() {
   const [details, setDetails] = useState(false);
   const [analytics, setAnalytics] = useState(true);
   const [marketing, setMarketing] = useState(true);
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!readConsent()) setOpen(true);
@@ -24,7 +26,8 @@ export default function ConsentBanner() {
     return () => window.removeEventListener(OPEN_CONSENT_EVENT, reopen);
   }, []);
 
-  if (!open) return null;
+  // Staff pages don't load any trackers — no need to ask there
+  if (!open || pathname?.startsWith('/admin')) return null;
 
   const decide = (a: boolean, m: boolean) => { writeConsent({ analytics: a, marketing: m }); setOpen(false); };
 

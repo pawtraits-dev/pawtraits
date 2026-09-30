@@ -8,13 +8,14 @@
  *  - Custom portraits: digital download + all print options for the format.
  *  - "Checkout now" or "Add to basket & keep shopping" (multiple purchases).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, Download, Truck, ShoppingBag, X, Hand, Gift } from 'lucide-react';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { useToast } from '@/components/ui/use-toast';
 import { buildStallCartProduct, SIZE_NAMES, isStallProductId } from '@/lib/cart/items';
 import { track } from '@/lib/tracking/events';
+import { orientationOf, printSizeFor, cropNote, type Orientation } from '@/lib/print/print-geometry';
 
 export interface BuyTarget {
   kind: 'catalog' | 'custom';
@@ -59,6 +60,14 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
   const [products, setProducts] = useState<ProductRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Shape of the design, so each size can show how it's cropped (S & L are 3:4 crops of a 2:3 design)
+  const [orientation, setOrientation] = useState<Orientation | null>(null);
+  useEffect(() => {
+    if (!open || !target.imageUrl) return;
+    const img = new window.Image();
+    img.onload = () => setOrientation(orientationOf(img.naturalWidth, img.naturalHeight));
+    img.src = target.imageUrl;
+  }, [open, target.imageUrl]);
   const [busy, setBusy] = useState<'checkout' | 'basket' | null>(null);
 
   const stallAvailable = target.kind === 'catalog' && !!stallOffer?.available && !!stallOffer.size && !!stallOffer.pricePence;
@@ -212,6 +221,8 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
                   return (
                     <Option key={p.id} checked={selected.has(p.id)} onClick={() => toggle(p.id)}
                       highlight={sameSize && !stallAvailable}
+                      thumb={orientation && p.width_cm && p.height_cm ? <ShapeThumb src={target.imageUrl} {...printSizeFor(p.width_cm, p.height_cm, orientation)} /> : undefined}
+                      note={orientation ? cropNote(orientation, p.width_cm, p.height_cm) : null}
                       title={`${p.size_name || ''} ${p.width_cm ? `${p.width_cm}×${p.height_cm} cm` : p.name}`.trim()}
                       subtitle={sameSize ? (stallAvailable ? 'Same size as the one in your hand, made fresh and delivered' : 'Same size as the print you scanned') : p.media_description}
                       perk="Free digital copy included"
@@ -243,9 +254,20 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
   );
 }
 
-function Option({ checked, onClick, title, subtitle, price, wasPrice, highlight, badge, disabled, perk }: {
+/** The design cropped to a print's shape — exactly how that size will be printed (centre crop). */
+function ShapeThumb({ src, widthMm, heightMm }: { src: string; widthMm: number; heightMm: number }) {
+  const h = 44;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt="" aria-hidden className="shrink-0 rounded-md object-cover object-center shadow-sm ring-1 ring-black/5"
+      style={{ height: h, width: Math.round((h * widthMm) / heightMm) }} />
+  );
+}
+
+function Option({ checked, onClick, title, subtitle, price, wasPrice, highlight, badge, disabled, perk, thumb, note }: {
   checked: boolean; onClick: () => void; title: string; subtitle?: string | null; price: string;
   wasPrice?: string; highlight?: boolean; badge?: string; disabled?: boolean; perk?: string;
+  thumb?: ReactNode; note?: string | null;
 }) {
   return (
     <button onClick={onClick} disabled={disabled} aria-pressed={checked}
@@ -254,10 +276,12 @@ function Option({ checked, onClick, title, subtitle, price, wasPrice, highlight,
       <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 ${checked ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-300'}`}>
         {checked && <Check className="h-4 w-4" />}
       </span>
+      {thumb}
       <span className="flex-1 min-w-0">
         {badge && <span className="mb-1 inline-block rounded-full bg-purple-600 px-2 py-0.5 text-[11px] font-semibold text-white">{badge}</span>}
         <span className="block font-semibold text-gray-900">{title}</span>
         {subtitle && <span className="block text-xs text-gray-500">{subtitle}</span>}
+        {note && <span className="block text-xs text-gray-500">{note}</span>}
         {perk && <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-green-700"><Gift className="h-3 w-3" />{perk}</span>}
       </span>
       <span className="text-right">

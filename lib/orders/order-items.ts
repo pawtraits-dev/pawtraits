@@ -6,7 +6,7 @@
  * created before this change. Idempotent: returns existing items if already created.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { resolveOrderImage, getPrintUrl } from './order-image';
+import { resolveOrderImage, buildPrintFiles } from './order-image';
 
 export interface CartSnapshotItem {
   productId: string;          // products.id, or "stall_print_S|M|L" for stall take-home
@@ -74,9 +74,15 @@ export async function createOrderItems(
     const isDigital = productData.product_type === 'digital_download';
     const needsPrintFile = !stall && !isDigital && order.fulfillment_type !== 'collected';
     let printUrl: string | null = null;
+    let selfPrintUrl: string | null = null;
+    let printMeta: Record<string, any> | null = null;
     if (needsPrintFile && img) {
       try {
-        printUrl = await getPrintUrl(img, order.id);
+        // Cropped to this product's shape at 300 dpi (S/L are 3:4 crops of the 2:3 reference)
+        const files = await buildPrintFiles(img, productData, order.id);
+        printUrl = files.printUrl;
+        selfPrintUrl = files.selfPrintUrl;
+        printMeta = files.meta;
       } catch (e) {
         console.error(`❌ Order ${order.id}: could not build print URL for ${item.imageId}`, e);
       }
@@ -90,6 +96,8 @@ export async function createOrderItems(
       image_title: item.imageTitle?.slice(0, 200) || 'Pawtrait',
       image_url: img?.previewUrl ?? '',
       print_image_url: printUrl,
+      self_print_file_url: selfPrintUrl,
+      print_file_meta: printMeta,
       quantity: item.quantity,
       unit_price: item.unitPrice,
       original_price: item.originalPrice ?? item.unitPrice,
@@ -100,7 +108,13 @@ export async function createOrderItems(
     });
   }
 
-  const { data: inserted, error } = await supabase.from('order_items').insert(rows).select('*');
+  let { data: inserted, error } = await supabase.from('order_items').insert(rows).select('*');
+  if (error && /self_print_file_url|print_file_meta/.test(error.message || '')) {
+    // Print-crop migration not run yet — never lose the order lines over it
+    console.error('⚠️ order_items print-file columns missing — run db/migrations/2026-09-30-print-crops.sql');
+    ({ data: inserted, error } = await supabase.from('order_items')
+      .insert(rows.map(({ self_print_file_url, print_file_meta, ...rest }) => rest)).select('*'));
+  }
   if (error) {
     console.error(`❌ Failed to create order items for ${order.id}`, error);
     throw error;

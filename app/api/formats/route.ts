@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from '@/lib/qr/server';
+import { ALLOWED_ASPECT_RATIOS, isAllowedAspectRatio } from '@/lib/print/print-geometry';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,8 +27,13 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await request.json();
+    if (body.aspect_ratio !== undefined && body.is_active !== false && !isAllowedAspectRatio(body.aspect_ratio)) {
+      return NextResponse.json({ error: `Aspect ratio must be one of ${ALLOWED_ASPECT_RATIOS.join(', ')} (got "${body.aspect_ratio}")` }, { status: 400 });
+    }
     
     // Convert JSON objects to strings for database storage
     const processedBody = {

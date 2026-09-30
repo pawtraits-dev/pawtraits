@@ -6,7 +6,8 @@ import type {
   MugCatalogEntry, MugCatalogCreate, MugCatalogUpdate,
   MugGeneration,
   StockLocation, StockLocationCreate, StockLocationUpdate,
-  ImageQrInfo, StickerImage, StickerSheetRequest, QrReport, AppSettingsMap
+  ImageQrInfo, StickerImage, StickerSheetRequest, QrReport, AppSettingsMap,
+  FulfilmentQueue, FulfilmentOrder, FulfilmentActionRequest
 } from './product-types';
 
 /**
@@ -584,5 +585,27 @@ export class AdminSupabaseService {
 
   async updateAppSetting(key: string, value: unknown): Promise<AdminResult<{ ok: true }>> {
     return adminRequest<{ ok: true }>('/api/admin/settings/app', jsonInit('PATCH', { key, value }));
+  }
+
+  // ===== ORDER FULFILMENT =====
+
+  /** Orders with prints to post, grouped by stage, plus the default provider. */
+  async getFulfilmentQueue(): Promise<AdminResult<FulfilmentQueue>> {
+    return adminRequest<FulfilmentQueue>('/api/admin/orders/fulfilment', { cache: 'no-store' });
+  }
+
+  /** Move an order through self-print, send it to Gelato, etc. Returns the updated order. */
+  async updateOrderFulfilment(orderId: string, request: FulfilmentActionRequest): Promise<AdminResult<FulfilmentOrder>> {
+    return adminRequest<FulfilmentOrder>(`/api/admin/orders/${encodeURIComponent(orderId)}/fulfilment`, jsonInit('POST', request));
+  }
+
+  /** URL of the packing slips PDF (the browser opens it with the admin cookie). */
+  getPackingSlipsUrl(orderIds: string[]): string {
+    return `/api/admin/orders/fulfilment/packing-slips?ids=${orderIds.map(encodeURIComponent).join(',')}`;
+  }
+
+  /** URL of the Royal Mail Click & Drop import CSV. */
+  getClickAndDropCsvUrl(orderIds: string[]): string {
+    return `/api/admin/orders/fulfilment/click-and-drop?ids=${orderIds.map(encodeURIComponent).join(',')}`;
   }
 }

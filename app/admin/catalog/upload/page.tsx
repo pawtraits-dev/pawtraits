@@ -16,6 +16,7 @@ import { MultiSubjectEditor } from '@/components/admin/MultiSubjectEditor';
 import { CompositionAnalysisPanel } from '@/components/admin/CompositionAnalysisPanel';
 import { PreviewVariationPanel } from '@/components/admin/PreviewVariationPanel';
 import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
+import { nearestAllowedRatio } from '@/lib/print/print-geometry';
 
 interface SubjectIdentification {
   subjectOrder: number;
@@ -119,6 +120,7 @@ export default function CatalogUploadPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [compressedFile, setCompressedFile] = useState<File | null>(null); // Store compressed version for saving
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [ratioWarning, setRatioWarning] = useState<string | null>(null);
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep>('idle');
   const [analysisProgress, setAnalysisProgress] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -248,41 +250,17 @@ export default function CatalogUploadPage() {
 
       console.log(`📐 Image dimensions: ${width}x${height}, aspect ratio: ${aspectRatio.toFixed(2)}`);
 
-      // Find matching format based on aspect ratio
-      // Common aspect ratios with tolerance
-      let matchedFormat = null;
-      const tolerance = 0.05; // 5% tolerance
-
-      if (Math.abs(aspectRatio - 1.0) < tolerance) {
-        // 1:1 (Square)
-        matchedFormat = formats.find(f => f.aspect_ratio === '1:1');
-        console.log('🎯 Detected format: Square (1:1)');
-      } else if (Math.abs(aspectRatio - 0.8) < tolerance) {
-        // 4:5 (Portrait)
-        matchedFormat = formats.find(f => f.aspect_ratio === '4:5');
-        console.log('🎯 Detected format: Portrait (4:5)');
-      } else if (Math.abs(aspectRatio - 1.25) < tolerance) {
-        // 5:4 (Landscape)
-        matchedFormat = formats.find(f => f.aspect_ratio === '5:4');
-        console.log('🎯 Detected format: Landscape (5:4)');
-      } else if (Math.abs(aspectRatio - (16/9)) < tolerance) {
-        // 16:9 (Widescreen)
-        matchedFormat = formats.find(f => f.aspect_ratio === '16:9');
-        console.log('🎯 Detected format: Widescreen (16:9)');
-      } else if (Math.abs(aspectRatio - (9/16)) < tolerance) {
-        // 9:16 (Tall portrait)
-        matchedFormat = formats.find(f => f.aspect_ratio === '9:16');
-        console.log('🎯 Detected format: Tall Portrait (9:16)');
-      } else if (Math.abs(aspectRatio - (3/4)) < tolerance) {
-        // 3:4 (Standard portrait)
-        matchedFormat = formats.find(f => f.aspect_ratio === '3:4');
-        console.log('🎯 Detected format: Standard Portrait (3:4)');
-      } else if (Math.abs(aspectRatio - (4/3)) < tolerance) {
-        // 4:3 (Standard landscape)
-        matchedFormat = formats.find(f => f.aspect_ratio === '4:3');
-        console.log('🎯 Detected format: Standard Landscape (4:3)');
+      // Reference images must be 1:1, 2:3, 3:2 or 2:1 (see lib/print/print-geometry.ts)
+      const { ratio, offBy } = nearestAllowedRatio(width, height);
+      // 2:1 mug art comes out of Gemini as 21:9 and is cropped later, so allow more slack there
+      const accepted = offBy <= 0.03 || (ratio === '2:1' && offBy <= 0.2);
+      const matchedFormat = accepted ? formats.find(f => f.aspect_ratio === ratio && f.is_active !== false) : null;
+      if (!accepted) {
+        setRatioWarning(`This image is ${width}×${height} (${aspectRatio.toFixed(2)}), which isn't one of the allowed shapes (1:1, 2:3, 3:2, 2:1). Nearest is ${ratio}, ${Math.round(offBy * 100)}% off — S and L prints are 3:4 crops of a 2:3 image, so an off-shape image will crop unpredictably. Re-export it at ${ratio}.`);
+      } else if (!matchedFormat) {
+        setRatioWarning(`No active ${ratio} format is set up — create one in Formats, or pick a format manually.`);
       } else {
-        console.warn(`⚠️ No matching format for aspect ratio ${aspectRatio.toFixed(2)}`);
+        setRatioWarning(ratio === '2:1' && offBy > 0.03 ? 'Wide image: it will be centre-cropped to 2:1 for mugs.' : null);
       }
 
       if (matchedFormat) {
@@ -296,6 +274,7 @@ export default function CatalogUploadPage() {
   };
 
   const handleRemoveImage = () => {
+    setRatioWarning(null);
     setSelectedFile(null);
     setPreviewUrl(null);
     setAnalysis(null);
@@ -614,6 +593,9 @@ export default function CatalogUploadPage() {
                   sizes="(max-width: 768px) 100vw, 500px"
                 />
               </div>
+              {ratioWarning && (
+                <p className="mx-auto max-w-md rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{ratioWarning}</p>
+              )}
               <div className="flex justify-center gap-4">
                 <Button
                   variant="outline"

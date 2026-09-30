@@ -174,26 +174,28 @@
     <div class="content">
       <p>Hi {{customer_name}},</p>
 
-      <p>Great news! Your custom pet portrait order has been shipped and is on its way to you.</p>
+      <p>Great news! Your Pawtraits order has been {{#if is_self_print}}printed, packed by hand and posted{{else}}shipped{{/if}} — it's on its way to you.</p>
 
       <div class="success-badge">
-        ✓ Shipped on {{shipped_date}}
+        ✓ Posted on {{shipped_date}}
       </div>
 
       <!-- Tracking Information -->
+      {{#if has_tracking}}
       <div class="tracking-box">
         <h3>📍 Track Your Package</h3>
-        <p style="color: #065f46; margin-bottom: 15px;">Your tracking number:</p>
+        <p style="color: #065f46; margin-bottom: 15px;">Your {{carrier_name}} tracking number:</p>
         <div class="tracking-number">{{tracking_number}}</div>
-        <a href="{{tracking_url}}" class="button" style="margin-top: 15px;">Track Your Shipment</a>
+        {{#if tracking_url}}<br><a href="{{tracking_url}}" class="button" style="margin-top: 15px;">Track Your Shipment</a>{{/if}}
       </div>
+      {{/if}}
 
       <!-- Delivery Estimate -->
       <div class="delivery-estimate">
         <h3>⏰ Estimated Delivery</h3>
         <div class="delivery-date">{{estimated_delivery_date}}</div>
         <p style="margin: 5px 0; color: #78350f; font-size: 14px;">
-          {{carrier_name}} • {{shipping_method}}
+          {{carrier_name}}{{#if shipping_method}} • {{shipping_method}}{{/if}}
         </p>
       </div>
 
@@ -209,8 +211,7 @@
       <h3 style="color: #111827; margin-top: 30px;">📋 What to Expect</h3>
       <ul style="color: #6b7280; font-size: 14px; line-height: 1.8;">
         <li>Your package is carefully wrapped to ensure safe delivery</li>
-        <li>Tracking updates will be sent to your email automatically</li>
-        <li>Someone will need to be available to sign for the package (if required)</li>
+        {{#if has_tracking}}<li>You can follow your parcel with the tracking link above</li>{{/if}}
         <li>If you're not home, the carrier will leave a notice with pickup instructions</li>
       </ul>
 
@@ -218,7 +219,7 @@
       <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
         <strong>Questions about your delivery?</strong><br>
         Contact us at <a href="mailto:support@pawtraits.pics" style="color: #10b981;">support@pawtraits.pics</a>
-        or use the tracking link above for the most up-to-date information.
+        {{#if has_tracking}}or use the tracking link above for the most up-to-date information.{{else}}and quote your order number.{{/if}}
       </p>
 
       <!-- CTA -->
@@ -235,12 +236,12 @@
       <p>Transform your pet into a masterpiece</p>
 
       <p style="margin-top: 20px; font-size: 12px; color: #9ca3af;">
-        © 2025 Pawtraits. All rights reserved.<br>
+        © 2026 Pawtraits. All rights reserved.<br>
         <a href="https://pawtraits.pics">Visit our website</a>
       </p>
 
       <p style="font-size: 11px; color: #d1d5db; margin-top: 15px;">
-        Order #{{order_number}} • Tracking #{{tracking_number}}
+        Order #{{order_number}}{{#if has_tracking}} • Tracking #{{tracking_number}}{{/if}}
       </p>
     </div>
   </div>

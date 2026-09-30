@@ -3,6 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { GEMINI_IMAGE_MODELS } from '@/lib/gemini-models';
 
+// Nano Banana Pro at 2K can take 20–60 s per image
+export const maxDuration = 300;
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
@@ -187,7 +190,7 @@ export async function POST(request: NextRequest) {
         testType,
         timestamp: new Date().toISOString(),
         imageSizeKB: Math.round(imageSizeBytes / 1024),
-        geminiModel: GEMINI_IMAGE_MODELS.flash
+        geminiModel: GEMINI_IMAGE_MODELS.pro
       }
     });
     
