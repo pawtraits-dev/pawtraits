@@ -45,9 +45,12 @@ export function buildStallCartProduct(size: 'S' | 'M' | 'L', pricePence: number)
 /** Does this basket line need posting to the customer? */
 export function itemNeedsShipping(item: { productId?: string; product?: any }): boolean {
   if (isStallProductId(item.productId)) return false;
-  const t = item.product?.product_type;
+  const p = item.product || {};
+  const t = p.product_type;
   if (t === 'digital_download' || t === 'stall_print') return false;
-  if (item.product?.requires_shipping === false) return false;
+  if (p.requires_shipping === false) return false;
+  // Belt and braces for basket lines saved with a partial product object
+  if (p.shape_family === 'any' || p.sku === 'DIGITAL' || p.medium?.slug === 'digital' || p.fulfillment_method === 'download') return false;
   return true;
 }
 

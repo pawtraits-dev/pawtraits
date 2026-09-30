@@ -51,10 +51,9 @@ export function DigitalDownloadButton({
       ]);
 
       // Find the master bundle product
-      const bundleProduct = products.find((p: any) =>
-        p.product_type === 'digital_download' &&
-        p.name === 'Digital Download Bundle'
-      );
+      const list = Array.isArray(products) ? products : (products?.products ?? []);
+      const digital = list.filter((p: any) => p.product_type === 'digital_download' && p.is_active !== false);
+      const bundleProduct = digital.find((p: any) => p.name === 'Digital Download Bundle') || digital.find((p: any) => p.sku === 'DIGITAL') || digital[0];
 
       if (!bundleProduct) {
         throw new Error('Digital download product not configured. Please contact support.');

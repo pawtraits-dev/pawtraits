@@ -744,6 +744,7 @@ guest: ${isGuest}  referral code: ${referralCode || 'none'}${referralDiscountPen
 shown: ${showExpress}  wallet available: ${String(walletAvailable)}
 ${walletInfo || 'Stripe has not reported yet'}
 blocked: ${blocked.length ? blocked.join(' | ') : 'nothing'}
+basket: ${items.map((i: any) => `${i.product?.sku || i.productId?.slice(0, 8)} type=${i.product?.product_type ?? '?'} ship=${itemNeedsShipping(i)}`).join(' | ')}  digital only: ${isDigitalOnly}
 page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
               </pre>
             )}
@@ -759,6 +760,8 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                       </p>
                     </div>
                     <ExpressCheckout
+                      // Wallet options (address, delivery) are fixed when it mounts, so remount if the basket changes between posted and digital-only
+                      key={isDigitalOnly ? 'digital' : 'posted'}
                       goodsTotalPence={goodsTotalPence}
                       needsShipping={!isDigitalOnly}
                       allowedCountries={DELIVERY_COUNTRIES}
