@@ -140,14 +140,11 @@ async function setGbPrice(supabase: SupabaseClient, productId: string, input: Ca
   const current = currentGbPrice(rows || []);
   const unitCost = input.unit_cost_pence ?? 0;
   const postage = input.postage_cost_pence ?? 0;
-  if (current && current.sale_price === input.price_pence && (current.product_cost ?? 0) === unitCost && (current.shipping_cost ?? 0) === postage) return;
+  if (current && current.is_current !== false && current.sale_price === input.price_pence && (current.product_cost ?? 0) === unitCost && (current.shipping_cost ?? 0) === postage) return;
   const now = new Date().toISOString();
   const profit = input.price_pence - unitCost - postage;
   const pct = (n: number) => Math.max(-99999, Math.min(99999, Math.round(n * 100) / 100));
-  // Add the new price first, then retire the old one — a failed save never leaves the product without a price
-  const { data: added, error } = await supabase.from('product_pricing').insert({
-    product_id: productId,
-    country_code: 'GB',
+  const price = {
     currency_code: 'GBP',
     currency_symbol: '£',
     sale_price: input.price_pence,
@@ -157,17 +154,26 @@ async function setGbPrice(supabase: SupabaseClient, productId: string, input: Ca
     profit_margin_percent: input.price_pence ? pct((profit / input.price_pence) * 100) : null,
     markup_percent: unitCost + postage > 0 ? pct((profit / (unitCost + postage)) * 100) : null,
     is_current: true,
+    end_date: null,
     effective_date: now,
-    created_by: userId || null,
+    updated_at: now,
     notes: 'Set in /admin/products',
-  }).select('id').single();
+  };
+  // One GB price row per product (the database enforces product + country unique), updated in place.
+  // Orders keep the price they were sold at, so no history is needed here.
+  const existing = current || [...(rows || [])].sort((x: any, y: any) => String(y.updated_at || y.created_at || '').localeCompare(String(x.updated_at || x.created_at || '')))[0];
+  const { error } = existing
+    ? await supabase.from('product_pricing').update(price).eq('id', existing.id)
+    : await supabase.from('product_pricing').insert({ ...price, product_id: productId, country_code: 'GB', created_by: userId || null });
   if (error) {
     throw new CatalogueError(/numeric field overflow/i.test(error.message)
       ? 'Price not saved: run db/migrations/2026-09-30-pricing-margin-columns.sql in Supabase (the margin columns are too small for high markups).'
       : `Price not saved: ${error.message}`, 500);
   }
-  await supabase.from('product_pricing').update({ is_current: false, end_date: now, updated_at: now })
-    .eq('product_id', productId).eq('country_code', 'GB').eq('is_current', true).neq('id', added.id);
+  // Tidy up any stray duplicates from before the constraint
+  if (existing && (rows?.length || 0) > 1) {
+    await supabase.from('product_pricing').update({ is_current: false }).eq('product_id', productId).eq('country_code', 'GB').neq('id', existing.id);
+  }
 }
 
 export async function createCatalogueProduct(supabase: SupabaseClient, input: CatalogueProductInput, userId?: string | null) {

@@ -265,7 +265,7 @@ export default function ProductForm({ product, initialType }: { product?: Catalo
               <span className="text-gray-500"> after costs and card fees (~{gbp(fees)})</span>
             </div>
           )}
-          <p className="text-xs text-gray-500">Saving a new price keeps the old one in the price history. Delivery is charged per order on top ({shippingSummary()}).</p>
+          <p className="text-xs text-gray-500">Past orders keep the price they were sold at. Delivery is charged per order on top ({shippingSummary()}).</p>
         </CardContent>
       </Card>
 

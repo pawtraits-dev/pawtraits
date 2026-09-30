@@ -14,7 +14,7 @@
 | `any` All designs | every design | Digital downloads |
 
 - Legacy products with no family still match their single `format_id` and show under "Single format (legacy)" in admin.
-- **Price:** the UK price lives on the product, stored as the current GB row in `product_pricing` (`sale_price`, `product_cost` = unit cost, `shipping_cost` = postage cost). Changing a price closes the old row, so history is kept. Other countries fall back to the GB price.
+- **Price:** the UK price lives on the product, stored as the current GB row in `product_pricing` (`sale_price`, `product_cost` = unit cost, `shipping_cost` = postage cost). There is one GB row per product (the database enforces product + country unique); saving updates it in place. Orders keep the price they sold at. Other countries fall back to the GB price.
 - **Margin** shown in admin = price − unit cost − postage − card fees (estimated 1.5% + 20p).
 - **Gelato is optional:** `gelato_sku` (portrait/square) and `gelato_sku_landscape` (if Gelato uses a different UID for landscape). Only "Send to Gelato" uses them; a product with no SKU can't be sent to Gelato.
 - **Fulfilment default** is `manual` (self-print); digital downloads use `download`.
@@ -50,7 +50,7 @@ Product APIs (`/api/public/products`, `/api/partners/products`, `/api/admin/prod
 
 Flat Royal Mail Tracked charge per order, whatever the size or number of prints: **UK £5 · Europe £10 · USA £15** (`lib/shipping/rates.ts`, which also lists the countries we deliver to). `/api/shipping/options` returns that single option; the payment price check uses the server's rate, not the browser's. Product "postage cost" is only for postage the delivery charge doesn't cover — usually 0.
 
-`product_pricing.profit_margin_percent` / `markup_percent` were DECIMAL(5,2), so markups over 999% failed to save — widened by `db/migrations/2026-09-30-pricing-margin-columns.sql`. A new price is now inserted before the old one is retired.
+`product_pricing.profit_margin_percent` / `markup_percent` were DECIMAL(5,2), so markups over 999% failed to save — widened by `db/migrations/2026-09-30-pricing-margin-columns.sql`.
 
 ## Not yet done
 
