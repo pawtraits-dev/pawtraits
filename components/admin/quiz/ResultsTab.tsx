@@ -21,7 +21,7 @@ const pct = (n: number, d: number) => (d ? `${Math.round((n / d) * 100)}%` : 'â€
 const SOURCE_LABELS: Record<string, string> = {
   home: 'Home page band', design: 'Design page', 'order-email': 'Order confirmation email',
   'welcome-email': 'Account email', 'my-pets': 'My pets', shared: "A friend's shared result",
-  'result-again': 'Another pet (after their result)', 'short-link': 'pawtraits.pics/quiz',
+  'result-again': 'Another pet (after their result)', 'short-link': 'pawtraits.pics/quiz', 'shared-portrait': 'A shared customised Pawtrait',
   partner: 'Partner link', direct: 'Direct / unknown', unknown: 'Not recorded',
 };
 
