@@ -19,8 +19,14 @@ export interface PublicQuizResult {
   code: string;
   type: QuizResultType | null;
   dimensions: DimensionScore[];
-  /** Breed-matched picture when made, else the type's design (phase 4 fills these in) */
+  /** Breed-matched picture when made, else the type's design */
   imageId: string | null;
+  /** Cloudinary public id of imageId (for server-made share cards) */
+  imagePublicId: string | null;
+  /** 'breed' = painted as their breed; 'design' = the type's standard design; null = no picture yet */
+  imageKind: 'breed' | 'design' | null;
+  /** True when a breed version could still be painted (breed given, design exists, not made yet) */
+  canPaintBreed: boolean;
   completedAt: string;
 }
 
@@ -38,6 +44,13 @@ export async function getPublicResult(shareCode: string): Promise<PublicQuizResu
   const type = snapshot?.resultTypes.find(t => t.code === r.result_type) ?? null;
   const dimensions = snapshot ? scoreQuiz(snapshot.questions, r.answers || {}, r.answer_order || []).dimensions : [];
   const breed = (r.breeds as any)?.id ? { id: (r.breeds as any).id, name: (r.breeds as any).name } : null;
+  const imageId: string | null = r.result_image_id ?? type?.designImageId ?? null;
+  const imageKind = r.result_image_id ? 'breed' as const : type?.designImageId ? 'design' as const : null;
+  let imagePublicId: string | null = null;
+  if (imageId) {
+    const { data: img } = await supabase.from('image_catalog').select('cloudinary_public_id').eq('id', imageId).maybeSingle();
+    imagePublicId = img?.cloudinary_public_id ?? null;
+  }
 
   return {
     shareCode: r.share_code,
@@ -49,7 +62,10 @@ export async function getPublicResult(shareCode: string): Promise<PublicQuizResu
     code: r.result_type,
     type,
     dimensions,
-    imageId: r.result_image_id ?? type?.designImageId ?? null,
+    imageId,
+    imagePublicId,
+    imageKind,
+    canPaintBreed: !!(breed && type?.designImageId && !r.result_image_id),
     completedAt: r.completed_at,
   };
 }

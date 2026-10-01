@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient } from '@/lib/qr/server';
 import { getLiveQuiz, hashIp, isAnimal, newShareCode, sessionUserId } from '@/lib/quiz/server';
 import { scoreQuiz, validateAnswers } from '@/lib/quiz/scoring';
+import { findBreedImage } from '@/lib/quiz/breed-images';
 import { getClientIp } from '@/lib/public-rate-limiter';
 
 const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ '’.-]{0,29}$/;
@@ -54,6 +55,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const order: string[] = Array.isArray(body.order) ? body.order.filter((x: unknown) => typeof x === 'string' && ids.has(x)) : [];
     const score = scoreQuiz(quiz.questions, body.answers, order);
     const userId = await sessionUserId();
+    // Breed version already made (top breeds, or painted while they answered): show it straight away
+    const design = quiz.resultTypes.find(t => t.code === score.code)?.designImageId;
+    const resultImageId = design && breedId ? await findBreedImage(design, breedId) : null;
 
     for (let attempt = 0; attempt < 3; attempt++) {
       const shareCode = newShareCode();
@@ -73,6 +77,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         partner_code: typeof body.partnerCode === 'string' && CODE_RE.test(body.partnerCode) ? body.partnerCode : null,
         referral_code: typeof body.referralCode === 'string' && CODE_RE.test(body.referralCode) ? body.referralCode.toUpperCase() : null,
         ip_hash: ipHash,
+        result_image_id: resultImageId,
       });
       if (!error) return NextResponse.json({ shareCode, code: score.code });
       if (error.code !== '23505') throw error; // retry only on a share-code clash

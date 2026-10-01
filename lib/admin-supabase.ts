@@ -584,6 +584,14 @@ export class AdminSupabaseService {
     return adminRequest<any>(`/api/admin/quizzes/${quizId}/results?days=${days}`);
   }
 
+  async getQuizBreedImages(quizId: string, top = 20): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/quizzes/${quizId}/breed-images?top=${top}`);
+  }
+
+  async makeQuizBreedImage(quizId: string, code: string, breedId: string): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/quizzes/${quizId}/breed-images`, jsonInit('POST', { code, breedId }));
+  }
+
   async getPawsonalityDesigns(animal: 'dog' | 'cat'): Promise<AdminResult<{ theme: string | null; designs: { id: string; description: string | null; breed: string | null }[] }>> {
     return adminRequest(`/api/admin/quizzes/designs?animal=${animal}`);
   }

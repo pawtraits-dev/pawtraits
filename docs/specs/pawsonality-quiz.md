@@ -1,6 +1,6 @@
 # 16 Pawsonalities quiz
 
-**Status:** Phases 1–3 (engine, admin, customer quiz) built 2026-10-01 · Plan and decisions: "16 Pawsonalities quiz — design and dev plan" (Claude Docs) · Source spec: quiz engine functional spec v1.0 (project doc `claude/quiz-engine-functional-spec-v1.md`) · Mock-ups: Pawtraits mock-up canvas, quiz row
+**Status:** Phases 1–4 (engine, admin, customer quiz, result page) built 2026-10-01 · Plan and decisions: "16 Pawsonalities quiz — design and dev plan" (Claude Docs) · Source spec: quiz engine functional spec v1.0 (project doc `claude/quiz-engine-functional-spec-v1.md`) · Mock-ups: Pawtraits mock-up canvas, quiz row
 
 ## Decisions (1 Oct 2026)
 - Dimensions E/I energy, S/N social, T/F training (cats: Responsive / Own Agenda), B/C boldness. 16 codes shared by dogs and cats; cats have their own type names.
@@ -16,8 +16,8 @@
 | 1 | Migration, scoring engine + tests, public API, seed content | **Built** |
 | 2 | Admin → Quizzes (edit questions and types, pictures, link designs, publish, pause, results) | **Built** |
 | 3 | Quiz pages `/quiz/pawsonality` (start, swipe cards, reveal) and a first result page | **Built** |
-| 4 | Result page: breed-matched picture, share card + previews, matched designs, save by email | Next |
-| 5 | Ways in (home band, design page, emails, My pets), launch | |
+| 4 | Result page: breed-matched picture, share card + previews, matched designs, save by email | **Built** |
+| 5 | Ways in (home band, design page, emails, My pets), launch | Next |
 
 ## Data (`db/migrations/2026-10-01-quiz-engine.sql`)
 - `quizzes` (slug + animal_type unique; status draft/live/paused; current_version; has_unpublished_changes)
@@ -75,3 +75,25 @@ All admin routes check `requireAdmin()`; pages call them through `AdminSupabaseS
 - `/quiz/pawsonality/r/[code]` (server, `noindex`): code, "Biscuit is The Party Animal", tagline, owner reality, four score bars ("4 of 5 swipes", "a close call" at 3–2), traits, signature move, share quote, "Find Biscuit's Pawtrait" (→ browse for now), "Do the quiz for another pet". Title and share preview text per result.
 - Analytics: `quiz_start`, `quiz_answer` (question number), `quiz_complete` (+ Meta `QuizCompleted` custom event, consent-gated) in `lib/tracking/events.ts`; `quizShare` and `quizResultDesignClick` ready for phase 4.
 - Tested end to end on a 390 px phone against a local stand-in for Supabase: start → 20 answers (buttons, drag, keys, undo) → stored result (type, breed, name) → result page.
+
+## Result page and breed pictures (phase 4)
+Migration: `db/migrations/2026-10-02-quiz-breed-pictures.sql` (`quiz_breed_images`: one row per type design + breed; status pending/running/done/failed; links the generated `image_catalog` design).
+
+- **Breed-matched picture** (`lib/quiz/breed-images.ts`): the type's Pawsonalities design is repainted as the breed with the existing Gemini variation service (`generateBreedVariations`), uploaded to Cloudinary (`pawtraits/pawsonality`) and saved to `image_catalog` as a normal public design (same theme/style/format, breed set, tags `pawsonality`, `pawsonality:<CODE>`), so it can be bought. Each design + breed is made once; concurrent requests get "pending"; a job stuck "running" for 4 minutes can be retaken; failures retry once for quiz takers (admins can always retry).
+  - **On the spot:** the quiz calls `POST /api/public/quiz/pawsonality/breed-image` as soon as all four letters are settled (typically around answer 14–15 of 20). The result saves with the picture if it's ready; otherwise the result page shows the standard design with "Painting Biscuit as a Labrador…", asks again, polls every 5 s (up to 3 minutes) and swaps it in. New pictures from one IP: 10 an hour.
+  - **In advance:** Admin → Quizzes → **Breed pictures**: breed × type grid for the top 10/20/30/50/all breeds (popularity rank); "Make missing" works through gaps one at a time (20–60 s each) while the page is open; click a cell to make or retry one. Uses the design linked in the draft.
+  - Needs a design linked to the type (Result types tab) and published; without one the result shows a paw placeholder and the CTA goes to browse.
+- **Result page** (`components/quiz/ResultView.tsx`): picture → code + "Biscuit is The Party Animal" → tagline, owner reality → **Share** → score bars → traits, signature move, quote → **Make Biscuit's Pawtrait as The Party Animal** ("Add Biscuit's photo" → `/customise/<breed picture or design>?start=photo&src=pawsonality`, or browse) → **Save** → do it for another pet.
+- **Share:** phone share sheet with the Stories card image where supported, else link share, else copy link; first share recorded on the result (`shared_at`, `share_platform`) and in analytics.
+- **Cards** (`lib/quiz/card.tsx`, next/og): `GET /api/public/quiz-results/[code]/card?format=story` (1080×1920) and the page's `opengraph-image` (1200×630) for WhatsApp/iMessage/Facebook previews. Picture fetched first (watermarked, jpg) with a paw fallback; Life Savers heading font from Google Fonts with a default fallback. `pawtraits.pics/quiz` (printed on cards) redirects to the quiz.
+- **Save:** signed in → "Save to Biscuit's profile" (type saved on the matching pet, or a new pet). Not signed in → email: an account is made if needed (as guest checkout does), the email is stored on the result, and a 3-day sign-in link brings them back with `?save=1`, which saves it to the pet. 3 emails per address per 15 minutes.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/public/quiz/[slug]/breed-image` | `{animal, code, breedId, shareCode?, peek?}` → done/pending/failed/unavailable |
+| `GET /api/public/quiz-results/[code]/card?format=story\|og` | Share card PNG |
+| `POST /api/public/quiz-results/[code]/shared` | Record first share |
+| `POST /api/public/quiz-results/[code]/save` | Save to pet / email a save link |
+| `GET/POST /api/admin/quizzes/[id]/breed-images` | Breed picture grid / make one |
+
+Tested end to end on a phone against a local stand-in for Supabase: picture request fired at answer 14, "Painting…" overlay, swap to the breed version, result updated, "Add photo" link follows the new picture, share recorded, both cards render, `og:image` absolute on pawtraits.pics. Not testable here: real Gemini generation, Cloudinary upload and the save email (they need live keys).

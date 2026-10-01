@@ -14,8 +14,9 @@ import StatusChip from '@/components/admin/quiz/StatusChip';
 import QuestionsTab, { type QuestionRow } from '@/components/admin/quiz/QuestionsTab';
 import ResultTypesTab from '@/components/admin/quiz/ResultTypesTab';
 import ResultsTab from '@/components/admin/quiz/ResultsTab';
+import BreedPicturesTab from '@/components/admin/quiz/BreedPicturesTab';
 
-type Tab = 'questions' | 'types' | 'results';
+type Tab = 'questions' | 'types' | 'breeds' | 'results';
 
 interface QuizMeta {
   id: string; slug: string; animal_type: 'dog' | 'cat'; title: string;
@@ -123,7 +124,7 @@ export default function QuizEditorPage({ params }: { params: Promise<{ id: strin
       )}
 
       <div role="tablist" aria-label="Quiz sections" className="flex gap-1 border-b border-gray-200">
-        {([['questions', `Questions (${activeCount})`], ['types', `Result types (${types.length})`], ['results', 'Results']] as [Tab, string][]).map(([key, label]) => (
+        {([['questions', `Questions (${activeCount})`], ['types', `Result types (${types.length})`], ['breeds', 'Breed pictures'], ['results', 'Results']] as [Tab, string][]).map(([key, label]) => (
           <button key={key} role="tab" type="button" aria-selected={tab === key} onClick={() => setTab(key)}
             className={`-mb-px border-b-2 px-4 py-2 text-sm ${tab === key ? 'border-purple-600 font-semibold text-purple-800' : 'border-transparent text-gray-600 hover:text-gray-900'}`}>
             {label}
@@ -140,6 +141,7 @@ export default function QuizEditorPage({ params }: { params: Promise<{ id: strin
           <ResultTypesTab quizId={quiz.id} animal={quiz.animal_type} types={types}
             onChange={next => { setTypes(next); markChanged(); }} onError={setError} />
         )}
+        {tab === 'breeds' && <BreedPicturesTab quizId={quiz.id} />}
         {tab === 'results' && <ResultsTab quizId={quiz.id} slug={quiz.slug} types={types} />}
       </div>
     </div>

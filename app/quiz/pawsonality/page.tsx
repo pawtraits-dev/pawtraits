@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { Check, RotateCcw, X } from 'lucide-react';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import SwipeCard, { type SwipeCardHandle } from '@/components/quiz/SwipeCard';
-import { scoreQuiz, seededShuffle, withPetName } from '@/lib/quiz/scoring';
+import { lockedCode, scoreQuiz, seededShuffle, withPetName } from '@/lib/quiz/scoring';
 import type { AnimalType, Answers, Dimension, Pole, Swipe } from '@/lib/quiz/types';
 import { track } from '@/lib/tracking/events';
 
@@ -59,6 +59,7 @@ export default function PawsonalityQuizPage() {
   const [loading, setLoading] = useState(false);
   const [attribution, setAttribution] = useState<{ partnerCode?: string; referralCode?: string }>({});
   const flingRef = useRef<SwipeCardHandle | null>(null);
+  const paintingFor = useRef<string | null>(null); // type code whose breed picture we've asked for
 
   // Attribution, preselected species, and a quiz in progress (refresh-safe)
   useEffect(() => {
@@ -161,6 +162,17 @@ export default function PawsonalityQuizPage() {
     const next: Progress = { ...progress, history: [...progress.history, current.id], answers: { ...progress.answers, [current.id]: swipe } };
     setProgress(next); save(next);
     track.quizAnswer(SLUG, next.history.length, total);
+    // Once every letter is settled, start painting the type as their breed (finishes while they read the reveal)
+    if (next.breedId && !paintingFor.current) {
+      const code = lockedCode(quiz.questions, next.answers);
+      if (code) {
+        paintingFor.current = code;
+        fetch(`/api/public/quiz/${SLUG}/breed-image`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ animal: next.animal, code, breedId: next.breedId }),
+        }).catch(() => { /* the result page retries */ });
+      }
+    }
     if (next.history.length >= total) submit(next, quiz);
   }, [progress, quiz, current, total, submit]);
 

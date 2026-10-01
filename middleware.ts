@@ -49,6 +49,7 @@ const BROWSE_REDIRECTS: Record<string, { path: string; params?: Record<string, s
   '/cats-redirect': { path: '/browse', params: { type: 'cats' } },
   '/themes-redirect': { path: '/browse', params: { type: 'themes' } },
   '/home': { path: '/' },
+  '/quiz': { path: '/quiz/pawsonality' },   // short address printed on share cards
 }
 
 export async function middleware(req: NextRequest) {
