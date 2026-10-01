@@ -12,7 +12,9 @@
     "test:influencers": "npx tsx scripts/run-influencer-tests.ts",
     "test:db": "npx tsx scripts/test-influencer-db.ts",
     "test:api": "npx tsx scripts/test-influencer-system.ts",
-    "test:workflows": "npx tsx scripts/test-influencer-workflows.ts"
+    "test:workflows": "npx tsx scripts/test-influencer-workflows.ts",
+    "test:quiz": "npx tsx scripts/test-quiz-scoring.ts",
+    "build:quiz-seed": "npx tsx scripts/build-quiz-seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",

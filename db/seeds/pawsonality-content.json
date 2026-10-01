@@ -1,0 +1,744 @@
+{
+ "source": "Quiz engine spec v1.0 (dog questions and types, with 1 Oct 2026 copy fixes) + Question drafts tab (new dog questions, all cat content)",
+ "quizzes": [
+  {
+   "slug": "pawsonality",
+   "animalType": "dog",
+   "title": "16 Pawsonalities · Dogs",
+   "questions": [
+    {
+     "key": "dog-q1",
+     "dimension": "EI",
+     "rightPole": "E",
+     "statement": "[PET_NAME] ALWAYS… acts like they've had 17 cups of coffee",
+     "shareQuote": "[PET_NAME] operates at approximately 400% capacity at all times. The vet has no explanation.",
+     "visualBrief": "Pet bouncing off walls with cartoon lightning bolts",
+     "isActive": true
+    },
+    {
+     "key": "dog-q2",
+     "dimension": "EI",
+     "rightPole": "I",
+     "statement": "[PET_NAME] NEVER… says no to a nap opportunity",
+     "shareQuote": "[PET_NAME] treats sleep as a competitive sport and is currently ranked number one.",
+     "visualBrief": "Pet sleeping in increasingly creative and impractical positions",
+     "isActive": true
+    },
+    {
+     "key": "dog-q3",
+     "dimension": "EI",
+     "rightPole": "E",
+     "statement": "[PET_NAME] ALWAYS… gets excited about the word 'walk' (even when spelled out)",
+     "shareQuote": "I cannot spell w-a-l-k in my own home. We have had to develop a code.",
+     "visualBrief": "Pet doing full parkour lap of the house at the mere mention of outdoor activity",
+     "isActive": true
+    },
+    {
+     "key": "dog-q4",
+     "dimension": "EI",
+     "rightPole": "E",
+     "statement": "[PET_NAME] NEVER… seems to run out of energy",
+     "shareQuote": "I am tired. My pet is not. This has been the situation for three years.",
+     "visualBrief": "Pet still bouncing joyfully while three humans lie exhausted on the floor behind them",
+     "isActive": true
+    },
+    {
+     "key": "dog-q5",
+     "dimension": "SN",
+     "rightPole": "S",
+     "statement": "[PET_NAME] ALWAYS… thinks every human exists specifically to pet them",
+     "shareQuote": "[PET_NAME] believes they are universally beloved. They may be correct.",
+     "visualBrief": "Pet doing full-body wiggle approach toward complete stranger, absolutely certain of welcome",
+     "isActive": true
+    },
+    {
+     "key": "dog-q6",
+     "dimension": "SN",
+     "rightPole": "S",
+     "statement": "[PET_NAME] NEVER… needs an invitation to make themselves at home",
+     "shareQuote": "[PET_NAME] does not wait for permission. They are the permission.",
+     "visualBrief": "Pet sprawled imperiously across entire sofa, wearing sunglasses, supreme confidence",
+     "isActive": false
+    },
+    {
+     "key": "dog-q7",
+     "dimension": "SN",
+     "rightPole": "S",
+     "statement": "[PET_NAME] ALWAYS… appears instantly when they hear someone upset",
+     "shareQuote": "[PET_NAME] is an uncertified emotional support professional who waived the fee.",
+     "visualBrief": "Pet materialising with concerned expression from nowhere at precisely the right moment",
+     "isActive": true
+    },
+    {
+     "key": "dog-q8",
+     "dimension": "SN",
+     "rightPole": "N",
+     "statement": "[PET_NAME] NEVER… seems to need constant attention from humans",
+     "shareQuote": "[PET_NAME] is fine without me. I am not fine without them. The power imbalance is real.",
+     "visualBrief": "Pet serenely doing their own thing while human desperately tries to get their attention",
+     "isActive": true
+    },
+    {
+     "key": "dog-q9",
+     "dimension": "TF",
+     "rightPole": "T",
+     "statement": "[PET_NAME] ALWAYS… learns new things suspiciously quickly",
+     "shareQuote": "[PET_NAME] understands everything I say and selectively chooses when to act on it.",
+     "visualBrief": "Pet nailing a trick first attempt while maintaining look of absolute nonchalance",
+     "isActive": true
+    },
+    {
+     "key": "dog-q10",
+     "dimension": "TF",
+     "rightPole": "F",
+     "statement": "[PET_NAME] NEVER… does something just because I asked them to",
+     "shareQuote": "[PET_NAME] heard me. My pet considered it. My pet decided against it. Respectfully.",
+     "visualBrief": "Pet receiving clear command, considering it, making firm eye contact, and doing something completely different",
+     "isActive": true
+    },
+    {
+     "key": "dog-q11",
+     "dimension": "TF",
+     "rightPole": "T",
+     "statement": "[PET_NAME] ALWAYS… comes when called (eventually)",
+     "shareQuote": "[PET_NAME] responds to their name on their own timeline. We respect the timeline.",
+     "visualBrief": "Pet doing a very casual slow-walk response to their name, three to five business days later",
+     "isActive": true
+    },
+    {
+     "key": "dog-q12",
+     "dimension": "TF",
+     "rightPole": "F",
+     "statement": "[PET_NAME] NEVER… follows the rules when they clearly know what the rules are",
+     "shareQuote": "[PET_NAME] knows the rules. My pet has opinions about the rules. The rules are suggestions.",
+     "visualBrief": "Pet maintaining eye contact while committing the exact infraction they have been informed is not allowed",
+     "isActive": true
+    },
+    {
+     "key": "dog-q13",
+     "dimension": "BC",
+     "rightPole": "B",
+     "statement": "[PET_NAME] ALWAYS… is the first to investigate strange noises",
+     "shareQuote": "[PET_NAME] is the home's first responder. Brave, fast, occasionally correct.",
+     "visualBrief": "Pet confidently striding toward mysterious sounds while every other creature hides behind the human",
+     "isActive": true
+    },
+    {
+     "key": "dog-q14",
+     "dimension": "BC",
+     "rightPole": "C",
+     "statement": "[PET_NAME] NEVER… goes anywhere without checking if I'm coming too",
+     "shareQuote": "[PET_NAME] needs emotional support to cross a threshold. I am their emotional support human.",
+     "visualBrief": "Pet looking back anxiously for explicit human approval before proceeding each approximately fifteen centimetres",
+     "isActive": true
+    },
+    {
+     "key": "dog-q15",
+     "dimension": "BC",
+     "rightPole": "B",
+     "statement": "[PET_NAME] ALWAYS… treats new experiences like personal challenges to conquer",
+     "shareQuote": "[PET_NAME] has never met a new situation they didn't immediately try to dominate.",
+     "visualBrief": "Pet approaching completely new object with determined expression and absolute confidence in the outcome",
+     "isActive": true
+    },
+    {
+     "key": "dog-q16",
+     "dimension": "BC",
+     "rightPole": "B",
+     "statement": "[PET_NAME] NEVER… seems fazed by anything life throws at them",
+     "shareQuote": "[PET_NAME] is the most mentally stable individual in this household. The bar is low. They clear it.",
+     "visualBrief": "Pet sitting calmly at the centre of total domestic chaos — vacuums, fireworks, builders — completely unbothered",
+     "isActive": true
+    },
+    {
+     "key": "dog-e5",
+     "dimension": "EI",
+     "rightPole": "I",
+     "statement": "[PET_NAME] ALWAYS… lies down mid-walk to announce the walk is over",
+     "shareQuote": "Halfway round the park, [PET_NAME] staged a sit-in. The walk ended there.",
+     "visualBrief": "Dog flat out on the pavement, lead slack, owner looking at their watch",
+     "isActive": true
+    },
+    {
+     "key": "dog-s5",
+     "dimension": "SN",
+     "rightPole": "N",
+     "statement": "[PET_NAME] ALWAYS… takes themselves off to bed when guests stay too long",
+     "shareQuote": "[PET_NAME] left the party at 9pm. Honestly, I was jealous.",
+     "visualBrief": "Dog padding upstairs past a dinner party in full swing",
+     "isActive": true
+    },
+    {
+     "key": "dog-s6",
+     "dimension": "SN",
+     "rightPole": "S",
+     "statement": "[PET_NAME] NEVER… lets a visitor sit down without a proper welcome",
+     "shareQuote": "Every guest gets the VIP treatment. The postman included.",
+     "visualBrief": "Dog greeting a guest on the sofa with a full-body wiggle and a slipper offering",
+     "isActive": true
+    },
+    {
+     "key": "dog-t5",
+     "dimension": "TF",
+     "rightPole": "T",
+     "statement": "[PET_NAME] ALWAYS… sits before being asked whenever a treat appears",
+     "shareQuote": "[PET_NAME] has worked out the system and is gaming it beautifully.",
+     "visualBrief": "Dog in a perfect sit, staring at a biscuit tin, owner not yet looking",
+     "isActive": true
+    },
+    {
+     "key": "dog-b5",
+     "dimension": "BC",
+     "rightPole": "C",
+     "statement": "[PET_NAME] ALWAYS… gives anything new a very wide berth for at least a day",
+     "shareQuote": "A new bin arrived on Tuesday. We're still in negotiations.",
+     "visualBrief": "Dog peering round a doorframe at a new wheelie bin",
+     "isActive": true
+    }
+   ],
+   "resultTypes": [
+    {
+     "code": "ESTB",
+     "name": "The Golden Retriever",
+     "tagline": "The Eternal Optimist",
+     "traits": [
+      "Boundlessly enthusiastic — loves everyone, treats every day like the best day ever"
+     ],
+     "signatureMove": "Full-body wiggle greeting for every human regardless of familiarity",
+     "ownerReality": "Your pet thinks every stranger is their new best friend",
+     "shareQuote": "[PET_NAME] is 90% enthusiasm, 10% actual dog. The enthusiasm is non-negotiable."
+    },
+    {
+     "code": "ESTC",
+     "name": "The Gentle Giant",
+     "tagline": "The Careful Optimist",
+     "traits": [
+      "Happy and social but reads the room first"
+     ],
+     "signatureMove": "Enthusiastic tail wag from a polite, considerate distance",
+     "ownerReality": "Your pet is the friend who brings good vibes to every situation without overwhelming anyone",
+     "shareQuote": "[PET_NAME] is the emotionally intelligent one in this relationship. It shows."
+    },
+    {
+     "code": "ESFB",
+     "name": "The Party Animal",
+     "tagline": "The Social Anarchist",
+     "traits": [
+      "First to every activity, last to leave, not sure what 'quiet time' means"
+     ],
+     "signatureMove": "Launching into play mode without any warm-up whatsoever",
+     "ownerReality": "Your pet is the chaos that makes life interesting",
+     "shareQuote": "[PET_NAME] doesn't do 'calm'. We've accepted this. We're at peace with it."
+    },
+    {
+     "code": "ESFC",
+     "name": "The Self-Appointed Supervisor",
+     "tagline": "The Eager Assistant",
+     "traits": [
+      "Sociable and always involved, but on their own terms and from a safe distance"
+     ],
+     "signatureMove": "Inserting themselves into every household task with maximum enthusiasm",
+     "ownerReality": "Your pet is always busy and none of it is your business",
+     "shareQuote": "[PET_NAME] helps with everything. Most of it unhelpfully. All of it enthusiastically."
+    },
+    {
+     "code": "ENTB",
+     "name": "The Action Hero",
+     "tagline": "The Self-Starter",
+     "traits": [
+      "High energy, happy with or without company, learns fast and tries anything once"
+     ],
+     "signatureMove": "Finding the one thing in the house they're not supposed to touch",
+     "ownerReality": "Your pet is exhausting, incredible, and has no regrets",
+     "shareQuote": "[PET_NAME] makes their own rules. I consult them before making any decisions."
+    },
+    {
+     "code": "ENTC",
+     "name": "The Social Philosopher",
+     "tagline": "The Curious Connector",
+     "traits": [
+      "Social and enquiring — they need to understand everything before committing"
+     ],
+     "signatureMove": "Sitting very close and staring with intense intellectual curiosity",
+     "ownerReality": "Your pet is conducting research on you. Continuously.",
+     "shareQuote": "[PET_NAME] is studying me. I believe I am passing. The criteria are unclear."
+    },
+    {
+     "code": "ENFB",
+     "name": "The Wild Card",
+     "tagline": "The Unpredictable Force",
+     "traits": [
+      "Energetic, independent, free-spirited and bold: the most unpredictable combination"
+     ],
+     "signatureMove": "Doing the unexpected in every situation without exception",
+     "ownerReality": "You never know what's coming. That's the whole experience.",
+     "shareQuote": "[PET_NAME] is a one-of-a-kind chaos engine and I would not change a single thing."
+    },
+    {
+     "code": "ENFC",
+     "name": "The Gentle Storm",
+     "tagline": "The Warm Adventurer",
+     "traits": [
+      "High energy and happy doing their own thing, but takes anything new very slowly"
+     ],
+     "signatureMove": "Enthusiastic participation once they've determined it's safe",
+     "ownerReality": "Your pet is brave on their own timeline. The timeline is theirs.",
+     "shareQuote": "[PET_NAME]'s bravery is selective and deliberate. I respect the system."
+    },
+    {
+     "code": "ISTB",
+     "name": "The Loyal Guardian",
+     "tagline": "The Steady Protector",
+     "traits": [
+      "Calm confidence, always watching over their family"
+     ],
+     "signatureMove": "Quietly positioning themselves between family and any potential threat",
+     "ownerReality": "Your pet is the strong, silent type who takes their responsibilities seriously",
+     "shareQuote": "My dog doesn't need to bark to communicate that they are on duty. They are always on duty."
+    },
+    {
+     "code": "ISTC",
+     "name": "The Gentle Soul",
+     "tagline": "The Quiet Companion",
+     "traits": [
+      "Prefers peaceful moments — excellent judge of character and atmosphere"
+     ],
+     "signatureMove": "Slow, deliberate approach with a cautious tail wag",
+     "ownerReality": "Your pet is the friend who shows up with everything you need before you ask for it",
+     "shareQuote": "[PET_NAME] believes the best conversations happen in comfortable silence. They're right."
+    },
+    {
+     "code": "ISFB",
+     "name": "The Confident Couch Potato",
+     "tagline": "The Regal Relaxer",
+     "traits": [
+      "Dignified presence — social but entirely on their own terms and schedule"
+     ],
+     "signatureMove": "Graciously accepting attention from their throne, which is your sofa",
+     "ownerReality": "Your pet has mastered looking majestic while doing absolutely nothing",
+     "shareQuote": "[PET_NAME] believes they are royalty. Honestly, they're not wrong."
+    },
+    {
+     "code": "ISFC",
+     "name": "The Velcro Pet",
+     "tagline": "The Professional Snuggler",
+     "traits": [
+      "Lives for quiet bonding time — perfectly content just being near you"
+     ],
+     "signatureMove": "Slowly migrating closer during quiet time until they are technically on your lap",
+     "ownerReality": "Your pet has redefined personal space to mean shared space",
+     "shareQuote": "[PET_NAME]'s favourite hobby is being as close to me as physically possible. I don't mind."
+    },
+    {
+     "code": "INTB",
+     "name": "The Wise Observer",
+     "tagline": "The Silent Strategist",
+     "traits": [
+      "Highly intelligent — prefers to watch and learn before acting"
+     ],
+     "signatureMove": "Solving problems through careful observation that makes humans feel slightly watched",
+     "ownerReality": "Your pet is definitely smarter than most humans you know",
+     "shareQuote": "[PET_NAME] has figured out things about this household that I haven't noticed yet."
+    },
+    {
+     "code": "INTC",
+     "name": "The Peaceful Philosopher",
+     "tagline": "The Zen Master",
+     "traits": [
+      "Deeply contemplative — finds wisdom in quiet moments"
+     ],
+     "signatureMove": "Long, thoughtful gazes that appear to contain the secrets of the universe",
+     "ownerReality": "Your pet has achieved a level of inner peace that you can only aspire to",
+     "shareQuote": "[PET_NAME] could teach a masterclass in equanimity. I would attend. I would take notes."
+    },
+    {
+     "code": "INFB",
+     "name": "The Creative Rebel",
+     "tagline": "The Artistic Soul",
+     "traits": [
+      "Marches to their own beat — finds creative solutions to every situation"
+     ],
+     "signatureMove": "Turning completely ordinary objects into sources of personal entertainment",
+     "ownerReality": "Your pet sees the world as their personal creative project",
+     "shareQuote": "[PET_NAME] believes rules are starting points for creative interpretation. The results are extraordinary."
+    },
+    {
+     "code": "INFC",
+     "name": "The Mysterious Mystic",
+     "tagline": "The Enigmatic Sage",
+     "traits": [
+      "Deeply independent — shares wisdom sparingly and on their own terms"
+     ],
+     "signatureMove": "Appearing and disappearing with timing that seems genuinely supernatural",
+     "ownerReality": "Your pet knows things. They will never tell you.",
+     "shareQuote": "[PET_NAME] chooses when to grace me with their presence. I am honoured every time."
+    }
+   ]
+  },
+  {
+   "slug": "pawsonality",
+   "animalType": "cat",
+   "title": "16 Pawsonalities · Cats",
+   "questions": [
+    {
+     "key": "cat-ei1",
+     "dimension": "EI",
+     "rightPole": "E",
+     "statement": "[PET_NAME] ALWAYS… does a full-speed lap of the house at 3am",
+     "shareQuote": "Every night at 3am [PET_NAME] hosts a Grand Prix. I am the track.",
+     "visualBrief": "Cat mid-skid round a corner in a dark hallway, owner's door ajar",
+     "isActive": true
+    },
+    {
+     "key": "cat-ei2",
+     "dimension": "EI",
+     "rightPole": "I",
+     "statement": "[PET_NAME] NEVER… turns down a sunny spot for a nap",
+     "shareQuote": "[PET_NAME] follows the sun round the house like a very small solar panel.",
+     "visualBrief": "Cat stretched along a single strip of sunlight on the floorboards",
+     "isActive": true
+    },
+    {
+     "key": "cat-ei3",
+     "dimension": "EI",
+     "rightPole": "E",
+     "statement": "[PET_NAME] ALWAYS… stalks, pounces and wins whenever a toy moves",
+     "shareQuote": "The feather wand hasn't won a round in four years.",
+     "visualBrief": "Cat airborne, all four paws out, feather wand bent in defeat",
+     "isActive": true
+    },
+    {
+     "key": "cat-ei4",
+     "dimension": "EI",
+     "rightPole": "I",
+     "statement": "[PET_NAME] ALWAYS… watches me wave a toy about, then looks at me with pity",
+     "shareQuote": "I perform. [PET_NAME] reviews. The reviews are poor.",
+     "visualBrief": "Cat lying still, unimpressed, while the owner flails a toy mouse",
+     "isActive": true
+    },
+    {
+     "key": "cat-ei5",
+     "dimension": "EI",
+     "rightPole": "E",
+     "statement": "[PET_NAME] NEVER… stays still long enough for a decent photo",
+     "shareQuote": "My camera roll is 400 blurry photos of a tail.",
+     "visualBrief": "Phone screen showing a blurry streak of tail",
+     "isActive": true
+    },
+    {
+     "key": "cat-sn1",
+     "dimension": "SN",
+     "rightPole": "S",
+     "statement": "[PET_NAME] ALWAYS… comes to the door to inspect every visitor",
+     "shareQuote": "[PET_NAME] runs the guest list. Most people get in.",
+     "visualBrief": "Cat sitting on the doormat looking a guest up and down like a bouncer",
+     "isActive": true
+    },
+    {
+     "key": "cat-sn2",
+     "dimension": "SN",
+     "rightPole": "S",
+     "statement": "[PET_NAME] NEVER… lets me sit down without claiming my lap",
+     "shareQuote": "I haven't seen my own lap since 2022.",
+     "visualBrief": "Cat already circling on the owner's lap before they've finished sitting",
+     "isActive": true
+    },
+    {
+     "key": "cat-sn3",
+     "dimension": "SN",
+     "rightPole": "N",
+     "statement": "[PET_NAME] ALWAYS… likes company, as long as it's in the next room",
+     "shareQuote": "[PET_NAME] enjoys our company from a respectful distance.",
+     "visualBrief": "Cat on a chair in the hallway, glancing through the doorway at the family",
+     "isActive": true
+    },
+    {
+     "key": "cat-sn4",
+     "dimension": "SN",
+     "rightPole": "S",
+     "statement": "[PET_NAME] ALWAYS… follows me from room to room to supervise",
+     "shareQuote": "I can't open a cupboard without an inspector present.",
+     "visualBrief": "Cat sitting on the bathroom mat staring at the owner",
+     "isActive": true
+    },
+    {
+     "key": "cat-sn5",
+     "dimension": "SN",
+     "rightPole": "N",
+     "statement": "[PET_NAME] NEVER… asks for a cuddle; cuddles are by appointment",
+     "shareQuote": "Cuddles are available on Tuesdays, briefly, on [PET_NAME]'s terms.",
+     "visualBrief": "Cat holding up one paw to an owner leaning in for a hug",
+     "isActive": true
+    },
+    {
+     "key": "cat-tf1",
+     "dimension": "TF",
+     "rightPole": "T",
+     "statement": "[PET_NAME] ALWAYS… comes running at the sound of their name",
+     "shareQuote": "[PET_NAME] comes when called. Nobody believes me.",
+     "visualBrief": "Cat bounding down the stairs as the owner calls from the kitchen",
+     "isActive": true
+    },
+    {
+     "key": "cat-tf2",
+     "dimension": "TF",
+     "rightPole": "F",
+     "statement": "[PET_NAME] NEVER… gets off the kitchen counter just because I said so",
+     "shareQuote": "I said 'down'. [PET_NAME] heard 'stay exactly where you are'.",
+     "visualBrief": "Cat on the worktop beside the butter, holding eye contact",
+     "isActive": true
+    },
+    {
+     "key": "cat-tf3",
+     "dimension": "TF",
+     "rightPole": "T",
+     "statement": "[PET_NAME] ALWAYS… knows the routine and turns up for it on the dot",
+     "shareQuote": "Breakfast is at 7. [PET_NAME] files a complaint at 6:58.",
+     "visualBrief": "Cat sitting by the food bowl, clock on the wall at 6:59",
+     "isActive": true
+    },
+    {
+     "key": "cat-tf4",
+     "dimension": "TF",
+     "rightPole": "F",
+     "statement": "[PET_NAME] ALWAYS… pushes things off tables while looking straight at me",
+     "shareQuote": "[PET_NAME] tests gravity daily. The results haven't changed.",
+     "visualBrief": "Cat mid-nudge, a mug at the table's edge, eyes on the owner",
+     "isActive": true
+    },
+    {
+     "key": "cat-tf5",
+     "dimension": "TF",
+     "rightPole": "T",
+     "statement": "[PET_NAME] ALWAYS… stops scratching the sofa when told (for now)",
+     "shareQuote": "[PET_NAME] respects the 'no'. The sofa remains cautiously optimistic.",
+     "visualBrief": "Cat freezing mid-scratch, one paw still on the sofa arm",
+     "isActive": true
+    },
+    {
+     "key": "cat-bc1",
+     "dimension": "BC",
+     "rightPole": "B",
+     "statement": "[PET_NAME] ALWAYS… climbs into any new box within seconds of it arriving",
+     "shareQuote": "We order things online purely for the boxes.",
+     "visualBrief": "Cat already in a delivery box, the new kettle still on the floor",
+     "isActive": true
+    },
+    {
+     "key": "cat-bc2",
+     "dimension": "BC",
+     "rightPole": "C",
+     "statement": "[PET_NAME] NEVER… comes out until the hoover is back in the cupboard",
+     "shareQuote": "The hoover went away an hour ago. [PET_NAME] needs another twenty minutes.",
+     "visualBrief": "Two eyes glowing from under the bed, hoover in the doorway",
+     "isActive": true
+    },
+    {
+     "key": "cat-bc3",
+     "dimension": "BC",
+     "rightPole": "B",
+     "statement": "[PET_NAME] ALWAYS… heads straight out to investigate when a door is left open",
+     "shareQuote": "[PET_NAME] treats an open door as an invitation to see the world.",
+     "visualBrief": "Cat striding across the threshold into the garden like an explorer",
+     "isActive": true
+    },
+    {
+     "key": "cat-bc4",
+     "dimension": "BC",
+     "rightPole": "C",
+     "statement": "[PET_NAME] ALWAYS… needs a full day to forgive a trip in the carrier",
+     "shareQuote": "One vet visit, three days of silence. Message received.",
+     "visualBrief": "Cat facing the wall, back to the owner, empty carrier by the door",
+     "isActive": true
+    },
+    {
+     "key": "cat-bc5",
+     "dimension": "BC",
+     "rightPole": "B",
+     "statement": "[PET_NAME] NEVER… lets a passing dog spoil their afternoon",
+     "shareQuote": "[PET_NAME] once stared down a Rottweiler. The Rottweiler left.",
+     "visualBrief": "Cat sitting calmly on a garden wall while a large dog barks below",
+     "isActive": true
+    }
+   ],
+   "resultTypes": [
+    {
+     "code": "ESTB",
+     "name": "The Welcoming Committee",
+     "tagline": "The Feline Greeter",
+     "traits": [
+      "Lively, sociable and quick to answer when called — first to the door, first to the box"
+     ],
+     "signatureMove": "Meeting guests at the door and escorting them to the sofa",
+     "ownerReality": "Your cat thinks every visitor came to see them. Usually correct.",
+     "shareQuote": "[PET_NAME] greets visitors before I do. I'm the support act."
+    },
+    {
+     "code": "ESTC",
+     "name": "The Devoted Sidekick",
+     "tagline": "The Gentle Shadow",
+     "traits": [
+      "Busy and affectionate, sticks to your routine, wary of anything new"
+     ],
+     "signatureMove": "Following one step behind, room to room",
+     "ownerReality": "Your cat goes where you go, unless something has changed.",
+     "shareQuote": "[PET_NAME] goes everywhere I go. Unless there's a new rug."
+    },
+    {
+     "code": "ESFB",
+     "name": "The Household Tornado",
+     "tagline": "The Fearless Freelancer",
+     "traits": [
+      "All energy, loves an audience, ignores the rules and fears nothing"
+     ],
+     "signatureMove": "The 3am lap that ends on your face",
+     "ownerReality": "Your cat runs the house. You're allowed to live here.",
+     "shareQuote": "[PET_NAME] runs this house. I just pay the bills."
+    },
+    {
+     "code": "ESFC",
+     "name": "The Chatty Diva",
+     "tagline": "The Opinionated Socialite",
+     "traits": [
+      "Lively and sociable, does things their own way, and hates surprises"
+     ],
+     "signatureMove": "Complaining loudly until things go back exactly as they were",
+     "ownerReality": "Your cat loves company and has notes on everything.",
+     "shareQuote": "[PET_NAME] has opinions about everything and shares them at volume."
+    },
+    {
+     "code": "ENTB",
+     "name": "The Garden Patroller",
+     "tagline": "The Purposeful Prowler",
+     "traits": [
+      "Active and self-sufficient, keeps to a routine, fearless outdoors"
+     ],
+     "signatureMove": "The evening patrol, same route, same time",
+     "ownerReality": "Your cat has a job outdoors and is home for dinner on the dot.",
+     "shareQuote": "[PET_NAME] has a job. I don't know what it is, but they're very committed."
+    },
+    {
+     "code": "ENTC",
+     "name": "The Night Watch",
+     "tagline": "The Quiet Professional",
+     "traits": [
+      "Alert and independent, reliable about routines, careful with strangers"
+     ],
+     "signatureMove": "Alert surveillance from the top of the wardrobe",
+     "ownerReality": "Nothing happens in your house without your cat knowing first.",
+     "shareQuote": "[PET_NAME] sees everything. Reports to no one."
+    },
+    {
+     "code": "ENFB",
+     "name": "The Escape Artist",
+     "tagline": "The Free Agent",
+     "traits": [
+      "Restless, independent, follows no rules and goes anywhere"
+     ],
+     "signatureMove": "Vanishing, then reappearing somewhere impossible",
+     "ownerReality": "Your cat doesn't need doors. Your cat has methods.",
+     "shareQuote": "I shut every door. [PET_NAME] was on the roof."
+    },
+    {
+     "code": "ENFC",
+     "name": "The Phantom",
+     "tagline": "The Elusive Acrobat",
+     "traits": [
+      "Quick and independent, answers to no one, keeps well clear of fuss"
+     ],
+     "signatureMove": "Seen at speed, never caught on camera",
+     "ownerReality": "You know your cat exists. The food bills prove it.",
+     "shareQuote": "I know [PET_NAME] lives here. I've just never seen them sit down."
+    },
+    {
+     "code": "ISTB",
+     "name": "The Lap Monarch",
+     "tagline": "The Benevolent Ruler",
+     "traits": [
+      "Calm, affectionate, knows the routine and settles anywhere"
+     ],
+     "signatureMove": "Settling on any lap, guests' included, without asking",
+     "ownerReality": "Your cat picks a lap, and the lap is honoured.",
+     "shareQuote": "[PET_NAME] chose the vicar's lap. The vicar stayed for dinner."
+    },
+    {
+     "code": "ISTC",
+     "name": "The Slow Blinker",
+     "tagline": "The Gentle Companion",
+     "traits": [
+      "Quiet and loving, likes things the same, close to their people"
+     ],
+     "signatureMove": "The slow blink from the next cushion",
+     "ownerReality": "Your cat stays close and says it all with a look.",
+     "shareQuote": "[PET_NAME] doesn't say 'I love you'. [PET_NAME] blinks it."
+    },
+    {
+     "code": "ISFB",
+     "name": "The Sofa Sovereign",
+     "tagline": "The Regal Lounger",
+     "traits": [
+      "Relaxed and sociable, entirely on their own terms, unbothered by anything"
+     ],
+     "signatureMove": "Taking your seat the moment you stand up",
+     "ownerReality": "Your cat enjoys company, on their throne, on their terms.",
+     "shareQuote": "I stood up for one second. That was my mistake."
+    },
+    {
+     "code": "ISFC",
+     "name": "The Selective Snuggler",
+     "tagline": "The Cuddle Connoisseur",
+     "traits": [
+      "Calm and loving with their chosen person, does it their way, shy with everyone else"
+     ],
+     "signatureMove": "Burrowing under the duvet with their chosen human",
+     "ownerReality": "Your cat loves exactly one person, under exactly one blanket.",
+     "shareQuote": "[PET_NAME] loves one person. I'm on probation."
+    },
+    {
+     "code": "INTB",
+     "name": "The Wise Old Soul",
+     "tagline": "The Calm Strategist",
+     "traits": [
+      "Unhurried and self-contained, knows the routine, nothing fazes them"
+     ],
+     "signatureMove": "The unbothered stare that ends every argument",
+     "ownerReality": "Your cat has seen it all and isn't impressed by any of it.",
+     "shareQuote": "[PET_NAME] has seen it all and is impressed by none of it."
+    },
+    {
+     "code": "INTC",
+     "name": "The Window Philosopher",
+     "tagline": "The Thoughtful Observer",
+     "traits": [
+      "Quiet and independent, likes a routine, watches rather than joins"
+     ],
+     "signatureMove": "Hours at the window, tail twitching at pigeons",
+     "ownerReality": "Your cat watches the world from a safe and comfy distance.",
+     "shareQuote": "[PET_NAME] watches the street like a very slow box set."
+    },
+    {
+     "code": "INFB",
+     "name": "The Aristocat",
+     "tagline": "The Untouchable",
+     "traits": [
+      "Serene, self-sufficient, makes their own rules and fears nothing"
+     ],
+     "signatureMove": "Sitting on the one thing you need right now",
+     "ownerReality": "Your cat doesn't ignore you. They simply choose not to notice.",
+     "shareQuote": "[PET_NAME] isn't ignoring me. [PET_NAME] just hasn't decided I exist today."
+    },
+    {
+     "code": "INFC",
+     "name": "The Mystery Guest",
+     "tagline": "The Enigma",
+     "traits": [
+      "Quiet, independent, answers to no one and keeps their distance"
+     ],
+     "signatureMove": "Appearing silently, gone before you say hello",
+     "ownerReality": "Your cat arrives when they like, leaves when they like, explains nothing.",
+     "shareQuote": "[PET_NAME] comes and goes like a rumour."
+    }
+   ]
+  }
+ ]
+}
