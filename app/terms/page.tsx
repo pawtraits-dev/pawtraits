@@ -116,7 +116,10 @@ export default function TermsPage() {
             Generated portraits are provided for your personal, non-commercial use. You may print, display, and share your portraits, but may not resell or commercially exploit them without explicit written permission.
           </p>
           <p className="text-gray-600 text-base my-4 leading-relaxed">
-            Pawtraits retains the right to use anonymized data patterns derived from portrait generations to improve our AI models and service quality. We do not share or sell your personal photos or identifying information.
+            Pawtraits retains the right to use anonymised data patterns derived from portrait generations to improve our AI models and service quality. We do not sell your personal photos or share your identifying information.
+          </p>
+          <p className="text-gray-600 text-base my-4 leading-relaxed">
+            <strong>Featuring your Pawtrait.</strong> When you create a customised Pawtrait preview or buy one, you give us permission to show it, together with the original photo you uploaded, on our website and social media (including Instagram), with your pet&apos;s first name and your town or city and country. We never show your name, email, street address or postcode, and we automatically check photos and leave out any that show people or personal details. You can withdraw this permission at any time using the &ldquo;Keep my pet out of it&rdquo; link in your order email (if you bought one) or by emailing <a href="mailto:support@pawtraits.pics" className="text-purple-700 underline">support@pawtraits.pics</a>; we then stop featuring your orders and remove any post already published.
           </p>
         </div>
 

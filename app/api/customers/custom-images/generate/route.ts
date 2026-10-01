@@ -10,6 +10,7 @@ import { GEMINI_IMAGE_MODELS, toGeminiAspectRatio, geminiImageConfig, ratioOfIma
 import { getRequester, setGuestCookie, clientIp } from '@/lib/guest/access';
 import { hashIp } from '@/lib/qr/attribution';
 import { getSetting } from '@/lib/app-settings';
+import { capturePreviews } from '@/lib/social/capture';
 
 // Generation continues after the response (via after()); give it room to finish.
 export const maxDuration = 300;
@@ -652,7 +653,8 @@ export async function POST(request: NextRequest) {
         firstPet?.breeds?.name,
         firstPet?.ai_analysis_data, // Pass AI analysis data from first pet
         sizeInstruction // NEW: Pass relative size instruction for multi-subject
-      ).catch(async (error) => {
+      ).then(() => capturePreviews({ ids: [customImage.id] })) // social loop: only if "Include free previews" is on
+      .catch(async (error) => {
         console.error('❌ Error in background generation:', error);
         // Update record with error status
         await supabase

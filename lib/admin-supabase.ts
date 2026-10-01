@@ -648,6 +648,36 @@ export class AdminSupabaseService {
     return adminRequest<{ ok: true }>('/api/admin/settings/app', jsonInit('PATCH', { key, value }));
   }
 
+  // ===== SOCIAL LOOP (Admin → Social) =====
+
+  async getSocial(view = 'all', limit = 50): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/social?view=${encodeURIComponent(view)}&limit=${limit}`);
+  }
+
+  async updateSocialItem(id: string, action: 'hide' | 'unhide' | 'approve' | 'recheck' | 'ig_exclude' | 'ig_include'): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/social/items/${id}`, jsonInit('PATCH', { action }));
+  }
+
+  async updateStallTown(id: string, town: string): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/social/stalls/${id}`, jsonInit('PATCH', { town }));
+  }
+
+  async getSocialCarousels(): Promise<AdminResult<any>> {
+    return adminRequest<any>('/api/admin/social/carousels');
+  }
+
+  async updateSocialCarousel(id: string, body: { caption?: string; action?: 'reset_caption' | 'mark_posted'; permalink?: string }): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/social/carousels/${id}`, jsonInit('PATCH', body));
+  }
+
+  async importSocialPreviews(days = 30): Promise<AdminResult<{ added: number }>> {
+    return adminRequest<{ added: number }>('/api/admin/social/import-previews', jsonInit('POST', { days }));
+  }
+
+  async retrySocialChecks(): Promise<AdminResult<{ retried: number }>> {
+    return adminRequest<{ retried: number }>('/api/admin/social/retry-checks', jsonInit('POST', {}));
+  }
+
   // ===== ORDER FULFILMENT =====
 
   /** Orders with prints to post, grouped by stage, plus the default provider. */

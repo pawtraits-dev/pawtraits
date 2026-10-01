@@ -14,6 +14,14 @@ export const SETTING_DEFAULTS = {
   default_fulfillment_provider: 'self_print' as FulfillmentProvider,
   /** Printed small under the address label on packing slips ("If undelivered return to: …") */
   return_address: '' as string,
+  /** Social loop (Admin → Social): website "recent creations" feed */
+  social_feed_enabled: true,
+  /** Social loop: post before/after carousels to Instagram (off until the Meta app is connected) */
+  social_instagram_enabled: false,
+  /** Social loop: automatic photo check before an order is featured */
+  social_photo_check_enabled: true,
+  /** Social loop: feature free previews (customisations not yet bought) as well as purchases */
+  social_include_previews: false,
 };
 export type FulfillmentProvider = 'self_print' | 'gelato';
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
@@ -67,6 +75,10 @@ export function validateSetting(key: string, value: unknown): string | null {
     case 'return_address':
       return typeof value === 'string' && value.length <= 160 ? null : 'Must be text, 160 characters max';
     case 'welcome_gift_enabled':
+    case 'social_feed_enabled':
+    case 'social_instagram_enabled':
+    case 'social_photo_check_enabled':
+    case 'social_include_previews':
       return typeof value === 'boolean' ? null : 'Must be true or false';
     case 'stall_prices_pence': {
       const v = value as Record<string, unknown>;

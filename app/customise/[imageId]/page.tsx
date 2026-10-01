@@ -487,7 +487,7 @@ export default function CustomisePage() {
             </div>
             {preparing && <p className="mt-3 text-sm text-gray-500">Getting your photo ready…</p>}
             <p className="mt-4 text-xs text-gray-500">
-              Your photo is only used to make your portrait. {!signedIn && <>No account needed — <Link href={`/auth/login?returnTo=/customise/${imageId}`} className="underline">sign in</Link> to use your saved pets.</>}
+              Your photo is used to make your portrait. We may show favourites on our website and Instagram with your pet’s first name only (<Link href="/terms" className="underline">terms</Link>). {!signedIn && <>No account needed — <Link href={`/auth/login?returnTo=/customise/${imageId}`} className="underline">sign in</Link> to use your saved pets.</>}
             </p>
 
             <StickyActionBar>
