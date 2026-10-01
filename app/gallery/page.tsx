@@ -679,7 +679,7 @@ function GalleryContent() {
   };
 
   const handleImageClick = (image: GalleryImage) => {
-    router.push(`/shop/${image.id}`);
+    router.push(`/customise/${image.id}`);
   };
 
   const handleShareComplete = (platform: string) => {

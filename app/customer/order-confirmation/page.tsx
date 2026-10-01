@@ -104,7 +104,7 @@ function CustomerOrderConfirmationContent() {
               </div>
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">Order Not Found</h2>
               <p className="text-gray-600 mb-8">{error}</p>
-              <Link href="/customer/shop">
+              <Link href="/browse">
                 <Button className="bg-purple-600 hover:bg-purple-700 text-white">
                   Continue Shopping
                 </Button>
@@ -197,13 +197,13 @@ function CustomerOrderConfirmationContent() {
 
         {/* Action Buttons */}
         <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-          <Link href="/customer/orders">
+          <Link href="/orders">
             <Button variant="outline" className="w-full sm:w-auto">
               View Order History
             </Button>
           </Link>
           
-          <Link href="/customer/shop">
+          <Link href="/browse">
             <Button className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white">
               Continue Shopping
               <ArrowRight className="w-4 h-4 ml-2" />

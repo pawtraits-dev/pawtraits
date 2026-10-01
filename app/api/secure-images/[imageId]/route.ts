@@ -29,6 +29,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const userId = searchParams.get('userId');
     const orderId = searchParams.get('orderId');
     const token = searchParams.get('token');
+    const width = parseInt(searchParams.get('w') || '', 10) || undefined;
 
     // Security checks
     const security = await validateImageRequest(request, imageId, variant, userId, orderId, token);
@@ -97,7 +98,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           variant, 
           userId, 
           orderId,
-          security.accessLevel
+          security.accessLevel,
+          width
         );
       } else {
         // Fallback to legacy URL for non-migrated images
@@ -127,7 +129,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     try {
       imageResponse = await fetch(imageUrl, {
         headers: {
-          'User-Agent': 'PawtraitsSecureProxy/1.0'
+          'User-Agent': 'PawtraitsSecureProxy/1.0',
+          // Pass on what the browser can show, so Cloudinary f_auto can send WebP/AVIF
+          'Accept': request.headers.get('accept') || 'image/*',
         },
         // Add timeout
         signal: AbortSignal.timeout(10000) // 10 second timeout
@@ -195,12 +199,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const imageBuffer = await imageResponse.arrayBuffer();
     const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
 
+    // Public catalogue designs (watermarked/small browsing variants) can be cached by the
+    // browser and Vercel's edge, so repeat views skip this function and Cloudinary.
+    // Customers' own images and anything else stay private.
+    const isPublicCatalogue = !isCustomerImage
+      && (image as any).is_public !== false
+      && !(image as any).is_customer_generated
+      && ['mid_size', 'thumbnail', 'full_size', 'catalog_watermarked'].includes(variant);
+
     // Return the image with security headers
     return new NextResponse(imageBuffer, {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'private, max-age=300', // 5 minutes cache
+        'Cache-Control': isPublicCatalogue
+          ? 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400'
+          : 'private, max-age=300',
+        'Vary': 'Accept',
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
         'Referrer-Policy': 'strict-origin',
@@ -341,7 +356,8 @@ async function getSecureVariantUrl(
   variant: string,
   userId: string | null,
   orderId: string | null,
-  accessLevel: 'public' | 'authenticated' | 'purchased'
+  accessLevel: 'public' | 'authenticated' | 'purchased',
+  width?: number
 ): Promise<string> {
   
   console.log(`🔄 Generating secure URL for publicId: ${publicId}, variant: ${variant}, accessLevel: ${accessLevel}`);
@@ -371,7 +387,7 @@ async function getSecureVariantUrl(
     case 'thumbnail':
     case 'mid_size':
       // Use public variant URL generation with short expiration for security
-      const url = cloudinaryService.getPublicVariantUrl(publicId, variant as any);
+      const url = cloudinaryService.getPublicVariantUrl(publicId, variant as any, { width });
       console.log(`✅ Generated URL: ${url}`);
       return url;
       

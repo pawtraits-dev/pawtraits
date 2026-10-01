@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { withOptimisedImages } from '@/lib/images/delivery';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       carousel,
-      content: content || []
+      content: withOptimisedImages(content || [], ['hero_image_url', 'image_url'])
     });
   } catch (error) {
     console.error('Error fetching public carousel content:', error);

@@ -28,7 +28,7 @@ export default function ShareModal({ isOpen, onClose, image, onShare }: ShareMod
   const [customMessage, setCustomMessage] = useState<string>('');
 
   // Generate share URL (you might want to create a dedicated share page)
-  const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/shop/${image.id}`;
+  const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/customise/${image.id}`;
 
   // Build share message based on user options
   const buildShareMessage = () => {

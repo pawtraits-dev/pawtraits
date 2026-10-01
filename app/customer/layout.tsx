@@ -32,6 +32,7 @@ import { getSupabaseClient } from '@/lib/supabase-client';
 import { CountryProvider } from '@/lib/country-context';
 import CountrySelector from '@/components/CountrySelector';
 import { ServerCartProvider } from '@/lib/server-cart-context';
+import CustomerTabBar, { CUSTOMER_NAV, isActivePath } from '@/components/customer/CustomerTabBar';
 
 // Security imports
 import { SecureWrapper } from '@/components/security/SecureWrapper';
@@ -41,18 +42,15 @@ interface CustomerLayoutProps {
   children: React.ReactNode;
 }
 
-const navigationItems = [
-  { name: 'Home', href: '/customer', icon: Home },
-  { name: 'Browse Shop', href: '/browse', icon: ShoppingBag },
-  { name: 'Products', href: '/customer/products', icon: Grid3X3 },
-  { name: 'My Gallery', href: '/customer/gallery', icon: ImageIcon },
-  { name: 'My Pets', href: '/customer/pets', icon: Heart },
-  { name: 'My Orders', href: '/customer/orders', icon: Package },
-  { name: 'My Downloads', href: '/customer/downloads', icon: Download },
+// Main customer menu: four places only (round 2 UX), shared with the phone tab bar
+const navigationItems = CUSTOMER_NAV;
+
+// Smaller links under the main four in the drawer
+const secondaryItems = [
+  { name: 'Browse designs', href: '/browse', icon: Sparkles },
+  { name: 'Downloads', href: '/customer/downloads', icon: Download },
+  { name: 'My pets', href: '/customer/pets', icon: Heart },
   { name: 'Inbox', href: '/customer/inbox', icon: Bell },
-  { name: 'Cart', href: '/shop/cart', icon: ShoppingCart },
-  { name: 'Share & Earn', href: '/referrals', icon: Share2 },
-  { name: 'My Account', href: '/customer/account', icon: User },
 ];
 
 export default function CustomerLayout({ children }: CustomerLayoutProps) {
@@ -253,25 +251,42 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4">
-          <div className="space-y-2">
+        <nav aria-label="Account menu" className="flex-1 overflow-y-auto p-4">
+          <div className="space-y-1">
             {navigationItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
-              
+              const isActive = isActivePath(pathname, item.match);
               return (
                 <Link
                   key={item.name}
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center px-3 py-3 text-sm rounded-lg transition-colors duration-200 ${
-                    isActive
-                      ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-600'
-                      : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex items-center px-3 py-3 text-base font-medium rounded-lg transition-colors duration-200 ${
+                    isActive ? 'bg-purple-50 text-purple-800' : 'text-gray-800 hover:bg-gray-100'
                   }`}
                 >
-                  <Icon className="w-5 h-5 mr-3" />
+                  <Icon className="w-5 h-5 mr-3" aria-hidden="true" />
                   {item.name}
+                </Link>
+              );
+            })}
+          </div>
+          <div className="mt-4 border-t border-gray-100 pt-4 space-y-1">
+            {secondaryItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className="flex items-center px-3 py-2 text-sm rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                >
+                  <Icon className="w-4 h-4 mr-3" aria-hidden="true" />
+                  {item.name}
+                  {item.href === '/customer/inbox' && unreadCount > 0 && (
+                    <span className="ml-auto rounded-full bg-purple-600 px-2 text-xs font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                  )}
                 </Link>
               );
             })}
@@ -299,8 +314,10 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
               <div className="flex items-center space-x-4">
                 <button
                   onClick={() => setSidebarOpen(true)}
+                  aria-label="Open menu"
                   className="flex items-center space-x-2 hover:bg-gray-100 rounded-lg p-2 transition-colors"
                 >
+                <Menu className="w-5 h-5 text-gray-700" aria-hidden="true" />
                 <Image 
                   src="/assets/logos/paw-svgrepo-200x200-purple.svg" 
                   alt="Pawtraits"
@@ -313,11 +330,12 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
             </div>
             
             {/* Search Bar */}
-            <div className="flex-1 max-w-2xl mx-4">
+            <div className="hidden md:block flex-1 max-w-2xl mx-4">
               <form onSubmit={handleSearch} className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
-                  placeholder="Search pet portraits, breeds, themes..."
+                  placeholder="Search designs, breeds, themes…"
+                  aria-label="Search designs"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 w-full"
@@ -325,11 +343,11 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
               </form>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <CountrySelector compact={true} showLabel={false} />
+            <div className="flex items-center space-x-2 md:space-x-4">
+              <div className="hidden sm:block"><CountrySelector compact={true} showLabel={false} /></div>
 
               {/* Inbox Icon */}
-              <Link href="/customer/inbox" className="relative">
+              <Link href="/customer/inbox" aria-label={unreadCount > 0 ? `Inbox, ${unreadCount} unread` : 'Inbox'} className="relative">
                 <Button variant="ghost" size="sm" className="relative">
                   <Bell className="w-5 h-5" />
                   {unreadCount > 0 && (
@@ -346,9 +364,12 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
           </header>
 
           {/* Page Content */}
-          <main className="p-6">
+          <main className="p-4 pb-24 md:p-6">
             {children}
           </main>
+
+          {/* Phone tab bar: the same four places as the menu */}
+          <CustomerTabBar />
         </div>
       </div>
     </CountryProvider>

@@ -141,7 +141,7 @@ export default function ReferralLandingPage() {
           window.location.href = `/signup/user?ref=${code}&discount=20&type=influencer`;
         } else if (referral.referral_type === 'image_share' && referral.image_id) {
           // Partner Method 2: Redirect to shop page for the specific image
-          window.location.href = `/shop/${referral.image_id}?ref=${code}&discount=20`;
+          window.location.href = `/customise/${referral.image_id}?ref=${code}&discount=20`;
         } else {
           // Partner Method 1: Traditional signup flow
           window.location.href = `/signup/user?ref=${code}&discount=20`;
@@ -155,7 +155,7 @@ export default function ReferralLandingPage() {
       } else if (referral.referral_type === 'influencer') {
         window.location.href = `/signup/user?ref=${code}&discount=20&type=influencer`;
       } else if (referral.referral_type === 'image_share' && referral.image_id) {
-        window.location.href = `/shop/${referral.image_id}?ref=${code}&discount=20`;
+        window.location.href = `/customise/${referral.image_id}?ref=${code}&discount=20`;
       } else {
         window.location.href = `/signup/user?ref=${code}&discount=20`;
       }

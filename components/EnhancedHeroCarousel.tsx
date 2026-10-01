@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { plainText, snippet } from '@/lib/text/plain';
 import { ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
@@ -237,13 +238,13 @@ export default function EnhancedHeroCarousel({
               
               {currentSlide.subtitle && (
                 <h2 className={`text-lg md:text-2xl font-semibold mb-2 md:mb-4 drop-shadow-lg ${getTextColorClasses(currentSlide.subtitle_color || currentSlide.text_color)}`}>
-                  {currentSlide.subtitle}
+                  {plainText(currentSlide.subtitle)}
                 </h2>
               )}
               
               {currentSlide.description && (
                 <p className={`text-sm md:text-lg mb-4 md:mb-8 max-w-2xl drop-shadow-lg opacity-90 leading-relaxed ${getTextColorClasses(currentSlide.description_color || currentSlide.text_color)}`}>
-                  {currentSlide.description}
+                  {snippet(currentSlide.description, 110)}
                 </p>
               )}
               
@@ -283,6 +284,7 @@ export default function EnhancedHeroCarousel({
               variant="ghost"
               size="sm"
               onClick={goToPrevious}
+              aria-label="Previous slide"
               className="ml-4 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border-0"
               aria-label="Previous image"
             >
@@ -295,6 +297,7 @@ export default function EnhancedHeroCarousel({
               variant="ghost"
               size="sm"
               onClick={goToNext}
+              aria-label="Next slide"
               className="mr-4 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border-0"
               aria-label="Next image"
             >
@@ -326,6 +329,7 @@ export default function EnhancedHeroCarousel({
               <button
                 key={slide.id}
                 onClick={() => goToSlide(index)}
+                aria-label={`Go to slide ${index + 1}`}
                 className={`flex-shrink-0 w-16 h-9 overflow-hidden rounded border-2 transition-all duration-200 ${
                   index === currentIndex 
                     ? 'border-white shadow-lg' 

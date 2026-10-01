@@ -10,13 +10,14 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Download, Truck, ShoppingBag, X, Hand, Gift } from 'lucide-react';
+import { Check, Download, Truck, ShoppingBag, X, Hand } from 'lucide-react';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { useToast } from '@/components/ui/use-toast';
 import { buildStallCartProduct, SIZE_NAMES, isStallProductId } from '@/lib/cart/items';
 import { track } from '@/lib/tracking/events';
-import { orientationOf, printSizeFor, cropNote, type Orientation } from '@/lib/print/print-geometry';
+import { orientationOf, printSizeFor, type Orientation } from '@/lib/print/print-geometry';
 import { orientedSize } from '@/lib/products/shape-family';
+import { shippingSummary } from '@/lib/shipping/rates';
 
 export interface BuyTarget {
   kind: 'catalog' | 'custom';
@@ -48,12 +49,17 @@ const STALL_OPTION = '__stall__';
 const pence = (p: ProductRow['pricing']) => (p.is_on_sale && p.discount_price ? p.discount_price : p.sale_price);
 const gbp = (v?: number) => (v === undefined ? '' : `£${(v / 100).toFixed(v % 100 === 0 ? 0 : 2)}`);
 
-export default function BuyOptionsSheet({ open, onClose, target, stallOffer, scannedSize }: {
+/** Brand-voice line for each Foamex size (shown under the size name) */
+const SIZE_LINES: Record<string, string> = { S: 'Sweet and petite', M: 'Just right', L: 'Large and in charge' };
+
+export default function BuyOptionsSheet({ open, onClose, target, stallOffer, scannedSize, inline = false }: {
   open: boolean;
   onClose: () => void;
   target: BuyTarget;
   stallOffer?: StallOfferView | null;
   scannedSize?: string | null;
+  /** Render as a section of the page (design page) instead of a bottom sheet */
+  inline?: boolean;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -81,8 +87,11 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
         setProducts(rows);
         // sensible default: the print in their hand, else the download for a custom portrait
         const digital = rows.find(p => p.product_type === 'digital_download');
+        const medium = rows.find(p => p.product_type !== 'digital_download' && p.size_code === (scannedSize || 'M'));
         if (stallAvailable) setSelected(new Set([STALL_OPTION]));
         else if (target.kind === 'custom' && digital) setSelected(new Set([digital.id]));
+        else if (inline && medium) setSelected(new Set([medium.id]));
+        else if (inline && digital && !rows.some(p => p.product_type !== 'digital_download')) setSelected(new Set([digital.id]));
       })
       .catch(e => setLoadError(e.message));
   }, [open, products, target.formatId, target.kind, stallAvailable]);
@@ -143,7 +152,7 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
         router.push('/shop/checkout');
       } else {
         onClose();
-        setSelected(new Set());
+        if (!inline) setSelected(new Set());
         toast({
           title: 'Added to your basket 🛍️',
           description: stallAvailable ? 'Scan another print or keep browsing — check out whenever you’re ready.' : 'Keep browsing — your basket is in the top bar.',
@@ -156,6 +165,102 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
     }
   }
 
+  const sections = (
+    <>
+          {stallAvailable && (
+            <section>
+              <p className="mb-2 flex items-center gap-1 text-sm font-semibold text-gray-800"><Hand className="h-4 w-4" /> Take it home now{stallOffer!.locationName ? ` · ${stallOffer!.locationName}` : ''}</p>
+              <Option
+                checked={selected.has(STALL_OPTION)} onClick={() => toggle(STALL_OPTION)} highlight
+                disabled={alreadyHasStallLine}
+                badge="The print in your hand"
+                title={`${SIZE_NAMES[stallOffer!.size!]} print — ready now`}
+                subtitle={alreadyHasStallLine ? 'Already in your basket' : 'Pay on your phone and take it with you'}
+                perk={alreadyHasStallLine ? undefined : 'Includes bonus digital copy'}
+                price={gbp(stallOffer!.pricePence)}
+                wasPrice={stallOffer!.discountPct ? gbp(stallOffer!.listPricePence) : undefined}
+              />
+            </section>
+          )}
+
+          {!products && !loadError && <div className="space-y-2">{[0, 1, 2].map(i => <div key={i} className="h-16 animate-pulse rounded-2xl bg-gray-100" />)}</div>}
+          {loadError && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{loadError}</p>}
+
+          {Object.entries(printsByMedium).map(([medium, rows]) => (
+            <section key={medium}>
+              <p className="mb-2 flex items-center gap-1 text-sm font-semibold text-gray-800">
+                <Truck className="h-4 w-4" /> {medium} · {stallAvailable ? 'made to order, delivered' : 'printed and posted'}
+              </p>
+              <div className="space-y-2">
+                {rows.map(p => {
+                  const sameSize = !!scannedSize && p.size_code === scannedSize;
+                  return (
+                    <Option key={p.id} checked={selected.has(p.id)} onClick={() => toggle(p.id)}
+                      highlight={sameSize && !stallAvailable}
+                      thumb={orientation && p.width_cm && p.height_cm ? <ShapeThumb src={target.imageUrl} {...printSizeFor(p.width_cm, p.height_cm, orientation)} /> : undefined}
+                      badge={p.size_code === 'M' && !stallAvailable && !sameSize ? 'Most popular' : undefined}
+                      title={`${p.size_name || p.name}${p.width_cm ? ` · ${orientedSize(p, orientation)}` : ''}`}
+                      subtitle={sameSize ? (stallAvailable ? 'Same size as the one in your hand, made fresh and delivered' : 'Same size as the print you scanned') : (SIZE_LINES[p.size_code || ''] || p.media_description)}
+                      perk="Includes bonus digital copy"
+                      price={gbp(pence(p.pricing))} />
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+
+          {digital.length > 0 && (
+            <section>
+              <p className="mb-2 flex items-center gap-1 text-sm font-semibold text-gray-800"><Download className="h-4 w-4" /> Digital</p>
+              <div className="space-y-2">
+                {digital.map(p => (
+                  <Option key={p.id} checked={!anyPrintSelected && selected.has(p.id)} onClick={() => !anyPrintSelected && toggle(p.id)}
+                    disabled={anyPrintSelected}
+                    title={anyPrintSelected ? 'Digital download — included free' : 'Digital download only'}
+                    subtitle={anyPrintSelected ? 'Comes free with the print you’ve chosen' : 'High-resolution Pawtrait · instant · perfect for phones and socials'}
+                    price={anyPrintSelected ? 'Free' : gbp(pence(p.pricing))}
+                    wasPrice={anyPrintSelected ? gbp(pence(p.pricing)) : undefined} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {products && products.length === 0 && !stallAvailable && (
+            <p className="text-sm text-gray-600">No products are set up for this design’s format yet.</p>
+          )}
+    </>
+  );
+
+  const actions = (
+    <>
+          <button onClick={() => add('checkout')} disabled={!selected.size || !!busy}
+            className="flex h-14 w-full items-center justify-between rounded-2xl bg-purple-600 px-5 text-lg font-semibold text-white shadow-lg disabled:bg-purple-300">
+            <span className="flex items-center gap-2"><ShoppingBag className="h-5 w-5" />{busy === 'checkout' ? 'One moment…' : inline ? 'Buy now' : 'Checkout now'}</span>
+            {total > 0 && <span>{gbp(total)}</span>}
+          </button>
+          <button onClick={() => add('basket')} disabled={!selected.size || !!busy}
+            className="h-12 w-full rounded-2xl border-2 border-purple-600 font-semibold text-purple-800 disabled:border-purple-200 disabled:text-purple-300">
+            {busy === 'basket' ? 'Adding…' : inline ? 'Add to basket' : 'Add to basket & keep shopping'}
+          </button>
+    </>
+  );
+
+  const hasPrints = stallAvailable || Object.keys(printsByMedium).length > 0;
+
+  if (inline) {
+    return (
+      <section aria-labelledby="buy-heading" className="mt-8">
+        <h2 id="buy-heading" className="text-lg font-bold text-gray-900">Or buy it as it is</h2>
+        <p className="mt-0.5 mb-4 text-sm text-gray-500">
+          {hasPrints || !products ? 'UV-printed on 3 mm rigid Foamex, ready to lean or hang.' : 'This design is available as a high-resolution digital download.'}
+        </p>
+        <div className="space-y-5">{sections}</div>
+        <div className="mt-4 space-y-2">{actions}</div>
+        {hasPrints && <p className="mt-3 text-center text-xs text-gray-500">Tracked delivery per order: {shippingSummary()}</p>}
+      </section>
+    );
+  }
+
   if (!open) return null;
 
   return (
@@ -166,91 +271,13 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={target.imageUrl} alt="" className="h-12 w-10 rounded-lg object-cover" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-purple-700">{target.kind === 'custom' ? 'Your portrait' : 'This print'}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-purple-700">{target.kind === 'custom' ? 'Your Pawtrait' : 'This Pawtrait'}</p>
             <p className="truncate font-semibold text-gray-900">{target.title}</p>
           </div>
           <button onClick={onClose} className="p-2 text-gray-500" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
-
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
-          <p className="flex items-start gap-2 rounded-2xl bg-green-50 px-3 py-2.5 text-sm text-green-900">
-            <Gift className="mt-0.5 h-4 w-4 shrink-0" />
-            <span><strong>Free digital copy with every print</strong> bought here — a high-res file for your phone, emailed with your receipt.</span>
-          </p>
-          {stallAvailable && (
-            <section>
-              <p className="mb-2 flex items-center gap-1 text-sm font-semibold text-gray-800"><Hand className="h-4 w-4" /> Take it home now{stallOffer!.locationName ? ` · ${stallOffer!.locationName}` : ''}</p>
-              <Option
-                checked={selected.has(STALL_OPTION)} onClick={() => toggle(STALL_OPTION)} highlight
-                disabled={alreadyHasStallLine}
-                badge="The print in your hand"
-                title={`${SIZE_NAMES[stallOffer!.size!]} print — ready now`}
-                subtitle={alreadyHasStallLine ? 'Already in your basket' : 'Pay on your phone and take it with you'}
-                perk={alreadyHasStallLine ? undefined : 'Free digital copy included'}
-                price={gbp(stallOffer!.pricePence)}
-                wasPrice={stallOffer!.discountPct ? gbp(stallOffer!.listPricePence) : undefined}
-              />
-            </section>
-          )}
-
-          {!products && !loadError && <div className="space-y-2">{[0, 1, 2].map(i => <div key={i} className="h-16 animate-pulse rounded-2xl bg-gray-100" />)}</div>}
-          {loadError && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{loadError}</p>}
-
-          {digital.length > 0 && (
-            <section>
-              <p className="mb-2 flex items-center gap-1 text-sm font-semibold text-gray-800"><Download className="h-4 w-4" /> Digital</p>
-              <div className="space-y-2">
-                {digital.map(p => (
-                  <Option key={p.id} checked={!anyPrintSelected && selected.has(p.id)} onClick={() => !anyPrintSelected && toggle(p.id)}
-                    disabled={anyPrintSelected}
-                    title={anyPrintSelected ? 'Digital download — included free' : 'Digital download only'}
-                    subtitle={anyPrintSelected ? 'Comes free with the print you’ve chosen 🎁' : 'High-resolution file · instant · perfect for phones and socials'}
-                    price={anyPrintSelected ? 'Free' : gbp(pence(p.pricing))}
-                    wasPrice={anyPrintSelected ? gbp(pence(p.pricing)) : undefined} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {Object.entries(printsByMedium).map(([medium, rows]) => (
-            <section key={medium}>
-              <p className="mb-2 flex items-center gap-1 text-sm font-semibold text-gray-800">
-                <Truck className="h-4 w-4" /> {medium} · {stallAvailable ? 'made to order, delivered' : 'delivered'}
-              </p>
-              <div className="space-y-2">
-                {rows.map(p => {
-                  const sameSize = !!scannedSize && p.size_code === scannedSize;
-                  return (
-                    <Option key={p.id} checked={selected.has(p.id)} onClick={() => toggle(p.id)}
-                      highlight={sameSize && !stallAvailable}
-                      thumb={orientation && p.width_cm && p.height_cm ? <ShapeThumb src={target.imageUrl} {...printSizeFor(p.width_cm, p.height_cm, orientation)} /> : undefined}
-                      note={orientation ? cropNote(orientation, p.width_cm, p.height_cm) : null}
-                      title={`${p.size_name || ''} ${p.width_cm ? orientedSize(p, orientation) : p.name}`.trim()}
-                      subtitle={sameSize ? (stallAvailable ? 'Same size as the one in your hand, made fresh and delivered' : 'Same size as the print you scanned') : p.media_description}
-                      perk="Free digital copy included"
-                      price={gbp(pence(p.pricing))} />
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-
-          {products && products.length === 0 && !stallAvailable && (
-            <p className="text-sm text-gray-600">No products are set up for this design’s format yet.</p>
-          )}
-        </div>
-
-        <div className="border-t bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-2">
-          <button onClick={() => add('checkout')} disabled={!selected.size || !!busy}
-            className="flex h-14 w-full items-center justify-between rounded-2xl bg-purple-600 px-5 text-lg font-semibold text-white shadow-lg disabled:bg-purple-300">
-            <span className="flex items-center gap-2"><ShoppingBag className="h-5 w-5" />{busy === 'checkout' ? 'One moment…' : 'Checkout now'}</span>
-            {total > 0 && <span>{gbp(total)}</span>}
-          </button>
-          <button onClick={() => add('basket')} disabled={!selected.size || !!busy}
-            className="h-12 w-full rounded-2xl border-2 border-purple-600 font-semibold text-purple-800 disabled:border-purple-200 disabled:text-purple-300">
-            {busy === 'basket' ? 'Adding…' : 'Add to basket & keep shopping'}
-          </button>
-        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">{sections}</div>
+        <div className="border-t bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-2">{actions}</div>
       </div>
     </div>
   );
@@ -284,7 +311,7 @@ function Option({ checked, onClick, title, subtitle, price, wasPrice, highlight,
         <span className="block font-semibold text-gray-900">{title}</span>
         {subtitle && <span className="block text-xs text-gray-500">{subtitle}</span>}
         {note && <span className="block text-xs text-gray-500">{note}</span>}
-        {perk && <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-green-700"><Gift className="h-3 w-3" />{perk}</span>}
+        {perk && <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-green-700"><Check className="h-3 w-3" />{perk}</span>}
       </span>
       <span className="text-right">
         <span className="block font-bold text-gray-900">{price}</span>

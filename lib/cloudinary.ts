@@ -855,7 +855,7 @@ export class CloudinaryImageService {
   /**
    * Get public variant URL by type with security (signed URLs)
    */
-  getPublicVariantUrl(publicId: string, variant: 'full_size' | 'thumbnail' | 'mid_size' | 'purchased' | 'catalog_watermarked'): string {
+  getPublicVariantUrl(publicId: string, variant: 'full_size' | 'thumbnail' | 'mid_size' | 'purchased' | 'catalog_watermarked', opts: { width?: number } = {}): string {
     try {
       ensureCloudinaryConfig();
       
@@ -879,7 +879,8 @@ export class CloudinaryImageService {
             ...baseConfig,
             width: 800,
             crop: 'limit', // Maintain aspect ratio, don't crop
-            quality: 85,
+            quality: 'auto',
+            fetch_format: 'auto',
             overlay: watermarkId,
             opacity: watermarkOpacity,
             gravity: 'center'
@@ -891,7 +892,8 @@ export class CloudinaryImageService {
             ...baseConfig,
             width: 1200,
             crop: 'limit', // Maintain aspect ratio, don't crop
-            quality: 85,
+            quality: 'auto',
+            fetch_format: 'auto',
             overlay: watermarkId,
             opacity: watermarkOpacity,
             gravity: 'center'
@@ -904,16 +906,19 @@ export class CloudinaryImageService {
             width: 150,
             height: 150,
             crop: 'fill',
-            quality: 80
+            quality: 'auto',
+            fetch_format: 'auto'
           });
           break;
           
         case 'mid_size':
+          // Card images. Width from an allowed set (responsive srcset); auto format/quality.
           generatedUrl = cloudinary.url(publicId, {
             ...baseConfig,
-            width: 400,
+            width: [300, 400, 600, 800].includes(opts.width || 0) ? opts.width : 400,
             crop: 'limit', // Maintain aspect ratio, don't crop
-            quality: 85
+            quality: 'auto',
+            fetch_format: 'auto'
           });
           break;
           
@@ -941,6 +946,24 @@ export class CloudinaryImageService {
       console.error(`❌ Public variant URL generation failed for "${publicId}", variant: ${variant}:`, error);
       throw new Error(`Public variant URL generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Link-preview image (WhatsApp, Facebook, iMessage…): 1200×630, design padded on the
+   * brand lilac, catalogue watermark, auto format/quality. Unsigned, no secrets needed.
+   */
+  getSharePreviewUrl(publicId: string): string {
+    ensureCloudinaryConfig();
+    const watermarkId = process.env.CLOUDINARY_WATERMARK_PUBLIC_ID || 'pawtraits_watermark_logo';
+    const watermarkOpacity = parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '20');
+    return cloudinary.url(publicId, {
+      secure: true,
+      transformation: [
+        { width: 1200, height: 630, crop: 'pad', background: 'rgb:F6F2FC' },
+        { overlay: watermarkId, opacity: watermarkOpacity, gravity: 'center', width: 400, crop: 'scale' },
+        { fetch_format: 'jpg', quality: 'auto' },
+      ],
+    });
   }
 
   /**

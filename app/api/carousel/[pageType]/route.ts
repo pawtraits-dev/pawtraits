@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withOptimisedImages } from '@/lib/images/delivery';
 import { createClient } from '@supabase/supabase-js';
 import { PageType } from '@/lib/carousel-types';
 
@@ -55,7 +56,7 @@ export async function GET(
 
     return NextResponse.json({
       carousel,
-      slides: slides || []
+      slides: withOptimisedImages(slides || [], ['image_url'])
     });
   } catch (error) {
     console.error('Error fetching carousel:', error);

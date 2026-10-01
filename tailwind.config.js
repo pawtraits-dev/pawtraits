@@ -75,6 +75,22 @@ module.exports = {
           DEFAULT: "hsl(262 52% 35%)",              // Darkest purple for admin authority
           foreground: "hsl(262 20% 97%)",
         },
+
+        // Customer-facing tokens (docs/design-tokens.md). Same values as the purple/gray
+        // utilities used on the home and design pages, with names that say what they're for.
+        brand: {
+          DEFAULT: "#7c3aed",   // purple-600: primary buttons, links, active tabs
+          strong: "#6d28d9",    // purple-700: hover, text links on white
+          soft: "#f5f3ff",      // purple-50: info panels, selected cards
+          line: "#ddd6fe",      // purple-200: selected-card borders
+        },
+        ink: {
+          DEFAULT: "#111827",   // gray-900: headings, prices
+          body: "#374151",      // gray-700: body copy
+          muted: "#4b5563",     // gray-600: secondary text (lowest for text: passes 4.5:1)
+          line: "#e5e7eb",      // gray-200: dividers, card borders
+          wash: "#f9fafb",      // gray-50: page sections
+        },
       },
       
       // Pet-friendly font system
@@ -128,6 +144,8 @@ module.exports = {
         'treat': '8px',   // Buttons, form inputs
         'toy': '12px',    // Cards, modals
         'collar': '16px', // Large cards, hero sections
+        'card': '12px',   // customer design cards and panels (= rounded-xl)
+        'sheet': '20px',  // bottom sheets (top corners)
       },
       
       // Pet-themed animation system
@@ -223,6 +241,8 @@ module.exports = {
         'collar': '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
         'warm': '0 4px 14px 0 rgb(251 113 133 / 0.15)', // Warm shadow for emotional elements
         'cool': '0 4px 14px 0 rgb(59 130 246 / 0.15)',  // Cool shadow for professional elements
+        'card': '0 1px 2px 0 rgb(17 24 39 / 0.06), 0 1px 3px 0 rgb(17 24 39 / 0.08)', // customer cards
+        'sheet': '0 -8px 24px -8px rgb(17 24 39 / 0.18)',                             // bottom sheets, docks
       },
       
       // Accessibility-focused utilities

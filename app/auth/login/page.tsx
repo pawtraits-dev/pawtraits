@@ -29,6 +29,30 @@ function LoginPageContent() {
   const searchParams = useSearchParams()
   const returnTo = searchParams.get('returnTo')
   const [isLoading, setIsLoading] = useState(false)
+  // Email sign-in link is the main way in (guest checkouts have no password); password is the alternative
+  const [mode, setMode] = useState<'link' | 'password'>('link')
+  const [linkEmail, setLinkEmail] = useState('')
+  const [linkState, setLinkState] = useState<'idle' | 'sending' | 'sent'>('idle')
+  const [linkMessage, setLinkMessage] = useState<string | null>(null)
+
+  const sendLink = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLinkState('sending')
+    setErrors({})
+    try {
+      const res = await fetch('/api/auth/email-link', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: linkEmail, returnTo: returnTo || undefined }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setErrors({ general: data.error || 'Couldn’t send the link — please try again.' }); setLinkState('idle'); return }
+      setLinkMessage(data.message)
+      setLinkState('sent')
+    } catch {
+      setErrors({ general: 'Couldn’t send the link — please try again.' })
+      setLinkState('idle')
+    }
+  }
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loginAttempts, setLoginAttempts] = useState(0)
   const [lastAttemptTime, setLastAttemptTime] = useState<number>(0)
@@ -168,10 +192,10 @@ function LoginPageContent() {
               />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2 font-[family-name:var(--font-life-savers)]">
-              Welcome Back to Pawtraits! 🎨
+              Welcome back
             </h1>
             <p className="text-gray-600">
-              Sign in to continue creating beautiful pet portraits
+              Sign in to see your orders, downloads and Pawtraits
             </p>
           </div>
 
@@ -186,6 +210,33 @@ function LoginPageContent() {
                 </div>
               )}
 
+              {mode === 'link' && (linkState === 'sent' ? (
+                <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-900" role="status">
+                  <p className="font-semibold">Check your inbox</p>
+                  <p className="mt-1">{linkMessage}</p>
+                  <button type="button" onClick={() => setLinkState('idle')} className="mt-2 font-medium underline">Use a different email</button>
+                </div>
+              ) : (
+                <form onSubmit={sendLink} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="link-email">Email Address</Label>
+                    <Input id="link-email" type="email" required autoComplete="email" placeholder="your@email.com"
+                      value={linkEmail} onChange={e => setLinkEmail(e.target.value)} />
+                    <p className="text-xs text-gray-500">We&apos;ll email you a link that signs you in, no password needed.</p>
+                  </div>
+                  <Button type="submit" disabled={linkState === 'sending'} className="w-full bg-purple-600 hover:bg-purple-700 text-white h-12 text-base">
+                    {linkState === 'sending' ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending…</> : 'Email me a sign-in link'}
+                  </Button>
+                </form>
+              ))}
+
+              <div className="mt-4 text-center">
+                <button type="button" onClick={() => setMode(mode === 'link' ? 'password' : 'link')} className="text-sm font-medium text-purple-700 underline">
+                  {mode === 'link' ? 'Use a password instead' : 'Email me a sign-in link instead'}
+                </button>
+              </div>
+
+              {mode === 'password' && (
               <form onSubmit={(e) => {
                 e.preventDefault()
                 const formData = new FormData(e.currentTarget)
@@ -225,7 +276,7 @@ function LoginPageContent() {
 
                 <Button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-3"
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3"
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -241,6 +292,7 @@ function LoginPageContent() {
                   )}
                 </Button>
               </form>
+              )}
 
               <Separator className="my-6" />
 
@@ -259,7 +311,7 @@ function LoginPageContent() {
                   <div className="flex items-center justify-center space-x-4 text-sm text-gray-600">
                     <div className="flex items-center">
                       <Camera className="w-4 h-4 mr-1 text-purple-500" />
-                      <span>Create Portraits</span>
+                      <span>Create Pawtraits</span>
                     </div>
                     <div className="flex items-center">
                       <Heart className="w-4 h-4 mr-1 text-pink-500" />
@@ -296,7 +348,7 @@ function LoginPageContent() {
             </p>
             <div className="mt-8 pt-8 border-t border-gray-800 text-center">
               <p className="text-gray-400">
-                © 2024 Pawtraits. All rights reserved.
+                © {new Date().getFullYear()} Pawtraits. All rights reserved.
               </p>
             </div>
           </div>

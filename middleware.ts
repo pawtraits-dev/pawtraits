@@ -32,6 +32,25 @@ const dlpMiddleware = createDLPMiddleware({
   ]
 })
 
+const TEST_PAGES = new Set([
+  '/quick-debug', '/simple-login', '/css-test', '/ui-demo', '/demo', '/interactions-demo', '/customer/test-cart',
+])
+
+// One browse page (customer UX round 2): old listing routes → /browse, keeping any query string.
+// Not redirected: /customer/gallery and /gallery (people's own Pawtraits; /gallery serves partners too), /catalog (admin shortcut).
+const BROWSE_REDIRECTS: Record<string, { path: string; params?: Record<string, string> }> = {
+  '/products': { path: '/browse' },
+  '/customer/shop': { path: '/browse' },
+  '/customer/products': { path: '/browse' },
+  '/dogs': { path: '/browse', params: { type: 'dogs' } },
+  '/cats': { path: '/browse', params: { type: 'cats' } },
+  '/themes': { path: '/browse', params: { type: 'themes' } },
+  '/dogs-redirect': { path: '/browse', params: { type: 'dogs' } },
+  '/cats-redirect': { path: '/browse', params: { type: 'cats' } },
+  '/themes-redirect': { path: '/browse', params: { type: 'themes' } },
+  '/home': { path: '/' },
+}
+
 export async function middleware(req: NextRequest) {
   // Sticker QR codes are printed in UPPER CASE (/S/1123M/CAMDEN) for a smaller QR;
   // routes are case-sensitive, so rewrite to the /s handler before anything else.
@@ -39,6 +58,30 @@ export async function middleware(req: NextRequest) {
     const url = req.nextUrl.clone()
     url.pathname = '/s/' + req.nextUrl.pathname.slice(3)
     return NextResponse.rewrite(url)
+  }
+
+  // One design page: /shop/<design> → /customise/<design> (spec: docs/specs/customer-ux-round-1.md).
+  // Partner discount and auto-add links keep the old page until those flows move across.
+  const shopDesign = req.nextUrl.pathname.match(/^\/shop\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i)
+  if (shopDesign && !req.nextUrl.searchParams.has('partner') && !req.nextUrl.searchParams.has('autoAdd')) {
+    const url = req.nextUrl.clone()
+    url.pathname = `/customise/${shopDesign[1]}`
+    return NextResponse.redirect(url, 308)
+  }
+
+  const browseTarget = BROWSE_REDIRECTS[req.nextUrl.pathname.replace(/\/$/, '') || '/']
+  if (browseTarget) {
+    const url = req.nextUrl.clone()
+    url.pathname = browseTarget.path
+    for (const [k, v] of Object.entries(browseTarget.params || {})) {
+      if (!url.searchParams.has(k)) url.searchParams.set(k, v)
+    }
+    return NextResponse.redirect(url, 308)
+  }
+
+  // Development/test pages are not for customers
+  if (process.env.NODE_ENV === 'production' && TEST_PAGES.has(req.nextUrl.pathname)) {
+    return new NextResponse('Not found', { status: 404 })
   }
 
   const res = NextResponse.next()

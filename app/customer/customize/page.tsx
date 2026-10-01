@@ -276,7 +276,7 @@ export default function CustomerCustomizePage() {
   };
 
   const handleShare = async (image: ImageCatalogWithDetails) => {
-    const shareUrl = `${window.location.origin}/shop/${image.id}`;
+    const shareUrl = `${window.location.origin}/customise/${image.id}`;
 
     try {
       if (navigator.share) {
@@ -620,7 +620,7 @@ export default function CustomerCustomizePage() {
                   <Card
                     key={image.id}
                     className="group hover:shadow-xl transition-shadow cursor-pointer overflow-hidden"
-                    onClick={() => router.push(`/shop/${image.id}`)}
+                    onClick={() => router.push(`/customise/${image.id}`)}
                   >
                     <div className="relative aspect-square overflow-hidden">
                       <CatalogImage
@@ -741,7 +741,7 @@ export default function CustomerCustomizePage() {
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          router.push(`/shop/${image.id}`);
+                          router.push(`/customise/${image.id}`);
                         }}
                       >
                         <ShoppingCart className="w-4 h-4 mr-2" />

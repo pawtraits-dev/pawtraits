@@ -13,17 +13,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Camera, ImagePlus, Sparkles, ShoppingBag, Share2, RotateCcw, Check, X } from 'lucide-react';
+import { ArrowLeft, Camera, ImagePlus, Sparkles, ShoppingBag, Share2, RotateCcw, Check, X, ChevronDown } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
 import StickyActionBar from '@/components/customise/StickyActionBar';
 import BasketBar from '@/components/customise/BasketBar';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { preparePetPhoto } from '@/lib/client/resize-photo';
 import { track } from '@/lib/tracking/events';
 import BuyOptionsSheet, { type BuyTarget } from '@/components/customise/BuyOptionsSheet';
 import { customPortraitTitle } from '@/lib/cart/items';
 import { extractDescriptionTitle } from '@/lib/utils';
+import { designTitle, plainText } from '@/lib/text/plain';
+import MoreLikeThis from '@/components/customise/MoreLikeThis';
 
 interface Pet {
   pet_id: string;
@@ -37,9 +40,9 @@ interface CatalogImage {
   id: string;
   description: string;
   imageUrl: string;
-  theme?: { name: string; displayName?: string };
+  theme?: { id?: string; name: string; displayName?: string };
   style?: { name: string; displayName?: string };
-  breed?: { name: string; displayName?: string };
+  breed?: { id?: string; name: string; displayName?: string };
   format?: { id: string; name: string; aspectRatio: string };
   isMultiSubject?: boolean;
   subjectCount?: number;
@@ -126,6 +129,9 @@ export default function CustomisePage() {
         try { sessionStorage.setItem('pt_qr_size', size); } catch { /* private mode */ }
       }
     }
+    // Referral links (/r/<code> and old /shop links) carry ?ref= — checkout reads it from storage
+    const ref = qs.get('ref');
+    if (ref) { try { localStorage.setItem('referralCode', ref.toUpperCase()); } catch { /* private mode */ } }
     if (qs.get('start') === 'photo') setStep('photo');
     if (qs.get('buy') === '1') setBuySheet('catalog');
 
@@ -292,7 +298,7 @@ export default function CustomisePage() {
     if (customImage) setBuySheet('custom');
   }
 
-  const buyTarget: BuyTarget | null = !catalogImage ? null : buySheet === 'custom' && customImage
+  const buyTarget: BuyTarget | null = !catalogImage ? null : (buySheet === 'custom' || step === 'result') && customImage
     ? {
         kind: 'custom', imageId: customImage.id, catalogImageId: catalogImage.id,
         imageUrl: customImage.generated_image_url || catalogImage.imageUrl,
@@ -330,6 +336,18 @@ export default function CustomisePage() {
 
   const heroSrc = step === 'result' && customImage?.generated_image_url ? customImage.generated_image_url : catalogImage.imageUrl;
   const themeName = catalogImage.theme?.displayName || catalogImage.theme?.name;
+  const breedName = catalogImage.breed?.displayName || catalogImage.breed?.name;
+  const title = designTitle(catalogImage.description, 'Pawtraits design');
+  // Description without its bold title line, as plain text
+  const aboutText = plainText((catalogImage.description || '').replace(/\*\*(.+?)\*\*/, '').trim());
+
+  async function shareDesign() {
+    const url = `${window.location.origin}/customise/${imageId}`;
+    try {
+      if (navigator.share) await navigator.share({ title, text: 'Look at this Pawtrait 🐾', url });
+      else { await navigator.clipboard.writeText(url); toast({ title: 'Link copied!' }); }
+    } catch { /* cancelled */ }
+  }
 
   return (
     <Shell>
@@ -341,61 +359,69 @@ export default function CustomisePage() {
         {/* HERO */}
         {step !== 'generating' && step !== 'failed' && step !== 'limit' && (
           <div className="relative mx-auto overflow-hidden rounded-2xl bg-gray-100 shadow-sm select-none"
-            style={step === 'result' ? ratio(catalogImage.format?.aspectRatio) : heroStyle(catalogImage.format?.aspectRatio, step === 'photo' ? 30 : 46)}
+            style={step === 'result' ? ratio(catalogImage.format?.aspectRatio) : heroStyle(catalogImage.format?.aspectRatio, step === 'photo' ? 30 : 70)}
             onContextMenu={e => e.preventDefault()}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={heroSrc} alt={catalogImage.description || 'Pawtraits design'} className="absolute inset-0 h-full w-full object-contain pointer-events-none" draggable={false} />
+            <img src={heroSrc} alt={title} className="absolute inset-0 h-full w-full object-contain pointer-events-none" draggable={false} />
             {step === 'result' && (
               <span className="absolute left-3 top-3 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">Preview · watermarked</span>
+            )}
+            {step === 'choose' && (
+              <button onClick={shareDesign} aria-label="Share this design"
+                className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-gray-900 shadow-sm">
+                <Share2 className="h-5 w-5" />
+              </button>
             )}
           </div>
         )}
 
-        {/* CHOOSE */}
+        {/* CHOOSE — the design page (spec: docs/specs/customer-ux-round-1.md) */}
         {step === 'choose' && (
           <>
-            <h1 className="mt-4 text-2xl font-bold text-gray-900 leading-tight" style={lifeSavers}>
-              {fromQr ? 'Love this one?' : 'Make it yours'}
-            </h1>
-            <p className="mt-1 text-gray-600">
-              {themeName ? `A ${themeName.toLowerCase()} portrait. ` : ''}Take it home as it is, or have Pawcasso paint <em>your</em> pet into it.
-            </p>
+            <div className="mt-4">
+              {(breedName || themeName) && (
+                <p className="text-sm text-gray-500">{[breedName, themeName].filter(Boolean).join(' · ')}</p>
+              )}
+              <h1 className="mt-0.5 text-[1.7rem] font-bold leading-tight text-gray-900" style={lifeSavers}>
+                {fromQr ? 'Love this one?' : title}
+              </h1>
+            </div>
 
             {stallOffer?.available && (
               <p className="mt-2 text-sm text-purple-800">
                 At the stall? Pay on your phone and take this {SIZE_LABEL[stallOffer.size || 'M'].toLowerCase()} print home now —
-                no queue for the card reader, and a free digital copy too 🎁
+                no queue for the card reader, and a bonus digital copy too.
               </p>
             )}
 
-            {/* Both choices pinned to the bottom of the screen on phones (always visible, thumb-reachable) */}
-            <StickyActionBar>
-              <BasketBar />
+            <section className="mt-5 rounded-2xl border border-purple-200 bg-purple-50 p-4">
+              <h2 className="text-lg font-bold text-gray-900">Put your pet in this picture</h2>
+              <p className="mt-0.5 text-sm text-gray-600">Add a photo and Pawcasso paints your pet in, cat or dog, any breed. Then choose a size.</p>
               <button onClick={startCustomise}
-                className="flex min-h-16 w-full items-center gap-3 rounded-2xl bg-purple-600 px-4 py-2.5 text-left text-white shadow-lg active:scale-[0.99] transition">
-                <span className="text-2xl" aria-hidden>🐾</span>
-                <span className="flex-1 leading-tight">
-                  <span className="block text-base font-semibold">Put my pet in this picture</span>
-                  <span className="block text-xs text-purple-100">Free preview in about a minute · no sign-up</span>
-                </span>
+                className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-purple-600 text-lg font-semibold text-white shadow-sm active:scale-[0.99] transition">
+                <Camera className="h-5 w-5" /> Add my pet&apos;s photo
               </button>
-              <button onClick={buyThisPrint}
-                className="flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 border-purple-600 bg-white px-4 py-2 text-left text-purple-900 active:scale-[0.99] transition">
-                <span className="text-xl" aria-hidden>🛍️</span>
-                <span className="flex-1 leading-tight">
-                  <span className="block text-base font-semibold">Buy this print</span>
-                  <span className="block text-xs text-purple-700">
-                    {stallOffer?.available ? `The one in your hand · free digital copy` : 'Sizes & prices · free digital copy with prints'}
-                  </span>
-                </span>
-                {stallOffer?.available && (
-                  <span className="text-right leading-tight">
-                    <span className="block font-bold">{gbp(stallOffer.pricePence)}</span>
-                    {stallOffer.discountPct ? <span className="block text-xs text-gray-400 line-through">{gbp(stallOffer.listPricePence)}</span> : null}
-                  </span>
-                )}
-              </button>
-            </StickyActionBar>
+              <p className="mt-2 text-center text-xs text-gray-500">Free preview in about a minute · no sign-up</p>
+            </section>
+
+            {buyTarget && (
+              <BuyOptionsSheet inline open onClose={() => {}} target={buyTarget}
+                stallOffer={stallOffer} scannedSize={scannedSize} />
+            )}
+
+            {aboutText && (
+              <details className="mt-8 border-y border-gray-200">
+                <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between font-semibold text-gray-900">
+                  About this design <ChevronDown className="h-5 w-5 text-gray-500" />
+                </summary>
+                <p className="pb-4 text-sm leading-relaxed text-gray-600">{aboutText}</p>
+              </details>
+            )}
+
+            <MoreLikeThis imageId={catalogImage.id} breedId={catalogImage.breed?.id} themeId={catalogImage.theme?.id} />
+
+            <div className="h-24 md:hidden" aria-hidden />
+            <BasketDock />
           </>
         )}
 
@@ -553,7 +579,7 @@ export default function CustomisePage() {
           </div>
         )}
       </div>
-      {buyTarget && (
+      {buyTarget && step !== 'choose' && (
         <BuyOptionsSheet
           open={!!buySheet}
           onClose={() => setBuySheet(null)}
@@ -563,6 +589,17 @@ export default function CustomisePage() {
         />
       )}
     </Shell>
+  );
+}
+
+/** Basket shortcut pinned to the bottom on phones once something is in the basket */
+function BasketDock() {
+  const { totalItems } = useHybridCart();
+  if (!totalItems) return null;
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:mt-6 md:border-0 md:bg-transparent md:p-0">
+      <div className="mx-auto max-w-xl"><BasketBar /></div>
+    </div>
   );
 }
 

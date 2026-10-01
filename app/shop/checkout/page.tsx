@@ -27,7 +27,7 @@ import ExpressCheckout, { type ExpressPayer, type ShippingQuote } from '@/compon
 import { checkoutValidation } from '@/lib/checkout-validation'
 import { extractDescriptionTitle } from '@/lib/utils'
 // Countries we deliver to (card form dropdown and Apple Pay / Google Pay address sheet)
-import { DELIVERY_COUNTRIES, shippingSummary } from '@/lib/shipping/rates'
+import { DELIVERY_COUNTRIES, shippingSummary, shippingQuoteFor } from '@/lib/shipping/rates'
 
 const countryName = (code: string) => {
   try { return new Intl.DisplayNames(['en-GB'], { type: 'region' }).of(code) || code } catch { return code }
@@ -286,7 +286,9 @@ function CheckoutPageContent() {
   }
 
   const subtotal = totalPrice / 100; // Convert from pence to pounds
-  const shipping = selectedShippingOption ? (selectedShippingOption.price / 100) : 0;
+  // Flat tracked delivery by country: shown (and totalled) as soon as a country is known
+  const deliveryQuote = !isDigitalOnly ? (selectedShippingOption || shippingQuoteFor(shippingData.country)) : null;
+  const shipping = deliveryQuote ? (deliveryQuote.price / 100) : 0;
 
   // Calculate discounts based on simplified commission rules
   let discount = 0;
@@ -669,8 +671,8 @@ function CheckoutPageContent() {
         { number: 3, title: "Payment", completed: false },
       ]
     : [
+        // Delivery is one flat tracked option, so there's no separate "choose delivery" step
         { number: 1, title: "Address", completed: currentStep > 1 },
-        { number: 2, title: "Shipping", completed: currentStep > 2 },
         { number: 3, title: "Payment", completed: false },
       ]
 
@@ -978,11 +980,11 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                       {loadingShipping ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Finding shipping options...
+                          One moment...
                         </>
                       ) : (
                         <>
-                          {isDigitalOnly ? 'Continue to Payment' : 'Continue to Shipping Options'}
+                          Continue to payment
                           <ArrowRight className="w-4 h-4 ml-2" />
                         </>
                       )}
@@ -1209,12 +1211,12 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                   <span className="font-medium">£{orderSummary.subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Shipping</span>
+                  <span className="text-gray-600">{isDigitalOnly ? 'Delivery' : 'Tracked delivery'}</span>
                   <span className="font-medium">
                     {isDigitalOnly ? (
                       <span className="text-gray-500">None — nothing to post</span>
-                    ) : selectedShippingOption ? (
-                      selectedShippingOption.price === 0 ? 'Free' : `£${orderSummary.shipping.toFixed(2)}`
+                    ) : deliveryQuote ? (
+                      deliveryQuote.price === 0 ? 'Free' : `£${orderSummary.shipping.toFixed(2)}`
                     ) : (
                       <span className="text-gray-500">{shippingSummary()}</span>
                     )}
@@ -1279,7 +1281,7 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                   <span>Total</span>
                   <span>£{orderSummary.total.toFixed(2)}</span>
                 </div>
-                {!selectedShippingOption && !isDigitalOnly && (
+                {!deliveryQuote && !isDigitalOnly && (
                   <div className="text-xs text-gray-500 text-center">
                     Tracked delivery is added once you enter your address
                   </div>

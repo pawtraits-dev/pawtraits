@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { plainText, snippet } from '@/lib/text/plain';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -211,7 +212,7 @@ export default function ContentBasedCarousel({
 
             {/* Title */}
             <h2 className="text-2xl md:text-4xl font-bold mb-2 font-[family-name:var(--font-life-savers)] drop-shadow-lg">
-              {currentContent.title}
+              {plainText(currentContent.title)}
             </h2>
 
             {/* Subtitle/Description - Extract and clean text between asterisks */}
@@ -224,7 +225,8 @@ export default function ContentBasedCarousel({
 
               // Extract text between first set of asterisks, or use cleaned text
               const asteriskMatch = cleanText.match(/\*\*(.*?)\*\*/);
-              const displayText = asteriskMatch ? asteriskMatch[1].trim() : cleanText.trim();
+              // Plain text, cut at a word with an ellipsis (no stray ** or "…professional sp")
+              const displayText = snippet(asteriskMatch ? asteriskMatch[1] : cleanText, 110);
 
               return displayText ? (
                 <p className="text-sm md:text-lg mb-4 opacity-90 max-w-2xl mx-auto drop-shadow-lg">
@@ -251,12 +253,14 @@ export default function ContentBasedCarousel({
             {/* Previous/Next Buttons */}
             <button
               onClick={prevSlide}
+              aria-label="Previous slide"
               className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full p-3 text-white transition-all"
             >
               <ChevronLeft className="w-6 h-6" />
             </button>
             <button
               onClick={nextSlide}
+              aria-label="Next slide"
               className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full p-3 text-white transition-all"
             >
               <ChevronRight className="w-6 h-6" />
@@ -265,6 +269,7 @@ export default function ContentBasedCarousel({
             {/* Play/Pause Button */}
             <button
               onClick={() => setIsPlaying(!isPlaying)}
+              aria-label={isPlaying ? 'Pause slideshow' : 'Play slideshow'}
               className="absolute bottom-4 left-4 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full p-2 text-white transition-all"
             >
               {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -276,6 +281,7 @@ export default function ContentBasedCarousel({
                 <button
                   key={index}
                   onClick={() => goToSlide(index)}
+                  aria-label={`Go to slide ${index + 1}`}
                   className={`w-3 h-3 rounded-full transition-all ${
                     index === currentIndex
                       ? 'bg-white'

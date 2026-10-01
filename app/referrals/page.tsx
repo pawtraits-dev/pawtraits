@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PartnerReferralsView from '@/components/referrals/PartnerReferralsView';
+import CustomerTabBar from '@/components/customer/CustomerTabBar';
 import CustomerReferralsView from '@/components/referrals/CustomerReferralsView';
 
 // 🏗️ CLIENT-SIDE USER-TYPE AWARE REFERRALS PAGE
@@ -98,7 +99,7 @@ export default function ReferralsPage() {
   // ✅ ARCHITECTURAL PATTERN: Route to appropriate component based on user type
   switch (userProfile.user_type) {
     case 'customer':
-      return <CustomerReferralsView userProfile={userProfile} />;
+      return (<div className="pb-16 md:pb-0"><CustomerReferralsView userProfile={userProfile} /><CustomerTabBar /></div>);
 
     case 'partner':
       return <PartnerReferralsView userProfile={userProfile} />;

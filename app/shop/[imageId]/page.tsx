@@ -443,9 +443,6 @@ function QRLandingPageContent() {
                     variant="default"
                     className="bg-purple-600 hover:bg-purple-700 w-full"
                   />
-                  <p className="text-xs text-gray-500 mt-2 text-center">
-                    Bundle pricing: 2 images £17.49 • 3 images £22.49 • Save up to 49%!
-                  </p>
                 </div>
 
                 <Separator />

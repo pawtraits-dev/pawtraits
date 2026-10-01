@@ -406,7 +406,7 @@ function CustomerInvitationPageContent() {
             </p>
             <div className="mt-8 pt-8 border-t border-gray-800 text-center">
               <p className="text-gray-400">
-                © 2024 Pawtraits. All rights reserved.
+                © {new Date().getFullYear()} Pawtraits. All rights reserved.
               </p>
             </div>
           </div>

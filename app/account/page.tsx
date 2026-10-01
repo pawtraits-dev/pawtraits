@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import CustomerTabBar from '@/components/customer/CustomerTabBar';
 import CustomerAccountView from '@/components/account/CustomerAccountView';
 import PartnerAccountView from '@/components/account/PartnerAccountView';
 import InfluencerAccountView from '@/components/account/InfluencerAccountView';
@@ -100,7 +101,7 @@ export default function AccountPage() {
   // ✅ ARCHITECTURAL PATTERN: Route to appropriate component based on user type
   switch (userProfile.user_type) {
     case 'customer':
-      return <CustomerAccountView userProfile={userProfile} />;
+      return (<div className="pb-16 md:pb-0"><CustomerAccountView userProfile={userProfile} /><CustomerTabBar /></div>);
 
     case 'partner':
       return <PartnerAccountView userProfile={userProfile} />;

@@ -18,7 +18,7 @@ import { CountryProvider } from '@/lib/country-context'
 import { shippingSummary } from '@/lib/shipping/rates'
 
 function ShoppingCartPageContent() {
-  const { items, totalItems, totalPrice, updateQuantity, removeFromCart, isGuest } = useHybridCart();
+  const { items, totalItems, totalPrice, updateQuantity, removeFromCart, isGuest, basketNotice, clearBasketNotice } = useHybridCart();
   const { continueShoppingRoute, userProfile } = useUserRouting();
   const [referralCode, setReferralCode] = useState("")
   const [referralValidation, setReferralValidation] = useState<any>(null)
@@ -121,6 +121,12 @@ function ShoppingCartPageContent() {
               Keep Exploring
             </Link>
             <h1 className="text-3xl font-bold text-gray-900">Your Basket</h1>
+          {basketNotice && (
+            <div role="status" className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <span>{basketNotice}</span>
+              <button onClick={clearBasketNotice} className="font-semibold underline">OK</button>
+            </div>
+          )}
           </div>
 
           {/* Empty State */}
@@ -156,6 +162,12 @@ function ShoppingCartPageContent() {
             Keep Exploring
           </Link>
           <h1 className="text-3xl font-bold text-gray-900">Your Basket</h1>
+          {basketNotice && (
+            <div role="status" className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <span>{basketNotice}</span>
+              <button onClick={clearBasketNotice} className="font-semibold underline">OK</button>
+            </div>
+          )}
           <p className="text-gray-600 mt-2">
             {items.length} gorgeous item{items.length !== 1 ? "s" : ""} ready for checkout
           </p>

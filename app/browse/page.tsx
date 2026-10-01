@@ -22,7 +22,8 @@ import {
   Palette,
   QrCode,
   Wand2,
-  Camera
+  Camera,
+  Paintbrush
 } from 'lucide-react';
 // Import SupabaseService for authentication checking
 import { SupabaseService } from '@/lib/supabase';
@@ -41,6 +42,18 @@ import ContentBasedCarousel from '@/components/ContentBasedCarousel';
 import { PageType } from '@/lib/carousel-types';
 import ReactMarkdown from 'react-markdown';
 import { DigitalDownloadButton } from '@/components/DigitalDownloadButton';
+
+// Only show breeds and themes that have at least one public design (customer UX round 2)
+function idsWithDesigns(imgs: any[]) {
+  const breeds = new Set<string>();
+  const themes = new Set<string>();
+  for (const img of imgs || []) {
+    if (img.breed_id) breeds.add(img.breed_id);
+    for (const s of img.generation_parameters?.subjects || []) if (s?.breedId) breeds.add(s.breedId);
+    if (img.theme_id) themes.add(img.theme_id);
+  }
+  return { breeds, themes };
+}
 
 type BrowseTab = 'all' | 'dogs' | 'cats' | 'themes';
 
@@ -173,12 +186,13 @@ function BrowsePageContent() {
 
       if (cacheIsValid) {
         // Use cached data
-        const dogs = dataCache.breeds!.filter(breed => breed.animal_type === 'dog').sort((a, b) => a.name.localeCompare(b.name));
-        const cats = dataCache.breeds!.filter(breed => breed.animal_type === 'cat').sort((a, b) => a.name.localeCompare(b.name));
+        const has = idsWithDesigns(dataCache.images!.images || []);
+        const dogs = dataCache.breeds!.filter(breed => breed.animal_type === 'dog' && has.breeds.has(breed.id)).sort((a, b) => a.name.localeCompare(b.name));
+        const cats = dataCache.breeds!.filter(breed => breed.animal_type === 'cat' && has.breeds.has(breed.id)).sort((a, b) => a.name.localeCompare(b.name));
 
         setDogBreeds(dogs);
         setCatBreeds(cats);
-        setThemes(dataCache.themes!.filter(theme => theme.is_active).sort((a, b) => a.name.localeCompare(b.name)));
+        setThemes(dataCache.themes!.filter(theme => theme.is_active && has.themes.has(theme.id)).sort((a, b) => a.name.localeCompare(b.name)));
         setImages(dataCache.images!.images || []);
         setProducts(dataCache.products! || []);
         setPricing(dataCache.pricing! || []);
@@ -238,13 +252,14 @@ function BrowsePageContent() {
         dataCache.pricing = pricingData;
         dataCache.lastCacheTime = now;
 
-        // Separate dog and cat breeds and sort alphabetically
-        const dogs = (breedsData || []).filter(breed => breed.animal_type === 'dog').sort((a, b) => a.name.localeCompare(b.name));
-        const cats = (breedsData || []).filter(breed => breed.animal_type === 'cat').sort((a, b) => a.name.localeCompare(b.name));
+        // Separate dog and cat breeds and sort alphabetically; only those with designs
+        const has = idsWithDesigns(imagesData?.images || []);
+        const dogs = (breedsData || []).filter(breed => breed.animal_type === 'dog' && has.breeds.has(breed.id)).sort((a, b) => a.name.localeCompare(b.name));
+        const cats = (breedsData || []).filter(breed => breed.animal_type === 'cat' && has.breeds.has(breed.id)).sort((a, b) => a.name.localeCompare(b.name));
 
         setDogBreeds(dogs);
         setCatBreeds(cats);
-        setThemes((themesData || []).filter(theme => theme.is_active).sort((a, b) => a.name.localeCompare(b.name)));
+        setThemes((themesData || []).filter(theme => theme.is_active && has.themes.has(theme.id)).sort((a, b) => a.name.localeCompare(b.name)));
         setImages(imagesData.images || []);
         setProducts(productsData || []);
         setPricing(pricingData || []);
@@ -634,6 +649,17 @@ function BrowsePageContent() {
                           )}
                         </div>
                       </div>
+                      {/* Any design can be personalised — so a breed with few designs never looks like a dead end */}
+                      <div className="mt-5 flex items-start gap-3 rounded-xl border border-purple-200 bg-white p-4">
+                        <Paintbrush className="mt-0.5 h-5 w-5 shrink-0 text-purple-700" />
+                        <div>
+                          <p className="font-semibold text-gray-900">Any design can star your {selectedBreed.name}</p>
+                          <p className="text-sm text-gray-600">
+                            The pet in each picture is a stand-in. Pick any Pawtrait in the gallery and Pawcasso paints your pet in.{' '}
+                            <button onClick={() => { setSelectedBreedId(''); router.push('/browse'); }} className="font-semibold text-purple-700 underline">Browse all designs</button>
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   );
                 })()}
@@ -782,7 +808,7 @@ function BrowsePageContent() {
                       <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
                         <div
                           className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
-                          onClick={() => router.push(`/shop/${image.id}`)}
+                          onClick={() => router.push(`/customise/${image.id}`)}
                         >
                           <CatalogImage
                             imageId={image.id}
@@ -922,7 +948,7 @@ function BrowsePageContent() {
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/create?id=${image.id}`);
+                              router.push(`/customise/${image.id}?start=photo`);
                             }}
                           >
                             <Camera className="w-4 h-4 mr-2" />
@@ -934,7 +960,7 @@ function BrowsePageContent() {
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/shop/${image.id}`);
+                              router.push(`/customise/${image.id}`);
                             }}
                           >
                             <ShoppingCart className="w-4 h-4 mr-2" />
@@ -973,12 +999,13 @@ function BrowsePageContent() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
               {/* Tab Navigation */}
-              <div className="flex justify-center mb-8">
-                <div className="flex bg-white rounded-lg p-1 shadow-lg">
+              {/* Scrolls sideways on its own on phones instead of widening the page */}
+              <div className="flex sm:justify-center mb-8 -mx-4 px-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex flex-shrink-0 bg-white rounded-lg p-1 shadow-lg">
                   <Button
                     variant={activeTab === 'all' ? 'default' : 'ghost'}
                     onClick={() => handleTabChange('all')}
-                    className={`px-6 py-3 rounded-md transition-all ${
+                    className={`px-4 sm:px-6 py-3 rounded-md whitespace-nowrap transition-all ${
                       activeTab === 'all'
                         ? 'bg-purple-600 text-white shadow-md'
                         : 'text-gray-700 hover:text-purple-600'
@@ -990,7 +1017,7 @@ function BrowsePageContent() {
                   <Button
                     variant={activeTab === 'dogs' ? 'default' : 'ghost'}
                     onClick={() => handleTabChange('dogs')}
-                    className={`px-6 py-3 rounded-md transition-all ${
+                    className={`px-4 sm:px-6 py-3 rounded-md whitespace-nowrap transition-all ${
                       activeTab === 'dogs'
                         ? 'bg-purple-600 text-white shadow-md'
                         : 'text-gray-700 hover:text-purple-600'
@@ -1002,7 +1029,7 @@ function BrowsePageContent() {
                   <Button
                     variant={activeTab === 'cats' ? 'default' : 'ghost'}
                     onClick={() => handleTabChange('cats')}
-                    className={`px-6 py-3 rounded-md transition-all ${
+                    className={`px-4 sm:px-6 py-3 rounded-md whitespace-nowrap transition-all ${
                       activeTab === 'cats'
                         ? 'bg-purple-600 text-white shadow-md'
                         : 'text-gray-700 hover:text-purple-600'
@@ -1014,7 +1041,7 @@ function BrowsePageContent() {
                   <Button
                     variant={activeTab === 'themes' ? 'default' : 'ghost'}
                     onClick={() => handleTabChange('themes')}
-                    className={`px-6 py-3 rounded-md transition-all ${
+                    className={`px-4 sm:px-6 py-3 rounded-md whitespace-nowrap transition-all ${
                       activeTab === 'themes'
                         ? 'bg-purple-600 text-white shadow-md'
                         : 'text-gray-700 hover:text-purple-600'
@@ -1086,7 +1113,7 @@ function BrowsePageContent() {
                   <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
                     <div
                       className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
-                      onClick={() => router.push(`/shop/${image.id}`)}
+                      onClick={() => router.push(`/customise/${image.id}`)}
                     >
                       <CatalogImage
                         imageId={image.id}
@@ -1226,7 +1253,7 @@ function BrowsePageContent() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            router.push(`/shop/${image.id}`);
+                            router.push(`/customise/${image.id}`);
                           }}
                         >
                           <ShoppingCart className="w-4 h-4 mr-2" />

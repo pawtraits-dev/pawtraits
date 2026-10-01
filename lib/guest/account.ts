@@ -123,7 +123,7 @@ export const hashClaimToken = (raw: string) => createHash('sha256').update(raw).
 
 export async function createClaimToken(
   supabase: SupabaseClient,
-  input: { userId: string; customerId: string | null; email: string; orderId: string | null }
+  input: { userId: string; customerId: string | null; email: string; orderId: string | null; expiresInHours?: number }
 ): Promise<string> {
   const raw = randomBytes(32).toString('base64url');
   const { error } = await supabase.from('account_claim_tokens').insert({
@@ -132,7 +132,7 @@ export async function createClaimToken(
     customer_id: input.customerId,
     email: input.email.toLowerCase(),
     order_id: input.orderId,
-    expires_at: new Date(Date.now() + CLAIM_TOKEN_DAYS * 86400_000).toISOString(),
+    expires_at: new Date(Date.now() + (input.expiresInHours ? input.expiresInHours * 3600_000 : CLAIM_TOKEN_DAYS * 86400_000)).toISOString(),
   });
   if (error) throw error;
   return raw;

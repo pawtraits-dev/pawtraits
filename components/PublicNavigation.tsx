@@ -63,17 +63,29 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
 
   const loadNavigationData = async () => {
     try {
-      const [allBreeds, themesData] = await Promise.all([
+      const [allBreeds, themesData, withDesigns, themesWithDesigns] = await Promise.all([
         supabaseService.getBreeds(),
-        supabaseService.getThemes()
+        supabaseService.getThemes(),
+        fetch('/api/public/breeds-with-designs').then(r => (r.ok ? r.json() : null)).catch(() => null),
+        fetch('/api/public/themes-with-designs').then(r => (r.ok ? r.json() : null)).catch(() => null),
       ]);
 
-      const dogs = allBreeds.filter(breed => breed.animal_type === 'dog').slice(0, 10);
-      const cats = allBreeds.filter(breed => breed.animal_type === 'cat').slice(0, 10);
+      // Only breeds that have designs (most designs first); everything if that list is unavailable
+      const order: string[] | null = withDesigns?.breeds ? withDesigns.breeds.map((b: any) => b.id) : null;
+      const visible = order
+        ? allBreeds.filter(b => order.includes(b.id)).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
+        : allBreeds;
+      const dogs = visible.filter(breed => breed.animal_type === 'dog').slice(0, 10);
+      const cats = visible.filter(breed => breed.animal_type === 'cat').slice(0, 10);
       
       setDogBreeds(dogs);
       setCatBreeds(cats);
-      setThemes(themesData.filter(theme => theme.is_active).slice(0, 10));
+      // Only themes that have designs, most designs first; all active themes if that list is unavailable
+      const themeOrder: string[] | null = themesWithDesigns?.themes ? themesWithDesigns.themes.map((t: any) => t.id) : null;
+      const activeThemes = themesData.filter(theme => theme.is_active);
+      setThemes((themeOrder
+        ? activeThemes.filter(t => themeOrder.includes(t.id)).sort((a, b) => themeOrder.indexOf(a.id) - themeOrder.indexOf(b.id))
+        : activeThemes).slice(0, 10));
     } catch (error) {
       console.error('Error loading navigation data:', error);
     } finally {
@@ -103,7 +115,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
       if (params.breed) searchParams.set('breed', params.breed);
       if (params.theme) searchParams.set('theme', params.theme);
       const queryString = searchParams.toString();
-      router.push(`${path}${queryString ? `?${queryString}` : ''}`);
+      router.push(`${path}${queryString ? `${path.includes('?') ? '&' : '?'}${queryString}` : ''}`);
     } else {
       router.push(path);
     }
@@ -264,7 +276,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
               className="mr-4"
             />
 
-            <Link href="/shop/cart" className="relative">
+            <Link href="/shop/cart" className="relative" aria-label={`Basket${totalItems ? `, ${totalItems} item${totalItems === 1 ? "" : "s"}` : ""}`}>
               <ShoppingCart className="w-6 h-6 text-gray-700 hover:text-purple-600 transition-colors" />
               {totalItems > 0 && (
                 <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
@@ -278,6 +290,8 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
           <button 
             className="md:hidden"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -287,10 +301,14 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
         {mobileMenuOpen && (
           <div className="md:hidden border-t bg-white">
             <div className="px-2 pt-2 pb-3 space-y-1 font-[family-name:var(--font-life-savers)]">
+              <Link href="/browse" onClick={() => setMobileMenuOpen(false)}
+                className="mx-1 mb-2 flex h-12 items-center justify-center rounded-xl bg-purple-600 font-sans font-semibold text-white">
+                Make my pet&apos;s Pawtrait
+              </Link>
               <div className="space-y-2">
                 <div className="px-3 py-2 font-medium text-gray-900">Dogs</div>
                 <button
-                  onClick={() => handleDropdownClick('/dogs')}
+                  onClick={() => handleDropdownClick('/browse?type=dogs')}
                   className="block w-full text-left px-6 py-1 text-gray-700 hover:text-purple-600"
                 >
                   View All Dogs
@@ -298,7 +316,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                 {dogBreeds.slice(0, 5).map((breed) => (
                   <button
                     key={breed.id}
-                    onClick={() => handleDropdownClick('/dogs', { breed: breed.id })}
+                    onClick={() => handleDropdownClick('/browse?type=dogs', { breed: breed.id })}
                     className="block w-full text-left px-6 py-1 text-sm text-gray-600 hover:text-purple-600"
                   >
                     {breed.name}
@@ -309,7 +327,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
               <div className="space-y-2">
                 <div className="px-3 py-2 font-medium text-gray-900">Cats</div>
                 <button
-                  onClick={() => handleDropdownClick('/cats')}
+                  onClick={() => handleDropdownClick('/browse?type=cats')}
                   className="block w-full text-left px-6 py-1 text-gray-700 hover:text-purple-600"
                 >
                   View All Cats
@@ -317,7 +335,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                 {catBreeds.slice(0, 5).map((breed) => (
                   <button
                     key={breed.id}
-                    onClick={() => handleDropdownClick('/cats', { breed: breed.id })}
+                    onClick={() => handleDropdownClick('/browse?type=cats', { breed: breed.id })}
                     className="block w-full text-left px-6 py-1 text-sm text-gray-600 hover:text-purple-600"
                   >
                     {breed.name}
@@ -328,7 +346,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
               <div className="space-y-2">
                 <div className="px-3 py-2 font-medium text-gray-900">Themes</div>
                 <button
-                  onClick={() => handleDropdownClick('/themes')}
+                  onClick={() => handleDropdownClick('/browse?type=themes')}
                   className="block w-full text-left px-6 py-1 text-gray-700 hover:text-purple-600"
                 >
                   View All Themes
@@ -336,7 +354,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                 {themes.slice(0, 5).map((theme) => (
                   <button
                     key={theme.id}
-                    onClick={() => handleDropdownClick('/themes', { theme: theme.id })}
+                    onClick={() => handleDropdownClick('/browse?type=themes&theme=' + theme.id)}
                     className="block w-full text-left px-6 py-1 text-sm text-gray-600 hover:text-purple-600"
                   >
                     {theme.name}
@@ -354,6 +372,8 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                   )}
                 </div>
               </Link>
+              <Link href="/orders" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 text-gray-700 hover:text-purple-600">My orders</Link>
+              <Link href="/auth/login" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 text-gray-700 hover:text-purple-600">Sign in</Link>
             </div>
           </div>
         )}

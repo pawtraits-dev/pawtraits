@@ -220,20 +220,52 @@ export function CloudinaryImageDisplay({
 }
 
 // Specific components for different use cases
-export function CatalogImage({ imageId, className, alt, fallbackUrl }: {
+/**
+ * Catalogue design image (public, small browsing variant).
+ * A plain <img> pointing at our image proxy, so the browser can lazy-load, pick a width
+ * from srcset and cache it, and Vercel's edge can cache it too (the old version fetched
+ * every image with JavaScript before it could start loading).
+ */
+export function CatalogImage({ imageId, className = '', alt = 'Pet Pawtrait', fallbackUrl, sizes = '(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw', priority = false }: {
   imageId: string;
   className?: string;
   alt?: string;
   fallbackUrl?: string;
+  /** CSS width the image will show at, for srcset */
+  sizes?: string;
+  /** Above-the-fold image: load straight away */
+  priority?: boolean;
 }) {
+  const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+  // An image that finished loading before hydration never fires onLoad for React
+  useEffect(() => {
+    const el = imgRef.current;
+    if (el?.complete && el.naturalWidth > 0) setLoaded(true);
+  }, []);
+  const src = (w: number) => `/api/secure-images/${imageId}?variant=mid_size&w=${w}`;
+
+  if (failed && !fallbackUrl) {
+    return <div className={`rounded-lg bg-gray-100 ${className}`} role="img" aria-label={alt} />;
+  }
+
   return (
-    <CloudinaryImageDisplay
-      imageId={imageId}
-      variant="mid_size"
-      className={className}
-      alt={alt}
-      fallbackUrl={fallbackUrl}
-    />
+    <div className="relative">
+      <img
+        ref={imgRef}
+        src={failed && fallbackUrl ? fallbackUrl : src(400)}
+        srcSet={failed ? undefined : `${src(300)} 300w, ${src(400)} 400w, ${src(600)} 600w, ${src(800)} 800w`}
+        sizes={failed ? undefined : sizes}
+        alt={alt}
+        loading={priority ? 'eager' : 'lazy'}
+        decoding="async"
+        {...(priority ? { fetchPriority: 'high' as const } : {})}
+        onLoad={() => setLoaded(true)}
+        onError={() => { if (!failed) setFailed(true); }}
+        className={`rounded-lg shadow-md bg-gray-100 transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${className}`}
+      />
+    </div>
   );
 }
 

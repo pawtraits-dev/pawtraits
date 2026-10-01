@@ -14,7 +14,7 @@ import { claimEntitlements } from '@/lib/orders/entitlements';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
-  const { token } = await request.json().catch(() => ({}));
+  const { token, next } = await request.json().catch(() => ({}));
   if (!token || typeof token !== 'string' || token.length < 20) {
     return NextResponse.json({ error: 'This link is not valid.' }, { status: 400 });
   }
@@ -22,13 +22,18 @@ export async function POST(request: NextRequest) {
   const admin = serviceClient();
   const { data: claim } = await admin
     .from('account_claim_tokens')
-    .select('id, user_id, customer_id, email, expires_at, use_count, first_used_at')
+    .select('id, user_id, customer_id, email, order_id, expires_at, use_count, first_used_at')
     .eq('token_hash', hashClaimToken(token))
     .maybeSingle();
 
   if (!claim) return NextResponse.json({ error: 'This link is not valid.', code: 'INVALID' }, { status: 400 });
   if (new Date(claim.expires_at) < new Date()) {
     return NextResponse.json({ error: 'This link has expired — sign in with your email address instead.', code: 'EXPIRED', email: claim.email }, { status: 410 });
+  }
+
+  // Sign-in links (no order) work once; the "account ready" email link can be reused until it expires
+  if (!claim.order_id && claim.first_used_at) {
+    return NextResponse.json({ error: 'This sign-in link has already been used — ask for a new one.', code: 'USED' }, { status: 410 });
   }
 
   // Fresh one-time magic link, verified immediately on the server → session cookies set
@@ -54,5 +59,7 @@ export async function POST(request: NextRequest) {
   let unlocked = 0;
   if (claim.customer_id) unlocked = await claimEntitlements(admin, claim.customer_id, claim.email);
 
-  return NextResponse.json({ ok: true, unlocked, redirectTo: '/customer/downloads?welcome=1' });
+    // Sign-in links can carry where to go next (a path on this site only)
+  const safeNext = typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : null;
+  return NextResponse.json({ ok: true, unlocked, redirectTo: safeNext || (claim.order_id ? '/customer/downloads?welcome=1' : '/customer') });
 }

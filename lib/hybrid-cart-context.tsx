@@ -33,6 +33,9 @@ interface CartContextType {
   totalPrice: number;
   loading: boolean;
   isGuest: boolean;
+  /** Set when a stored basket was changed on load (removed or re-priced lines) */
+  basketNotice: string | null;
+  clearBasketNotice: () => void;
   digitalBundlePricing: BundlePricing | null;
   getMasterBundleProductId: () => Promise<string | null>;
   addToCart: (item: Omit<CartItem, 'id' | 'addedAt'>) => Promise<void>;
@@ -50,6 +53,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(true);
+  const [basketNotice, setBasketNotice] = useState<string | null>(null);
   const digitalBundlePricing: BundlePricing | null = null; // bundle pricing retired
 
   // Initialize bundle pricing service once
@@ -71,6 +75,7 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
 
         if (Array.isArray(guestItems)) {
           const validatedItems = validateCartItems(guestItems);
+          repriceGuestItems(validatedItems);
           console.log(`Guest cart validation: ${guestItems.length} items → ${validatedItems.length} valid items`);
 
           // Merge with any existing items (in case items were added during loading)
@@ -265,6 +270,43 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
 
       return true;
     });
+  };
+
+  /**
+   * Guest baskets live in the browser and can be days old: re-check each line against the
+   * catalogue, drop discontinued products and update prices to today's.
+   * Stall lines (synthetic ids) and partner-discounted lines keep their own price.
+   */
+  const repriceGuestItems = async (current: CartItem[]) => {
+    const ids = current.map(i => i.productId).filter(id => /^[0-9a-f-]{36}$/i.test(id));
+    if (!ids.length) return;
+    try {
+      const r = await fetch('/api/cart/reprice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productIds: ids }) });
+      if (!r.ok) return;
+      const { products } = await r.json();
+      let removed = 0, changed = 0;
+      setItems(prev => {
+        const next = prev.flatMap(item => {
+          const info = products?.[item.productId];
+          if (!info) return [item]; // not checked (stall line etc.)
+          if (!info.active || !info.pricing) { removed++; return []; }
+          if ((item as any).partnerId) return [item];
+          const fresh = info.pricing.is_on_sale && info.pricing.discount_price ? info.pricing.discount_price : info.pricing.sale_price;
+          if (fresh && fresh !== item.pricing?.sale_price) {
+            changed++;
+            return [{ ...item, pricing: { ...item.pricing, ...info.pricing, sale_price: fresh } as any, product: { ...(item.product as any), ...info.product } }];
+          }
+          return [item];
+        });
+        if (removed || changed) saveGuestCart(next);
+        return next;
+      });
+      if (removed || changed) {
+        setBasketNotice(removed
+          ? `${removed} item${removed === 1 ? ' is' : 's are'} no longer available and ${removed === 1 ? 'has' : 'have'} been removed from your basket.`
+          : 'Prices in your basket have been updated to today’s prices.');
+      }
+    } catch { /* keep the basket as it is */ }
   };
 
   const saveGuestCart = (newItems: CartItem[]) => {
@@ -592,6 +634,8 @@ export function HybridCartProvider({ children }: { children: React.ReactNode }) 
     totalPrice,
     loading,
     isGuest,
+    basketNotice,
+    clearBasketNotice: () => setBasketNotice(null),
     digitalBundlePricing,
     getMasterBundleProductId,
     addToCart,
