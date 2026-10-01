@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient } from '@/lib/qr/server';
+import { LISTED_ONLY } from '@/lib/catalog/listing';
 
 export const revalidate = 300;
 
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
     .eq('is_public', true)
     .not('breed_id', 'is', null)
     .or('is_customer_generated.is.null,is_customer_generated.eq.false')
+    .or(LISTED_ONLY) // link-only designs (Pawsonality breed pictures) don't count
     .order('created_at', { ascending: false })
     .limit(2000);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

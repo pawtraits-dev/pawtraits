@@ -30,6 +30,7 @@ import type {
   InfluencerReferralCode
 } from './types';
 import type { UserProfile, UserType } from './user-types';
+import { LISTED_ONLY } from '@/lib/catalog/listing';
 import type { 
   Media, MediaCreate, MediaUpdate,
   Product, ProductCreate, ProductUpdate,
@@ -835,7 +836,8 @@ export class SupabaseService {
       .range(offset, offset + limit - 1);
 
     if (filters?.publicOnly !== false) {
-      query = query.eq('is_public', true);
+      // Public listings: hidden designs and link-only designs (Pawsonality breed pictures) left out
+      query = query.eq('is_public', true).or(LISTED_ONLY);
     }
 
     // Multi-breed filtering: Check both primary breed_id AND subjects in junction table

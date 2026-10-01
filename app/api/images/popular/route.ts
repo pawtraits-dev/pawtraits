@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { LISTED_ONLY } from '@/lib/catalog/listing';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('is_public', true)
+      .or(LISTED_ONLY) // link-only designs (Pawsonality breed pictures) left out
       .order('created_at', { ascending: false }); // Fallback ordering
 
     if (error) {

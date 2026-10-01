@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import { serviceClient } from '@/lib/qr/server';
 import { cloudinaryService } from '@/lib/cloudinary';
 import { designTitle, snippet } from '@/lib/text/plain';
+import { isListed } from '@/lib/catalog/listing';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -20,7 +21,7 @@ export async function generateMetadata(
   try {
     const { data } = await serviceClient()
       .from('image_catalog')
-      .select('id, description, marketing_description, marketing_description_approved, cloudinary_public_id, public_url, is_public, is_customer_generated, breeds:breed_id (name), themes:theme_id (name)')
+      .select('id, description, marketing_description, marketing_description_approved, cloudinary_public_id, public_url, is_public, is_customer_generated, tags, breeds:breed_id (name), themes:theme_id (name)')
       .eq('id', imageId)
       .maybeSingle();
 
@@ -28,6 +29,8 @@ export async function generateMetadata(
     if (!data || data.is_public === false || data.is_customer_generated) {
       return { ...generic, robots: { index: false, follow: false } };
     }
+    // Link-only designs (Pawsonality breed pictures): normal preview, but kept out of search
+    const linkOnly = !isListed(data as { tags?: string[] | null });
 
     const breed = (data.breeds as any)?.name as string | undefined;
     const theme = (data.themes as any)?.name as string | undefined;
@@ -51,6 +54,7 @@ export async function generateMetadata(
       alternates: { canonical: url },
       openGraph: { title, description, url, siteName: 'Pawtraits', type: 'website', locale: 'en_GB', images },
       twitter: { card: 'summary_large_image', title, description, images: image ? [image] : undefined },
+      ...(linkOnly ? { robots: { index: false, follow: true } } : {}),
     };
   } catch (err) {
     console.error('customise metadata failed', err);

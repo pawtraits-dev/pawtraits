@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { LISTED_ONLY } from '@/lib/catalog/listing';
 
 /**
  * POST /api/images/recommended
@@ -88,8 +89,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Limit results and order by rating
+    // Limit results and order by rating (link-only designs left out)
     query = query
+      .or(LISTED_ONLY)
       .order('rating', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(20);
