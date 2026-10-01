@@ -59,6 +59,23 @@ export const track = {
     gtagEvent('preview_ready', { item_id: item.id });
     fbqTrack('PreviewReady', { content_ids: [item.id] }, undefined, true);
   },
+  /** Quiz funnel (spec 5.5): start → each answer → complete → share / design click / save */
+  quizStart(quiz: string, petType: string) {
+    gtagEvent('quiz_start', { quiz_type: quiz, pet_type: petType });
+  },
+  quizAnswer(quiz: string, questionNumber: number, total: number) {
+    gtagEvent('quiz_answer', { quiz_type: quiz, question_number: questionNumber, total_questions: total });
+  },
+  quizComplete(quiz: string, resultType: string, petType: string) {
+    gtagEvent('quiz_complete', { quiz_type: quiz, result_type: resultType, pet_type: petType });
+    fbqTrack('QuizCompleted', { quiz_type: quiz, result_type: resultType, pet_type: petType }, undefined, true);
+  },
+  quizShare(quiz: string, resultType: string, method: string) {
+    gtagEvent('share', { content_type: 'quiz_result', item_id: resultType, method, quiz_type: quiz });
+  },
+  quizResultDesignClick(quiz: string, resultType: string, imageId: string) {
+    gtagEvent('quiz_result_design_click', { quiz_type: quiz, result_type: resultType, item_id: imageId });
+  },
   buyThisPrintClicked(item: TrackItem, mode: 'stall' | 'online') {
     gtagEvent('select_item', { items: gaItems([item]), item_list_name: mode === 'stall' ? 'stall_take_home' : 'buy_this_print' });
   },
