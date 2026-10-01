@@ -159,6 +159,10 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
     metadataKeys: Object.keys(paymentIntent.metadata || {})
   });
 
+  // If the order itself isn't saved, fail the webhook (500) so Stripe retries it automatically.
+  // Once the order exists, later steps (emails, commissions, fulfilment) only log — a retry
+  // would skip them anyway because of the idempotency check below.
+  let orderSaved = false;
   try {
     // Extract order information from metadata
     const metadata = paymentIntent.metadata || {};
@@ -318,8 +322,9 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
 
     if (orderError) {
       console.error('Failed to create order from payment:', orderError);
-      return;
+      throw new Error(`Order not saved for ${paymentIntent.id}: ${orderError.message}`);
     }
+    orderSaved = true;
 
     if (qrScanId && order?.qr_scan_id) {
       const { error: scanUpdateError } = await supabase
@@ -456,6 +461,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
 
   } catch (error) {
     console.error('Error handling successful payment:', error);
+    if (!orderSaved) throw error; // → 500, Stripe retries
   }
 }
 
