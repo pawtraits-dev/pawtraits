@@ -7,6 +7,8 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { lockedCode, otherPole, scoreQuiz, seededShuffle, validateAnswers, withPetName } from '../lib/quiz/scoring';
 import { DIMENSIONS, DIMENSION_ORDER, type Answers, type QuizQuestion } from '../lib/quiz/types';
+import { checkPublishable, type AdminQuestionRow, type AdminResultTypeRow } from '../lib/quiz/admin';
+import { parseQuestionInput, parseResultTypeInput } from '../lib/quiz/admin-server';
 
 const content = JSON.parse(readFileSync(path.resolve(__dirname, '../db/seeds/pawsonality-content.json'), 'utf8'));
 let passed = 0;
@@ -111,5 +113,45 @@ test('seededShuffle is stable for a seed and keeps every item', () => {
   assert.deepEqual(seededShuffle(items, 'abc').slice().sort((a, b) => a - b), items);
   assert.notDeepEqual(seededShuffle(items, 'abc'), items);
 });
+
+console.log('\nAdmin');
+{
+  const quiz = content.quizzes[1];
+  const qRows: AdminQuestionRow[] = quiz.questions.map((q: any, i: number) => ({
+    id: q.key, quiz_id: 'x', dimension: q.dimension, right_pole: q.rightPole, statement: q.statement,
+    share_quote: q.shareQuote, visual_brief: q.visualBrief, image_public_id: null, sort_order: i, is_active: q.isActive,
+  }));
+  const tRows: AdminResultTypeRow[] = quiz.resultTypes.map((t: any) => ({
+    id: t.code, quiz_id: 'x', code: t.code, name: t.name, tagline: t.tagline, traits: t.traits,
+    signature_move: t.signatureMove, owner_reality: t.ownerReality, share_quote: t.shareQuote, design_image_id: null,
+  }));
+  test('seed content is publishable (pictures and designs only as notes)', () => {
+    const c = checkPublishable(qRows, tRows);
+    assert.deepEqual(c.errors, []);
+    assert.ok(c.warnings.some(w => w.includes('no picture')) && c.warnings.some(w => w.includes('design')));
+  });
+  test('publish refused with fewer than 3 active questions on a dimension or a missing type', () => {
+    const off = qRows.map(q => (q.dimension === 'BC' && q.id !== qRows.find(x => x.dimension === 'BC')!.id ? { ...q, is_active: false } : q));
+    assert.ok(checkPublishable(off, tRows).errors.some(e => e.startsWith('Boldness')));
+    assert.ok(checkPublishable(qRows, tRows.slice(1)).errors.some(e => e.includes('missing')));
+  });
+  test('even question count and one-sided dimension are warned about', () => {
+    const four = qRows.filter(q => q.id !== qRows.find(x => x.dimension === 'EI')!.id);
+    assert.ok(checkPublishable(four, tRows).warnings.some(w => w.includes('ties')));
+    const oneSided = qRows.map(q => (q.dimension === 'SN' ? { ...q, right_pole: 'S' as const } : q));
+    assert.ok(checkPublishable(oneSided, tRows).warnings.some(w => w.includes('always gets that letter')));
+  });
+  test('question input: pole must belong to the dimension; statement required', () => {
+    assert.ok('error' in parseQuestionInput({ dimension: 'EI', right_pole: 'S', statement: '[PET_NAME] naps a lot' }, true));
+    assert.ok('error' in parseQuestionInput({ dimension: 'EI', right_pole: 'E', statement: ' ' }, true));
+    const ok = parseQuestionInput({ dimension: 'EI', right_pole: 'I', statement: '  [PET_NAME]   naps  ' }, true);
+    assert.ok('value' in ok && ok.value.statement === '[PET_NAME] naps' && ok.value.is_active === true);
+  });
+  test('result type input: design must be a uuid, traits trimmed', () => {
+    assert.ok('error' in parseResultTypeInput({ design_image_id: 'not-a-uuid' }));
+    const ok = parseResultTypeInput({ traits: [' a ', '', 'b'], design_image_id: '' });
+    assert.ok('value' in ok && ok.value.traits!.join() === 'a,b' && ok.value.design_image_id === null);
+  });
+}
 
 console.log(`\n${passed} tests passed`);

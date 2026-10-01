@@ -38,7 +38,8 @@ import {
   Send,
   Coffee,
   MapPin,
-  Printer
+  Printer,
+  Sparkles
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -65,10 +66,11 @@ const navigationSections = [
     items: [
       { name: 'Breeds', href: '/admin/breeds', icon: Tag },
       { name: 'Coats', href: '/admin/coats', icon: Palette },
-      { name: 'Themes', href: '/admin/themes', icon: Image },
+      { name: 'Themes', href: '/admin/themes', icon: ImageIcon },
       { name: 'Styles', href: '/admin/styles', icon: Eye },
       { name: 'Outfits', href: '/admin/outfits', icon: Shirt },
       { name: 'Formats', href: '/admin/formats', icon: FileImage },
+      { name: 'Quizzes', href: '/admin/quizzes', icon: Sparkles },
     ]
   },
   {

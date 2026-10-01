@@ -536,6 +536,58 @@ export class AdminSupabaseService {
     return adminRequest<StockLocation>('/api/admin/stock/locations', jsonInit('PATCH', data));
   }
 
+  // ===== QUIZ METHODS (Admin → Quizzes; spec docs/specs/pawsonality-quiz.md) =====
+
+  async getQuizzes(): Promise<AdminResult<any[]>> {
+    return adminRequest<any[]>('/api/admin/quizzes');
+  }
+
+  async getQuiz(id: string): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/quizzes/${id}`);
+  }
+
+  async updateQuiz(id: string, data: { status?: 'live' | 'paused'; title?: string }): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/quizzes/${id}`, jsonInit('PATCH', data));
+  }
+
+  async publishQuiz(id: string): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/quizzes/${id}/publish`, { method: 'POST' });
+  }
+
+  async createQuizQuestion(quizId: string, data: Record<string, unknown>): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/quizzes/${quizId}/questions`, jsonInit('POST', data));
+  }
+
+  async updateQuizQuestion(quizId: string, questionId: string, data: Record<string, unknown>): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/quizzes/${quizId}/questions/${questionId}`, jsonInit('PATCH', data));
+  }
+
+  async deleteQuizQuestion(quizId: string, questionId: string): Promise<AdminResult<{ ok: true }>> {
+    return adminRequest<{ ok: true }>(`/api/admin/quizzes/${quizId}/questions/${questionId}`, { method: 'DELETE' });
+  }
+
+  async uploadQuizQuestionImage(quizId: string, questionId: string, file: File): Promise<AdminResult<any>> {
+    const form = new FormData();
+    form.append('file', file);
+    return adminRequest<any>(`/api/admin/quizzes/${quizId}/questions/${questionId}/image`, { method: 'POST', body: form });
+  }
+
+  async removeQuizQuestionImage(quizId: string, questionId: string): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/quizzes/${quizId}/questions/${questionId}/image`, { method: 'DELETE' });
+  }
+
+  async updateQuizResultType(quizId: string, code: string, data: Record<string, unknown>): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/quizzes/${quizId}/types/${code}`, jsonInit('PATCH', data));
+  }
+
+  async getQuizResults(quizId: string, days = 30): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/quizzes/${quizId}/results?days=${days}`);
+  }
+
+  async getPawsonalityDesigns(animal: 'dog' | 'cat'): Promise<AdminResult<{ theme: string | null; designs: { id: string; description: string | null; breed: string | null }[] }>> {
+    return adminRequest(`/api/admin/quizzes/designs?animal=${animal}`);
+  }
+
   // ===== STICKER QR METHODS =====
 
   async getImageQrInfo(imageId: string, opts: { size?: string; locationCode?: string } = {}): Promise<AdminResult<ImageQrInfo>> {
