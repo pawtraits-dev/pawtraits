@@ -60,8 +60,8 @@ export const track = {
     fbqTrack('PreviewReady', { content_ids: [item.id] }, undefined, true);
   },
   /** Quiz funnel (spec 5.5): start → each answer → complete → share / design click / save */
-  quizStart(quiz: string, petType: string) {
-    gtagEvent('quiz_start', { quiz_type: quiz, pet_type: petType });
+  quizStart(quiz: string, petType: string, source?: string) {
+    gtagEvent('quiz_start', { quiz_type: quiz, pet_type: petType, ...(source ? { entry_source: source } : {}) });
   },
   quizAnswer(quiz: string, questionNumber: number, total: number) {
     gtagEvent('quiz_answer', { quiz_type: quiz, question_number: questionNumber, total_questions: total });

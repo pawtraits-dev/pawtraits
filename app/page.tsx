@@ -6,6 +6,7 @@
  *   hero: the proposition + "Make my pet's Pawtrait"
  *   how it works (3 steps)
  *   find your breed (only breeds that have designs)
+ *   Pawsonality quiz band (only while the quiz is live)
  *   designs: 2-column grid, New / Popular / Staff picks
  *   "every design can be your pet" band
  *
@@ -21,6 +22,7 @@ import { CountryProvider } from '@/lib/country-context';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import { productMatchesFormat } from '@/lib/products/shape-family';
 import { designTitle } from '@/lib/text/plain';
+import QuizPromo from '@/components/quiz/QuizPromo';
 
 interface HomeImage {
   id: string;
@@ -188,6 +190,9 @@ function HomePageContent() {
           <p className="mt-1 px-5 text-sm text-gray-500">Don&apos;t see yours? Any design can be painted with your pet, cat or dog.</p>
         </section>
       )}
+
+      {/* PAWSONALITY QUIZ */}
+      <QuizPromo source="home" />
 
       {/* DESIGNS */}
       <section id="gallery" className="mx-auto max-w-6xl px-5 pt-10">

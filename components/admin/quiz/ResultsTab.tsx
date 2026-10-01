@@ -2,7 +2,7 @@
 
 /**
  * Admin → Quizzes → Results: completions, shares, saves and purchases in a period, how results
- * spread across the 16 types, and the latest results.
+ * spread across the 16 types, where quiz takers came from, and the latest results.
  */
 import { useEffect, useState } from 'react';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
@@ -11,10 +11,19 @@ import type { AdminResultTypeRow } from '@/lib/quiz/admin';
 interface Stats {
   days: number; completions: number; shared: number; saved: number; purchased: number;
   byType: Record<string, number>;
+  bySource?: Record<string, { completions: number; shared: number; purchased: number }>;
   recent: { share_code: string; pet_name: string; result_type: string; quiz_version: number; completed_at: string; shared_at: string | null; breed: string | null }[];
 }
 
 const pct = (n: number, d: number) => (d ? `${Math.round((n / d) * 100)}%` : '–');
+
+/** Plain names for the ?src= values the ways in use; anything else (utm_source, partner tags) shows as is */
+const SOURCE_LABELS: Record<string, string> = {
+  home: 'Home page band', design: 'Design page', 'order-email': 'Order confirmation email',
+  'welcome-email': 'Account email', 'my-pets': 'My pets', shared: "A friend's shared result",
+  'result-again': 'Another pet (after their result)', 'short-link': 'pawtraits.pics/quiz',
+  partner: 'Partner link', direct: 'Direct / unknown', unknown: 'Not recorded',
+};
 
 export default function ResultsTab({ quizId, slug, types }: { quizId: string; slug: string; types: AdminResultTypeRow[] }) {
   const [days, setDays] = useState(30);
@@ -50,7 +59,7 @@ export default function ResultsTab({ quizId, slug, types }: { quizId: string; sl
               ['Completed', stats.completions.toLocaleString('en-GB'), ''],
               ['Shared', stats.shared.toLocaleString('en-GB'), pct(stats.shared, stats.completions)],
               ['Saved', stats.saved.toLocaleString('en-GB'), pct(stats.saved, stats.completions)],
-              ['Bought', stats.purchased.toLocaleString('en-GB'), pct(stats.purchased, stats.completions)],
+              ['Ordered within 30 days', stats.purchased.toLocaleString('en-GB'), pct(stats.purchased, stats.completions)],
             ].map(([label, value, sub]) => (
               <div key={label} className="rounded-xl border border-gray-200 bg-white p-4">
                 <dt className="text-sm text-gray-600">{label}</dt>
@@ -74,6 +83,27 @@ export default function ResultsTab({ quizId, slug, types }: { quizId: string; sl
               </ul>
             )}
           </section>
+
+          {stats.bySource && Object.keys(stats.bySource).length > 0 && (
+            <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+              <h3 className="px-4 pt-4 font-semibold text-gray-900">Where quiz takers came from</h3>
+              <table className="mt-2 w-full text-sm">
+                <thead className="bg-gray-50 text-left text-gray-600">
+                  <tr><th className="px-4 py-2 font-medium">Way in</th><th className="px-4 py-2 text-right font-medium">Completed</th><th className="px-4 py-2 text-right font-medium">Shared</th><th className="px-4 py-2 text-right font-medium">Ordered</th></tr>
+                </thead>
+                <tbody>
+                  {Object.entries(stats.bySource).sort((a, b) => b[1].completions - a[1].completions).map(([src, v]) => (
+                    <tr key={src} className="border-t border-gray-100">
+                      <td className="px-4 py-2 text-gray-900">{SOURCE_LABELS[src] ?? src}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{v.completions}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-gray-700">{v.shared} <span className="text-gray-500">({pct(v.shared, v.completions)})</span></td>
+                      <td className="px-4 py-2 text-right tabular-nums text-gray-700">{v.purchased} <span className="text-gray-500">({pct(v.purchased, v.completions)})</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
 
           <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
             <h3 className="px-4 pt-4 font-semibold text-gray-900">Latest results</h3>

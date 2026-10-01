@@ -27,6 +27,7 @@ import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
 import type { UserPetData } from '@/lib/types';
 import type { UserProfile } from '@/lib/user-types';
+import PetPawsonality, { usePetPawsonalities } from '@/components/quiz/PetPawsonality';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
 
@@ -44,6 +45,7 @@ export default function PetsClient() {
   const [deletingPet, setDeletingPet] = useState(false);
 
   const supabaseService = new SupabaseService();
+  const pawsonalities = usePetPawsonalities(pets.length > 0);
 
   useEffect(() => {
     loadUserData();
@@ -438,6 +440,8 @@ export default function PetsClient() {
                       <p>Age: {getAgeDisplay(pet.age)}</p>
                     )}
                   </div>
+
+                  <PetPawsonality data={pawsonalities} pet={pet} />
 
                   <div className="mt-4 flex items-center justify-between">
                     <div className="text-xs text-gray-500">

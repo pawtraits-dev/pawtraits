@@ -3,6 +3,8 @@
 /**
  * Pawsonality result page body (client): picture (upgrading to the breed version), type copy,
  * share, score bars, traits, "Make Biscuit's Pawtrait", save. Data comes from the server page.
+ * Someone opening a friend's shared result (not taken in this browser) gets a "What's your pet's
+ * Pawsonality?" banner at the top: the share loop.
  */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -20,11 +22,19 @@ export default function ResultView({ r }: { r: PublicQuizResult }) {
   const typeName = t?.name ?? r.code;
   const [imageId, setImageId] = useState<string | null>(r.imageId);
   const [signedIn, setSignedIn] = useState(false);
+  const [visitor, setVisitor] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/check', { credentials: 'include' }).then(res => (res.ok ? res.json() : null))
       .then(d => setSignedIn(!!d?.isAuthenticated)).catch(() => {});
-  }, []);
+    // Taken in this browser, or back from the save email → the owner; otherwise a friend's link
+    let mine = new URLSearchParams(window.location.search).has('save');
+    try { mine = mine || (JSON.parse(localStorage.getItem('pawtraits.quiz.mine') || '[]') as string[]).includes(r.shareCode); } catch { /* storage blocked */ }
+    setVisitor(!mine);
+  }, [r.shareCode]);
+
+  // A friend's pet may not be the same species as theirs, so only the owner's link preselects it
+  const quizHref = (src: string) => (src === 'shared' ? `/quiz/pawsonality?src=${src}` : `/quiz/pawsonality?animal=${r.animalType}&src=${src}`);
 
   const common = {
     shareCode: r.shareCode, animal: r.animalType, code: r.code, typeName, petName: name,
@@ -34,6 +44,16 @@ export default function ResultView({ r }: { r: PublicQuizResult }) {
 
   return (
     <main>
+      {visitor && (
+        <div className="bg-[#2A1A52] px-5 py-3 text-white">
+          <div className="mx-auto flex max-w-md items-center justify-between gap-3">
+            <p className="text-sm leading-snug">What&rsquo;s <strong>your</strong> pet&rsquo;s Pawsonality? 20 swipes, free.</p>
+            <Link href={quizHref('shared')} className="flex h-10 shrink-0 items-center rounded-lg bg-white px-3.5 text-sm font-bold text-[#2A1A52]">
+              Take the quiz
+            </Link>
+          </div>
+        </div>
+      )}
       <section className="bg-[#F6F2FC] px-5 pb-7 pt-5">
         <div className="mx-auto max-w-md">
           <ResultHeroPicture {...common} onImage={setImageId} />
@@ -93,8 +113,8 @@ export default function ResultView({ r }: { r: PublicQuizResult }) {
           {signedIn ? `Keep it on ${name}’s profile.` : `We’ll email you a link that saves it to ${name}’s profile. Optional.`}
         </p>
         <SaveResult shareCode={r.shareCode} petName={name} signedIn={signedIn} />
-        <Link href={`/quiz/pawsonality?animal=${r.animalType}`} className="mt-6 inline-block text-sm font-semibold text-purple-800 underline">
-          Do the quiz for another pet
+        <Link href={visitor ? quizHref('shared') : quizHref('result-again')} className="mt-6 inline-block text-sm font-semibold text-purple-800 underline">
+          {visitor ? 'Find out your pet’s Pawsonality' : 'Do the quiz for another pet'}
         </Link>
       </section>
     </main>

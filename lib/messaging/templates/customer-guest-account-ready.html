@@ -40,6 +40,13 @@
         <li>Track your order</li>
         <li>Put your pet into more designs (Pawcasso never tires of a good muse)</li>
       </ul>
+      {{#if quiz_url}}
+      <div style="margin: 24px 0; padding: 18px; background: #2A1A52; border-radius: 12px; color: #fff; text-align: center;">
+        <p style="margin: 0 0 6px; font-size: 17px; font-weight: 700; color: #fff;">What’s your pet’s Pawsonality?</p>
+        <p style="margin: 0 0 12px; font-size: 14px; color: #D9CDF5;">20 quick swipes, 16 types. Free, about 90 seconds.</p>
+        <a href="{{quiz_url}}" style="display: inline-block; background: #fff; color: #2A1A52; text-decoration: none; padding: 11px 22px; border-radius: 10px; font-weight: 700;">Take the quiz</a>
+      </div>
+      {{/if}}
       <p class="small">Didn’t place this order? Just ignore this email and nothing will happen.</p>
     </div>
     <div class="footer">

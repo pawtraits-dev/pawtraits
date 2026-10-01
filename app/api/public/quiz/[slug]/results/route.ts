@@ -1,9 +1,11 @@
 /**
  * POST /api/public/quiz/[slug]/results
  * Body: { animal, petName, breedId?, answers: { questionId: 'right'|'left' }, order?: string[],
- *         partnerCode?, referralCode? }
+ *         partnerCode?, referralCode?, source?, petId? }
  * Scores the answers against the live version (never trusts a browser score), saves the result
  * and returns its share code. No sign-up needed; a signed-in customer's user id is attached.
+ * source: where they came from ('home', 'design', 'order-email', 'my-pets', 'shared'…).
+ * petId: started from My pets — if the signed-in customer owns that pet, the type is saved to it.
  * Limit: 30 completed quizzes per IP per hour.
  */
 import { NextRequest, NextResponse } from 'next/server';
@@ -12,6 +14,7 @@ import { getLiveQuiz, hashIp, isAnimal, newShareCode, sessionUserId } from '@/li
 import { scoreQuiz, validateAnswers } from '@/lib/quiz/scoring';
 import { findBreedImage } from '@/lib/quiz/breed-images';
 import { getClientIp } from '@/lib/public-rate-limiter';
+import { cleanSource } from '@/lib/quiz/ways-in';
 
 const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ '’.-]{0,29}$/;
 const CODE_RE = /^[A-Za-z0-9_-]{2,40}$/;
@@ -59,9 +62,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const design = quiz.resultTypes.find(t => t.code === score.code)?.designImageId;
     const resultImageId = design && breedId ? await findBreedImage(design, breedId) : null;
 
+    // Started from one of their pets on My pets: link it (only their own, same species)
+    let petId: string | null = null;
+    if (userId && typeof body.petId === 'string' && UUID_RE.test(body.petId)) {
+      const { data: pet } = await supabase.from('pets').select('id, animal_type')
+        .eq('id', body.petId).eq('user_id', userId).maybeSingle();
+      if (pet && (!pet.animal_type || pet.animal_type === animal)) petId = pet.id;
+    }
+
     for (let attempt = 0; attempt < 3; attempt++) {
       const shareCode = newShareCode();
-      const { error } = await supabase.from('quiz_results').insert({
+      const { data: saved, error } = await supabase.from('quiz_results').insert({
         share_code: shareCode,
         quiz_id: quiz.quizId,
         quiz_type: quiz.slug,
@@ -78,9 +89,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         referral_code: typeof body.referralCode === 'string' && CODE_RE.test(body.referralCode) ? body.referralCode.toUpperCase() : null,
         ip_hash: ipHash,
         result_image_id: resultImageId,
-      });
-      if (!error) return NextResponse.json({ shareCode, code: score.code });
-      if (error.code !== '23505') throw error; // retry only on a share-code clash
+        entry_source: cleanSource(body.source),
+        pet_id: petId,
+      }).select('id').single();
+      if (!error && saved) {
+        if (petId) {
+          await supabase.from('pets').update({ pawsonality_type: score.code, pawsonality_result_id: saved.id, updated_at: new Date().toISOString() })
+            .eq('id', petId).then(({ error: e }) => { if (e) console.error('quiz pet link failed', e); });
+        }
+        return NextResponse.json({ shareCode, code: score.code, savedToPet: !!petId });
+      }
+      if (error && error.code !== '23505') throw error; // retry only on a share-code clash
     }
     throw new Error('Could not allocate a share code');
   } catch (err) {

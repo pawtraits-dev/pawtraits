@@ -27,6 +27,7 @@ import { customPortraitTitle } from '@/lib/cart/items';
 import { extractDescriptionTitle } from '@/lib/utils';
 import { designTitle, plainText } from '@/lib/text/plain';
 import MoreLikeThis from '@/components/customise/MoreLikeThis';
+import DesignQuizLink from '@/components/quiz/DesignQuizLink';
 
 interface Pet {
   pet_id: string;
@@ -403,6 +404,8 @@ export default function CustomisePage() {
               </button>
               <p className="mt-2 text-center text-xs text-gray-500">Free preview in about a minute · no sign-up</p>
             </section>
+
+            <DesignQuizLink imageId={catalogImage.id} themeName={themeName} />
 
             {buyTarget && (
               <BuyOptionsSheet inline open onClose={() => {}} target={buyTarget}

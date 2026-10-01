@@ -379,6 +379,15 @@
         <a href="{{order_url}}" class="button">{{#if is_collected}}View Your Order{{else}}Track Your Masterpiece{{/if}}</a>
       </div>
 
+      {{#if quiz_url}}
+      <!-- Pawsonality quiz (only while the quiz is live) -->
+      <div style="margin: 30px 0 0; padding: 20px; background: #2A1A52; border-radius: 12px; color: #ffffff; text-align: center;">
+        <p style="margin: 0 0 6px; font-size: 18px; font-weight: 700; color: #ffffff;">Bonus round: what's your pet's Pawsonality?</p>
+        <p style="margin: 0 0 14px; font-size: 14px; color: #D9CDF5;">20 quick swipes, 16 types, and one suspiciously accurate result. Free, about 90 seconds.</p>
+        <a href="{{quiz_url}}" style="display: inline-block; background: #ffffff; color: #2A1A52; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 700;">Take the quiz</a>
+      </div>
+      {{/if}}
+
       <!-- Support Info -->
       <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
         <strong>Questions? Concerns? Just want to chat about your pet?</strong><br>

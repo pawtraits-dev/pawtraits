@@ -10,6 +10,7 @@ import { isStallProductId } from '@/lib/cart/items';
 import { ensureCustomerAccount, createClaimToken, sendAccountReadyEmail } from '@/lib/guest/account';
 import { sendMetaPurchase } from '@/lib/tracking/meta-capi';
 import { FulfillmentRouter } from '@/lib/fulfillment/fulfillment-router';
+import { markQuizPurchase, quizEmailUrl } from '@/lib/quiz/ways-in';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -417,6 +418,9 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
 
     // Send order confirmation email to customer
     await sendOrderConfirmationEmail(supabase, order, paymentIntent, metadata);
+
+    // Took the Pawsonality quiz in the last 30 days? Count the result as bought (admin results)
+    await markQuizPurchase(supabase, order);
 
     // Guest: second email with sign-in link + free download
     if (guestAccount && customerEmail) {
@@ -2007,6 +2011,9 @@ async function sendOrderConfirmationEmail(
       stallName = loc?.name ?? null;
     }
 
+    // Pawsonality quiz block (left out while the quiz isn't live)
+    const quizUrl = await quizEmailUrl(baseUrl, 'order-email');
+
     // Send email via messaging service
     await sendMessage({
       templateKey: 'order_confirmation',
@@ -2040,6 +2047,7 @@ async function sendOrderConfirmationEmail(
         downloads_url: `${baseUrl}/customer/downloads`,
         is_collected: isCollected,
         stall_name: stallName,
+        quiz_url: quizUrl,
         unsubscribe_url: `${baseUrl}/preferences/unsubscribe`
       },
       priority: 'high'

@@ -5,6 +5,8 @@
  * Start (name, dog/cat, breed) → 20 swipe cards (drag, buttons or arrow keys, undo) → reveal →
  * result page. Progress survives a refresh (sessionStorage). The browser scores for the instant
  * reveal; the server re-scores and stores the result (POST /api/public/quiz/pawsonality/results).
+ * Ways in (phase 5) link here with ?src= (home, design, order-email, welcome-email, my-pets,
+ * shared, result-again) so admin can see which work; My pets also passes ?pet=&name=&breed=.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -20,6 +22,24 @@ const STORAGE_KEY = 'pawtraits.quiz.pawsonality.v1';
 const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' };
 const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ '’.-]{0,29}$/;
 const MIN_REVEAL_MS = 1800;
+const MINE_KEY = 'pawtraits.quiz.mine'; // share codes taken in this browser (result page: owner vs visitor)
+const SOURCE_RE = /^[a-z0-9_-]{1,32}$/;
+
+/** Where this quiz taker came from: ?src=, else utm_source, else a partner link, else direct */
+function entrySource(qs: URLSearchParams): string {
+  for (const v of [qs.get('src'), qs.get('utm_source')]) {
+    const s = v?.trim().toLowerCase();
+    if (s && SOURCE_RE.test(s)) return s;
+  }
+  return qs.get('partner') ? 'partner' : 'direct';
+}
+
+function rememberMine(shareCode: string) {
+  try {
+    const list: string[] = JSON.parse(localStorage.getItem(MINE_KEY) || '[]');
+    localStorage.setItem(MINE_KEY, JSON.stringify([shareCode, ...list.filter(c => c !== shareCode)].slice(0, 20)));
+  } catch { /* storage blocked */ }
+}
 
 interface PublicQuestion { id: string; dimension: Dimension; rightPole: Pole; statement: string; imageUrl: string | null }
 interface PublicQuiz { slug: string; animalType: AnimalType; version: number; questions: PublicQuestion[]; resultTypes: { code: string; name: string }[] }
@@ -28,6 +48,7 @@ interface Breed { id: string; name: string; animal_type: AnimalType; is_active?:
 interface Progress {
   animal: AnimalType; petName: string; breedId: string | null; breedName: string;
   version: number; seed: string; history: string[]; answers: Answers;
+  source?: string; petId?: string | null;
 }
 
 type Step = 'start' | 'cards' | 'reveal';
@@ -58,6 +79,7 @@ export default function PawsonalityQuizPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [attribution, setAttribution] = useState<{ partnerCode?: string; referralCode?: string }>({});
+  const [entry, setEntry] = useState<{ source: string; petId: string | null; breedId: string | null }>({ source: 'direct', petId: null, breedId: null });
   const flingRef = useRef<SwipeCardHandle | null>(null);
   const paintingFor = useRef<string | null>(null); // type code whose breed picture we've asked for
 
@@ -66,6 +88,12 @@ export default function PawsonalityQuizPage() {
     const qs = new URLSearchParams(window.location.search);
     const a = qs.get('animal');
     if (a === 'cat' || a === 'dog') setAnimal(a);
+    // Started from My pets: their pet's name and breed are filled in
+    const name = qs.get('name')?.trim();
+    if (name && NAME_RE.test(name)) setPetName(name);
+    const uuid = /^[0-9a-f-]{36}$/i;
+    const pet = qs.get('pet'); const breed = qs.get('breed');
+    setEntry({ source: entrySource(qs), petId: pet && uuid.test(pet) ? pet : null, breedId: breed && uuid.test(breed) ? breed : null });
     let referralCode: string | undefined;
     try {
       const ref = qs.get('ref');
@@ -90,6 +118,13 @@ export default function PawsonalityQuizPage() {
       setBreeds(Array.isArray(rows) ? rows.filter(b => b.is_active !== false) : []);
     }).catch(() => setBreeds([]));
   }, []);
+
+  // Prefilled breed (from My pets) once the breed list has loaded
+  useEffect(() => {
+    if (!entry.breedId || breedName) return;
+    const b = breeds.find(x => x.id === entry.breedId);
+    if (b) setBreedName(b.name);
+  }, [breeds, entry.breedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const speciesBreeds = useMemo(
     () => breeds.filter(b => b.animal_type === animal).sort((a, b) => a.name.localeCompare(b.name)),
@@ -116,9 +151,10 @@ export default function PawsonalityQuizPage() {
     const p: Progress = {
       animal, petName: name, breedId: breed?.id ?? null, breedName: breed?.name ?? '',
       version: q.version, seed: Math.random().toString(36).slice(2), history: [], answers: {},
+      source: entry.source, petId: entry.petId,
     };
     setQuiz(q); setProgress(p); save(p); setStep('cards');
-    track.quizStart(SLUG, animal);
+    track.quizStart(SLUG, animal, entry.source);
     window.scrollTo({ top: 0 });
   }
 
@@ -137,7 +173,10 @@ export default function PawsonalityQuizPage() {
     try {
       const r = await fetch(`/api/public/quiz/${SLUG}/results`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ animal: p.animal, petName: p.petName, breedId: p.breedId, answers: p.answers, order: p.history, ...attribution }),
+        body: JSON.stringify({
+          animal: p.animal, petName: p.petName, breedId: p.breedId, answers: p.answers, order: p.history,
+          source: p.source, petId: p.petId ?? undefined, ...attribution,
+        }),
       });
       const body = await r.json().catch(() => ({}));
       if (r.status === 409) {
@@ -150,6 +189,7 @@ export default function PawsonalityQuizPage() {
       await new Promise(res => setTimeout(res, Math.max(0, MIN_REVEAL_MS - (Date.now() - started))));
       track.quizComplete(SLUG, body.code || localCode, p.animal);
       save(null);
+      rememberMine(body.shareCode);
       router.push(`/quiz/${SLUG}/r/${body.shareCode}`);
     } catch (err: any) {
       setStep('cards');

@@ -1,6 +1,6 @@
 # 16 Pawsonalities quiz
 
-**Status:** Phases 1–4 (engine, admin, customer quiz, result page) built 2026-10-01 · Plan and decisions: "16 Pawsonalities quiz — design and dev plan" (Claude Docs) · Source spec: quiz engine functional spec v1.0 (project doc `claude/quiz-engine-functional-spec-v1.md`) · Mock-ups: Pawtraits mock-up canvas, quiz row
+**Status:** Phases 1–5 (engine, admin, customer quiz, result page, ways in) built 2026-10-01; launch checklist below · Plan and decisions: "16 Pawsonalities quiz — design and dev plan" (Claude Docs) · Source spec: quiz engine functional spec v1.0 (project doc `claude/quiz-engine-functional-spec-v1.md`) · Mock-ups: Pawtraits mock-up canvas, quiz row
 
 ## Decisions (1 Oct 2026)
 - Dimensions E/I energy, S/N social, T/F training (cats: Responsive / Own Agenda), B/C boldness. 16 codes shared by dogs and cats; cats have their own type names.
@@ -17,7 +17,7 @@
 | 2 | Admin → Quizzes (edit questions and types, pictures, link designs, publish, pause, results) | **Built** |
 | 3 | Quiz pages `/quiz/pawsonality` (start, swipe cards, reveal) and a first result page | **Built** |
 | 4 | Result page: breed-matched picture, share card + previews, matched designs, save by email | **Built** |
-| 5 | Ways in (home band, design page, emails, My pets), launch | Next |
+| 5 | Ways in (home band, design page, emails, My pets, shared results), where-from tracking, launch | **Built** |
 
 ## Data (`db/migrations/2026-10-01-quiz-engine.sql`)
 - `quizzes` (slug + animal_type unique; status draft/live/paused; current_version; has_unpublished_changes)
@@ -97,3 +97,43 @@ Migration: `db/migrations/2026-10-02-quiz-breed-pictures.sql` (`quiz_breed_image
 | `GET/POST /api/admin/quizzes/[id]/breed-images` | Breed picture grid / make one |
 
 Tested end to end on a phone against a local stand-in for Supabase: picture request fired at answer 14, "Painting…" overlay, swap to the breed version, result updated, "Add photo" link follows the new picture, share recorded, both cards render, `og:image` absolute on pawtraits.pics. Not testable here: real Gemini generation, Cloudinary upload and the save email (they need live keys).
+
+## Ways in and launch (phase 5)
+Migration: `db/migrations/2026-10-03-quiz-ways-in.sql` (`quiz_results.entry_source`, index on `email`).
+
+**Every way in shows only while the quiz is live** (`lib/quiz/ways-in.ts` `liveAnimals`). Pausing a quiz in admin hides them all; pausing just dogs or just cats hides that species' buttons.
+
+| Way in | Where | `src` |
+|---|---|---|
+| Home page band "What's your pet's Pawsonality?", Start with my dog / cat (`components/quiz/QuizPromo.tsx`) | between Find your breed and Designs | `home` |
+| Design page card "The Party Animal, one of 16 Pawsonalities · Is this your dog?" (`components/quiz/DesignQuizLink.tsx`) | designs in a Pawsonalities theme that are a type's design or a breed version of one; hidden when they came from their own result | `design` |
+| Order confirmation email, "Bonus round" block | `customer-order-confirmation.html` (`quiz_url`) | `order-email` |
+| Guest account email | `customer-guest-account-ready.html` (`quiz_url`) | `welcome-email` |
+| My pets: type chip linking to the result, or "What's Biscuit's Pawsonality?" (`components/quiz/PetPawsonality.tsx`, both `/pets` and `/customer/pets`) | starts the quiz with the pet's name, species and breed filled in; the result is **saved to that pet automatically** (only the signed-in owner's pet, same species) | `my-pets` |
+| A friend's shared result: banner "What's your pet's Pawsonality? Take the quiz" (no species preselected) | result page, when the result wasn't taken in this browser (and not back from the save email) | `shared` |
+| "Do the quiz for another pet" (owner) | result page | `result-again` |
+| `pawtraits.pics/quiz` (printed on cards) | redirect | `short-link` |
+
+Other sources: `utm_source` is used when there's no `src`; a partner link with no `src` counts as `partner`; otherwise `direct`. Stored on the result (`entry_source`) and sent with the `quiz_start` analytics event.
+
+**Admin → Quizzes → Results** now shows **Where quiz takers came from** (completed, shared, ordered per way in) and **Ordered within 30 days**: when an order is paid, the Stripe webhook marks the buyer's latest quiz result from the last 30 days (matched by account or the email they saved it with) as bought, with the order (`markQuizPurchase`). It counts anyone who took the quiz and then ordered anything, so treat it as "quiz takers who bought", not "bought because of the quiz".
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/public/quiz/[slug]/status` | `{dog, cat}` live flags (edge-cached 60 s) |
+| `GET /api/public/quiz/[slug]/design/[imageId]` | Type code/name for a type design or its breed version; 404 otherwise |
+| `GET /api/customers/pets/pawsonality` | Signed-in customer's pets' types + live flags |
+| `POST /api/public/quiz/[slug]/results` | now also takes `source`, `petId` |
+
+Tested end to end on a phone against a real PostgREST over the full schema (25 checks): band → quiz → result with `entry_source=home`; owner vs visitor banner and links; design page card shown/hidden correctly; pausing one or both quizzes hides buttons/band; My pets prompt → prefilled quiz → saved to the pet → chip on My pets; another customer's or wrong-species pet ignored; bad `src` dropped; admin where-from table. Email blocks render with the link and disappear when no quiz is live; purchase linking matched by account and by saved email, ignores results older than 30 days.
+
+### Launch checklist
+1. Run the migrations in order (each is safe to re-run): `2026-10-01-quiz-engine.sql`, `2026-10-01-pawsonality-seed.sql`, `2026-10-02-quiz-breed-pictures.sql`, `2026-10-03-quiz-ways-in.sql`.
+2. **The seed publishes both quizzes as live**, so every way in appears as soon as this is deployed. Pause both in Admin → Quizzes until the designs are in, unless you want a soft launch with paw placeholders.
+3. Create the Pawsonalities theme (name must contain "Pawsonalit") and the 32 type designs (16 dogs, 16 cats); link each in Result types; publish both quizzes.
+4. Breed pictures: "Make missing" for the top 20 breeds per species (about 640 Gemini calls at 20–60 s each).
+5. Upload question pictures (optional; cards work without them) and review the drafted cat questions and dog copy fixes.
+6. Check the Gemini, Cloudinary and email keys in Vercel, then do one real run on a phone: quiz with a breed → painted picture → share to WhatsApp (preview card) → save by email → link works → type on My pets.
+7. Go live: unpause. Watch Results → Where quiz takers came from for the first week.
+
+Decision to make: breed pictures made for quiz takers are saved as public designs, so they appear in Browse and the home page "New" tab alongside your own designs. If that's unwanted, they can be kept out of the catalogue listings (still buyable from the result).

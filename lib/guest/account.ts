@@ -12,6 +12,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createHash, randomBytes } from 'crypto';
 import { sendMessage } from '@/lib/messaging/message-service';
+import { quizEmailUrl } from '@/lib/quiz/ways-in';
 
 export const CLAIM_TOKEN_DAYS = 14;
 
@@ -172,6 +173,7 @@ export async function sendAccountReadyEmail(
       order_number: input.orderNumber,
       expires_days: CLAIM_TOKEN_DAYS,
       base_url: input.baseUrl,
+      quiz_url: await quizEmailUrl(input.baseUrl, 'welcome-email'),
     },
     priority: 'high',
   } as any);
