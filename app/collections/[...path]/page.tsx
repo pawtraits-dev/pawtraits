@@ -15,7 +15,7 @@ import { ChevronRight, Sparkles } from 'lucide-react';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
 import DesignGrid, { GridSkeleton, type GridDesign } from '@/components/collections/DesignGrid';
-import CollectionCard from '@/components/collections/CollectionCard';
+import { CollectionCircles } from '@/components/collections/CollectionCard';
 import ZodiacFinder from '@/components/collections/ZodiacFinder';
 
 const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' };
@@ -153,9 +153,7 @@ function CollectionPageContent() {
         {/* Collections inside this one */}
         {(data?.children?.length ?? 0) > 0 && (
           <section className="mt-6" aria-label={`Inside ${c?.name}`}>
-            <ul className="grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-4 md:grid-cols-6">
-              {data!.children.map(ch => <li key={ch.id}><CollectionCard c={ch} size="sm" /></li>)}
-            </ul>
+            <CollectionCircles items={data!.children} layout={data!.children.length > 8 ? 'wrap' : 'scroll'} showCount label={`Inside ${c?.name}`} />
           </section>
         )}
 

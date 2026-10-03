@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
-import CollectionCard from '@/components/collections/CollectionCard';
+import { CollectionCircles } from '@/components/collections/CollectionCard';
 
 interface C { id: string; kind: string; path: string; depth: number; name: string; description: string | null; designs: number; heroImageId: string | null; inSeason: boolean; details: Record<string, any> }
 
@@ -48,9 +48,7 @@ export default function HomeCollections() {
             <h2 id="collections-heading" className="text-xl font-bold">Collections</h2>
             <Link href="/collections" className="text-sm font-semibold text-purple-700">See all</Link>
           </div>
-          <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-5 md:grid-cols-4">
-            {tops.map(c => <li key={c.id}><CollectionCard c={c} /></li>)}
-          </ul>
+          <div className="mt-3"><CollectionCircles items={tops} showCount label="Collections" /></div>
         </section>
       )}
     </>

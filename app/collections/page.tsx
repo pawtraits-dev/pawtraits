@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { ArrowRight, Search } from 'lucide-react';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
-import CollectionCard, { type CardCollection } from '@/components/collections/CollectionCard';
+import { CollectionCircles, type CardCollection } from '@/components/collections/CollectionCard';
 
 interface C extends CardCollection { id: string; kind: string; parentPath: string | null; depth: number; description: string | null }
 const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' };
@@ -60,9 +60,7 @@ function CollectionsContent() {
               {top.kind === 'pawsonality' && (
                 <p className="mt-1 text-sm"><Link href="/quiz/pawsonality?src=collections" className="font-semibold text-purple-700 underline">Take the free 2-minute quiz</Link> <span className="text-gray-600">to find your pet’s type.</span></p>
               )}
-              <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                {kids.slice(0, top.kind === 'occasion' ? 12 : 6).map(c => <li key={c.id}><CollectionCard c={c} size="sm" /></li>)}
-              </ul>
+              <div className="mt-3"><CollectionCircles items={kids.slice(0, 24)} showCount label={top.name} /></div>
             </section>
           );
         })}
