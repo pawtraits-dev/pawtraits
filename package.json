@@ -14,7 +14,9 @@
     "test:api": "npx tsx scripts/test-influencer-system.ts",
     "test:workflows": "npx tsx scripts/test-influencer-workflows.ts",
     "test:quiz": "npx tsx scripts/test-quiz-scoring.ts",
-    "build:quiz-seed": "npx tsx scripts/build-quiz-seed.ts"
+    "build:quiz-seed": "npx tsx scripts/build-quiz-seed.ts",
+    "test:social": "tsx scripts/test-social.ts",
+    "test:emails": "tsx scripts/test-emails.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",

@@ -4,6 +4,25 @@
 // Renders message templates with dynamic variables
 
 import Handlebars from 'handlebars';
+import fs from 'fs';
+import path from 'path';
+
+/**
+ * Shared email parts (lib/messaging/templates/partials/*.html), used as {{> button url=… label=…}}
+ * and {{#> layout preheader=…}} … {{/layout}}. Loaded once per server instance.
+ */
+let partialsLoaded = false;
+export function loadEmailPartials(dir = path.join(process.cwd(), 'lib', 'messaging', 'templates', 'partials')) {
+  if (partialsLoaded) return;
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      if (f.endsWith('.html')) Handlebars.registerPartial(f.replace(/\.html$/, ''), fs.readFileSync(path.join(dir, f), 'utf8'));
+    }
+    partialsLoaded = true;
+  } catch (err) {
+    console.error('Email partials could not be loaded', err);
+  }
+}
 
 // Register custom helpers
 Handlebars.registerHelper('currency', function(amount: number, currency: string = 'GBP') {
@@ -45,6 +64,15 @@ Handlebars.registerHelper('formatDate', function(date: string | Date, format: st
   return d.toLocaleDateString('en-GB');
 });
 
+/** {{concat a b c}} joins values (used for headings built from names) */
+Handlebars.registerHelper('concat', function(...args: any[]) {
+  return args.slice(0, -1).map(a => (a == null ? '' : String(a))).join('');
+});
+/** {{ifelse cond a b}} inline choice */
+Handlebars.registerHelper('ifelse', function(cond: any, a: any, b: any) {
+  return cond ? a : b;
+});
+
 Handlebars.registerHelper('uppercase', function(text: string) {
   return text?.toUpperCase() || '';
 });
@@ -82,6 +110,7 @@ export function renderTemplate(
   variables: Record<string, any>
 ): string {
   try {
+    if (template.includes('{{>') || template.includes('{{#>')) loadEmailPartials();
     const compiledTemplate = Handlebars.compile(template);
     return compiledTemplate(variables);
   } catch (error) {

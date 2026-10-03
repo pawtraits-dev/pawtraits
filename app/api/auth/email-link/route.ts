@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient } from '@/lib/qr/server';
 import { createClaimToken } from '@/lib/guest/account';
 import { sendMessageImmediate } from '@/lib/messaging/message-service';
+import { renderEmailFile } from '@/lib/messaging/render-file';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,17 +36,11 @@ export async function POST(request: NextRequest) {
     const token = await createClaimToken(admin, { userId: profile.user_id, customerId: profile.customer_id ?? null, email, orderId: null, expiresInHours: 1 });
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
     const url = `${baseUrl}/auth/claim?t=${encodeURIComponent(token)}&login=1${returnTo ? `&next=${encodeURIComponent(returnTo)}` : ''}`;
-    const name = profile.first_name ? `Hi ${escapeHtml(profile.first_name)},` : 'Hi,';
     await sendMessageImmediate({
       channel: 'email',
       recipientEmail: email,
       subject: 'Your Pawtraits sign-in link',
-      body: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#1d1828">
-        <p>${name}</p>
-        <p>Tap the button to sign in to Pawtraits. The link works for 1 hour.</p>
-        <p style="margin:28px 0"><a href="${url}" style="background:#7c3aed;color:#fff;text-decoration:none;padding:14px 22px;border-radius:10px;font-weight:bold;display:inline-block">Sign in to Pawtraits</a></p>
-        <p style="color:#5f5870;font-size:13px">Didn’t ask for this? You can ignore this email; nobody can sign in without it.</p>
-      </div>`,
+      body: renderEmailFile('customer-sign-in.html', { customer_name: profile.first_name || '', sign_in_url: url }),
     });
   } catch (e) {
     console.error('email-link failed', e);
@@ -53,6 +48,3 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(OK);
 }
 
-function escapeHtml(s: string) {
-  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}

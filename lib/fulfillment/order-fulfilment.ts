@@ -10,6 +10,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { GelatoFulfillmentService } from './gelato-fulfillment-service';
+import { countryName, deliveryFor, deliveryWindow, heroImage } from '@/lib/messaging/order-email';
 import { postedItems, needsPosting, fulfilmentStage, POSTAGE_SERVICES, SELF_PRINT_STEPS, STAGE_LABELS, royalMailTrackingUrl } from './shared';
 import type { FulfilmentStage, SelfPrintStatus, PostageServiceId } from '@/lib/product-types';
 
@@ -255,7 +256,10 @@ export async function sendPostedEmail(supabase: SupabaseClient, orderId: string,
       has_tracking: !!trackingCode,
       carrier_name: service?.carrier || order.carrier || 'Royal Mail',
       shipping_method: service ? service.label.replace(/^Royal Mail /, '') : '',
-      estimated_delivery_date: `Usually ${eta || service?.eta || '2–3 working days'}`,
+      estimated_delivery_date: deliveryWindow(new Date(order.shipped_at || Date.now()), eta || service?.eta || deliveryFor(order.shipping_country).days)
+        ?? `Usually ${eta || service?.eta || '2–3 working days'}`,
+      hero_image_url: heroImage(order.order_items ?? []).url,
+      shipping_country_name: countryName(order.shipping_country),
       item_count: itemCount,
       shipping_city: order.shipping_city,
       shipping_postcode: order.shipping_postcode,

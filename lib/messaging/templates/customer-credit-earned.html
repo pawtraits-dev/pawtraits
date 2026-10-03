@@ -1,0 +1,19 @@
+{{#> layout title="You’ve earned credit" preheader=(concat "Your balance is now " total_credit_balance ". Use it on your next Pawtrait.") unsubscribe_url=unsubscribe_url}}
+<tr><td class="pt-pad" style="padding:4px 32px 0;font-family:Arial,Helvetica,sans-serif;">
+  {{> heading text=(concat "You’ve earned " credit_amount " credit!")}}
+  <p style="margin:0;font-size:16px;line-height:1.55;color:#374151;">Thanks, {{customer_name}}. A friend you invited has just ordered their first Pawtrait, so {{credit_amount}} is now in your account.</p>
+</td></tr>
+<tr><td class="pt-pad" style="padding:18px 32px 0;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F6F2FC;border-radius:12px;font-family:Arial,Helvetica,sans-serif;">
+    <tr><td style="padding:16px 18px;">
+      <p style="margin:0;font-size:13px;font-weight:bold;letter-spacing:.04em;text-transform:uppercase;color:#6b7280;">Your credit balance</p>
+      <p style="margin:2px 0 0;font-size:26px;font-weight:bold;color:#111827;">{{total_credit_balance}}</p>
+      <p style="margin:4px 0 0;font-size:13px;color:#4b5563;">Taken off your next order automatically at checkout.</p>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td class="pt-pad" style="padding:4px 32px 26px;font-family:Arial,Helvetica,sans-serif;">
+  {{> button url=shop_url label="Use my credit"}}
+  <p style="margin:8px 0 0;font-size:14px;text-align:center;"><a href="{{referrals_url}}" style="color:#7e22ce;">Invite more friends and earn again</a></p>
+</td></tr>
+{{/layout}}

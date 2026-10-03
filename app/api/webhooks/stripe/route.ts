@@ -11,6 +11,9 @@ import { ensureCustomerAccount, createClaimToken, sendAccountReadyEmail } from '
 import { sendMetaPurchase } from '@/lib/tracking/meta-capi';
 import { FulfillmentRouter } from '@/lib/fulfillment/fulfillment-router';
 import { markQuizPurchase, quizEmailUrl } from '@/lib/quiz/ways-in';
+import { captureSocialItems } from '@/lib/social/capture';
+import { optOutUrl } from '@/lib/social/opt-out';
+import { countryName, deliveryFor, emailItems, heroImage, petPossessive } from '@/lib/messaging/order-email';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -421,6 +424,15 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
 
     // Took the Pawsonality quiz in the last 30 days? Count the result as bought (admin results)
     await markQuizPurchase(supabase, order);
+
+    // Social loop: customised portraits in a genuine paid order become before/after items
+    // (website feed, Instagram batches) after the photo check. Held orders are left out.
+    if (metadata.priceCheck !== 'suspicious' && orderItems.length) {
+      const socialItems = orderItems;
+      after(async () => {
+        await captureSocialItems(supabase, order, socialItems, { chargeId: typeof paymentIntent.latest_charge === 'string' ? paymentIntent.latest_charge : null });
+      });
+    }
 
     // Guest: second email with sign-in link + free download
     if (guestAccount && customerEmail) {
@@ -2014,6 +2026,38 @@ async function sendOrderConfirmationEmail(
     // Pawsonality quiz block (left out while the quiz isn't live)
     const quizUrl = await quizEmailUrl(baseUrl, 'order-email');
 
+    // Wording for the refreshed design: portrait at the top, plain item lines, delivery promise
+    const allDigital = (orderItems || []).length > 0 && (orderItems || []).every((i: any) => i.is_digital || (typeof i.product_data === 'object' && i.product_data?.product_type === 'digital_download'));
+    const hero = heroImage(orderItems || []);
+    const delivery = deliveryFor(order.shipping_country);
+    const petLead = petPossessive(hero.alt);
+    const totalLabel = `£${(order.total_amount / 100).toFixed(2)}`;
+    const refreshVars = {
+      items: emailItems(orderItems || [], !!giftStatus),
+      hero_image_url: hero.url,
+      hero_alt: hero.alt,
+      is_digital_only: allDigital && !isCollected,
+      multiple_downloads: downloadLinks.length > 1,
+      show_delivery: !isCollected && !allDigital,
+      delivery_service: delivery.service,
+      delivery_days: delivery.days,
+      shipping_country_name: countryName(order.shipping_country),
+      pet_possessive: petLead,
+      preheader: isCollected
+        ? `Receipt for your Pawtrait${stallName ? ` from ${stallName}` : ''}. Paid ${totalLabel}`
+        : allDigital ? `Your full-resolution Pawtrait is ready to save. Paid ${totalLabel}`
+        : `Printing now · posted within 2 working days, tracked. Paid ${totalLabel}`,
+      footer_note: `Order ${order.order_number} · You’re getting this because you placed an order with Pawtraits.`,
+    };
+    if (downloadLinks.length === 1) downloadLinks[0].title = 'Download my Pawtrait';
+
+    // Customised portraits may be featured (website, Instagram): say so, with a one-click opt-out
+    const lineImageIds = (orderItems || []).map((i: any) => i.image_id).filter(Boolean);
+    const { data: customLines } = lineImageIds.length
+      ? await supabase.from('customer_custom_images').select('id').in('id', lineImageIds).limit(1)
+      : { data: [] as any[] };
+    const socialOptOutUrl = customLines?.length ? optOutUrl(baseUrl, order.id) : null;
+
     // Send email via messaging service
     await sendMessage({
       templateKey: 'order_confirmation',
@@ -2025,7 +2069,6 @@ async function sendOrderConfirmationEmail(
         customer_name: order.shipping_first_name,
         order_number: order.order_number,
         order_id: order.id,
-        items,
         subtotal,
         discount_amount: discountAmount,
         referral_code: order.referral_code || null,
@@ -2048,7 +2091,9 @@ async function sendOrderConfirmationEmail(
         is_collected: isCollected,
         stall_name: stallName,
         quiz_url: quizUrl,
-        unsubscribe_url: `${baseUrl}/preferences/unsubscribe`
+        social_opt_out_url: socialOptOutUrl,
+        // Refreshed email design (lib/messaging/templates/customer-order-confirmation.html)
+        ...refreshVars,
       },
       priority: 'high'
     });

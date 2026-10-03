@@ -1,0 +1,13 @@
+{{#> layout title="Your pet is on Instagram" preheader=(concat pet_name " is one of five pets in our latest post. Go and give them some love!") footer_note="You’re getting this because your Pawtrait was featured."}}
+<tr><td class="pt-pad" style="padding:4px 32px 0;font-family:Arial,Helvetica,sans-serif;">
+  {{> heading text=(concat pet_name "’s on Instagram!")}}
+  <p style="margin:0;font-size:16px;line-height:1.55;color:#374151;">{{pet_name}} is one of five pets in our latest post, from phone photo to Pawtrait. Go and give them some love, and share it with anyone who&rsquo;ll appreciate it.</p>
+</td></tr>
+{{> portrait src=picture_url alt=(concat pet_name "’s Pawtrait")}}
+<tr><td class="pt-pad" style="padding:4px 32px 0;">
+  {{> button url=post_url label="See the post"}}
+</td></tr>
+<tr><td class="pt-pad" style="padding:16px 32px 26px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.55;color:#6b7280;">
+  We only show your pet&rsquo;s first name and your town. Rather it came down? <a href="{{opt_out_url}}" style="color:#7e22ce;">Tell us</a> and we&rsquo;ll remove it.
+</td></tr>
+{{/layout}}

@@ -1,0 +1,11 @@
+{{#> layout title="Save your pet’s Pawsonality" preheader=(concat "One tap saves it to " pet_name "’s profile. The link works for 3 days.") footer_note="Didn’t ask for this? You can ignore this email."}}
+<tr><td class="pt-pad" style="padding:4px 32px 0;font-family:Arial,Helvetica,sans-serif;">
+  {{> heading text=(concat "Save " pet_name "’s Pawsonality")}}
+  <p style="margin:0;font-size:16px;line-height:1.55;color:#374151;">{{pet_name}} is <strong>{{type_name}}</strong>{{#if type_code}} ({{type_code}}){{/if}}. Tap the button to keep it on {{pet_name}}&rsquo;s profile in your Pawtraits account. You&rsquo;ll be signed in, no password needed.</p>
+</td></tr>
+{{> portrait src=picture_url alt=(concat pet_name " as " type_name)}}
+<tr><td class="pt-pad" style="padding:4px 32px 26px;font-family:Arial,Helvetica,sans-serif;">
+  {{> button url=save_url label=(concat "Save " pet_name "’s Pawsonality")}}
+  <p style="margin:6px 0 0;font-size:13px;line-height:1.5;color:#6b7280;text-align:center;">The link works for 3 days.</p>
+</td></tr>
+{{/layout}}

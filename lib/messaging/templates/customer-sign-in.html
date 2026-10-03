@@ -1,0 +1,8 @@
+{{#> layout title="Sign in to Pawtraits" preheader="Tap the button to sign in. The link works for 1 hour." footer_note="Didn’t ask for this? You can ignore this email; nobody can sign in without the link."}}
+<tr><td class="pt-pad" style="padding:4px 32px 26px;font-family:Arial,Helvetica,sans-serif;">
+  {{> heading text="Your sign-in link"}}
+  <p style="margin:0;font-size:16px;line-height:1.55;color:#374151;">Hi{{#if customer_name}} {{customer_name}}{{/if}}, tap the button to sign in to Pawtraits. No password needed.</p>
+  {{> button url=sign_in_url label="Sign in to Pawtraits"}}
+  <p style="margin:6px 0 0;font-size:13px;line-height:1.5;color:#6b7280;text-align:center;">The link works once, for 1 hour.</p>
+</td></tr>
+{{/layout}}

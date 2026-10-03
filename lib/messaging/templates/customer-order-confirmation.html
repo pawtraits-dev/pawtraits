@@ -1,427 +1,74 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your Masterpiece is On Its Way! - Pawtraits</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      background: #f9fafb;
-      margin: 0;
-      padding: 0;
-    }
-    .email-container {
-      max-width: 600px;
-      margin: 40px auto;
-      background: white;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 40px 30px;
-      text-align: center;
-    }
-    .header h1 {
-      margin: 0 0 10px 0;
-      font-size: 32px;
-      font-weight: 700;
-    }
-    .header p {
-      margin: 0;
-      font-size: 16px;
-      opacity: 0.95;
-    }
-    .content {
-      padding: 40px 30px;
-    }
-    .order-number {
-      display: inline-block;
-      background: #f3f4f6;
-      padding: 12px 20px;
-      border-radius: 8px;
-      font-weight: 600;
-      color: #7c3aed;
-      margin: 20px 0;
-      font-size: 18px;
-    }
-    .info-box {
-      background: #f9fafb;
-      border-left: 4px solid #7c3aed;
-      padding: 20px;
-      margin: 25px 0;
-      border-radius: 4px;
-    }
-    .info-box h3 {
-      margin: 0 0 15px 0;
-      font-size: 16px;
-      color: #7c3aed;
-    }
-    .info-box p {
-      margin: 5px 0;
-      font-size: 14px;
-    }
-    .order-summary {
-      background: #f9fafb;
-      border-radius: 8px;
-      padding: 20px;
-      margin: 25px 0;
-    }
-    .order-item {
-      display: flex;
-      justify-content: space-between;
-      padding: 15px 0;
-      border-bottom: 1px solid #e5e7eb;
-    }
-    .order-item:last-child {
-      border-bottom: none;
-    }
-    .item-details {
-      flex: 1;
-    }
-    .item-title {
-      font-weight: 600;
-      color: #111827;
-      margin: 0 0 5px 0;
-    }
-    .item-meta {
-      font-size: 14px;
-      color: #6b7280;
-    }
-    .item-price {
-      font-weight: 600;
-      color: #111827;
-      text-align: right;
-    }
-    .totals {
-      margin-top: 20px;
-      padding-top: 20px;
-      border-top: 2px solid #e5e7eb;
-    }
-    .total-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 0;
-      font-size: 15px;
-    }
-    .total-row.final {
-      font-size: 20px;
-      font-weight: 700;
-      color: #7c3aed;
-      padding-top: 15px;
-      border-top: 1px solid #e5e7eb;
-      margin-top: 10px;
-    }
-    .button {
-      display: inline-block;
-      background: #7c3aed;
-      color: white !important;
-      padding: 16px 32px;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 16px;
-      margin: 20px 0;
-      text-align: center;
-    }
-    .button:hover {
-      background: #6d28d9;
-    }
-    .timeline {
-      margin: 30px 0;
-      padding: 25px;
-      background: linear-gradient(to right, #faf5ff, #f3f4f6);
-      border-radius: 8px;
-    }
-    .timeline h3 {
-      margin: 0 0 15px 0;
-      color: #7c3aed;
-      font-size: 18px;
-    }
-    .timeline-step {
-      display: flex;
-      align-items: flex-start;
-      margin: 15px 0;
-    }
-    .timeline-icon {
-      flex-shrink: 0;
-      width: 32px;
-      height: 32px;
-      background: #7c3aed;
-      color: white;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      margin-right: 15px;
-    }
-    .timeline-content p {
-      margin: 0;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-    .timeline-content strong {
-      color: #111827;
-    }
-    .footer {
-      background: #f9fafb;
-      padding: 30px;
-      text-align: center;
-      color: #6b7280;
-      font-size: 14px;
-      border-top: 1px solid #e5e7eb;
-    }
-    .footer p {
-      margin: 10px 0;
-    }
-    .footer a {
-      color: #7c3aed;
-      text-decoration: none;
-    }
-    .footer a:hover {
-      text-decoration: underline;
-    }
-    .social-links {
-      margin: 20px 0;
-    }
-    .social-links a {
-      display: inline-block;
-      margin: 0 10px;
-      color: #7c3aed;
-      text-decoration: none;
-    }
-    @media only screen and (max-width: 600px) {
-      .email-container {
-        margin: 0;
-        border-radius: 0;
-      }
-      .header {
-        padding: 30px 20px;
-      }
-      .header h1 {
-        font-size: 24px;
-      }
-      .content {
-        padding: 30px 20px;
-      }
-      .button {
-        display: block;
-        width: 100%;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="email-container">
-    <!-- Header -->
-    <div class="header">
-      <div style="margin-bottom: 20px;">
-        <img src="{{base_url}}/assets/logos/pawrtraits-logo.svg" alt="Pawtraits" style="height: 60px; width: auto;" />
-      </div>
-      <h1>🎨 Your Masterpiece is On Its Way!</h1>
-      <p>We're turning your pet into art (the fancy kind, not the crayon-on-wall kind)</p>
-    </div>
+{{#> layout title="Order confirmed" preheader=preheader footer_note=footer_note}}
+<tr><td class="pt-pad" style="padding:4px 32px 0;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+  {{#if is_collected}}
+    {{> heading text=(concat "It’s yours, " customer_name "!")}}
+    <p style="margin:0;font-size:16px;line-height:1.55;color:#374151;">You took your Pawtrait home from our stall{{#if stall_name}} at {{stall_name}}{{/if}}. Here&rsquo;s your receipt &ndash; nothing more to wait for, except the compliments.</p>
+  {{else}}{{#if is_digital_only}}
+    {{> heading text=(concat "Your download is ready, " customer_name "!")}}
+    <p style="margin:0;font-size:16px;line-height:1.55;color:#374151;">Thanks for your order. Your full-resolution Pawtrait{{#if multiple_downloads}}s are{{else}} is{{/if}} ready to save.</p>
+  {{else}}
+    {{> heading text=(concat "Order confirmed, " customer_name "!")}}
+    <p style="margin:0;font-size:16px;line-height:1.55;color:#374151;">Thank you. We&rsquo;re printing your Pawtrait now and we&rsquo;ll email you when it&rsquo;s posted, usually within 2 working days.</p>
+  {{/if}}{{/if}}
+</td></tr>
 
-    <!-- Content -->
-    <div class="content">
-      <p>Hey {{customer_name}}! 👋</p>
+{{> portrait src=hero_image_url alt=hero_alt}}
 
-      <p>Guess what just happened? You've officially commissioned a work of art that would make the Renaissance painters jealous. Your pet's about to get the portrait treatment they've always deserved (and probably demanded through strategic staring).</p>
+{{#if is_digital_only}}{{#if download_links}}<tr><td class="pt-pad" style="padding:0 32px;">
+  {{#each download_links}}{{> button url=this.url label=this.title margin="16px 0 0"}}{{/each}}
+  <p style="margin:10px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#6b7280;text-align:center;">These links work for 30 days. Your downloads are always in your account under My downloads.</p>
+</td></tr>{{/if}}{{/if}}
 
-      <div class="order-number">
-        Order #{{order_number}}
-      </div>
+<!-- Order summary -->
+<tr><td class="pt-pad" style="padding:20px 32px 0;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#111827;">
+    <tr><td colspan="2" style="padding:0 0 8px;font-size:13px;font-weight:bold;letter-spacing:.04em;text-transform:uppercase;color:#6b7280;">Your order &middot; <span style="text-transform:none;letter-spacing:0;">{{order_number}}</span></td></tr>
+    {{#each items}}
+    <tr>
+      <td style="padding:10px 0;border-top:1px solid #EEE8F7;vertical-align:top;">
+        <strong>{{this.title}}</strong><br>
+        <span style="font-size:13px;color:#6b7280;">{{this.description}}{{#if this.multiple}} &middot; &times;{{this.quantity}}{{/if}}</span>
+      </td>
+      <td style="padding:10px 0;border-top:1px solid #EEE8F7;text-align:right;vertical-align:top;white-space:nowrap;">{{this.price}}</td>
+    </tr>
+    {{/each}}
+    {{#if show_delivery}}<tr><td style="padding:6px 0;color:#4b5563;">Delivery{{#if delivery_service}} &middot; {{delivery_service}}{{/if}}</td><td style="padding:6px 0;text-align:right;color:#4b5563;">{{shipping_amount}}</td></tr>{{/if}}
+    {{#if discount_amount}}<tr><td style="padding:6px 0;color:#15803d;">Discount{{#if referral_code}} ({{referral_code}}){{/if}}</td><td style="padding:6px 0;text-align:right;color:#15803d;">&minus;{{discount_amount}}</td></tr>{{/if}}
+    {{#if credit_applied}}<tr><td style="padding:6px 0;color:#15803d;">Credit used</td><td style="padding:6px 0;text-align:right;color:#15803d;">&minus;{{credit_applied}}</td></tr>{{/if}}
+    <tr><td style="padding:10px 0 0;border-top:2px solid #111827;font-weight:bold;font-size:17px;">Paid</td><td style="padding:10px 0 0;border-top:2px solid #111827;text-align:right;font-weight:bold;font-size:17px;">{{total_amount}}</td></tr>
+  </table>
+</td></tr>
 
-      <!-- Order Summary -->
-      <div class="order-summary">
-        <h2 style="margin-top: 0; font-size: 20px; color: #111827;">Your Pet's Moment of Glory</h2>
+{{#unless is_collected}}{{#unless is_digital_only}}
+<!-- What happens next -->
+<tr><td class="pt-pad" style="padding:22px 32px 0;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F6F2FC;border-radius:12px;font-family:Arial,Helvetica,sans-serif;">
+    <tr><td style="padding:16px 18px 6px;font-size:15px;font-weight:bold;color:#111827;">What happens next</td></tr>
+    <tr><td style="padding:2px 18px;font-size:14px;line-height:1.5;color:#374151;">&#9312;&nbsp; We print it on rigid 3&nbsp;mm Foamex and pack it by hand.</td></tr>
+    <tr><td style="padding:2px 18px;font-size:14px;line-height:1.5;color:#374151;">&#9313;&nbsp; We post it within 2 working days and email you the tracking.</td></tr>
+    <tr><td style="padding:2px 18px 16px;font-size:14px;line-height:1.5;color:#374151;">&#9314;&nbsp; {{#if delivery_days}}It arrives {{delivery_days}} working days after posting.{{else}}Royal Mail delivers it, tracked all the way.{{/if}}</td></tr>
+  </table>
+</td></tr>
+<tr><td class="pt-pad" style="padding:18px 32px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#374151;">
+  <strong style="color:#111827;">Delivering to</strong><br>
+  {{shipping_name}}<br>{{shipping_address_line_1}}<br>{{#if shipping_address_line_2}}{{shipping_address_line_2}}<br>{{/if}}{{shipping_city}} {{shipping_postcode}}<br>{{shipping_country_name}}
+</td></tr>
+{{/unless}}{{/unless}}
 
-        {{#each items}}
-        <div class="order-item">
-          <div class="item-details">
-            <p class="item-title">{{this.title}}</p>
-            <p class="item-meta">{{this.format}} • {{this.size}} • Qty: {{this.quantity}}</p>
-          </div>
-          <div class="item-price">
-            {{this.price}}
-          </div>
-        </div>
-        {{/each}}
+{{#if gift_available}}<tr><td class="pt-pad" style="padding:18px 32px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#374151;">
+  <strong style="color:#111827;">&#127873; Free digital copy</strong><br>Every print comes with a full-resolution download of the design. <a href="{{downloads_url}}" style="color:#7e22ce;">It&rsquo;s in My downloads</a>.
+</td></tr>{{/if}}
+{{#if gift_locked}}<tr><td class="pt-pad" style="padding:18px 32px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#374151;">
+  <strong style="color:#111827;">&#127873; Free digital copy</strong><br>Every print comes with a full-resolution download. Look out for our next email: one tap unlocks it, no password needed.
+</td></tr>{{/if}}
 
-        <!-- Totals -->
-        <div class="totals">
-          <div class="total-row">
-            <span>Subtotal</span>
-            <span>{{subtotal}}</span>
-          </div>
-          {{#if discount_amount}}
-          <div class="total-row" style="color: #10b981;">
-            <span>Discount {{#if referral_code}}({{referral_code}}){{/if}}</span>
-            <span>-{{discount_amount}}</span>
-          </div>
-          {{/if}}
-          {{#if credit_applied}}
-          <div class="total-row" style="color: #10b981;">
-            <span>Credit Applied</span>
-            <span>-{{credit_applied}}</span>
-          </div>
-          {{/if}}
-          <div class="total-row">
-            <span>Shipping</span>
-            <span>{{shipping_amount}}</span>
-          </div>
-          <div class="total-row final">
-            <span>Total</span>
-            <span>{{total_amount}}</span>
-          </div>
-        </div>
-      </div>
+<tr><td class="pt-pad" style="padding:6px 32px 20px;">
+  {{> button url=order_url label="View your order"}}
+</td></tr>
 
-      {{#if download_links}}
-      <!-- Digital downloads -->
-      <div class="info-box">
-        <h3>⬇️ Your downloads</h3>
-        {{#each download_links}}
-        <p><a href="{{this.url}}">{{this.title}}</a></p>
-        {{/each}}
-        <p style="font-size: 13px; color: #6b7280;">Full-resolution files. Links work for 30 days, and they’re always in your account under “My downloads”.</p>
-      </div>
-      {{/if}}
+{{> quiz-promo quiz_url=quiz_url}}
 
-      {{#if gift_available}}
-      <!-- Free digital copy (account holders: ready now) -->
-      <div class="info-box">
-        <h3>🎁 Your free digital copy</h3>
-        <p>Every print bought on our website comes with a high-resolution digital download of the design. Yours is ready:</p>
-        <p><a href="{{downloads_url}}">Open My downloads</a></p>
-      </div>
-      {{/if}}
-      {{#if gift_locked}}
-      <!-- Free digital copy (guests: unlocked from the account email) -->
-      <div class="info-box">
-        <h3>🎁 A free digital copy is waiting for you</h3>
-        <p>Every print bought on our website comes with a high-resolution digital download. Look out for our next email — one tap unlocks it (no password needed).</p>
-      </div>
-      {{/if}}
-
-      {{#if is_collected}}
-      <!-- Stall collection -->
-      <div class="info-box">
-        <h3>🛍️ Yours to take home</h3>
-        <p>You paid on your phone at our stall{{#if stall_name}} ({{stall_name}}){{/if}}, so your print went home with you. Nothing more to wait for — except the compliments.</p>
-      </div>
-      {{else}}
-      {{#if shipping_address_line_1}}
-      <!-- Shipping Address -->
-      <div class="info-box">
-        <h3>📦 Delivering Cuteness To</h3>
-        <p><strong>{{shipping_name}}</strong></p>
-        <p>{{shipping_address_line_1}}</p>
-        {{#if shipping_address_line_2}}
-        <p>{{shipping_address_line_2}}</p>
-        {{/if}}
-        <p>{{shipping_city}}, {{shipping_postcode}}</p>
-        <p>{{shipping_country}}</p>
-        <p style="margin-top: 10px; font-size: 13px; color: #6b7280; font-style: italic;">
-          (We promise to pack it so carefully, it'll arrive ready to make everyone jealous of your walls)
-        </p>
-      </div>
-
-      <!-- What Happens Next -->
-      <div class="timeline">
-        <h3>🚀 Your Portrait's Journey to Greatness</h3>
-
-        <div class="timeline-step">
-          <div class="timeline-icon">✓</div>
-          <div class="timeline-content">
-            <p><strong>Order Received!</strong><br>
-            We got it, we're excited about it, and our printers are already warming up.</p>
-          </div>
-        </div>
-
-        <div class="timeline-step">
-          <div class="timeline-icon">2</div>
-          <div class="timeline-content">
-            <p><strong>Printing & Quality Control</strong><br>
-            Your Pawtrait is getting the VIP treatment on our fancy professional printers. We're checking every detail because your pet deserves perfection.</p>
-          </div>
-        </div>
-
-        <div class="timeline-step">
-          <div class="timeline-icon">3</div>
-          <div class="timeline-content">
-            <p><strong>Packing Time!</strong><br>
-            We wrap it like it's the crown jewels. Because basically, it is. Your order ships within 2-3 business days.</p>
-          </div>
-        </div>
-
-        <div class="timeline-step">
-          <div class="timeline-icon">4</div>
-          <div class="timeline-content">
-            <p><strong>Doorstep Arrival!</strong><br>
-            Expected delivery: {{estimated_delivery}}<br>
-            <span style="font-size: 13px; color: #6b7280;">(Your walls are about to level up significantly)</span></p>
-          </div>
-        </div>
-      </div>
-
-      {{/if}}
-      {{/if}}
-
-      <!-- CTA Button -->
-      <div style="text-align: center;">
-        <a href="{{order_url}}" class="button">{{#if is_collected}}View Your Order{{else}}Track Your Masterpiece{{/if}}</a>
-      </div>
-
-      {{#if quiz_url}}
-      <!-- Pawsonality quiz (only while the quiz is live) -->
-      <div style="margin: 30px 0 0; padding: 20px; background: #2A1A52; border-radius: 12px; color: #ffffff; text-align: center;">
-        <p style="margin: 0 0 6px; font-size: 18px; font-weight: 700; color: #ffffff;">Bonus round: what's your pet's Pawsonality?</p>
-        <p style="margin: 0 0 14px; font-size: 14px; color: #D9CDF5;">20 quick swipes, 16 types, and one suspiciously accurate result. Free, about 90 seconds.</p>
-        <a href="{{quiz_url}}" style="display: inline-block; background: #ffffff; color: #2A1A52; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 700;">Take the quiz</a>
-      </div>
-      {{/if}}
-
-      <!-- Support Info -->
-      <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
-        <strong>Questions? Concerns? Just want to chat about your pet?</strong><br>
-        We're here for all of it! Drop us a line at
-        <a href="mailto:support@pawtraits.pics" style="color: #7c3aed;">support@pawtraits.pics</a>
-      </p>
-
-      <p style="font-size: 14px; color: #6b7280;">
-        We usually respond within 24 hours (probably while also showing your portrait to everyone in the office because we can't help ourselves).
-      </p>
-    </div>
-
-    <!-- Footer -->
-    <div class="footer">
-      <p><strong>Pawtraits</strong></p>
-      <p>Where every pet becomes a professional work of art<br>(and rightfully so)</p>
-
-      <div class="social-links">
-        <a href="https://facebook.com/pawtraits">Facebook</a> •
-        <a href="https://instagram.com/pawtraits">Instagram</a> •
-        <a href="https://twitter.com/pawtraits">Twitter</a>
-      </div>
-
-      <p style="margin-top: 20px; font-size: 12px; color: #9ca3af;">
-        © 2025 Pawtraits. All rights reserved.<br>
-        <a href="https://pawtraits.pics">Visit our website</a> •
-        <a href="{{unsubscribe_url}}">Unsubscribe</a>
-      </p>
-
-      <p style="font-size: 11px; color: #d1d5db; margin-top: 15px;">
-        This is a transactional email confirming your order.<br>
-        Order ID: {{order_number}} • Payment ID: {{payment_intent_id}}
-      </p>
-    </div>
-  </div>
-</body>
-</html>
+{{#if social_opt_out_url}}<tr><td class="pt-pad" style="padding:0 32px 22px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.55;color:#6b7280;">
+  Your pet might be a star: now and then we feature customers&rsquo; Pawtraits, with the original photo, on our website and Instagram, using only the pet&rsquo;s first name and your town. Prefer not? <a href="{{social_opt_out_url}}" style="color:#7e22ce;">Keep my pet out of it</a>.
+</td></tr>{{/if}}
+{{/layout}}

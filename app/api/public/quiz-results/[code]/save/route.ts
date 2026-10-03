@@ -13,6 +13,9 @@ import { serviceClient } from '@/lib/qr/server';
 import { sessionUserId } from '@/lib/quiz/server';
 import { createClaimToken, ensureCustomerAccount } from '@/lib/guest/account';
 import { sendMessageImmediate } from '@/lib/messaging/message-service';
+import { renderEmailFile } from '@/lib/messaging/render-file';
+import { getPublicResult } from '@/lib/quiz/results';
+import { afterFrame } from '@/lib/social/feed';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,17 +55,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
     const next = `/quiz/${result.quiz_type}/r/${result.share_code}?save=1`;
     const url = `${baseUrl}/auth/claim?t=${encodeURIComponent(token)}&login=1&next=${encodeURIComponent(next)}`;
-    const pet = escapeHtml(result.pet_name);
+    const pub = await getPublicResult(result.share_code).catch(() => null);
     await sendMessageImmediate({
       channel: 'email',
       recipientEmail: email,
-      subject: `${result.pet_name}'s Pawsonality is ready to save`,
-      body: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#1d1828">
-        <p>Hi,</p>
-        <p>Tap the button to save ${pet}'s Pawsonality to your Pawtraits account. You'll be signed in, no password needed. The link works for 3 days.</p>
-        <p style="margin:28px 0"><a href="${url}" style="background:#7c3aed;color:#fff;text-decoration:none;padding:14px 22px;border-radius:10px;font-weight:bold;display:inline-block">Save ${pet}'s Pawsonality</a></p>
-        <p style="color:#5f5870;font-size:13px">Didn't ask for this? You can ignore this email.</p>
-      </div>`,
+      subject: `Save ${result.pet_name}’s Pawsonality 🐾`,
+      body: renderEmailFile('customer-quiz-save.html', {
+        pet_name: result.pet_name,
+        type_name: pub?.type?.name ?? result.result_type,
+        type_code: pub?.type?.name ? result.result_type : null,
+        picture_url: pub?.imagePublicId ? afterFrame(pub.imagePublicId, '') || null : null,
+        save_url: url,
+      }),
     });
     return NextResponse.json({ saved: 'emailed' });
   } catch (err) {
@@ -94,6 +98,3 @@ async function savePet(userId: string, r: { id: string; pet_name: string; animal
   return pet.id;
 }
 
-function escapeHtml(s: string) {
-  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}
