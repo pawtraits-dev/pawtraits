@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
+import { serviceClient } from '@/lib/qr/server';
+import { autoTagNew } from '@/lib/collections/auto-tag';
 import { SupabaseService } from '@/lib/supabase';
 import { generateImageMetadata, extractColorTags } from '@/lib/metadata-generator';
 import { cloudinaryService } from '@/lib/cloudinary';
@@ -236,6 +238,7 @@ export async function POST(request: NextRequest) {
     };
 
     const savedImage = await supabaseService.createImage(imageData);
+    after(() => autoTagNew(serviceClient(), savedImage?.id));
 
     return NextResponse.json(savedImage);
   } catch (error) {

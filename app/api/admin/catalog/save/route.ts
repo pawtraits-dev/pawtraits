@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
+import { serviceClient } from '@/lib/qr/server';
+import { autoTagNew } from '@/lib/collections/auto-tag';
 import { createClient } from '@supabase/supabase-js';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 
@@ -232,6 +234,9 @@ export async function POST(request: NextRequest) {
     } else {
       console.log(`✅ [ADMIN CATALOG SAVE] Created ${subjectRows.length} subject entries`);
     }
+
+    // Collections, team and tags (Admin → Collections → Tagging)
+    after(() => autoTagNew(serviceClient(), savedImage.id));
 
     return NextResponse.json({
       success: true,

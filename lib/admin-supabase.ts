@@ -670,6 +670,19 @@ export class AdminSupabaseService {
     return adminRequest<{ ok: true; added: number }>('/api/admin/collections/themes/apply-all', jsonInit('POST', {}));
   }
 
+  async getTaggingDesigns(params: { view?: string; collection?: string; q?: string; page?: number }): Promise<AdminResult<any>> {
+    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]));
+    return adminRequest<any>(`/api/admin/collections/designs?${qs}`);
+  }
+
+  async updateDesignTagging(id: string, body: { tags?: string[]; add?: string; remove?: string; retag?: boolean }): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/collections/designs/${id}`, jsonInit('PATCH', body));
+  }
+
+  async autoTagBatch(limit = 12, retryFailed = false): Promise<AdminResult<{ tagged: number; failed: number; remaining: number }>> {
+    return adminRequest<{ tagged: number; failed: number; remaining: number }>('/api/admin/collections/auto-tag', jsonInit('POST', { limit, retry_failed: retryFailed }));
+  }
+
   // ===== SOCIAL LOOP (Admin → Social) =====
 
   async getSocial(view = 'all', limit = 50): Promise<AdminResult<any>> {

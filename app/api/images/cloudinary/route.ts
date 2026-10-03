@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
+import { serviceClient } from '@/lib/qr/server';
+import { autoTagNew } from '@/lib/collections/auto-tag';
 import { SupabaseService } from '@/lib/supabase';
 import { cloudinaryService } from '@/lib/cloudinary';
 import type { ImageCatalogCreate } from '@/lib/types';
@@ -293,6 +295,7 @@ export async function POST(request: NextRequest) {
     const savedImage = await supabaseService.createImage(imageData);
     
     console.log(`✅ Image catalog entry created: ID ${savedImage.id}`);
+    after(() => autoTagNew(serviceClient(), savedImage.id));
     console.log(`   Print-ready URL: ${imageVariants.original?.url || 'N/A'}`);
 
     return NextResponse.json({

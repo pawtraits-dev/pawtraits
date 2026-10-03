@@ -18,7 +18,8 @@
     "test:social": "tsx scripts/test-social.ts",
     "test:emails": "tsx scripts/test-emails.ts",
     "build:collections-seed": "npx tsx scripts/build-collections-seed.ts",
-    "test:collections": "npx tsx scripts/test-collections.ts"
+    "test:collections": "npx tsx scripts/test-collections.ts",
+    "test:search": "npx tsx scripts/test-search-tags.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",

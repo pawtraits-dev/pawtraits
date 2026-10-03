@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, RefreshCw, Sparkles } from 'lucide-react';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
+import TaggingTab from '@/components/admin/collections/TaggingTab';
 
 interface Window { start: string; end: string }
 interface Collection {
@@ -240,7 +241,7 @@ function ThemeMapping({ themes, collections, reload }: { themes: Theme[]; collec
 export default function AdminCollectionsPage() {
   const [data, setData] = useState<{ collections: Collection[]; themes: Theme[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<'collections' | 'themes'>('collections');
+  const [tab, setTab] = useState<'collections' | 'themes' | 'tagging'>('collections');
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -262,9 +263,9 @@ export default function AdminCollectionsPage() {
         {inSeasonNow.length > 0 && <p className="mt-2 text-sm text-green-800">Promoted right now: {inSeasonNow.join(', ')}</p>}
       </div>
       <div role="tablist" className="flex gap-1 border-b border-gray-200">
-        {(['collections', 'themes'] as const).map(t => (
+        {(['collections', 'themes', 'tagging'] as const).map(t => (
           <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold ${tab === t ? 'border-purple-600 text-purple-700' : 'border-transparent text-gray-700 hover:text-gray-900'}`}>
-            {t === 'collections' ? 'Collections' : 'Themes → collections'}
+            {t === 'collections' ? 'Collections' : t === 'themes' ? 'Themes → collections' : 'Tagging'}
           </button>
         ))}
       </div>
@@ -276,6 +277,7 @@ export default function AdminCollectionsPage() {
           {!top.length && <li className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">No collections yet. Run db/migrations/2026-10-07-collections-seed.sql.</li>}
         </ul>
       )}
+      {data && tab === 'tagging' && <TaggingTab collections={data.collections} />}
       {data && tab === 'themes' && <ThemeMapping themes={data.themes} collections={data.collections} reload={load} />}
     </div>
   );

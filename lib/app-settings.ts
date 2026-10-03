@@ -22,6 +22,8 @@ export const SETTING_DEFAULTS = {
   social_photo_check_enabled: true,
   /** Social loop: feature free previews (customisations not yet bought) as well as purchases */
   social_include_previews: false,
+  /** Collections: tag new catalogue designs automatically (collections, team, descriptive tags) */
+  auto_tag_enabled: true,
 };
 export type FulfillmentProvider = 'self_print' | 'gelato';
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
@@ -78,6 +80,7 @@ export function validateSetting(key: string, value: unknown): string | null {
     case 'social_feed_enabled':
     case 'social_instagram_enabled':
     case 'social_photo_check_enabled':
+    case 'auto_tag_enabled':
     case 'social_include_previews':
       return typeof value === 'boolean' ? null : 'Must be true or false';
     case 'stall_prices_pence': {
