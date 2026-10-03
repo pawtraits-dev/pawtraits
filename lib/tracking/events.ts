@@ -76,6 +76,11 @@ export const track = {
   quizResultDesignClick(quiz: string, resultType: string, imageId: string) {
     gtagEvent('quiz_result_design_click', { quiz_type: quiz, result_type: resultType, item_id: imageId });
   },
+  /** Site search (GA4 standard "search") and "See more <tag>" links */
+  search(term: string, results: number, kind: 'query' | 'tag' = 'query') {
+    gtagEvent('search', { search_term: term, results, search_kind: kind });
+    fbqTrack('Search', { search_string: term }, undefined, false);
+  },
   buyThisPrintClicked(item: TrackItem, mode: 'stall' | 'online') {
     gtagEvent('select_item', { items: gaItems([item]), item_list_name: mode === 'stall' ? 'stall_take_home' : 'buy_this_print' });
   },

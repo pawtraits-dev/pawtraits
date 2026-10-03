@@ -27,6 +27,7 @@ import { customPortraitTitle } from '@/lib/cart/items';
 import { extractDescriptionTitle } from '@/lib/utils';
 import { designTitle, plainText } from '@/lib/text/plain';
 import MoreLikeThis from '@/components/customise/MoreLikeThis';
+import DesignChips, { useDesignCollections } from '@/components/customise/DesignChips';
 import DesignQuizLink from '@/components/quiz/DesignQuizLink';
 
 interface Pet {
@@ -104,6 +105,8 @@ export default function CustomisePage() {
   const [stallOffer, setStallOffer] = useState<StallOffer | null>(null);
   const [fromQr, setFromQr] = useState(false);
   const [scannedSize, setScannedSize] = useState<string | null>(null);
+  const [fromCollection, setFromCollection] = useState<string | null>(null);
+  const chips = useDesignCollections(imageId);
 
   const [step, setStep] = useState<Step>('choose');
   const [subjects, setSubjects] = useState<Array<{ pet: Pet | null; file: File | null; preview: string | null }>>([{ pet: null, file: null, preview: null }]);
@@ -123,6 +126,9 @@ export default function CustomisePage() {
   useEffect(() => {
     const qs = new URLSearchParams(window.location.search);
     const size = qs.get('size')?.toUpperCase() || null;
+    // Came from a collection page: the back link returns there
+    const from = qs.get('from');
+    if (from && /^[a-z0-9-]+(\/[a-z0-9-]+){0,2}$/.test(from)) setFromCollection(from);
     if (qs.get('src') === 'qr') {
       setFromQr(true);
       if (size && ['S', 'M', 'L'].includes(size)) {
@@ -353,8 +359,8 @@ export default function CustomisePage() {
   return (
     <Shell>
       <div className="mx-auto max-w-xl px-4 pt-3 md:pt-6">
-        <Link href="/browse" className="inline-flex items-center gap-1 text-sm text-gray-600 py-2">
-          <ArrowLeft className="h-4 w-4" /> All designs
+        <Link href={fromCollection ? `/collections/${fromCollection}` : '/browse'} className="inline-flex items-center gap-1 text-sm text-gray-600 py-2">
+          <ArrowLeft className="h-4 w-4" /> {fromCollection ? `Back to ${chips?.collections.find(c => c.path === fromCollection)?.name ?? 'collection'}` : 'All designs'}
         </Link>
 
         {/* HERO */}
@@ -380,12 +386,11 @@ export default function CustomisePage() {
         {step === 'choose' && (
           <>
             <div className="mt-4">
-              {(breedName || themeName) && (
-                <p className="text-sm text-gray-500">{[breedName, themeName].filter(Boolean).join(' · ')}</p>
-              )}
+              {breedName && <p className="text-sm text-gray-600">{breedName}</p>}
               <h1 className="mt-0.5 text-[1.7rem] font-bold leading-tight text-gray-900" style={lifeSavers}>
                 {fromQr ? 'Love this one?' : title}
               </h1>
+              <DesignChips data={chips} />
             </div>
 
             {stallOffer?.available && (
@@ -421,7 +426,7 @@ export default function CustomisePage() {
               </details>
             )}
 
-            <MoreLikeThis imageId={catalogImage.id} breedId={catalogImage.breed?.id} themeId={catalogImage.theme?.id} />
+            <MoreLikeThis imageId={catalogImage.id} breedId={catalogImage.breed?.id} collection={chips?.collections[0] ?? null} tag={chips?.tags[0] ?? null} />
 
             <div className="h-24 md:hidden" aria-hidden />
             <BasketDock />

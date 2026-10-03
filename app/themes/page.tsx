@@ -1,22 +1,23 @@
-'use client';
+/**
+ * Old theme links (/themes, /themes?theme=<id>, and /browse?type=themes which comes here).
+ * Themes are behind the scenes now: send people to the theme's collection, else all collections.
+ */
+import { redirect } from 'next/navigation';
+import { serviceClient } from '@/lib/qr/server';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+export const dynamic = 'force-dynamic';
+const UUID = /^[0-9a-f-]{36}$/i;
 
-export default function ThemesPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Redirect to unified browse page with themes tab
-    router.replace('/browse?type=themes');
-  }, [router]);
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Redirecting to themes...</p>
-      </div>
-    </div>
-  );
+export default async function ThemesRedirect({ searchParams }: { searchParams: Promise<{ theme?: string }> }) {
+  const { theme } = await searchParams;
+  let target = '/collections';
+  if (theme) {
+    try {
+      const q = serviceClient().from('themes').select('collections:default_collection_id (path, is_active)');
+      const { data } = await (UUID.test(theme) ? q.eq('id', theme) : q.eq('slug', theme.slice(0, 80))).maybeSingle();
+      const c = (data as any)?.collections;
+      if (c?.path && c.is_active) target = `/collections/${c.path}`;
+    } catch { /* fall back to all collections */ }
+  }
+  redirect(target);
 }

@@ -25,7 +25,8 @@ import {
   Heart,
   Dog,
   Cat,
-  Palette,
+  Layers,
+  Search,
   Images,
   PawPrint,
   Share2,
@@ -166,7 +167,8 @@ export default function UserAwareNavigation({
   const getTopMenuItems = () => [
     { name: 'Dogs', href: '/browse?type=dogs', icon: Dog },
     { name: 'Cats', href: '/browse?type=cats', icon: Cat },
-    { name: 'Themes', href: '/browse?type=themes', icon: Palette }
+    { name: 'Collections', href: '/collections', icon: Layers },
+    { name: 'Search', href: '/search', icon: Search }
   ]
 
   const expandableMenuItems = getExpandableMenuItems()
@@ -331,7 +333,7 @@ export default function UserAwareNavigation({
 
           {/* Permanent Top Menu (desktop) */}
           <div className="hidden md:flex items-center space-x-6">
-            {/* Dogs, Cats, Themes */}
+            {/* Dogs, Cats, Collections, Search */}
             {topMenuItems.map((item) => {
               const Icon = item.icon
               const isActive = isActivePath(item.href.split('?')[0])

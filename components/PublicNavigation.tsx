@@ -8,7 +8,8 @@ import {
   ShoppingCart, 
   Menu, 
   X,
-  ChevronDown
+  ChevronDown,
+  Search
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -21,10 +22,14 @@ interface Breed {
   animal_type: string;
 }
 
-interface Theme {
+interface NavCollection {
   id: string;
+  path: string;
   name: string;
-  description: string;
+  kind: string;
+  depth: number;
+  designs: number;
+  inSeason: boolean;
 }
 
 interface PublicNavigationProps {
@@ -37,7 +42,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [dogBreeds, setDogBreeds] = useState<Breed[]>([]);
   const [catBreeds, setCatBreeds] = useState<Breed[]>([]);
-  const [themes, setThemes] = useState<Theme[]>([]);
+  const [collections, setCollections] = useState<NavCollection[]>([]);
   const [loading, setLoading] = useState(true);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -63,11 +68,10 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
 
   const loadNavigationData = async () => {
     try {
-      const [allBreeds, themesData, withDesigns, themesWithDesigns] = await Promise.all([
+      const [allBreeds, withDesigns, collectionsData] = await Promise.all([
         supabaseService.getBreeds(),
-        supabaseService.getThemes(),
         fetch('/api/public/breeds-with-designs').then(r => (r.ok ? r.json() : null)).catch(() => null),
-        fetch('/api/public/themes-with-designs').then(r => (r.ok ? r.json() : null)).catch(() => null),
+        fetch('/api/public/collections').then(r => (r.ok ? r.json() : null)).catch(() => null),
       ]);
 
       // Only breeds that have designs (most designs first); everything if that list is unavailable
@@ -80,18 +84,17 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
       
       setDogBreeds(dogs);
       setCatBreeds(cats);
-      // Only themes that have designs, most designs first; all active themes if that list is unavailable
-      const themeOrder: string[] | null = themesWithDesigns?.themes ? themesWithDesigns.themes.map((t: any) => t.id) : null;
-      const activeThemes = themesData.filter(theme => theme.is_active);
-      setThemes((themeOrder
-        ? activeThemes.filter(t => themeOrder.includes(t.id)).sort((a, b) => themeOrder.indexOf(a.id) - themeOrder.indexOf(b.id))
-        : activeThemes).slice(0, 10));
+      // Collections that have designs (themes are behind the scenes now: collections-plan phase 3)
+      setCollections(((collectionsData?.collections ?? []) as NavCollection[]).filter(c => c.designs > 0));
     } catch (error) {
       console.error('Error loading navigation data:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  const inSeason = collections.filter(c => c.kind === 'occasion' && c.depth === 1 && c.inSeason).slice(0, 2);
+  const topCollections = collections.filter(c => c.depth === 0);
 
   const scrollToSection = (sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
@@ -223,40 +226,41 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
               </button>
             )}
 
-            {/* Themes Dropdown */}
+            {/* Collections Dropdown */}
             <div 
               className="relative"
-              onMouseEnter={() => handleMouseEnter('themes')}
+              onMouseEnter={() => handleMouseEnter('collections')}
               onMouseLeave={handleMouseLeave}
             >
-              <button className="flex items-center space-x-1 text-gray-700 hover:text-purple-600 transition-colors">
-                <span>Themes</span>
+              <button className="flex items-center space-x-1 text-gray-700 hover:text-purple-600 transition-colors" onClick={() => handleDropdownClick('/collections')}>
+                <span>Collections</span>
                 <ChevronDown className="w-4 h-4" />
               </button>
               
-              {activeDropdown === 'themes' && !loading && (
+              {activeDropdown === 'collections' && !loading && (
                 <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="text-sm font-medium text-gray-900">Popular Themes</p>
-                  </div>
-                  <button
-                    onClick={() => handleDropdownClick('/browse?type=themes')}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
-                  >
-                    View All Themes
-                  </button>
-                  {themes.map((theme) => (
-                    <button
-                      key={theme.id}
-                      onClick={() => handleDropdownClick('/browse?type=themes&theme=' + theme.id)}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-600 transition-colors"
-                    >
-                      {theme.name}
-                    </button>
+                  {inSeason.length > 0 && (
+                    <div className="border-b border-gray-100 pb-1">
+                      <p className="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-purple-700">In season</p>
+                      {inSeason.map(c => (
+                        <button key={c.id} onClick={() => handleDropdownClick(`/collections/${c.path}`)}
+                          className="w-full text-left px-4 py-2 text-sm font-medium text-gray-800 hover:bg-purple-50 hover:text-purple-600 transition-colors">{c.name}</button>
+                      ))}
+                    </div>
+                  )}
+                  {topCollections.map(c => (
+                    <button key={c.id} onClick={() => handleDropdownClick(`/collections/${c.path}`)}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors">{c.name}</button>
                   ))}
+                  <button onClick={() => handleDropdownClick('/collections')}
+                    className="w-full text-left px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-50 transition-colors">All collections</button>
                 </div>
               )}
             </div>
+
+            <Link href="/search" aria-label="Search designs" className="text-gray-700 hover:text-purple-600 transition-colors">
+              <Search className="w-5 h-5" />
+            </Link>
 
 
             {/* Sign Up - Only show on home page */}
@@ -344,23 +348,27 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
               </div>
 
               <div className="space-y-2">
-                <div className="px-3 py-2 font-medium text-gray-900">Themes</div>
-                <button
-                  onClick={() => handleDropdownClick('/browse?type=themes')}
-                  className="block w-full text-left px-6 py-1 text-gray-700 hover:text-purple-600"
-                >
-                  View All Themes
-                </button>
-                {themes.slice(0, 5).map((theme) => (
+                <div className="px-3 py-2 font-medium text-gray-900">Collections</div>
+                {[...inSeason, ...topCollections].map((c) => (
                   <button
-                    key={theme.id}
-                    onClick={() => handleDropdownClick('/browse?type=themes&theme=' + theme.id)}
+                    key={c.id}
+                    onClick={() => handleDropdownClick(`/collections/${c.path}`)}
                     className="block w-full text-left px-6 py-1 text-sm text-gray-600 hover:text-purple-600"
                   >
-                    {theme.name}
+                    {c.name}{c.inSeason && c.depth > 0 ? ' · in season' : ''}
                   </button>
                 ))}
+                <button
+                  onClick={() => handleDropdownClick('/collections')}
+                  className="block w-full text-left px-6 py-1 text-gray-700 hover:text-purple-600"
+                >
+                  All collections
+                </button>
               </div>
+
+              <Link href="/search" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-purple-600">
+                <Search className="h-4 w-4" /> Search designs
+              </Link>
 
               <Link href="/shop/cart" className="relative block px-3 py-2 text-gray-700 hover:text-purple-600">
                 <div className="flex items-center">

@@ -6,6 +6,7 @@
  *   hero: the proposition + "Make my pet's Pawtrait"
  *   how it works (3 steps)
  *   find your breed (only breeds that have designs)
+ *   seasonal band (only while an occasion is in season) + collection tiles (collections-plan phase 3)
  *   recent custom creations: real paid orders, before/after (only while the feed is on)
  *   Pawsonality quiz band (only while the quiz is live)
  *   designs: 2-column grid, New / Popular / Staff picks
@@ -25,6 +26,7 @@ import { productMatchesFormat } from '@/lib/products/shape-family';
 import { designTitle } from '@/lib/text/plain';
 import QuizPromo from '@/components/quiz/QuizPromo';
 import RecentCreations from '@/components/social/RecentCreations';
+import HomeCollections from '@/components/collections/HomeCollections';
 
 interface HomeImage {
   id: string;
@@ -193,6 +195,9 @@ function HomePageContent() {
         </section>
       )}
 
+      {/* IN SEASON + COLLECTIONS */}
+      <HomeCollections />
+
       {/* RECENT CUSTOM CREATIONS (social proof) */}
       <RecentCreations />
 
@@ -232,9 +237,7 @@ function HomePageContent() {
                     )}
                   </div>
                   <p className="mt-2 text-sm font-semibold leading-snug line-clamp-2">{title}</p>
-                  {(img.breed_name || img.theme_name) && (
-                    <p className="mt-0.5 text-xs text-gray-500 line-clamp-1">{[img.breed_name, img.theme_name].filter(Boolean).join(' · ')}</p>
-                  )}
+                  {img.breed_name && <p className="mt-0.5 text-xs text-gray-500 line-clamp-1">{img.breed_name}</p>}
                   {price && <p className="mt-0.5 text-sm font-semibold">{price.label}</p>}
                 </Link>
               );

@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * "More like this" on the design page: same breed first, then same theme.
- * Data: GET /api/images (public catalogue, filtered by breed_id / theme_id).
+ * "More like this" on the design page: same breed first, then the design's (most specific)
+ * collection, then designs sharing its first tag.
+ * Data: /api/images (by breed), /api/public/collection, /api/public/search?tag=.
  */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -11,8 +12,8 @@ import { designTitle } from '@/lib/text/plain';
 
 interface Item { id: string; description?: string; public_url?: string; image_url?: string }
 
-export default function MoreLikeThis({ imageId, breedId, themeId, max = 4 }: {
-  imageId: string; breedId?: string | null; themeId?: string | null; max?: number;
+export default function MoreLikeThis({ imageId, breedId, collection, tag, max = 4 }: {
+  imageId: string; breedId?: string | null; collection?: { path: string; name: string } | null; tag?: string | null; max?: number;
 }) {
   const [items, setItems] = useState<Item[] | null>(null);
 
@@ -21,12 +22,16 @@ export default function MoreLikeThis({ imageId, breedId, themeId, max = 4 }: {
     (async () => {
       const seen = new Set<string>([imageId]);
       const out: Item[] = [];
-      for (const q of [breedId && `breed_id=${breedId}`, themeId && `theme_id=${themeId}`].filter(Boolean)) {
+      const sources: (() => Promise<Item[]>)[] = [];
+      const get = async (url: string) => { const r = await fetch(url); return r.ok ? r.json() : null; };
+      if (breedId) sources.push(async () => ((await get(`/api/images?public=true&limit=12&breed_id=${breedId}`))?.images || []) as Item[]);
+      if (collection) sources.push(async () => ((await get(`/api/public/collection?path=${encodeURIComponent(collection.path)}`))?.designs || [])
+        .map((d: any) => ({ id: d.id, description: d.description, public_url: d.publicUrl })));
+      if (tag) sources.push(async () => ((await get(`/api/public/search?tag=${encodeURIComponent(tag)}`))?.designs || []) as Item[]);
+      for (const load of sources) {
         if (out.length >= max) break;
         try {
-          const r = await fetch(`/api/images?public=true&limit=12&${q}`);
-          const d = r.ok ? await r.json() : null;
-          for (const img of (d?.images || []) as Item[]) {
+          for (const img of await load()) {
             if (out.length >= max) break;
             if (!seen.has(img.id)) { seen.add(img.id); out.push(img); }
           }
@@ -35,7 +40,7 @@ export default function MoreLikeThis({ imageId, breedId, themeId, max = 4 }: {
       if (!cancelled) setItems(out);
     })();
     return () => { cancelled = true; };
-  }, [imageId, breedId, themeId, max]);
+  }, [imageId, breedId, collection?.path, tag, max]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!items || items.length === 0) return null;
 
@@ -43,7 +48,7 @@ export default function MoreLikeThis({ imageId, breedId, themeId, max = 4 }: {
     <section aria-labelledby="more-heading" className="mt-8">
       <div className="mb-3 flex items-baseline justify-between">
         <h2 id="more-heading" className="text-lg font-bold text-gray-900">More like this</h2>
-        <Link href="/browse" className="text-sm font-semibold text-purple-700">See all</Link>
+        <Link href={collection ? `/collections/${collection.path}` : '/browse'} className="text-sm font-semibold text-purple-700">{collection ? `More ${collection.name}` : 'See all'}</Link>
       </div>
       <div className="grid grid-cols-2 gap-x-3 gap-y-5">
         {items.map(img => (

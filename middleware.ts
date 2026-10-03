@@ -44,10 +44,9 @@ const BROWSE_REDIRECTS: Record<string, { path: string; params?: Record<string, s
   '/customer/products': { path: '/browse' },
   '/dogs': { path: '/browse', params: { type: 'dogs' } },
   '/cats': { path: '/browse', params: { type: 'cats' } },
-  '/themes': { path: '/browse', params: { type: 'themes' } },
   '/dogs-redirect': { path: '/browse', params: { type: 'dogs' } },
   '/cats-redirect': { path: '/browse', params: { type: 'cats' } },
-  '/themes-redirect': { path: '/browse', params: { type: 'themes' } },
+  '/themes-redirect': { path: '/themes' },
   '/home': { path: '/' },
   '/quiz': { path: '/quiz/pawsonality', params: { src: 'short-link' } },   // short address printed on share cards
 }
@@ -67,6 +66,16 @@ export async function middleware(req: NextRequest) {
   if (shopDesign && !req.nextUrl.searchParams.has('partner') && !req.nextUrl.searchParams.has('autoAdd')) {
     const url = req.nextUrl.clone()
     url.pathname = `/customise/${shopDesign[1]}`
+    return NextResponse.redirect(url, 308)
+  }
+
+  // Themes are behind the scenes now (collections-plan phase 3): old theme browse links go to
+  // /themes, which sends people to the theme's collection (or all collections)
+  if (req.nextUrl.pathname === '/browse' && req.nextUrl.searchParams.get('type') === 'themes') {
+    const url = req.nextUrl.clone()
+    const theme = url.searchParams.get('theme')
+    url.pathname = '/themes'
+    url.search = theme ? `?theme=${encodeURIComponent(theme)}` : ''
     return NextResponse.redirect(url, 308)
   }
 

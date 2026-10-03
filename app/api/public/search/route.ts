@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const [{ data: hits, error }, breeds, collections] = await Promise.all([
       supabase.rpc('search_designs', { p_query: tsquery, p_animal: animal, p_breed_id: breedId, p_tag: tag, p_limit: PAGE, p_offset: page * PAGE }),
       like && page === 0
-        ? supabase.from('breeds').select('name, slug, animal_type').eq('is_active', true)
+        ? supabase.from('breeds').select('id, name, slug, animal_type').eq('is_active', true)
           .or(words.map(w => `name.ilike.%${w}%`).join(',')).order('popularity_rank', { ascending: true, nullsFirst: false }).limit(6)
         : Promise.resolve({ data: [] }),
       like && page === 0

@@ -80,6 +80,7 @@ function BrowsePageContent() {
   };
 
   const [activeTab, setActiveTab] = useState<BrowseTab>(getInitialTab);
+
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [selectedBreedId, setSelectedBreedId] = useState(searchParams.get('breed') || '');
   const [selectedThemeId, setSelectedThemeId] = useState(searchParams.get('theme') || '');
@@ -909,23 +910,6 @@ function BrowsePageContent() {
                               </Badge>
                             </div>
                           )}
-                          {image.theme_name && image.theme_id && (
-                            <div>
-                              <Badge
-                                variant="secondary"
-                                className="text-xs cursor-pointer hover:bg-purple-200 transition-colors"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedThemeId(image.theme_id);
-                                  setSelectedBreedId('');
-                                  setSearchTerm('');
-                                  setActiveTab('themes');
-                                }}
-                              >
-                                {image.theme_name}
-                              </Badge>
-                            </div>
-                          )}
                         </div>
 
                         {/* Country-aware pricing */}
@@ -1039,16 +1023,12 @@ function BrowsePageContent() {
                     Cats ({catBreeds.length})
                   </Button>
                   <Button
-                    variant={activeTab === 'themes' ? 'default' : 'ghost'}
-                    onClick={() => handleTabChange('themes')}
-                    className={`px-4 sm:px-6 py-3 rounded-md whitespace-nowrap transition-all ${
-                      activeTab === 'themes'
-                        ? 'bg-purple-600 text-white shadow-md'
-                        : 'text-gray-700 hover:text-purple-600'
-                    }`}
+                    variant="ghost"
+                    onClick={() => router.push('/collections')}
+                    className="px-4 sm:px-6 py-3 rounded-md whitespace-nowrap transition-all text-gray-700 hover:text-purple-600"
                   >
                     <Palette className="w-5 h-5 mr-2" />
-                    Themes ({themes.length})
+                    Collections
                   </Button>
                 </div>
               </div>
@@ -1199,23 +1179,6 @@ function BrowsePageContent() {
                               }}
                             >
                               {image.breed_name}
-                            </Badge>
-                          </div>
-                        )}
-                        {image.theme_name && image.theme_id && (
-                          <div>
-                            <Badge
-                              variant="secondary"
-                              className="text-xs cursor-pointer hover:bg-purple-200 transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedThemeId(image.theme_id);
-                                setSelectedBreedId('');
-                                setSearchTerm('');
-                                setActiveTab('themes');
-                              }}
-                            >
-                              {image.theme_name}
                             </Badge>
                           </div>
                         )}

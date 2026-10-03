@@ -2,9 +2,10 @@
 import { allCollections, inSeason, zodiacFor, suggestCollectionForTheme, OCCASIONS } from '../lib/collections/definitions';
 import { cleanWindows, cleanTerms, slugify } from '../lib/collections/server';
 import { SPORTS_TEAMS } from '../lib/collections/sports-teams';
+import { cleanPath, orderOccasions, type PublicCollection } from '../lib/collections/public';
 
 let pass = 0, fail = 0;
-const ok = (name: string, cond: boolean) => { if (cond) pass++; else { fail++; console.log('FAIL', name); } };
+const ok = (name: string, cond: boolean, extra?: unknown) => { if (cond) pass++; else { fail++; console.log('FAIL', name, extra ?? ''); } };
 const d = (s: string) => new Date(`${s}T12:00:00`);
 
 // Seasons
@@ -68,6 +69,17 @@ ok('windows max 4', 'error' in cleanWindows(Array(5).fill({ start: '01-01', end:
 ok('terms split + dedupe', JSON.stringify(cleanTerms('Xmas, festive, xmas, ')) === '["xmas","festive"]');
 ok('slugify', slugify("St Patrick’s Day!") === 'st-patricks-day');
 ok('slugify accents', slugify('Día de Muertos') === 'dia-de-muertos');
+
+// Customer side
+ok('cleanPath ok', cleanPath('/sports/nfl/kansas-city-chiefs/') === 'sports/nfl/kansas-city-chiefs');
+ok('cleanPath rejects 4 levels', cleanPath('a/b/c/d') === null);
+ok('cleanPath rejects odd chars', cleanPath('sports/../admin') === null && cleanPath("x' or 1=1") === null && cleanPath('') === null);
+const occ = (slug: string, seasons: { start: string; end: string }[], sortOrder: number): PublicCollection => ({
+  id: slug, kind: 'occasion', path: `occasions/${slug}`, parentPath: 'occasions', depth: 1, name: slug, shortName: null, description: null,
+  designs: 1, heroImageId: null, seasonal: seasons.length > 0, inSeason: inSeason(seasons, d('2026-11-10')), seasons, details: {}, sortOrder,
+});
+const ordered = orderOccasions([occ('birthday', [], 10), occ('christmas', [{ start: '11-01', end: '12-26' }], 20), occ('thanksgiving', [{ start: '11-01', end: '11-28' }], 30), occ('halloween', [{ start: '10-01', end: '10-31' }], 5)], d('2026-11-10'));
+ok('in season first, nearest end first', ordered.map(o => o.id).join() === 'thanksgiving,christmas,halloween,birthday', ordered.map(o => o.id).join());
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

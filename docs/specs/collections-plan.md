@@ -50,6 +50,16 @@ On upload Claude looks at the image + prompt + theme and returns: collection(s) 
 - **Collection pages** `/collections/<slug>` (and `/collections/sports/nfl/chiefs`), with page titles and share previews. Pawsonalities link to the quiz; Zodiac has "find your pet's sign" from their birthday.
 - **Design page:** tag chips under the title → "See more crown designs"; More like this = same breed, then same collection, then shared tags. Themes removed from nav and captions; old theme links redirect.
 
+## Phase 3 — built (2026-10-03)
+- **Migration:** `db/migrations/2026-10-09-collections-browse.sql` (run after 2026-10-08; safe to re-run): read-only functions `collection_summary()` (design counts including collections inside, picture = admin's pick else most popular design), `collection_designs()` (paged, by animal or breed), `collection_breeds()`.
+- **Pages:** `/collections` (Occasions with in-season ones first and badged, Sports leagues, 16 Pawsonalities with the quiz link, Zodiac); `/collections/<path>` (breadcrumb, intro, team colours / zodiac dates / Pawsonality type, collections inside it, Dogs·Cats filter and breed picker ("1 design for your Labrador Retriever"), Show more, "Any design can be your pet", neighbouring collections; Pawsonality pages link to the quiz; Zodiac has "Find your pet's sign" from a birthday); each with its own title, description and share picture. `/search` (search box that updates as you type, jump-to chips for collections and breeds, Dogs/Cats, `?tag=` for "See more" links, empty state). Only collections with designs are shown.
+- **Home:** one "In season" band (only while an occasion with designs is in season, e.g. Halloween in October) and the four collection tiles, after Find your breed.
+- **Navigation:** Dogs · Cats · Collections · Search (Themes removed).
+- **Design page:** collection chips and tag chips ("See more crown designs") under the title; back link returns to the collection you came from (`?from=`); More like this = same breed, then the design's collection, then its first tag; theme name no longer shown.
+- **Themes out of customer view:** `/themes`, `/themes-redirect` and `/browse?type=themes[&theme=]` go to the theme's collection if it has one, else `/collections`; theme badges and the Themes tab removed from /browse (tab now links to Collections); home captions show breed only.
+- **APIs:** `GET /api/public/collections`, `GET /api/public/collection?path=&animal=&breed=&page=`, `GET /api/public/designs/[id]/collections`. Search events go to GA4 (`search`) and Meta (`Search`).
+- **Tests:** `npm run test:collections` (50 checks), 29 browser checks against local data (home band, index, team page and title, back link, chips, tag search, filters, zodiac finder, quiz link, unknown collection, search, nav, theme redirects, phone width).
+
 ## Sports team switcher (phase 4)
 - Each sports design records its team. **Team variants** of a design are made with the "switch team" prompt (Gemini edit of the design), saved as link-only designs (like Pawsonality breed pictures) and tracked in `design_team_variants` (design, team, picture, status).
 - Made in advance for the most popular teams (admin grid: design × team, "Make missing"), on demand for the rest (20–60 s, "Painting it in Chiefs colours…" overlay, then swap).
