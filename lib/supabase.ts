@@ -817,6 +817,8 @@ export class SupabaseService {
     featured?: boolean;
     publicOnly?: boolean;
     search?: string;
+    /** Admin → Catalogue: designs in any of these collections; 'none' = in no collection */
+    collectionIds?: string[] | 'none';
   }): Promise<ImageCatalogWithDetails[]> {
     const page = filters?.page || 1;
     const limit = filters?.limit || 20;
@@ -830,10 +832,17 @@ export class SupabaseService {
         themes(name),
         styles(name),
         formats(name),
-        coats(name, hex_color, animal_type)
+        coats(name, hex_color, animal_type)${filters?.collectionIds === 'none' ? ',\n        design_collections(collection_id)'
+          : filters?.collectionIds?.length ? ',\n        design_collections!inner(collection_id)' : ''}
       `)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
+
+    if (filters?.collectionIds === 'none') {
+      query = query.eq('design_collections.excluded', false).is('design_collections', null);
+    } else if (filters?.collectionIds?.length) {
+      query = query.in('design_collections.collection_id', filters.collectionIds).eq('design_collections.excluded', false);
+    }
 
     if (filters?.publicOnly !== false) {
       // Public listings: hidden designs and link-only designs (Pawsonality breed pictures) left out

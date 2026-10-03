@@ -31,6 +31,8 @@ export default function AdminCatalogPage() {
   const [animalType, setAnimalType] = useState<AnimalType | ''>('');
   const [selectedBreed, setSelectedBreed] = useState('');
   const [selectedTheme, setSelectedTheme] = useState('');
+  const [selectedCollection, setSelectedCollection] = useState(''); // collection id, or 'none'
+  const [collections, setCollections] = useState<{ id: string; parent_id: string | null; path: string; name: string; depth: number; sort_order: number; designs: number }[]>([]);
   const [selectedStyle, setSelectedStyle] = useState('');
   const [selectedFormat, setSelectedFormat] = useState('');
   const [featuredOnly, setFeaturedOnly] = useState(false);
@@ -67,11 +69,11 @@ export default function AdminCatalogPage() {
   // Reset page when filters change (but not when page size changes)
   useEffect(() => {
     setPage(1);
-  }, [animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, visibleOnly, visibilityFilter, ratingFilter, debouncedSearchTerm]);
+  }, [animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, visibleOnly, visibilityFilter, ratingFilter, debouncedSearchTerm, selectedCollection]);
 
   useEffect(() => {
     loadImages();
-  }, [page, pageSize, animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, visibleOnly, visibilityFilter, ratingFilter, debouncedSearchTerm]);
+  }, [page, pageSize, animalType, selectedBreed, selectedTheme, selectedCollection, selectedStyle, selectedFormat, featuredOnly, visibleOnly, visibilityFilter, ratingFilter, debouncedSearchTerm]);
 
   const loadData = async () => {
     try {
@@ -99,6 +101,8 @@ export default function AdminCatalogPage() {
       setStyles(stylesData?.filter((s: any) => s.is_active) || []);
       setFormats(formatsData?.filter((f: any) => f.is_active) || []);
       setOutfits(outfitsData?.filter((o: any) => o.is_active) || []);
+      const cols = await adminSupabaseService.getCollections();
+      if (cols.ok) setCollections(cols.data.collections || []);
       
       console.log('Set filter state:', { 
         breeds: breedsData?.filter((b: any) => b.is_active)?.length || 0,
@@ -120,6 +124,10 @@ export default function AdminCatalogPage() {
         limit: pageSize,
         breedId: selectedBreed || null,
         themeId: selectedTheme || null,
+        // A collection includes the collections inside it (NFL → every NFL team)
+        collectionIds: selectedCollection === 'none' ? 'none' : selectedCollection
+          ? (() => { const sel = collections.find(c => c.id === selectedCollection); return sel ? collections.filter(c => c.path === sel.path || c.path.startsWith(`${sel.path}/`)).map(c => c.id) : [selectedCollection]; })()
+          : undefined,
         styleId: selectedStyle || null,
         formatId: selectedFormat || null,
         featured: featuredOnly,
@@ -167,6 +175,7 @@ export default function AdminCatalogPage() {
     setAnimalType('');
     setSelectedBreed('');
     setSelectedTheme('');
+    setSelectedCollection('');
     setSelectedStyle('');
     setSelectedFormat('');
     setFeaturedOnly(false);
@@ -325,6 +334,15 @@ export default function AdminCatalogPage() {
   };
 
   // Get filtered breeds based on animal type
+  // Collections in tree order (Occasions › Christmas, Sports › NFL › Chiefs…)
+  const collectionOptions = (() => {
+    const out: typeof collections = [];
+    const walk = (pid: string | null) => collections.filter(c => c.parent_id === pid).sort((a, b) => a.sort_order - b.sort_order).forEach(c => { out.push(c); walk(c.id); });
+    walk(null);
+    // Count includes the collections inside (Sports = all teams' designs)
+    return out.map(c => ({ ...c, total: collections.filter(x => x.path === c.path || x.path.startsWith(`${c.path}/`)).reduce((n, x) => n + (x.designs || 0), 0) }));
+  })();
+
   const filteredBreeds = animalType ? breeds.filter(b => b.animal_type === animalType) : breeds;
 
   if (loading && page === 1) {
@@ -424,7 +442,7 @@ export default function AdminCatalogPage() {
               </div>
 
               {/* Filter Row */}
-              <div className="grid grid-cols-2 md:grid-cols-8 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-4">
                 <select
                   value={animalType}
                   onChange={(e) => setAnimalType(e.target.value as AnimalType | '')}
@@ -457,6 +475,21 @@ export default function AdminCatalogPage() {
                   {themes.map(theme => (
                     <option key={theme.id} value={theme.id}>
                       {theme.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={selectedCollection}
+                  onChange={(e) => setSelectedCollection(e.target.value)}
+                  aria-label="Collection"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                >
+                  <option value="">All Collections</option>
+                  <option value="none">Not in any collection</option>
+                  {collectionOptions.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {'\u00a0\u00a0'.repeat(c.depth)}{c.name}{c.total ? ` (${c.total})` : ''}
                     </option>
                   ))}
                 </select>
