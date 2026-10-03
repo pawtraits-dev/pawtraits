@@ -683,6 +683,22 @@ export class AdminSupabaseService {
     return adminRequest<{ tagged: number; failed: number; remaining: number }>('/api/admin/collections/auto-tag', jsonInit('POST', { limit, retry_failed: retryFailed }));
   }
 
+  async getTeamVersionDesigns(q = '', page = 0): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/collections/team-versions?q=${encodeURIComponent(q)}&page=${page}`);
+  }
+
+  async getTeamVersions(id: string): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/collections/team-versions/${id}`);
+  }
+
+  async setTeamSwitch(id: string, teamSwitch: 'league' | 'any' | 'off'): Promise<AdminResult<{ ok: true }>> {
+    return adminRequest<{ ok: true }>(`/api/admin/collections/team-versions/${id}`, jsonInit('PATCH', { team_switch: teamSwitch }));
+  }
+
+  async makeTeamVersion(id: string, team: string): Promise<AdminResult<{ status: string; imageId?: string; error?: string }>> {
+    return adminRequest<{ status: string; imageId?: string; error?: string }>(`/api/admin/collections/team-versions/${id}`, jsonInit('POST', { team }));
+  }
+
   // ===== SOCIAL LOOP (Admin → Social) =====
 
   async getSocial(view = 'all', limit = 50): Promise<AdminResult<any>> {

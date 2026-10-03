@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, RefreshCw, Sparkles } from 'lucide-react';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 import TaggingTab from '@/components/admin/collections/TaggingTab';
+import TeamVersionsTab from '@/components/admin/collections/TeamVersionsTab';
 
 interface Window { start: string; end: string }
 interface Collection {
@@ -241,7 +242,7 @@ function ThemeMapping({ themes, collections, reload }: { themes: Theme[]; collec
 export default function AdminCollectionsPage() {
   const [data, setData] = useState<{ collections: Collection[]; themes: Theme[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<'collections' | 'themes' | 'tagging'>('collections');
+  const [tab, setTab] = useState<'collections' | 'themes' | 'tagging' | 'teams'>('collections');
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -262,10 +263,10 @@ export default function AdminCollectionsPage() {
         <p className="mt-1 text-gray-700">Besides breed, the places customers browse: Occasions, Sports, 16 Pawsonalities and Zodiac signs.</p>
         {inSeasonNow.length > 0 && <p className="mt-2 text-sm text-green-800">Promoted right now: {inSeasonNow.join(', ')}</p>}
       </div>
-      <div role="tablist" className="flex gap-1 border-b border-gray-200">
-        {(['collections', 'themes', 'tagging'] as const).map(t => (
-          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold ${tab === t ? 'border-purple-600 text-purple-700' : 'border-transparent text-gray-700 hover:text-gray-900'}`}>
-            {t === 'collections' ? 'Collections' : t === 'themes' ? 'Themes → collections' : 'Tagging'}
+      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-gray-200">
+        {(['collections', 'themes', 'tagging', 'teams'] as const).map(t => (
+          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold ${tab === t ? 'border-purple-600 text-purple-700' : 'border-transparent text-gray-700 hover:text-gray-900'}`}>
+            {t === 'collections' ? 'Collections' : t === 'themes' ? 'Themes → collections' : t === 'tagging' ? 'Tagging' : 'Team versions'}
           </button>
         ))}
       </div>
@@ -278,6 +279,7 @@ export default function AdminCollectionsPage() {
         </ul>
       )}
       {data && tab === 'tagging' && <TaggingTab collections={data.collections} />}
+      {tab === 'teams' && <TeamVersionsTab />}
       {data && tab === 'themes' && <ThemeMapping themes={data.themes} collections={data.collections} reload={load} />}
     </div>
   );

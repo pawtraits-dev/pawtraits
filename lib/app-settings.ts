@@ -24,6 +24,10 @@ export const SETTING_DEFAULTS = {
   social_include_previews: false,
   /** Collections: tag new catalogue designs automatically (collections, team, descriptive tags) */
   auto_tag_enabled: true,
+  /** Collections: customers can change a sports design to another team */
+  team_switch_enabled: true,
+  /** New team versions one visitor can have painted per hour (ready-made ones are unlimited) */
+  team_switch_hourly_limit: 6,
 };
 export type FulfillmentProvider = 'self_print' | 'gelato';
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
@@ -69,6 +73,7 @@ export function validateSetting(key: string, value: unknown): string | null {
   switch (key) {
     case 'guest_preview_daily_limit':
     case 'guest_preview_ip_daily_limit':
+    case 'team_switch_hourly_limit':
       return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 10000 ? null : 'Must be a whole number 0–10000';
     case 'stall_online_discount_pct':
       return typeof value === 'number' && value >= 0 && value <= 100 ? null : 'Must be 0–100';
@@ -81,6 +86,7 @@ export function validateSetting(key: string, value: unknown): string | null {
     case 'social_instagram_enabled':
     case 'social_photo_check_enabled':
     case 'auto_tag_enabled':
+    case 'team_switch_enabled':
     case 'social_include_previews':
       return typeof value === 'boolean' ? null : 'Must be true or false';
     case 'stall_prices_pence': {

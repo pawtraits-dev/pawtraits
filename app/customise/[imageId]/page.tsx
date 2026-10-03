@@ -28,6 +28,7 @@ import { extractDescriptionTitle } from '@/lib/utils';
 import { designTitle, plainText } from '@/lib/text/plain';
 import MoreLikeThis from '@/components/customise/MoreLikeThis';
 import DesignChips, { useDesignCollections } from '@/components/customise/DesignChips';
+import TeamPicker from '@/components/customise/TeamPicker';
 import DesignQuizLink from '@/components/quiz/DesignQuizLink';
 
 interface Pet {
@@ -392,6 +393,8 @@ export default function CustomisePage() {
               </h1>
               <DesignChips data={chips} />
             </div>
+
+            <TeamPicker imageId={catalogImage.id} />
 
             {stallOffer?.available && (
               <p className="mt-2 text-sm text-purple-800">
