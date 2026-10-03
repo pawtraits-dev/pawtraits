@@ -1532,4 +1532,4 @@ CREATE TABLE public.user_profiles (
   CONSTRAINT user_profiles_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id),
   CONSTRAINT user_profiles_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
   CONSTRAINT user_profiles_influencer_id_fkey FOREIGN KEY (influencer_id) REFERENCES public.influencers(id)
-);
+);  

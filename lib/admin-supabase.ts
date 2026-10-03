@@ -648,6 +648,28 @@ export class AdminSupabaseService {
     return adminRequest<{ ok: true }>('/api/admin/settings/app', jsonInit('PATCH', { key, value }));
   }
 
+  // ===== COLLECTIONS (Admin → Collections) =====
+
+  async getCollections(): Promise<AdminResult<any>> {
+    return adminRequest<any>('/api/admin/collections');
+  }
+
+  async createCollection(body: { parent_id: string; name: string; slug?: string; description?: string }): Promise<AdminResult<{ id: string; path: string }>> {
+    return adminRequest<{ id: string; path: string }>('/api/admin/collections', jsonInit('POST', body));
+  }
+
+  async updateCollection(id: string, body: Record<string, unknown>): Promise<AdminResult<{ ok: true }>> {
+    return adminRequest<{ ok: true }>(`/api/admin/collections/${id}`, jsonInit('PATCH', body));
+  }
+
+  async setThemeCollection(themeId: string, collectionId: string | null): Promise<AdminResult<{ ok: true; added: number }>> {
+    return adminRequest<{ ok: true; added: number }>(`/api/admin/collections/themes/${themeId}`, jsonInit('PATCH', { collection_id: collectionId }));
+  }
+
+  async refileThemeCollections(): Promise<AdminResult<{ ok: true; added: number }>> {
+    return adminRequest<{ ok: true; added: number }>('/api/admin/collections/themes/apply-all', jsonInit('POST', {}));
+  }
+
   // ===== SOCIAL LOOP (Admin → Social) =====
 
   async getSocial(view = 'all', limit = 50): Promise<AdminResult<any>> {

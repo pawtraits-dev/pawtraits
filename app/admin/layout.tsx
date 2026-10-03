@@ -39,7 +39,9 @@ import {
   Coffee,
   MapPin,
   Printer,
-  Sparkles
+  Sparkles,
+  Instagram,
+  Layers
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -66,6 +68,7 @@ const navigationSections = [
     items: [
       { name: 'Breeds', href: '/admin/breeds', icon: Tag },
       { name: 'Coats', href: '/admin/coats', icon: Palette },
+      { name: 'Collections', href: '/admin/collections', icon: Layers },
       { name: 'Themes', href: '/admin/themes', icon: ImageIcon },
       { name: 'Styles', href: '/admin/styles', icon: Eye },
       { name: 'Outfits', href: '/admin/outfits', icon: Shirt },
@@ -111,6 +114,7 @@ const navigationSections = [
       { name: 'Message Templates', href: '/admin/messaging', icon: Mail },
       { name: 'Message Queue', href: '/admin/messaging/queue', icon: Send },
       { name: 'Test Email', href: '/admin/messaging/test', icon: MessageSquare },
+      { name: 'Social', href: '/admin/social', icon: Instagram },
     ]
   },
   {
