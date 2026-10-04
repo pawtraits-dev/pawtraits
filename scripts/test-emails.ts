@@ -42,6 +42,8 @@ ok('country GB', countryName('GB') === 'United Kingdom' && countryName('United K
 ok('delivery GB', deliveryFor('GB').service === 'Royal Mail Tracked 48' && deliveryFor('United Kingdom').days === '2–3');
 ok('delivery DE', deliveryFor('DE').service === 'Royal Mail International Tracked');
 ok('pet possessive', petPossessive('Custom Pawtrait of Biscuit · Royal') === 'Biscuit’s' && petPossessive('The Royal Highness') === null);
+ok('pet possessive, two pets', petPossessive('Custom Pawtrait of Biscuit & Luna · Royal') === 'Biscuit & Luna’s' && petPossessive('Custom Pawtrait of Bo, Rex & Luna') === 'Bo, Rex & Luna’s');
+ok('pet possessive ignores sentences', petPossessive('Custom Pawtrait of the dog and more') === null);
 ok('window Thu+2–3', deliveryWindow(new Date('2026-10-01T10:00:00Z'), '2–3 working days') === 'Sat 3 – Mon 5 October', String(deliveryWindow(new Date('2026-10-01T10:00:00Z'), '2–3 working days')));
 ok('window month change', deliveryWindow(new Date('2026-10-29T10:00:00Z'), '2-3') === 'Sat 31 October – Mon 2 November', String(deliveryWindow(new Date('2026-10-29T10:00:00Z'), '2-3')));
 

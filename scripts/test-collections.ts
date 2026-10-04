@@ -3,6 +3,8 @@ import { allCollections, inSeason, zodiacFor, suggestCollectionForTheme, OCCASIO
 import { cleanWindows, cleanTerms, slugify } from '../lib/collections/server';
 import { SPORTS_TEAMS } from '../lib/collections/sports-teams';
 import { cleanPath, orderOccasions, type PublicCollection } from '../lib/collections/public';
+import { joinPetNames } from '../lib/text/pet-names';
+import { recolourFor } from '../lib/collections/team-variants';
 
 let pass = 0, fail = 0;
 const ok = (name: string, cond: boolean, extra?: unknown) => { if (cond) pass++; else { fail++; console.log('FAIL', name, extra ?? ''); } };
@@ -80,6 +82,16 @@ const occ = (slug: string, seasons: { start: string; end: string }[], sortOrder:
 });
 const ordered = orderOccasions([occ('birthday', [], 10), occ('christmas', [{ start: '11-01', end: '12-26' }], 20), occ('thanksgiving', [{ start: '11-01', end: '11-28' }], 30), occ('halloween', [{ start: '10-01', end: '10-31' }], 5)], d('2026-11-10'));
 ok('in season first, nearest end first', ordered.map(o => o.id).join() === 'thanksgiving,christmas,halloween,birthday', ordered.map(o => o.id).join());
+
+// Several pets (multi-pet plan phase 1)
+ok('names: two', joinPetNames(['Biscuit', 'Luna']) === 'Biscuit & Luna');
+ok('names: three', joinPetNames(['Bo', 'Rex', 'Luna']) === 'Bo, Rex & Luna');
+ok('names: placeholders dropped', joinPetNames(['Biscuit', 'Uploaded Pet', ' ']) === 'Biscuit' && joinPetNames([null, 'Uploaded Pet']) === 'Uploaded Pet');
+const chiefsRecolour = 'Recolour the pet\'s sports outfit to Chiefs colours (red, gold): red jersey. Keep the same type of garment, cut, folds, pose, background and lighting; change only the colours and stripes.';
+ok('recolour: one pet unchanged', recolourFor(chiefsRecolour, 1) === chiefsRecolour);
+ok('recolour: two pets', recolourFor(chiefsRecolour, 2).startsWith('There are 2 pets. Recolour every pet\'s sports outfit, all in the same team kit, to Chiefs colours') && recolourFor(chiefsRecolour, 2).includes('Keep each pet’s type of garment'));
+const realTeam = allCollections(types).find(c => c.path === 'sports/nfl/kansas-city-chiefs')!.metadata!.recolour_prompt as string;
+ok('recolour: real team prompt reworded for two', recolourFor(realTeam, 2).startsWith('There are 2 pets.'));
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server';
+import { joinPetNames } from '@/lib/text/pet-names';
 import { createClient } from '@supabase/supabase-js';
 import { v2 as cloudinary } from 'cloudinary';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
@@ -597,7 +598,8 @@ export async function POST(request: NextRequest) {
         ip_hash: ipHash,
         catalog_image_id: catalogImageId,
         pet_id: firstPetId || null,
-        pet_name: firstPet?.name || 'Uploaded Pet',
+        // Every pet's name ("Biscuit & Luna"); the first pet's details stay in pet_id / breed / coat
+        pet_name: joinPetNames(petsData.map(p => p?.name)),
         pet_breed_id: firstPet?.breed_id || null,
         pet_coat_id: firstPet?.coat_id || null,
         pet_image_url: petImageUrls[0],

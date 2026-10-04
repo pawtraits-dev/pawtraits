@@ -181,6 +181,9 @@ export async function POST(request: NextRequest) {
       cloudinary_version: uploadResult.version,
       cloudinary_signature: uploadResult.cloudinary_signature,
       image_variants: uploadResult.variants,
+      // The pets, also in their own columns (multi-pet plan phase 1)
+      subjects: subjects,
+      is_multi_subject: subjects.length > 1,
       generation_parameters: {
         composition_analysis: compositionAnalysis,
         composition_metadata: compositionMetadata,

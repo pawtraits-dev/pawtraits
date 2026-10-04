@@ -147,7 +147,11 @@ export async function autoTagImage(supabase: any, imageId: string, opts: { model
     const quizCode = (row.tags ?? []).map((t: string) => /^pawsonality:([A-Z]{4})$/.exec(t)?.[1]).find(Boolean);
     if (quizCode && byPath.has(`pawsonalities/${quizCode.toLowerCase()}`)) sure.push(`pawsonalities/${quizCode.toLowerCase()}`);
 
-    const prompt = buildPrompt(ctx, { prompt: row.prompt_text, description: row.marketing_description || row.description, theme: row.themes?.name, breed: row.breeds?.name, outfit: row.outfits?.name });
+    // Every pet's breed ("Beagle and Persian"), not just the first (multi-pet plan phase 1)
+    const { data: pets } = await supabase.from('image_catalog_subjects').select('subject_order, breeds:breed_id (name)').eq('image_catalog_id', imageId).order('subject_order');
+    const petBreeds = Array.from(new Set([row.breeds?.name, ...(pets ?? []).map((p: any) => p.breeds?.name)].filter(Boolean)));
+    const breed = petBreeds.length > 1 ? `${(pets ?? []).length || petBreeds.length} pets: ${petBreeds.join(' and ')}` : petBreeds[0];
+    const prompt = buildPrompt(ctx, { prompt: row.prompt_text, description: row.marketing_description || row.description, theme: row.themes?.name, breed, outfit: row.outfits?.name });
     const reply = await (opts.model ?? askModel)(prompt, thumbUrl(row));
     const answer = parseTagReply(reply, new Set(byPath.keys()));
     if (!answer) {

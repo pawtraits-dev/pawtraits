@@ -58,9 +58,10 @@ export function deliveryFor(country: string | null | undefined): { service: stri
   return zone ? { service: SHIPPING_ZONES[zone].service, days: SHIPPING_ZONES[zone].days.replace('-', '–') } : { service: null, days: null };
 }
 
-/** "Biscuit’s" from a customised portrait title ("Custom Pawtrait of Biscuit · Royal"), else null */
+/** "Biscuit’s" / "Biscuit & Luna’s" from a customised portrait title ("Custom Pawtrait of Biscuit & Luna · Royal"), else null */
 export function petPossessive(title: string | null | undefined): string | null {
-  const m = /^Custom Pawtrait of ([A-Za-zÀ-ÖØ-öø-ÿ'’-]{2,20})\b/.exec(title ?? '');
+  const NAME = "[A-Za-zÀ-ÖØ-öø-ÿ'’-]{2,20}";
+  const m = new RegExp(`^Custom Pawtrait of (${NAME}(?:(?:, | & )${NAME}){0,4})(?= ·|$)`).exec((title ?? '').trim());
   return m ? `${m[1]}’s` : null;
 }
 

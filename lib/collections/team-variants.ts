@@ -120,7 +120,7 @@ const geminiRecolour: RecolourFn = async (pngBase64, instruction) => {
     model: GEMINI_IMAGE_MODELS.pro,
     config: geminiImageConfig(ratioOfImage(pngBase64)),
     contents: [
-      { text: `${instruction} Keep the animal exactly as it is: same breed, face, markings, expression and pose. Keep the art style, composition, background and every other detail unchanged.` },
+      { text: `${instruction} Keep every animal exactly as it is: same breed, face, markings, expression, pose and place in the picture, and the same number of animals. Keep the art style, composition, background and every other detail unchanged.` },
       { inlineData: { mimeType: 'image/png', data: pngBase64 } },
     ],
   });
@@ -190,7 +190,7 @@ export async function peekTeamVariant(sourceId: string, teamId: string): Promise
 async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: RecolourFn, upload: UploadFn, fetchImage: (url: string) => Promise<string>): Promise<string> {
   const supabase = serviceClient();
   const { data: source } = await supabase.from('image_catalog')
-    .select('id, prompt_text, description, marketing_description, cloudinary_public_id, public_url, breed_id, coat_id, theme_id, style_id, format_id, display_tags, is_multi_subject, subjects, composition_metadata, variation_prompt_template')
+    .select('id, prompt_text, description, marketing_description, cloudinary_public_id, public_url, breed_id, coat_id, theme_id, style_id, format_id, display_tags, is_multi_subject, subjects, generation_parameters, composition_metadata, variation_prompt_template')
     .eq('id', sourceId).maybeSingle();
   if (!source) throw new Error('Design not found');
 
@@ -200,7 +200,10 @@ async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: R
     : source.public_url;
   const base64 = await fetchImage(url);
 
-  const painted = await recolour(base64, team.recolour);
+  // Several pets: every one of them changes kit (multi-pet plan phase 1)
+  const pets = Math.max(1, Array.isArray(source.subjects) ? source.subjects.length : 0,
+    Array.isArray(source.generation_parameters?.subjects) ? source.generation_parameters.subjects.length : 0);
+  const painted = await recolour(base64, recolourFor(team.recolour, pets));
   if (!painted) throw new Error('The picture service returned no image');
 
   const slug = team.path.split('/').slice(1).join('-');
@@ -218,11 +221,25 @@ async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: R
     display_tags: source.display_tags ?? [],
     breed_id: source.breed_id, coat_id: source.coat_id, theme_id: source.theme_id, style_id: source.style_id, format_id: source.format_id,
     outfit_id: team.outfitId,
-    is_multi_subject: source.is_multi_subject, subjects: source.subjects, composition_metadata: source.composition_metadata,
+    is_multi_subject: pets > 1, subjects: source.subjects, generation_parameters: source.generation_parameters ?? {}, composition_metadata: source.composition_metadata,
     variation_prompt_template: source.variation_prompt_template,
     cloudinary_public_id: uploaded.public_id, cloudinary_version: uploaded.version?.toString(), cloudinary_signature: uploaded.signature,
     rating: 4, is_featured: false, is_public: true,
   }).select('id').single();
   if (error || !saved) throw new Error(`Saving the picture failed: ${error?.message}`);
+
+  // Same pets, same places: copy the per-pet rows (breed filters, multi-pet swaps)
+  const { data: petRows } = await supabase.from('image_catalog_subjects')
+    .select('subject_order, is_primary, breed_id, coat_id, position, size_prominence, pose_description, gaze_direction, expression').eq('image_catalog_id', sourceId);
+  if (petRows?.length) {
+    await supabase.from('image_catalog_subjects').insert(petRows.map((r: any) => ({ ...r, image_catalog_id: saved.id, outfit_id: team.outfitId })));
+  }
   return saved.id;
+}
+
+/** The team's recolour instruction, worded for every pet when the design has more than one */
+export function recolourFor(instruction: string, pets: number): string {
+  if (pets <= 1) return instruction;
+  return instruction.replace(/^Recolour the pet's sports outfit/, `There are ${pets} pets. Recolour every pet's sports outfit, all in the same team kit,`)
+    .replace(/Keep the same type of garment/, 'Keep each pet’s type of garment');
 }

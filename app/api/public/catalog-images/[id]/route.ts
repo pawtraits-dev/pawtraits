@@ -41,6 +41,7 @@ export async function GET(
         style_id,
         format_id,
         generation_parameters,
+        subjects,
         breed:breeds(
           id,
           name,
@@ -103,9 +104,12 @@ export async function GET(
       hasCloudinaryId: !!catalogImage.cloudinary_public_id
     });
 
-    // Extract multi-subject information from generation_parameters
-    const isMultiSubject = catalogImage.generation_parameters?.is_multi_subject || false;
-    const subjectCount = catalogImage.generation_parameters?.subjects?.length || 1;
+    // How many pets: image_catalog.subjects (kept in step with generation_parameters by a trigger,
+    // multi-pet plan phase 1), else generation_parameters for anything older
+    const subjectCount = Math.max(1,
+      Array.isArray(catalogImage.subjects) ? catalogImage.subjects.length : 0,
+      Array.isArray(catalogImage.generation_parameters?.subjects) ? catalogImage.generation_parameters.subjects.length : 0);
+    const isMultiSubject = subjectCount > 1;
 
     // Format response
     const response = {
