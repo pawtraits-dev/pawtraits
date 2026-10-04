@@ -65,10 +65,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!themeId || !styleId || !formatId) {
+    // Theme and style are optional (themes are internal recipes now; collections come from tagging)
+    if (!formatId) {
       console.log('❌ [ADMIN CATALOG SAVE] Missing metadata fields');
       return NextResponse.json(
-        { error: 'Missing required metadata: themeId, styleId, formatId' },
+        { error: 'Missing required metadata: formatId' },
         { status: 400 }
       );
     }
@@ -97,17 +98,13 @@ export async function POST(request: NextRequest) {
       .eq('id', primarySubject.breedId)
       .single();
 
-    const { data: theme } = await supabase
-      .from('themes')
-      .select('name')
-      .eq('id', themeId)
-      .single();
+    const { data: theme } = themeId
+      ? await supabase.from('themes').select('name').eq('id', themeId).single()
+      : { data: null };
 
-    const { data: style } = await supabase
-      .from('styles')
-      .select('name')
-      .eq('id', styleId)
-      .single();
+    const { data: style } = styleId
+      ? await supabase.from('styles').select('name').eq('id', styleId).single()
+      : { data: null };
 
     const { data: format } = await supabase
       .from('formats')
@@ -170,9 +167,12 @@ export async function POST(request: NextRequest) {
       prompt_text: variationPromptTemplate || '',
       description: marketingDescription,
       tags: tags || [],
+      // Tags shown to customers; reviewed on upload, so the auto-tagger keeps them
+      display_tags: Array.isArray(tags) ? tags.map((t: string) => String(t).toLowerCase().trim()).filter(Boolean).slice(0, 10) : [],
+      display_tags_edited: Array.isArray(tags) && tags.length > 0,
       breed_id: primarySubject.breedId,
-      theme_id: themeId,
-      style_id: styleId,
+      theme_id: themeId || null,
+      style_id: styleId || null,
       format_id: formatId,
       coat_id: primarySubject.coatId || null,
       is_featured: isFeatured || false,

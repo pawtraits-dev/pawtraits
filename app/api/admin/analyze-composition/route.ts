@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ClaudeCompositionAnalyzer } from '@/lib/claude-composition-analyzer';
 import { createClient } from '@supabase/supabase-js';
+import { matchBreed } from '@/lib/catalog/breed-match';
+import { cleanTags } from '@/lib/collections/auto-tag';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,14 +51,14 @@ export async function POST(req: NextRequest) {
     const [themesData, stylesData, breedsData, coatsData] = await Promise.all([
       themeId ? supabase.from('themes').select('*').eq('id', themeId).single() : Promise.resolve({ data: null }),
       styleId ? supabase.from('styles').select('*').eq('id', styleId).single() : Promise.resolve({ data: null }),
-      supabase.from('breeds').select('id, name, display_name').eq('is_active', true),
-      supabase.from('coats').select('id, name, display_name, breed_id')
+      supabase.from('breeds').select('id, name, alternative_names, animal_type').eq('is_active', true),
+      supabase.from('breed_coats').select('breed_id, coats:coat_id (id, name)')
     ]);
 
     const theme = themesData?.data;
     const style = stylesData?.data;
     const breeds = breedsData?.data || [];
-    const coats = coatsData?.data || [];
+    const coats = (coatsData?.data || []).map((bc: any) => ({ id: bc.coats?.id, name: bc.coats?.name, breed_id: bc.breed_id })).filter((c: any) => c.id);
 
     console.log('✅ [Analyze API] Context loaded:', {
       theme: theme?.name,
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest) {
     const analysis = await analyzer.analyzeImageFromFile(file, {
       theme: theme?.display_name || theme?.name,
       style: style?.display_name || style?.name,
-      knownBreeds: breeds.map(b => b.display_name || b.name)
+      knownBreeds: breeds.map((b: any) => b.name)
     });
 
     console.log('✅ [Analyze API] Analysis complete');
@@ -80,21 +82,17 @@ export async function POST(req: NextRequest) {
     console.log('🔗 [Analyze API] Matching breeds/coats to database...');
     const enrichedSubjects = analysis.subjects.map(subject => {
       // Find matching breed
-      const matchedBreed = breeds.find(b => {
-        const breedName = (b.display_name || b.name).toLowerCase();
-        const identifiedName = subject.identifiedBreed.name.toLowerCase();
-        return breedName === identifiedName ||
-               breedName.includes(identifiedName) ||
-               identifiedName.includes(breedName);
-      });
+      // Best guess, pre-filled for the admin to check (any confidence)
+      const matchedBreed: any = matchBreed(subject.identifiedBreed?.name, breeds as any[], subject.species);
 
       // Find matching coat (if breed matched)
       let matchedCoat = null;
       if (matchedBreed) {
-        const breedCoats = coats.filter(c => c.breed_id === matchedBreed.id);
-        matchedCoat = breedCoats.find(c => {
-          const coatName = (c.display_name || c.name).toLowerCase();
-          const identifiedPattern = subject.identifiedCoat.pattern.toLowerCase();
+        const breedCoats = coats.filter((c: any) => c.breed_id === matchedBreed.id);
+        matchedCoat = breedCoats.find((c: any) => {
+          const coatName = String(c.name).toLowerCase();
+          const identifiedPattern = String(subject.identifiedCoat?.pattern || '').toLowerCase();
+          if (!identifiedPattern) return false;
           return coatName.includes(identifiedPattern) ||
                  identifiedPattern.includes(coatName);
         });
@@ -105,12 +103,12 @@ export async function POST(req: NextRequest) {
         isPrimary: subject.isPrimary,
         suggestedBreed: matchedBreed ? {
           id: matchedBreed.id,
-          name: matchedBreed.display_name || matchedBreed.name,
+          name: matchedBreed.name,
           confidence: subject.identifiedBreed.confidence / 10
         } : undefined,
         suggestedCoat: matchedCoat ? {
           id: matchedCoat.id,
-          name: matchedCoat.display_name || matchedCoat.name,
+          name: matchedCoat.name,
           confidence: subject.identifiedCoat.confidence / 10
         } : undefined,
         breedId: matchedBreed?.id,
@@ -139,6 +137,8 @@ export async function POST(req: NextRequest) {
       subjects: enrichedSubjects,
       compositionMetadata: analysis.compositionMetadata,
       variationPromptTemplate: analysis.variationPromptTemplate,
+      // Suggested tags (breed names and generic words left out); the admin can edit them before saving
+      tags: cleanTags(analysis.tags).filter(t => !breeds.some((b: any) => b.name.toLowerCase() === t)),
       confidence: analysis.confidence
     });
 

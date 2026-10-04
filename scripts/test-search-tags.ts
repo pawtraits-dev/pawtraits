@@ -1,6 +1,7 @@
 /** Unit checks for search queries and the auto-tagger's answer handling (npm run test:search) */
 import { buildSearchQuery, cleanTag } from '../lib/search/query';
 import { buildPrompt, cleanTags, parseTagReply } from '../lib/collections/auto-tag';
+import { matchBreed } from '../lib/catalog/breed-match';
 
 let pass = 0, fail = 0;
 const ok = (name: string, cond: boolean, extra?: unknown) => { if (cond) pass++; else { fail++; console.log('FAIL', name, extra ?? ''); } };
@@ -45,6 +46,20 @@ ok('prompt lists teams with colours', /sports\/nfl\/kansas-city-chiefs = Chiefs 
 ok('prompt lists pawsonalities', prompt.includes('pawsonalities/esfb (The Party Animal)'));
 ok('prompt has breed', prompt.includes('Breed: Pug'));
 ok('prompt not huge', prompt.length < 20000, prompt.length);
+
+// Upload: best-guess breed from the analysis
+const breeds = [
+  { id: 'cs', name: 'Cocker Spaniel', animal_type: 'dog' }, { id: 'ess', name: 'English Springer Spaniel', animal_type: 'dog' },
+  { id: 'fb', name: 'French Bulldog', alternative_names: ['Frenchie'], animal_type: 'dog' }, { id: 'bd', name: 'Bulldog', animal_type: 'dog' },
+  { id: 'gr', name: 'Golden Retriever', animal_type: 'dog' }, { id: 'lab', name: 'Labrador Retriever', alternative_names: ['Labrador', 'Lab'], animal_type: 'dog' },
+  { id: 'tp', name: 'Toy Poodle', animal_type: 'dog' }, { id: 'p', name: 'Poodle', animal_type: 'dog' }, { id: 'cp', name: 'Cockerpoo', alternative_names: ['Cockapoo'], animal_type: 'dog' },
+  { id: 'mc', name: 'Maine Coon', animal_type: 'cat' }, { id: 'bsh', name: 'British Shorthair', animal_type: 'cat' },
+];
+const bm = (g: string, exp: string | null, sp?: string) => ok(`breed "${g}"`, (matchBreed(g, breeds, sp)?.id ?? null) === exp, matchBreed(g, breeds, sp)?.id);
+bm('Cocker Spaniel', 'cs'); bm('English Cocker Spaniel', 'cs'); bm('Frenchie', 'fb'); bm('French Bulldog', 'fb'); bm('Bulldog', 'bd');
+bm('Golden Retriever mix', 'gr'); bm('Labrador', 'lab'); bm('Black Labrador Retriever', 'lab'); bm('Poodle', 'p'); bm('Standard Poodle', 'p');
+bm('Cockapoo', 'cp'); bm('Maine Coon cat', 'mc'); bm('British Shorthair', 'bsh'); bm('Unicorn', null); bm('', null);
+bm('Maine Coon', null, 'dog'); bm('Siamese', null, 'cat');
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

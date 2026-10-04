@@ -164,6 +164,11 @@ export function MultiSubjectEditor({
               AI Suggestion Available
             </Badge>
           )}
+          {subject.suggestedBreed && subject.breedId === subject.suggestedBreed.id && (
+            <Badge variant="outline" className={`ml-2 text-xs ${subject.suggestedBreed.confidence < 0.7 ? 'border-amber-300 bg-amber-50 text-amber-900' : ''}`}>
+              AI best guess · {Math.round(subject.suggestedBreed.confidence * 100)}%{subject.suggestedBreed.confidence < 0.7 ? ', please check' : ''}
+            </Badge>
+          )}
         </Label>
 
         {subject.suggestedBreed && !subject.breedId && (

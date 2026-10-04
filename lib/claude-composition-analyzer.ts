@@ -77,6 +77,7 @@ export interface CompositionAnalysisResponse {
   subjects: SubjectIdentification[]; // Array of identified subjects
   compositionMetadata: CompositionMetadata; // Structured data
   variationPromptTemplate: string; // Template for Gemini variations
+  tags?: string[]; // 5–10 descriptive tags shoppers might search (crown, tartan scarf, snow)
   confidence: {
     overall: number; // 0-1
     breedIdentification: number; // 0-1
@@ -299,6 +300,9 @@ Structure the template as:
 
 Be extremely specific so that generated variations maintain the exact composition.
 
+## PART 5: TAGS
+5 to 10 short lowercase tags a shopper might search for or click: clothing and accessories (crown, tartan scarf, bow tie), props, setting (snow, library, beach), activity, occasion if obvious (christmas, birthday), mood, main colours. 1 to 3 words each. Not the breed, not "dog", "cat", "pet", "portrait", "cute", art-style words, or anything about AI.
+
 ## RESPONSE FORMAT
 
 Respond with ONLY valid JSON in this exact structure:
@@ -353,6 +357,7 @@ Respond with ONLY valid JSON in this exact structure:
     }
   },
   "variation_prompt_template": "CRITICAL: COMPOSITION-PRESERVING variation...\\n\\nMUST PRESERVE EXACTLY:\\n- Solid beige background (#F5F5DC)\\n...",
+  "tags": ["bow tie", "studio", "beige", "smart", "sitting pretty"],
   "confidence": {
     "overall": 0.85,
     "breed_identification": 0.80,
@@ -439,6 +444,7 @@ CRITICAL REQUIREMENTS:
         })),
         compositionMetadata: parsed.composition_metadata,
         variationPromptTemplate: parsed.variation_prompt_template,
+        tags: Array.isArray(parsed.tags) ? parsed.tags.map((t: unknown) => String(t)) : [],
         confidence: parsed.confidence
       };
 

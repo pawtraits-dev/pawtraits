@@ -38,6 +38,7 @@ interface CompositionAnalysis {
   subjects: SubjectIdentification[];
   compositionMetadata: any;
   variationPromptTemplate: string;
+  tags?: string[]; // suggested from the image analysis
   confidence: {
     overall: number;
     breedIdentification: number;
@@ -349,15 +350,18 @@ export default function CatalogUploadPage() {
       setCompositionAnalysis(analysisData.compositionAnalysis);
       setIsMultiSubject(analysisData.subjects.length > 1);
 
-      // Set subjects with AI-matched breeds/coats already populated
-      // Auto-accept high-confidence matches (>70%)
+      // Suggested tags from the analysis (keeps any typed in already)
+      setTags(prev => Array.from(new Set([...prev, ...(analysisData.tags || [])])).slice(0, 10));
+
+      // Set subjects with AI-matched breeds/coats already populated: the best guess is always
+      // pre-filled (the subject card shows the confidence so it can be checked)
       const subjectsWithAutoAccept = analysisData.subjects.map(subject => {
         const updatedSubject = { ...subject };
 
-        // Auto-accept breed if high confidence and not already set
-        if (!updatedSubject.breedId && updatedSubject.suggestedBreed && updatedSubject.aiConfidence && updatedSubject.aiConfidence >= 0.7) {
+        // Pre-fill the best-guess breed if not already set
+        if (!updatedSubject.breedId && updatedSubject.suggestedBreed) {
           updatedSubject.breedId = updatedSubject.suggestedBreed.id;
-          console.log(`✅ Auto-accepted breed: ${updatedSubject.suggestedBreed.name} (${Math.round(updatedSubject.aiConfidence * 100)}% confidence)`);
+          console.log(`✅ Auto-accepted breed: ${updatedSubject.suggestedBreed.name} (${Math.round(updatedSubject.suggestedBreed.confidence * 100)}% confidence)`);
         }
 
         // Auto-accept coat if breed is set
@@ -409,8 +413,8 @@ export default function CatalogUploadPage() {
     }
 
     // Validate required fields
-    if (!selectedTheme || !selectedStyle || !selectedFormat) {
-      setError('Please select theme, style, and format');
+    if (!selectedFormat) {
+      setError('Please select a format');
       return;
     }
 
@@ -450,8 +454,8 @@ export default function CatalogUploadPage() {
       formData.append('compositionAnalysis', compositionAnalysis);
       formData.append('isMultiSubject', String(isMultiSubject));
       formData.append('subjects', JSON.stringify(subjects));
-      formData.append('themeId', selectedTheme);
-      formData.append('styleId', selectedStyle);
+      if (selectedTheme) formData.append('themeId', selectedTheme); // optional
+      if (selectedStyle) formData.append('styleId', selectedStyle); // optional
       formData.append('formatId', selectedFormat);
       formData.append('tags', JSON.stringify(tags));
       formData.append('isFeatured', String(isFeatured));
@@ -791,14 +795,14 @@ export default function CatalogUploadPage() {
               {/* Theme, Style, Format Selection */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="theme">Theme *</Label>
+                  <Label htmlFor="theme">Theme <span className="font-normal text-gray-500">(optional)</span></Label>
                   <select
                     id="theme"
                     value={selectedTheme}
                     onChange={(e) => setSelectedTheme(e.target.value)}
                     className="w-full px-3 py-2 border rounded-md"
                   >
-                    <option value="">Select theme...</option>
+                    <option value="">No theme</option>
                     {themes.map((theme) => (
                       <option key={theme.id} value={theme.id}>
                         {theme.display_name || theme.name}
@@ -808,14 +812,14 @@ export default function CatalogUploadPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="style">Style *</Label>
+                  <Label htmlFor="style">Style <span className="font-normal text-gray-500">(optional)</span></Label>
                   <select
                     id="style"
                     value={selectedStyle}
                     onChange={(e) => setSelectedStyle(e.target.value)}
                     className="w-full px-3 py-2 border rounded-md"
                   >
-                    <option value="">Select style...</option>
+                    <option value="">No style</option>
                     {styles.map((style) => (
                       <option key={style.id} value={style.id}>
                         {style.display_name || style.name}
@@ -856,7 +860,7 @@ export default function CatalogUploadPage() {
 
               {/* Tags */}
               <div className="space-y-2">
-                <Label htmlFor="tags">Tags (Optional)</Label>
+                <Label htmlFor="tags">Tags {analysis?.tags?.length ? <span className="font-normal text-gray-500">(suggested from the picture: remove or add any)</span> : <span className="font-normal text-gray-500">(optional)</span>}</Label>
                 <div className="flex gap-2">
                   <Input
                     id="tags"
