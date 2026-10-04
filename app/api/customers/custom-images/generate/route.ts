@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { joinPetNames } from '@/lib/text/pet-names';
+import { buildMultiSubjectReplacementPrompt, type SlotReplacement } from '@/lib/variation-prompt-builder';
+import { loadSlots, subjectsOf } from '@/lib/catalog/slots-server';
+import { slotNow } from '@/lib/catalog/slots';
 import { createClient } from '@supabase/supabase-js';
 import { v2 as cloudinary } from 'cloudinary';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
@@ -65,7 +68,8 @@ async function generateCustomImage(
   aspectRatio: string | undefined,
   customerPetBreedName?: string,
   aiAnalysisData?: any,
-  sizeInstruction?: string // NEW: Relative size instruction for multi-subject
+  sizeInstruction?: string, // NEW: Relative size instruction for multi-subject
+  slotPlan?: SlotReplacement[] // several pets: which photo replaces which pet (multi-pet plan phase 2)
 ): Promise<void> {
   console.log('🎨 Starting custom image generation for:', customImageId);
   console.log('📐 Target aspect ratio:', aspectRatio || 'default (1:1)');
@@ -112,7 +116,12 @@ async function generateCustomImage(
       console.log('✨ Using AI-detected characteristics:', petCharacteristics);
     }
 
-    const generationPrompt = promptBuilder.buildSubjectReplacementPrompt({
+    const generationPrompt = slotPlan && slotPlan.length > 1 && slotPlan.length === petImageUrls.length
+      ? buildMultiSubjectReplacementPrompt({
+        compositionTemplate: variationPromptTemplate, aspectRatio, sizeInstruction, slots: slotPlan,
+        metadata: { themeName, styleName, formatName: 'portrait' },
+      })
+      : promptBuilder.buildSubjectReplacementPrompt({
       compositionTemplate: variationPromptTemplate,
       aspectRatio: aspectRatio, // Pass aspect ratio as direct parameter
       sizeInstruction: sizeInstruction, // NEW: Relative size instruction for multi-subject
@@ -389,6 +398,7 @@ export async function POST(request: NextRequest) {
         format_id,
         prompt_text,
         generation_parameters,
+        subjects,
         breeds (id, name),
         themes (id, name),
         styles (id, name),
@@ -641,6 +651,21 @@ export async function POST(request: NextRequest) {
       .update({ status: 'generating' })
       .eq('id', customImage.id);
 
+    // Several pets: photo N replaces slot N (left to right), named in the prompt
+    let slotPlan: SlotReplacement[] | undefined;
+    if (petImageUrls.length > 1) {
+      const slots = await loadSlots(supabase, subjectsOf(catalogImage as any));
+      if (slots.length === petImageUrls.length) {
+        slotPlan = slots.map((slot, i) => ({
+          label: slot.label,
+          now: slotNow(slot),
+          newPet: petsData[i] ? { name: petsData[i].name, breed: petsData[i].breeds?.name, animalType: petsData[i].animal_type } : undefined,
+        }));
+      } else {
+        console.warn(`⚠️ ${petImageUrls.length} photos for ${slots.length} pets in the design; using the general prompt`);
+      }
+    }
+
     // Run generation after the response is sent; after() keeps the function alive until it finishes
     after(() =>
       generateCustomImage(
@@ -654,7 +679,8 @@ export async function POST(request: NextRequest) {
         catalogImage.formats?.aspect_ratio, // Pass aspect ratio from format
         firstPet?.breeds?.name,
         firstPet?.ai_analysis_data, // Pass AI analysis data from first pet
-        sizeInstruction // NEW: Pass relative size instruction for multi-subject
+        sizeInstruction, // NEW: Pass relative size instruction for multi-subject
+        slotPlan
       ).then(() => capturePreviews({ ids: [customImage.id] })) // social loop: only if "Include free previews" is on
       .catch(async (error) => {
         console.error('❌ Error in background generation:', error);

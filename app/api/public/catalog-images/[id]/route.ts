@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { CloudinaryImageService } from '@/lib/cloudinary';
+import { loadSlots, subjectsOf } from '@/lib/catalog/slots-server';
 
 // Use service role client to bypass RLS for public catalog data
 const supabaseServiceRole = createClient(
@@ -110,6 +111,8 @@ export async function GET(
       Array.isArray(catalogImage.subjects) ? catalogImage.subjects.length : 0,
       Array.isArray(catalogImage.generation_parameters?.subjects) ? catalogImage.generation_parameters.subjects.length : 0);
     const isMultiSubject = subjectCount > 1;
+    // Who goes where (multi-pet plan phase 2): one slot per pet, left to right, photo N → slot N
+    const slots = isMultiSubject ? await loadSlots(supabaseServiceRole, subjectsOf(catalogImage)) : [];
 
     // Format response
     const response = {
@@ -121,6 +124,7 @@ export async function GET(
       description: catalogImage.description,
       isMultiSubject,
       subjectCount,
+      slots: slots.map(s => ({ label: s.label, breedName: s.breedName, animalType: s.animalType, pose: s.pose })),
       breed: catalogImage.breed ? {
         id: catalogImage.breed.id,
         name: catalogImage.breed.name,

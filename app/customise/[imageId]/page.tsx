@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Camera, ImagePlus, Sparkles, ShoppingBag, Share2, RotateCcw, Check, X, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, Camera, ImagePlus, Sparkles, ShoppingBag, Share2, RotateCcw, Check, X, ChevronDown } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
@@ -49,6 +49,8 @@ interface CatalogImage {
   format?: { id: string; name: string; aspectRatio: string };
   isMultiSubject?: boolean;
   subjectCount?: number;
+  /** One per pet in the picture, left to right: photo N replaces slot N (multi-pet plan phase 2) */
+  slots?: { label: string; breedName: string | null; animalType: 'dog' | 'cat' | null; pose: string | null }[];
 }
 
 interface CustomImage {
@@ -110,7 +112,7 @@ export default function CustomisePage() {
   const chips = useDesignCollections(imageId);
 
   const [step, setStep] = useState<Step>('choose');
-  const [subjects, setSubjects] = useState<Array<{ pet: Pet | null; file: File | null; preview: string | null }>>([{ pet: null, file: null, preview: null }]);
+  const [subjects, setSubjects] = useState<Array<{ pet: Pet | null; file: File | null; preview: string | null; warning?: string | null }>>([{ pet: null, file: null, preview: null }]);
   const [preparing, setPreparing] = useState(false);
   const [customImage, setCustomImage] = useState<CustomImage | null>(null);
   const [progressIndex, setProgressIndex] = useState(0);
@@ -195,15 +197,34 @@ export default function CustomisePage() {
       return;
     }
     const preview = URL.createObjectURL(file);
-    setSubjects(prev => prev.map((s, i) => (i === idx ? { pet: null, file, preview } : s)));
+    setSubjects(prev => prev.map((s, i) => (i === idx ? { pet: null, file, preview, warning: null } : s)));
     if (trackItem) track.photoAdded(trackItem);
+    // Several pets: each photo should show one pet (advice only)
+    if (subjectCount > 1) {
+      const fd = new FormData();
+      fd.append('photo', file);
+      fetch('/api/public/photo-check', { method: 'POST', body: fd })
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          const n = d?.pets;
+          const warning = n === 0 ? 'We can’t see a pet in this photo. Try one where your pet is clearly in view.'
+            : typeof n === 'number' && n > 1 ? `This photo has ${n} pets. Use a photo of just one pet for each place.` : null;
+          if (warning) setSubjects(prev => prev.map((s, i) => (i === idx && s.file === file ? { ...s, warning } : s)));
+        })
+        .catch(() => {});
+    }
+  }
+
+  /** Swap the photos of two places ("Left" ⇄ "Right") */
+  function swapSubjects(a: number, b: number) {
+    setSubjects(prev => prev.map((s, i) => (i === a ? prev[b] : i === b ? prev[a] : s)));
   }
 
   function choosePet(pet: Pet, idx: number) {
-    setSubjects(prev => prev.map((s, i) => (i === idx ? { pet, file: null, preview: pet.primary_photo_url || null } : s)));
+    setSubjects(prev => prev.map((s, i) => (i === idx ? { pet, file: null, preview: pet.primary_photo_url || null, warning: null } : s)));
   }
   function clearSubject(idx: number) {
-    setSubjects(prev => prev.map((s, i) => (i === idx ? { pet: null, file: null, preview: null } : s)));
+    setSubjects(prev => prev.map((s, i) => (i === idx ? { pet: null, file: null, preview: null, warning: null } : s)));
   }
 
   const allReady = subjects.length > 0 && subjects.every(s => s.pet || s.file);
@@ -404,11 +425,20 @@ export default function CustomisePage() {
             )}
 
             <section className="mt-5 rounded-2xl border border-purple-200 bg-purple-50 p-4">
-              <h2 className="text-lg font-bold text-gray-900">Put your pet in this picture</h2>
-              <p className="mt-0.5 text-sm text-gray-600">Add a photo and Pawcasso paints your pet in, cat or dog, any breed. Then choose a size.</p>
+              {subjectCount > 1 ? (
+                <>
+                  <h2 className="text-lg font-bold text-gray-900">Put {subjectCount === 2 ? 'two' : subjectCount} pets in this picture</h2>
+                  <p className="mt-0.5 text-sm text-gray-600">Add a photo of each pet (yours, a friend’s, a family pet) and Pawcasso paints them in, cats or dogs, any breed. Then choose a size.</p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-lg font-bold text-gray-900">Put your pet in this picture</h2>
+                  <p className="mt-0.5 text-sm text-gray-600">Add a photo and Pawcasso paints your pet in, cat or dog, any breed. Then choose a size.</p>
+                </>
+              )}
               <button onClick={startCustomise}
                 className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-purple-600 text-lg font-semibold text-white shadow-sm active:scale-[0.99] transition">
-                <Camera className="h-5 w-5" /> Add my pet&apos;s photo
+                <Camera className="h-5 w-5" /> {subjectCount > 1 ? 'Add the pets’ photos' : <>Add my pet&apos;s photo</>}
               </button>
               <p className="mt-2 text-center text-xs text-gray-500">Free preview in about a minute · no sign-up</p>
             </section>
@@ -440,14 +470,27 @@ export default function CustomisePage() {
         {step === 'photo' && (
           <div ref={photoSectionRef} className="pt-4 scroll-mt-4">
             <h2 className="text-xl font-bold text-gray-900" style={lifeSavers}>
-              {subjectCount > 1 ? `Add ${subjectCount} pet photos` : 'Add a photo of your pet'}
+              {subjectCount > 1 ? `Add a photo for each of the ${subjectCount} pets` : 'Add a photo of your pet'}
             </h2>
-            <p className="mt-1 text-sm text-gray-600">Face on, good light, whole head in the picture. Pawcasso does the rest.</p>
+            <p className="mt-1 text-sm text-gray-600">
+              {subjectCount > 1
+                ? 'One pet per photo, face on, good light. They don’t all have to be yours: add a friend’s or family pet too.'
+                : 'Face on, good light, whole head in the picture. Pawcasso does the rest.'}
+            </p>
 
             <div className="mt-4 space-y-4">
               {subjects.map((s, idx) => (
                 <div key={idx}>
-                  {subjectCount > 1 && <p className="mb-2 text-sm font-medium text-gray-800">Pet {idx + 1}</p>}
+                  {subjectCount > 1 && (() => {
+                    const slot = catalogImage.slots?.[idx];
+                    const now = slot && (slot.breedName || slot.animalType) ? `currently ${/^[aeiou]/i.test(slot.pose || slot.breedName || slot.animalType || '') ? 'an' : 'a'} ${slot.pose ? `${slot.pose} ` : ''}${slot.breedName || slot.animalType}` : null;
+                    return (
+                      <p className="mb-2 text-sm text-gray-800">
+                        <span className="font-semibold">{slot?.label || `Pet ${idx + 1}`}</span>
+                        {now && <span className="text-gray-600"> · {now}</span>}
+                      </p>
+                    );
+                  })()}
                   {s.preview ? (
                     <div className="relative flex items-center gap-3 rounded-2xl border-2 border-purple-500 bg-purple-50 p-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -474,6 +517,8 @@ export default function CustomisePage() {
                     </div>
                   )}
 
+                  {s.warning && <p role="alert" className="mt-2 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">{s.warning}</p>}
+
                   {!s.preview && signedIn && pets.length > 0 && (
                     <div className="mt-3">
                       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Or pick one of your pets</p>
@@ -489,6 +534,12 @@ export default function CustomisePage() {
                         ))}
                       </div>
                     </div>
+                  )}
+
+                  {subjectCount > 1 && idx < subjects.length - 1 && (subjects[idx].preview || subjects[idx + 1].preview) && (
+                    <button onClick={() => swapSubjects(idx, idx + 1)} className="mx-auto mt-3 flex h-9 items-center gap-1.5 rounded-full border border-gray-300 px-4 text-sm font-medium text-gray-800 hover:border-purple-400">
+                      <ArrowLeftRight className="h-4 w-4" aria-hidden /> Swap {catalogImage.slots?.[idx]?.label?.toLowerCase() || `pet ${idx + 1}`} and {catalogImage.slots?.[idx + 1]?.label?.toLowerCase() || `pet ${idx + 2}`}
+                    </button>
                   )}
                 </div>
               ))}

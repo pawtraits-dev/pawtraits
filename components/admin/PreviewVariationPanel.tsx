@@ -6,12 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Upload, CheckCircle, AlertCircle, RefreshCw, Download } from 'lucide-react';
 import Image from 'next/image';
+import { buildSlots } from '@/lib/catalog/slots';
 
 interface SubjectData {
   subjectOrder: number;
   isPrimary: boolean;
   breedId?: string;
   suggestedBreed?: { name: string };
+  position?: string;
+  poseDescription?: string;
 }
 
 interface PreviewVariationPanelProps {
@@ -45,6 +48,8 @@ export function PreviewVariationPanel({
 }: PreviewVariationPanelProps) {
   const subjectCount = subjects.length;
   const isMultiSubject = subjectCount > 1;
+  // The same left-to-right labels customers see ("Left", "Right"), keyed by subject
+  const slotLabel = new Map(buildSlots(subjects).map(sl => [sl.subjectIndex, sl.label]));
 
   // Track uploaded pet images for each subject
   const [petImages, setPetImages] = useState<Array<{ file: File | null; base64: string | null }>>(() =>
@@ -234,9 +239,10 @@ export function PreviewVariationPanel({
       };
 
       if (isMultiSubject) {
-        // Multi-subject: send all pet images
-        requestBody.pet1ImageBase64 = petImages[0].base64;
-        requestBody.pet2ImageBase64 = petImages[1].base64;
+        // Multi-subject: every pet's photo, in subject order, with the subjects so the server can
+        // name each photo against its place in the picture (multi-pet plan phase 2)
+        requestBody.petImagesBase64 = petImages.map(p => p.base64);
+        requestBody.subjects = subjects.map(s => ({ subjectOrder: s.subjectOrder, isPrimary: s.isPrimary, breedId: s.breedId, position: s.position, poseDescription: s.poseDescription }));
         console.log('📤 [PREVIEW PANEL] Sending PAIR request...');
       } else {
         // Single subject: send one pet image
@@ -322,7 +328,7 @@ export function PreviewVariationPanel({
             {subjects.map((subject, index) => (
               <div key={subject.subjectOrder}>
                 <label className="text-sm font-medium block mb-2">
-                  {isMultiSubject ? `Subject ${subject.subjectOrder}` : 'Upload Test Pet Photo'}
+                  {isMultiSubject ? `${slotLabel.get(index) ?? `Subject ${subject.subjectOrder}`} pet` : 'Upload Test Pet Photo'}
                   {subject.suggestedBreed && (
                     <span className="text-gray-500 ml-2">({subject.suggestedBreed.name})</span>
                   )}
@@ -495,7 +501,7 @@ export function PreviewVariationPanel({
             </p>
             {isMultiSubject && (
               <p className="mt-2 text-orange-700">
-                ⚠️ For multi-subject images, upload one pet photo per subject in the order they appear in the reference image.
+                For multi-pet images, upload one photo per pet, each under the place it goes (left, right…). The test uses the same who-goes-where prompt as customers.
               </p>
             )}
           </div>

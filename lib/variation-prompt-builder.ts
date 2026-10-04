@@ -184,3 +184,80 @@ CRITICAL VERIFICATION:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━` : ''}`;
   }
 }
+
+/** One pet's place in a multi-pet design, and who replaces it (docs/specs/multi-pet-plan.md, phase 2) */
+export interface SlotReplacement {
+  label: string;               // "Left", "Right", "Front"…
+  now: string;                 // what's there in the reference: "a sitting Beagle"
+  newPet?: { name?: string | null; breed?: string | null; animalType?: string | null; coat?: string | null };
+}
+
+export interface MultiSubjectPromptOptions {
+  compositionTemplate?: string;
+  aspectRatio?: string;
+  sizeInstruction?: string;
+  slots: SlotReplacement[];    // in the same order as the pet photos sent after the reference image
+  metadata?: { themeName?: string; styleName?: string; formatName?: string };
+}
+
+/**
+ * Prompt for a design with several pets: names each pet photo against the pet it replaces
+ * ("IMAGE 2 replaces the LEFT pet, currently a sitting Beagle"), so pets aren't swapped, merged
+ * or dropped. Image 1 is always the reference portrait; images 2… are the pet photos in slot order.
+ */
+export function buildMultiSubjectReplacementPrompt(options: MultiSubjectPromptOptions): string {
+  const { compositionTemplate, aspectRatio, sizeInstruction, slots, metadata } = options;
+  const n = slots.length;
+  const preservation = compositionTemplate || `- The EXACT background, composition, framing and camera angle
+- The EXACT lighting, shadows and highlights
+- The EXACT props, outfits, objects and scenery
+- The EXACT colour palette, mood, artistic style, brushwork and texture
+- The EXACT position, pose and size of each pet in the frame`;
+  const orientation = (() => {
+    if (!aspectRatio) return '';
+    const [w, h] = aspectRatio.split(':').map(Number);
+    return w > h ? 'LANDSCAPE' : h > w ? 'PORTRAIT' : 'SQUARE';
+  })();
+
+  // "the LEFT pet" / "pet number 3 counting from the left"
+  const place = (label: string) => /^Pet \d+$/.test(label) ? `pet number ${label.slice(4)} (counting from the left)` : `${label.toUpperCase()} pet`;
+  const mapping = slots.map((s, i) => {
+    const kind = s.newPet ? [s.newPet.breed || s.newPet.animalType, s.newPet.coat && `(${s.newPet.coat})`].filter(Boolean).join(' ') : '';
+    const article = kind ? `${/^[aeiou]/i.test(kind) ? 'an' : 'a'} ${kind}` : '';
+    const who = s.newPet?.name ? [s.newPet.name, article].filter(Boolean).join(', ') : article;
+    return `- IMAGE ${i + 2} replaces the ${place(s.label)} in the reference (currently ${s.now})${who ? `: this is ${who}` : ''}.`;
+  }).join('\n');
+
+  return `CRITICAL INSTRUCTION: MODIFY THE REFERENCE IMAGE, DO NOT CREATE A NEW IMAGE
+${aspectRatio ? `
+🎯 MANDATORY OUTPUT FORMAT: ${aspectRatio} (${orientation}). Use the reference image's shape, never a pet photo's.
+` : ''}
+You are given ${n + 1} images:
+1. IMAGE 1 (REFERENCE): the portrait to keep. It contains ${n} pets.
+${slots.map((s, i) => `${i + 2}. IMAGE ${i + 2}: a photo of the new pet for the ${place(s.label)}. Use it ONLY for that pet's appearance.`).join('\n')}
+
+YOUR TASK: replace each of the ${n} pets in the reference with the pet from its own photo, and change nothing else.
+
+WHO GOES WHERE (follow exactly):
+${mapping}
+
+RULES FOR SEVERAL PETS:
+- The output MUST contain exactly ${n} pets: one for each photo. Never drop a pet, never add one, never merge two pets into one.
+- Each new pet takes the place, pose, size in frame, outfit and props of the pet it replaces. Do not swap their places.
+- Each new pet keeps ITS OWN appearance from ITS OWN photo: colouring, markings, face, ears, fur length and texture. Do not mix features between pets.
+- A cat may replace a dog or a dog a cat: adapt the pose naturally to the new species while keeping the same place and attitude.
+- Ignore everything in the pet photos except the pets themselves (backgrounds, people, other animals, framing, lighting).
+${sizeInstruction ? `\n${sizeInstruction}\n` : ''}
+PRESERVATION REQUIREMENTS (MUST REMAIN IDENTICAL):
+${preservation}
+
+STYLE:
+- Render every new pet in the reference's artistic medium and lighting (oil, watercolour, digital or photographic), not the photos' style.
+- Anthropomorphic outfits and accessories stay exactly as in the reference, fitted naturally to each new pet.
+
+FINAL CHECK:
+✓ Exactly ${n} pets, each matching its own photo, each in its own place (${slots.map(s => s.label).join(', ')})
+✓ Background, composition, outfits, props, lighting and style identical to the reference
+${aspectRatio ? `✓ Output aspect ratio is ${aspectRatio}\n` : ''}
+Reference metadata: theme ${metadata?.themeName || 'original'}, style ${metadata?.styleName || 'original'}, format ${metadata?.formatName || 'original'}.`;
+}

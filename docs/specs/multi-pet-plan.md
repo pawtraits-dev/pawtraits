@@ -96,6 +96,35 @@ A Christmas duo belongs in Christmas *and* should be easy to find by people with
   - 12 integration checks: trigger, design page count, search / Dogs-Cats / breed filters by the second pet, duo team version keeps both pets and its wording, delete cascade.
   - The earlier team-switcher (22) and tagging/search (25) checks still pass.
 
+## Phase 2 — built (2026-10-04)
+
+- **Slots** (`lib/catalog/slots.ts`): one per pet, ordered left to right from each pet's analysed position.
+  - Labels customers understand: "Left", "Right", "Middle", or "Front"/"Back" when stacked. Otherwise "Pet 1", "Pet 2".
+  - Each slot also describes what's there now ("a sitting Labrador Retriever").
+  - The design page, the painting prompt and the admin test all use the same order, so photo N always replaces slot N.
+- **Design page** for multi-pet designs:
+  - Copy reads "Put two pets in this picture" and "Add the pets' photos".
+  - The photo step says "Add a photo for each of the 2 pets. One pet per photo… They don't all have to be yours."
+  - One card per place ("Left · currently a sitting Labrador Retriever").
+  - "Swap left and right" exchanges two photos; any warning moves with its photo.
+  - `/api/public/catalog-images/[id]` now returns `slots`.
+- **Photo check** (`POST /api/public/photo-check`, Claude Haiku): when a photo is added to a multi-pet design, it counts the pets.
+  - Two or more pets in one photo: "This photo has 2 pets. Use a photo of just one pet for each place."
+  - No pet: a matching hint.
+  - Advice only, never blocks. Capped at 40 checks per visitor per hour.
+- **Painting prompt for several pets** (`buildMultiSubjectReplacementPrompt`):
+  - Names each photo against its place: "IMAGE 2 replaces the LEFT pet (currently a sitting Beagle): this is Biscuit, a Cockerpoo".
+  - Demands exactly N pets, never merged or swapped, each keeping its own markings, and cat ↔ dog allowed.
+  - Keeps the composition template and the size rule.
+  - Used by customer generation whenever there's more than one photo and the count matches the design's pets (otherwise it falls back to the general prompt and logs it).
+- **Admin test** (upload page → Test Variation):
+  - One photo per pet (2–5), labelled by place.
+  - Sent with the pets' positions, so the server uses the same slots and prompt as customers.
+  - `preview-pair-variation` is now admin-only.
+- **Tests:** `npm run test:multipet` (21: slots and labels, prompt wording, photo-check replies) and 11 browser checks (duo copy, slot labels in order, two-pets warning, swap and warning moving with the photo, photos sent left first). Real Gemini output still needs the test set below; it can't be run here.
+
+**Next before launch:** run the test set in admin (6 duo designs × 5 photo pairs: dog+dog, cat+cat, dog+cat, big+small, look-alikes) and note any design whose prompt template needs editing.
+
 ## Decisions (Steve, 2026-10-04)
 
 - Collection name: **Double Trouble** (children: Two dogs, Two cats, Dog & cat, Three or more).

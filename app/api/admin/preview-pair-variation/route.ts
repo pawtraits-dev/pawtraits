@@ -3,6 +3,10 @@ import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
 import { GEMINI_IMAGE_MODELS, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
+import { buildMultiSubjectReplacementPrompt } from '@/lib/variation-prompt-builder';
+import { loadSlots } from '@/lib/catalog/slots-server';
+import { slotNow } from '@/lib/catalog/slots';
+import { requireAdmin, serviceClient } from '@/lib/qr/server';
 
 // Nano Banana Pro at 2K can take 20–60 s per image
 export const maxDuration = 300;
@@ -22,12 +26,20 @@ export const dynamic = 'force-dynamic';
  * Handles 2+ subjects (pair portraits)
  */
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     console.log('🎨 [ADMIN PAIR PREVIEW API] Request received');
 
     // Parse request body
     const body = await request.json();
-    const { referenceImageBase64, pet1ImageBase64, pet2ImageBase64, compositionPromptTemplate, metadata } = body;
+    const { referenceImageBase64, compositionPromptTemplate, metadata } = body;
+    // One photo per pet, in the same order as `subjects` (2–5 pets); older callers send pet1/pet2
+    const petPhotos: string[] = Array.isArray(body.petImagesBase64) && body.petImagesBase64.length >= 2
+      ? body.petImagesBase64.slice(0, 5)
+      : [body.pet1ImageBase64, body.pet2ImageBase64].filter(Boolean);
+    const subjects: any[] = Array.isArray(body.subjects) ? body.subjects : [];
+    const pet1ImageBase64 = petPhotos[0], pet2ImageBase64 = petPhotos[1];
 
     console.log('📦 [ADMIN PAIR PREVIEW API] Request data:', {
       hasReferenceImage: !!referenceImageBase64,
@@ -50,25 +62,29 @@ export async function POST(request: NextRequest) {
     const referenceValid = referenceImageBase64.match(/^data:image\/(jpeg|jpg|png|webp);base64,/);
     const pet1Valid = pet1ImageBase64.match(/^data:image\/(jpeg|jpg|png|webp);base64,/);
     const pet2Valid = pet2ImageBase64.match(/^data:image\/(jpeg|jpg|png|webp);base64,/);
+    const allValid = petPhotos.every(p => typeof p === 'string' && /^data:image\/(jpeg|jpg|png|webp);base64,/.test(p));
 
-    if (!referenceValid || !pet1Valid || !pet2Valid) {
+    if (!referenceValid || !pet1Valid || !pet2Valid || !allValid) {
       return NextResponse.json(
         { error: 'Invalid image format. Only JPEG, PNG, and WEBP are supported.' },
         { status: 400 }
       );
     }
 
-    // 3. Build subject replacement prompt for pair using shared service
-    const customPrompt = promptBuilder.buildSubjectReplacementPrompt({
-      compositionTemplate: compositionPromptTemplate,
-      metadata
-    });
+    // 3. Who goes where: the same left-to-right slots customers see; photos reordered to match
+    const slots = subjects.length === petPhotos.length ? await loadSlots(serviceClient(), subjects) : [];
+    const orderedPhotos = slots.length ? slots.map(sl => petPhotos[sl.subjectIndex]) : petPhotos;
+    const customPrompt = slots.length
+      ? buildMultiSubjectReplacementPrompt({
+        compositionTemplate: compositionPromptTemplate, slots: slots.map(sl => ({ label: sl.label, now: slotNow(sl) })),
+        metadata: { themeName: metadata?.themeName, styleName: metadata?.styleName, formatName: metadata?.formatName },
+      })
+      : promptBuilder.buildSubjectReplacementPrompt({ compositionTemplate: compositionPromptTemplate, metadata });
     console.log('📝 [ADMIN PAIR PREVIEW API] Prompt length:', customPrompt.length, 'characters');
 
     // 4. Prepare image data for Gemini (remove data URL prefixes)
     const referenceImageData = referenceImageBase64.split(',')[1];
-    const pet1ImageData = pet1ImageBase64.split(',')[1];
-    const pet2ImageData = pet2ImageBase64.split(',')[1];
+    const petImageData = orderedPhotos.map(p => p.split(',')[1]);
 
     // 5. Call Gemini API for subject replacement with TWO pets
     console.log('🤖 [ADMIN PAIR PREVIEW API] Starting Gemini generation...');
@@ -87,18 +103,7 @@ export async function POST(request: NextRequest) {
               data: referenceImageData,
             },
           },
-          {
-            inlineData: {
-              mimeType: "image/png",
-              data: pet1ImageData,
-            },
-          },
-          {
-            inlineData: {
-              mimeType: "image/png",
-              data: pet2ImageData,
-            },
-          },
+          ...petImageData.map(data => ({ inlineData: { mimeType: 'image/png', data } })),
         ],
         config: geminiImageConfig(ratioOfImage(referenceImageData)), // Pro at 2K, same shape as the reference
       });
