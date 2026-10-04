@@ -81,6 +81,7 @@ export default function PawsonalityQuizPage() {
   const [attribution, setAttribution] = useState<{ partnerCode?: string; referralCode?: string }>({});
   const [entry, setEntry] = useState<{ source: string; petId: string | null; breedId: string | null }>({ source: 'direct', petId: null, breedId: null });
   const flingRef = useRef<SwipeCardHandle | null>(null);
+  const [lean, setLean] = useState(0); // card drag: <0 towards "not", >0 towards "totally" 
   const paintingFor = useRef<string | null>(null); // type code whose breed picture we've asked for
 
   // Attribution, preselected species, and a quiz in progress (refresh-safe)
@@ -259,6 +260,8 @@ export default function PawsonalityQuizPage() {
   // ---------- Cards ----------
   if (step === 'cards' && progress && quiz && current) {
     const { lead, rest } = split(current.statement, progress.petName);
+    const petLabel = progress.petName?.trim() || 'my pet';
+    const leaningNo = lean < -0.15;
     const pct = Math.round((index / total) * 100);
     return (
       <main className="flex min-h-[100dvh] flex-col bg-[#F6F2FC] text-gray-900">
@@ -278,21 +281,24 @@ export default function PawsonalityQuizPage() {
           )}
           <div className="absolute inset-x-6 inset-y-0">
             <SwipeCard key={current.id} lead={lead} statement={rest} imageUrl={current.imageUrl}
-              dimension={current.dimension} onAnswer={answer} flingRef={flingRef} />
+              dimension={current.dimension} onAnswer={answer} flingRef={flingRef} onLean={setLean} petLabel={petLabel} />
           </div>
           <p className="sr-only" aria-live="polite">{`Question ${index + 1} of ${total}: ${lead} ${rest}`}</p>
         </div>
 
         <div className="mx-auto w-full max-w-md px-5 pb-[max(18px,env(safe-area-inset-bottom))] pt-6">
           {error && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          {/* The button the card is leaning towards lights up (default: "Totally") */}
           <div className="grid grid-cols-2 gap-3">
             <button type="button" onClick={() => flingRef.current?.fling('left')}
-              className="flex h-14 items-center justify-center gap-2 rounded-2xl border-[1.5px] border-gray-300 bg-white text-base font-bold text-gray-900 active:scale-[0.98]">
-              <X className="h-5 w-5" aria-hidden="true" /> Not my pet
+              style={{ transform: lean < 0 ? `scale(${1 + 0.05 * -lean})` : undefined }}
+              className={`flex h-14 min-w-0 items-center justify-center gap-1.5 rounded-2xl px-2 text-[15px] font-bold transition-colors duration-150 active:scale-[0.98] ${leaningNo ? 'bg-purple-700 text-white' : 'border-[1.5px] border-gray-300 bg-white text-gray-900'}`}>
+              <X className="h-5 w-5 shrink-0" aria-hidden="true" /> <span className="truncate">Not {petLabel}</span>
             </button>
             <button type="button" onClick={() => flingRef.current?.fling('right')}
-              className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-purple-700 text-base font-bold text-white active:scale-[0.98]">
-              <Check className="h-5 w-5" aria-hidden="true" /> Totally my pet
+              style={{ transform: lean > 0 ? `scale(${1 + 0.05 * lean})` : undefined }}
+              className={`flex h-14 min-w-0 items-center justify-center gap-1.5 rounded-2xl px-2 text-[15px] font-bold transition-colors duration-150 active:scale-[0.98] ${leaningNo ? 'border-[1.5px] border-gray-300 bg-white text-gray-900' : 'bg-purple-700 text-white'}`}>
+              <Check className="h-5 w-5 shrink-0" aria-hidden="true" /> <span className="truncate">Totally {petLabel}</span>
             </button>
           </div>
           <div className="mt-2 flex items-center justify-between">

@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * One quiz statement as a swipeable card. Drag right = "Totally my pet!", left = "Not my pet!".
+ * One quiz statement as a swipeable card. Drag right = "Totally Daisy!", left = "Not Daisy"
+ * ("my pet" when no name was given).
  * The parent also offers buttons and arrow keys, so swiping is never required.
  * Pointer events (mouse, touch, pen); the card flies off, then onAnswer fires.
  */
@@ -17,7 +18,7 @@ const DIM_ICON: Record<Dimension, typeof Zap> = { EI: Zap, SN: Users, TF: Gradua
 export interface SwipeCardHandle { fling: (swipe: Swipe) => void }
 
 export default function SwipeCard({
-  lead, statement, imageUrl, dimension, onAnswer, flingRef, disabled,
+  lead, statement, imageUrl, dimension, onAnswer, flingRef, disabled, onLean, petLabel = 'my pet',
 }: {
   /** e.g. "BISCUIT ALWAYS…" */
   lead: string;
@@ -29,6 +30,10 @@ export default function SwipeCard({
   /** Lets the parent's buttons and keys trigger the same fly-off animation */
   flingRef?: React.MutableRefObject<SwipeCardHandle | null>;
   disabled?: boolean;
+  /** How far the card leans while dragged or flying: -1 (fully "no") … 0 … 1 (fully "yes") */
+  onLean?: (lean: number) => void;
+  /** The pet's name for the stamps ("TOTALLY DAISY!"), else "my pet" */
+  petLabel?: string;
 }) {
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -73,6 +78,8 @@ export default function SwipeCard({
   const yes = Math.min(1, Math.max(0, x / THRESHOLD));
   const no = Math.min(1, Math.max(0, -x / THRESHOLD));
   const Icon = DIM_ICON[dimension];
+  const lean = Math.max(-1, Math.min(1, x / THRESHOLD));
+  useEffect(() => { onLean?.(lean); }, [lean]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
@@ -97,10 +104,10 @@ export default function SwipeCard({
               </span>
             </div>
           )}
-          <span className="absolute left-4 top-4 rounded-lg border-[2.5px] border-green-700 bg-white px-3 py-1 text-sm font-extrabold tracking-wide text-green-700"
-            style={{ opacity: yes, transform: 'rotate(-8deg)' }} aria-hidden="true">TOTALLY MY PET!</span>
-          <span className="absolute right-4 top-4 rounded-lg border-[2.5px] border-gray-700 bg-white px-3 py-1 text-sm font-extrabold tracking-wide text-gray-700"
-            style={{ opacity: no, transform: 'rotate(8deg)' }} aria-hidden="true">NOT MY PET</span>
+          <span className="absolute left-4 top-4 max-w-[75%] truncate rounded-lg border-[2.5px] border-green-700 bg-white px-3 py-1 text-sm font-extrabold tracking-wide text-green-700"
+            style={{ opacity: yes, transform: 'rotate(-8deg)' }} aria-hidden="true">TOTALLY {petLabel.toUpperCase()}!</span>
+          <span className="absolute right-4 top-4 max-w-[75%] truncate rounded-lg border-[2.5px] border-gray-700 bg-white px-3 py-1 text-sm font-extrabold tracking-wide text-gray-700"
+            style={{ opacity: no, transform: 'rotate(8deg)' }} aria-hidden="true">NOT {petLabel.toUpperCase()}</span>
         </div>
         <div className="flex flex-1 flex-col justify-center gap-1.5 px-5 py-4">
           <p className="text-sm font-bold uppercase tracking-wide text-purple-700">{lead}</p>
