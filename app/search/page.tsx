@@ -12,7 +12,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, X } from 'lucide-react';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
-import DesignGrid, { GridSkeleton } from '@/components/collections/DesignGrid';
+import DesignGrid, { GridSkeleton, PetCountFilter } from '@/components/collections/DesignGrid';
 import { track } from '@/lib/tracking/events';
 
 const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' };
@@ -35,6 +35,7 @@ function SearchContent() {
   const q = sp.get('q') ?? '';
   const tag = sp.get('tag');
   const animal = sp.get('animal');
+  const pets = sp.get('pets') === '1' ? 1 : sp.get('pets') === '2' ? 2 : null;
   const [text, setText] = useState(q);
   const [result, setResult] = useState<Result | null>(null);
   const [extra, setExtra] = useState<any[]>([]);
@@ -65,12 +66,13 @@ function SearchContent() {
     if (q) qs.set('q', q);
     if (tag) qs.set('tag', tag);
     if (animal) qs.set('animal', animal);
+    if (pets) qs.set('pets', String(pets));
     fetch(`/api/public/search?${qs}`).then(r => (r.ok ? r.json() : Promise.reject()))
       .then(d => { if (!cancelled) { setResult(d); if (q || tag) track.search(tag || q, d.total, tag ? 'tag' : 'query'); } })
       .catch(() => !cancelled && setError(true))
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };
-  }, [q, tag, animal]);
+  }, [q, tag, animal, pets]);
 
   const more = async () => {
     if (!result) return;
@@ -78,20 +80,22 @@ function SearchContent() {
     if (q) qs.set('q', q);
     if (tag) qs.set('tag', tag);
     if (animal) qs.set('animal', animal);
+    if (pets) qs.set('pets', String(pets));
     qs.set('page', String(Math.floor((result.designs.length + extra.length) / result.pageSize)));
     const r = await fetch(`/api/public/search?${qs}`);
     if (r.ok) { const d = await r.json(); setExtra(e => [...e, ...d.designs]); }
   };
 
-  const setAnimal = (a: string | null) => {
+  const setFilters = (a: string | null, n: 1 | 2 | null) => {
     const qs = new URLSearchParams();
     if (q) qs.set('q', q);
     if (tag) qs.set('tag', tag);
     if (a) qs.set('animal', a);
+    if (n) qs.set('pets', String(n));
     router.replace(`/search?${qs}`, { scroll: false });
   };
 
-  const designs = [...(result?.designs ?? []), ...extra].map(d => ({ id: d.id, description: d.description, publicUrl: d.public_url, breed: d.breeds ? { name: d.breeds.name } : null }));
+  const designs = [...(result?.designs ?? []), ...extra].map(d => ({ id: d.id, description: d.description, publicUrl: d.public_url, breed: d.breeds ? { name: d.breeds.name } : null, pets: d.subject_count ?? 1 }));
   const heading = tag ? `Designs with ${tag}` : q ? `Results for “${q}”` : 'Search designs';
 
   return (
@@ -132,11 +136,14 @@ function SearchContent() {
         )}
 
         {(q || tag) && (
-          <div className="mt-5 flex items-center gap-1.5" role="group" aria-label="Show">
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5" role="group" aria-label="Show">
             {([[null, 'All'], ['dog', 'Dogs'], ['cat', 'Cats']] as [string | null, string][]).map(([a, label]) => (
-              <button key={label} onClick={() => setAnimal(a)} aria-pressed={(animal ?? null) === a}
+              <button key={label} onClick={() => setFilters(a, pets)} aria-pressed={(animal ?? null) === a}
                 className={`h-9 rounded-full px-4 text-sm font-semibold ${(animal ?? null) === a ? 'bg-gray-900 text-white' : 'border border-gray-300 bg-white text-gray-800 hover:border-gray-500'}`}>{label}</button>
             ))}
+          </div>
+          <PetCountFilter value={pets} onChange={n => setFilters(animal, n)} />
           </div>
         )}
 

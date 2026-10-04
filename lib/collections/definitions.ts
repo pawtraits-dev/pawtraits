@@ -4,7 +4,7 @@
  */
 import { LEAGUES, SPORTS_TEAMS, teamOutfit, type League } from './sports-teams';
 
-export type CollectionKind = 'occasion' | 'sport' | 'pawsonality' | 'zodiac';
+export type CollectionKind = 'occasion' | 'sport' | 'pawsonality' | 'zodiac' | 'group';
 export interface SeasonWindow { start: string; end: string } // 'MM-DD', inclusive; may wrap the year end
 export interface CollectionDef {
   kind: CollectionKind;
@@ -22,6 +22,7 @@ export interface CollectionDef {
 export const TOP_LEVEL: CollectionDef[] = [
   { kind: 'occasion', path: 'occasions', slug: 'occasions', name: 'Occasions', description: 'Christmas, birthdays, Halloween and every excuse for a party.' },
   { kind: 'sport', path: 'sports', slug: 'sports', name: 'Sports', description: 'Your pet in your team’s colours: Premier League, NFL, NBA, NHL and college.' },
+  { kind: 'group', path: 'double-trouble', slug: 'double-trouble', name: 'Double Trouble', description: 'Two pets (or more) in one masterpiece. Add a photo of each: they don’t all have to be yours.', searchTerms: ['duo', 'duos', 'pair', 'pairs', 'two pets', 'double', 'together', 'besties', 'siblings', 'family'] },
   { kind: 'pawsonality', path: 'pawsonalities', slug: 'pawsonalities', name: '16 Pawsonalities', description: 'The Pawtrait for every type. Not sure which yours is? Take the quiz.' },
   { kind: 'zodiac', path: 'zodiac', slug: 'zodiac', name: 'Zodiac signs', description: 'Twelve signs, twelve masterpieces. Find your pet’s sign from their birthday.' },
 ];
@@ -64,10 +65,19 @@ const LEAGUE_TERMS: Record<League, string[]> = {
   college: ['college', 'university', 'ncaa', 'varsity'],
 };
 
+/** Double Trouble: designs with more than one pet are filed here automatically by pet count and species */
+export const DOUBLE_TROUBLE: Omit<CollectionDef, 'kind' | 'path'>[] = [
+  { slug: 'two-dogs', name: 'Two dogs', searchTerms: ['two dogs', 'dog duo', 'puppies'], metadata: { pets: 'dog+dog' } },
+  { slug: 'two-cats', name: 'Two cats', searchTerms: ['two cats', 'cat duo', 'kittens'], metadata: { pets: 'cat+cat' } },
+  { slug: 'dog-and-cat', name: 'Dog & cat', searchTerms: ['dog and cat', 'cat and dog'], metadata: { pets: 'dog+cat' } },
+  { slug: 'three-or-more', name: 'Three or more', searchTerms: ['three pets', 'pack', 'gang', 'family'], metadata: { pets: '3+' } },
+];
+
 /** Every collection, parents before children (pawsonality types are passed in from the quiz content) */
 export function allCollections(pawsonalityTypes: { code: string; dogName: string; catName: string }[]): CollectionDef[] {
   const out: CollectionDef[] = [...TOP_LEVEL];
   for (const o of OCCASIONS) out.push({ kind: 'occasion', path: `occasions/${o.slug}`, ...o });
+  for (const d of DOUBLE_TROUBLE) out.push({ kind: 'group', path: `double-trouble/${d.slug}`, ...d });
   LEAGUE_ORDER.forEach(lg => {
     out.push({ kind: 'sport', path: `sports/${lg}`, slug: lg, name: LEAGUES[lg].name, searchTerms: LEAGUE_TERMS[lg], metadata: { league: lg, sport: LEAGUES[lg].sport } });
     for (const t of SPORTS_TEAMS.filter(x => x.league === lg)) {

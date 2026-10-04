@@ -4,7 +4,7 @@
  */
 import { inSeason, suggestCollectionForTheme, type SeasonWindow } from './definitions';
 
-export const KINDS = ['occasion', 'sport', 'pawsonality', 'zodiac'] as const;
+export const KINDS = ['occasion', 'sport', 'pawsonality', 'zodiac', 'group'] as const;
 
 export function slugify(s: string): string {
   return s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/['’]/g, '')

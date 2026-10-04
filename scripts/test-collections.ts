@@ -37,7 +37,7 @@ ok('every day of a leap year has a sign', allDays);
 const types = Array.from({ length: 16 }, (_, i) => ({ code: `T${String(i).padStart(3, '0')}`, dogName: `Dog ${i}`, catName: `Cat ${i}` }));
 const all = allCollections(types);
 const paths = new Set(all.map(c => c.path));
-ok('183 collections', all.length === 4 + 11 + 5 + SPORTS_TEAMS.length + 16 + 12);
+ok('188 collections', all.length === 5 + 11 + 4 + 5 + SPORTS_TEAMS.length + 16 + 12);
 ok('paths unique', paths.size === all.length);
 ok('parents before children', all.every((c, i) => !c.path.includes('/') || all.slice(0, i).some(p => p.path === c.path.slice(0, c.path.lastIndexOf('/')))));
 ok('slugs valid', all.every(c => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(c.slug)));

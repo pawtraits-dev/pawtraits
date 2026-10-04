@@ -125,6 +125,26 @@ A Christmas duo belongs in Christmas *and* should be easy to find by people with
 
 **Next before launch:** run the test set in admin (6 duo designs × 5 photo pairs: dog+dog, cat+cat, dog+cat, big+small, look-alikes) and note any design whose prompt template needs editing.
 
+## Phase 3 — built (2026-10-04)
+
+- **Migration** `db/migrations/2026-10-13-double-trouble.sql` (after 2026-10-12; safe to re-run):
+  - New collection kind `group` and link source `pets`.
+  - Adds **Double Trouble** (top level, between Sports and 16 Pawsonalities) with Two dogs, Two cats, Dog & cat and Three or more.
+  - `file_design_by_pets()` plus triggers on `image_catalog` and `image_catalog_subjects` file every design with 2+ pets into the right group from its pet count and species. Unknown species go to Double Trouble itself.
+  - Designs are refiled when their pets change, never for customers' own images. "Take out" in admin sticks.
+  - Existing designs are filed straight away.
+  - `search_designs()` and `collection_designs()` take `p_pets` (1 = one pet, 2 = two or more).
+- `lib/collections/definitions.ts` knows the new collections, and the regenerated `2026-10-07-collections-seed.sql` includes them. There's no need to re-run the seed; the migration adds them.
+- **Pet-count filter** ("Any number · 1 pet · 2+ pets"):
+  - On collection pages, shown only when the collection has duos and isn't Double Trouble itself. The choice is kept when changing animal or breed.
+  - On the search page.
+  - API: `?pets=1|2` on `/api/public/collection` and `/api/public/search`.
+- **"2 pets" / "3 pets" badges** on design cards: collection and search grids, home page designs, /browse and More like this.
+- **Admin → Collections:** Double Trouble has no "Add" button and shows a note that it fills itself.
+- **Tests:**
+  - test:collections 56 (188 collections).
+  - 16 checks (8 API, 8 browser): filing by species and count, refile when a pet's breed changes, admin exclusion sticks, customer images never filed, filters, badges, Double Trouble page, /collections section, the design-page chip.
+
 ## Decisions (Steve, 2026-10-04)
 
 - Collection name: **Double Trouble** (children: Two dogs, Two cats, Dog & cat, Three or more).

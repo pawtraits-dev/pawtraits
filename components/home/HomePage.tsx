@@ -41,6 +41,7 @@ interface HomeImage {
   breed_name?: string;
   theme_name?: string;
   is_featured?: boolean;
+  subject_count?: number;
   like_count?: number;
   view_count?: number;
   created_at: string;
@@ -238,6 +239,9 @@ function HomePageContent({ hero }: { hero: FeedItem | null }) {
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
                     {price?.digitalOnly && (
                       <span className="absolute left-2 top-2 rounded-md bg-white/95 px-2 py-0.5 text-[11px] font-semibold text-gray-900">Digital only</span>
+                    )}
+                    {(img.subject_count ?? 1) > 1 && (
+                      <span className="absolute right-2 top-2 rounded-md bg-white/95 px-2 py-0.5 text-[11px] font-semibold text-purple-800 shadow-sm">{img.subject_count} pets</span>
                     )}
                   </div>
                   <p className="mt-2 text-sm font-semibold leading-snug line-clamp-2">{title}</p>

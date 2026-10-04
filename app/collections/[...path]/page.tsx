@@ -14,7 +14,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRight, Sparkles } from 'lucide-react';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
-import DesignGrid, { GridSkeleton, type GridDesign } from '@/components/collections/DesignGrid';
+import DesignGrid, { GridSkeleton, PetCountFilter, type GridDesign } from '@/components/collections/DesignGrid';
 import { CollectionCircles } from '@/components/collections/CollectionCard';
 import ZodiacFinder from '@/components/collections/ZodiacFinder';
 
@@ -29,7 +29,8 @@ interface Node {
 interface PageData {
   collection: Node; breadcrumb: { name: string; path: string }[]; children: Node[]; siblings: Node[];
   breeds: { name: string; slug: string; animalType: 'dog' | 'cat'; designs: number }[];
-  filter: { animal: 'dog' | 'cat' | null; breed: { name: string; slug: string } | null };
+  filter: { animal: 'dog' | 'cat' | null; breed: { name: string; slug: string } | null; pets: 1 | 2 | null };
+  multiPetDesigns: number;
   designs: GridDesign[]; total: number; page: number; pageSize: number;
 }
 
@@ -44,6 +45,7 @@ function CollectionPageContent() {
   const router = useRouter();
   const animal = sp.get('animal');
   const breed = sp.get('breed');
+  const pets = sp.get('pets');
   const [data, setData] = useState<PageData | null>(null);
   const [more, setMore] = useState<GridDesign[]>([]);
   const [page, setPage] = useState(0);
@@ -54,9 +56,10 @@ function CollectionPageContent() {
     const qs = new URLSearchParams({ path });
     if (animal) qs.set('animal', animal);
     if (breed) qs.set('breed', breed);
+    if (pets) qs.set('pets', pets);
     if (p) qs.set('page', String(p));
     return `/api/public/collection?${qs}`;
-  }, [path, animal, breed]);
+  }, [path, animal, breed, pets]);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,10 +81,12 @@ function CollectionPageContent() {
     } finally { setLoadingMore(false); }
   };
 
-  const setFilter = (next: { animal?: string | null; breed?: string | null }) => {
+  const setFilter = (next: { animal?: string | null; breed?: string | null; pets?: number | null }) => {
     const qs = new URLSearchParams();
     if (next.animal) qs.set('animal', next.animal);
     if (next.breed) qs.set('breed', next.breed);
+    const p = 'pets' in next ? next.pets : data?.filter.pets;  // keep the pet-count choice unless changed
+    if (p) qs.set('pets', String(p));
     router.replace(`/collections/${path}${qs.toString() ? `?${qs}` : ''}`, { scroll: false });
   };
 
@@ -157,9 +162,12 @@ function CollectionPageContent() {
           </section>
         )}
 
-        {/* Narrow by animal or breed */}
-        {data && data.breeds.length > 0 && (
+        {/* Narrow by animal, breed or number of pets */}
+        {data && (data.breeds.length > 0 || data.multiPetDesigns > 0) && (
           <div className="mt-6 flex flex-wrap items-center gap-2">
+            {data.multiPetDesigns > 0 && c?.kind !== 'group' && (
+              <PetCountFilter value={data.filter.pets} onChange={v => setFilter({ animal: data.filter.animal, breed: data.filter.breed?.slug, pets: v })} />
+            )}
             {animals.size > 1 && (
               <div className="flex gap-1.5" role="group" aria-label="Show">
                 {([[null, 'All'], ['dog', 'Dogs'], ['cat', 'Cats']] as [string | null, string][]).map(([a, label]) => {

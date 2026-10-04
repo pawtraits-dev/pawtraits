@@ -157,7 +157,8 @@ function Row({ c, all, open, toggle, editing, setEditing, reload }: {
           {children.length > 0 && (
             <ul>{children.map(ch => <Row key={ch.id} c={ch} all={all} open={open} toggle={toggle} editing={editing} setEditing={setEditing} reload={reload} />)}</ul>
           )}
-          {c.depth < 2 && c.kind !== 'zodiac' && c.kind !== 'pawsonality' && <AddChild parent={c} onAdded={reload} />}
+          {c.depth < 2 && c.kind !== 'zodiac' && c.kind !== 'pawsonality' && c.kind !== 'group' && <AddChild parent={c} onAdded={reload} />}
+          {c.kind === 'group' && c.depth === 0 && <p className="mt-1 text-xs text-gray-600">Filled automatically: every design with more than one pet goes in the right group by number of pets and species.</p>}
         </div>
       )}
     </li>

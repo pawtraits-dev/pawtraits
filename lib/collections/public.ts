@@ -57,7 +57,7 @@ export function cleanPath(raw: string | null | undefined): string | null {
   return /^[a-z0-9]+(-[a-z0-9]+)*(\/[a-z0-9]+(-[a-z0-9]+)*){0,2}$/.test(p) ? p : null;
 }
 
-export async function loadCollectionPage(supabase: any, path: string, opts: { animal?: string | null; breedSlug?: string | null; page?: number; pageSize?: number } = {}) {
+export async function loadCollectionPage(supabase: any, path: string, opts: { animal?: string | null; breedSlug?: string | null; pets?: number | null; page?: number; pageSize?: number } = {}) {
   const tree = await loadPublicTree(supabase);
   const node = tree.find(c => c.path === path);
   if (!node) return null;
@@ -67,14 +67,19 @@ export async function loadCollectionPage(supabase: any, path: string, opts: { an
   const { data: breeds } = await supabase.rpc('collection_breeds', { p_path: path });
   const breed = opts.breedSlug ? (breeds ?? []).find((b: any) => b.slug === opts.breedSlug) ?? null : null;
   const animal = opts.animal === 'dog' || opts.animal === 'cat' ? opts.animal : null;
-  const { data: hits, error } = await supabase.rpc('collection_designs', {
-    p_path: path, p_animal: breed ? null : animal, p_breed_id: breed?.breed_id ?? null, p_limit: pageSize, p_offset: page * pageSize,
-  });
+  const pets = opts.pets === 1 || opts.pets === 2 ? opts.pets : null;
+  const [{ data: hits, error }, { data: multi }] = await Promise.all([
+    supabase.rpc('collection_designs', {
+      p_path: path, p_animal: breed ? null : animal, p_breed_id: breed?.breed_id ?? null, p_limit: pageSize, p_offset: page * pageSize, p_pets: pets,
+    }),
+    // Is there anything with 2+ pets here? (shows the 1 pet / 2+ pets filter)
+    supabase.rpc('collection_designs', { p_path: path, p_limit: 1, p_offset: 0, p_pets: 2 }),
+  ]);
   if (error) throw error;
   const ids = (hits ?? []).map((h: any) => h.id);
   const { data: rows } = ids.length
     ? await supabase.from('image_catalog')
-      .select('id, description, public_url, format_id, breeds!breed_id (name, slug, animal_type)')
+      .select('id, description, public_url, format_id, subject_count, breeds!breed_id (name, slug, animal_type)')
       .in('id', ids)
     : { data: [] };
   const byId = new Map((rows ?? []).map((r: any) => [r.id, r]));
@@ -95,9 +100,10 @@ export async function loadCollectionPage(supabase: any, path: string, opts: { an
     children,
     siblings: siblings.slice(0, 12),
     breeds: (breeds ?? []).map((b: any) => ({ name: b.name, slug: b.slug, animalType: b.animal_type, designs: b.designs })),
-    filter: { animal: breed ? breed.animal_type : animal, breed: breed ? { name: breed.name, slug: breed.slug } : null },
+    filter: { animal: breed ? breed.animal_type : animal, breed: breed ? { name: breed.name, slug: breed.slug } : null, pets },
+    multiPetDesigns: Number(multi?.[0]?.total ?? 0),
     designs: ids.map((id: string) => byId.get(id)).filter(Boolean).map((r: any) => ({
-      id: r.id, description: r.description, publicUrl: r.public_url, formatId: r.format_id,
+      id: r.id, description: r.description, publicUrl: r.public_url, formatId: r.format_id, pets: r.subject_count ?? 1,
       breed: r.breeds ? { name: r.breeds.name, slug: r.breeds.slug, animalType: r.breeds.animal_type } : null,
     })),
     total: Number(hits?.[0]?.total ?? 0), page, pageSize,

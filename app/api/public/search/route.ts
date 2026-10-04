@@ -1,5 +1,5 @@
 /**
- * GET /api/public/search?q=&tag=&animal=dog|cat&breed=<slug>&page=
+ * GET /api/public/search?q=&tag=&animal=dog|cat&breed=<slug>&pets=1|2&page=
  * One search box for the whole shop. Returns matching breeds and collections (to jump to)
  * and designs ranked by how well they match (collections, team nicknames and breed count most,
  * then tags, then descriptions), with synonyms ("xmas" finds Christmas). `tag` is the
@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
   const tag = cleanTag(sp.get('tag'));
   const animal = sp.get('animal') === 'dog' || sp.get('animal') === 'cat' ? sp.get('animal') : null;
   const page = Math.min(50, Math.max(0, Number(sp.get('page')) || 0));
+  const pets = sp.get('pets') === '1' ? 1 : sp.get('pets') === '2' ? 2 : null;  // one pet / two or more
   const { tsquery, words } = buildSearchQuery(q, { prefix: sp.get('typing') === '1' });
   if (!tsquery && !tag) return NextResponse.json({ query: q, tag, breeds: [], collections: [], designs: [], total: 0, page });
 
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
     }
     const like = words.length ? words.join(' ') : null;
     const [{ data: hits, error }, breeds, collections] = await Promise.all([
-      supabase.rpc('search_designs', { p_query: tsquery, p_animal: animal, p_breed_id: breedId, p_tag: tag, p_limit: PAGE, p_offset: page * PAGE }),
+      supabase.rpc('search_designs', { p_query: tsquery, p_animal: animal, p_breed_id: breedId, p_tag: tag, p_limit: PAGE, p_offset: page * PAGE, p_pets: pets }),
       like && page === 0
         ? supabase.from('breeds').select('id, name, slug, animal_type').eq('is_active', true)
           .or(words.map(w => `name.ilike.%${w}%`).join(',')).order('popularity_rank', { ascending: true, nullsFirst: false }).limit(6)
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
     const ids = (hits ?? []).map((h: any) => h.id);
     const { data: rows } = ids.length
       ? await supabase.from('image_catalog')
-        .select('id, description, public_url, cloudinary_public_id, image_variants, display_tags, like_count, share_count, breed_id, theme_id, format_id, created_at, breeds!breed_id (id, name, slug, animal_type), formats!format_id (id, name)')
+        .select('id, description, public_url, cloudinary_public_id, image_variants, display_tags, like_count, share_count, breed_id, theme_id, format_id, subject_count, created_at, breeds!breed_id (id, name, slug, animal_type), formats!format_id (id, name)')
         .in('id', ids)
       : { data: [] };
     const byId = new Map((rows ?? []).map((r: any) => [r.id, r]));
