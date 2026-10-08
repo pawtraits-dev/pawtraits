@@ -703,9 +703,9 @@ export default function AdminCatalogPage() {
                 </div>
 
                 {/* Full-resolution original, for checking detail */}
-                {(image.public_url || (image as any).cloudinary_secure_url) && (
+                {fullSizeUrl(image) && (
                   <a
-                    href={(image as any).cloudinary_secure_url || image.public_url}
+                    href={fullSizeUrl(image)!}
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
@@ -837,6 +837,11 @@ export default function AdminCatalogPage() {
       </div>
     </div>
   );
+}
+
+/** The full-resolution original: image_variants.original (public_url is the mid-size card image) */
+function fullSizeUrl(image: any): string | null {
+  return image?.image_variants?.original?.url || image?.cloudinary_secure_url || image?.public_url || null;
 }
 
 // Image Detail Modal Component

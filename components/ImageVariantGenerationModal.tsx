@@ -763,7 +763,8 @@ export default function ImageVariantGenerationModal({
     setIsSavingToCategory(true);
     setSaveResults([]);
 
-    try {
+    // Old path, only for previews that never reached Cloudinary: upload from the browser
+    const saveViaBrowser = async (variations: any[]): Promise<any[]> => {
       // First, convert base64 data to File objects for Cloudinary upload
       const filesToUpload = await Promise.all(variations.map(async variation => {
         if (variation.imageData) {
@@ -857,18 +858,37 @@ export default function ImageVariantGenerationModal({
         }
       }
 
+      return results;
+    };
+
+    try {
+      // Normal path: the server moves each preview into the catalogue on Cloudinary (no
+      // download or re-upload) and creates the catalogue entry
+      const onCloudinary = variations.filter((v) => v.preview_public_id);
+      const inBrowser = variations.filter((v) => !v.preview_public_id && v.imageData);
+      const results: any[] = [];
+      if (onCloudinary.length) {
+        const res = await fetch('/api/admin/variations/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ variations: onCloudinary.map(({ imageData, aiDescription, ...v }) => v) }),
+        });
+        const saved = await res.json().catch(() => null);
+        if (!res.ok || !Array.isArray(saved)) throw new Error(saved?.error || res.statusText);
+        results.push(...saved);
+      }
+      if (inBrowser.length) results.push(...await saveViaBrowser(inBrowser));
       setSaveResults(results);
       
       // Close modal after successful save (after a brief delay to show results)
       const successfulSaves = results.filter(r => r.success).length;
       if (successfulSaves > 0) {
+        // Show the results for 2 s, then close and refresh the catalogue. (Refreshing straight
+        // away re-rendered the page behind and closed the window before the results showed.)
         setTimeout(() => {
           onClose();
-        }, 2000); // 2 second delay to show success message
-      }
-      
-      if (onVariationsGenerated) {
-        onVariationsGenerated();
+          onVariationsGenerated?.();
+        }, 2000);
       }
       
     } catch (error) {

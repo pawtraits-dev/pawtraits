@@ -28,8 +28,9 @@ export async function uploadVariationPreview(buffer: Buffer, filename: string): 
     cloudinary.uploader
       .upload_stream(
         {
-          folder: PREVIEW_FOLDER,
-          public_id: filename.replace(/\.[^.]+$/, ''),
+          // Full path in the public id (not `folder`), so the id is the same in fixed- and
+          // dynamic-folder Cloudinary accounts and promoteVariationPreview can rely on it
+          public_id: `${PREVIEW_FOLDER}/${filename.replace(/\.[^.]+$/, '')}`,
           resource_type: 'image',
           type: 'upload',
           tags: [PREVIEW_TAG],
@@ -71,4 +72,28 @@ export async function loadCatalogImageBase64(image: { cloudinary_public_id?: str
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Could not load the design image (${res.status})`);
   return Buffer.from(await res.arrayBuffer()).toString('base64');
+}
+
+const CATALOGUE_FOLDER = 'pawtraits/variations';
+
+/**
+ * Move a saved preview into the catalogue folder on Cloudinary (a rename: no download, no
+ * re-upload) and drop its preview tag, so preview clean-up never touches it.
+ */
+export async function promoteVariationPreview(previewPublicId: string, filename: string): Promise<{ public_id: string; secure_url: string; width: number; height: number; bytes: number; format: string }> {
+  if (!previewPublicId.startsWith(`${PREVIEW_FOLDER}/`)) throw new Error('Not a variation preview');
+  configure();
+  const stem = filename.replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').slice(0, 80) || 'variation';
+  let target = `${CATALOGUE_FOLDER}/${stem}`;
+  let res: any;
+  try {
+    res = await cloudinary.uploader.rename(previewPublicId, target, { overwrite: false, invalidate: true });
+  } catch (e: any) {
+    // Name taken (e.g. saved twice): add a short suffix and try once more
+    if (!/already exists/i.test(e?.message || e?.error?.message || '')) throw e;
+    target = `${target}-${Math.random().toString(36).slice(2, 7)}`;
+    res = await cloudinary.uploader.rename(previewPublicId, target, { overwrite: false, invalidate: true });
+  }
+  await cloudinary.uploader.remove_tag(PREVIEW_TAG, [res.public_id]).catch(() => undefined);
+  return { public_id: res.public_id, secure_url: res.secure_url, width: res.width, height: res.height, bytes: res.bytes, format: res.format };
 }

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { serviceClient } from '@/lib/qr/server';
 import { autoTagNew } from '@/lib/collections/auto-tag';
 import { SupabaseService } from '@/lib/supabase';
-import { cloudinaryService } from '@/lib/cloudinary';
-import type { ImageCatalogCreate } from '@/lib/types';
+import { registerCloudinaryImage } from '@/lib/catalog/register-image';
 
 const supabaseService = new SupabaseService();
 
@@ -154,149 +153,16 @@ export async function POST(request: NextRequest) {
       console.warn(`   Maximum recommended: ${printQuality.maxSizeRecommendation}`);
     }
 
-    // Generate image variant URLs using Cloudinary service
-    let imageVariants;
-    try {
-      imageVariants = {
-        // Original image at full resolution (300 DPI for print)
-        original: {
-          url: cloudinary_secure_url, // Use the direct secure URL for original
-          access_type: 'print_fulfillment_only',
-          dpi: 300,
-          overlay: 'none',
-          description: 'For printing'
-        },
-        // Public variants with different sizes
-        full_size: {
-          url: cloudinaryService.getPublicVariantUrl(cloudinary_public_id, 'full_size'),
-          access_type: 'public',
-          overlay: 'watermark_center',
-          description: 'Detail page / modal'
-        },
-        thumbnail: {
-          url: cloudinaryService.getPublicVariantUrl(cloudinary_public_id, 'thumbnail'),
-          access_type: 'public',
-          size: 'small',
-          overlay: 'none',
-          description: 'In rows or carts'
-        },
-        mid_size: {
-          url: cloudinaryService.getPublicVariantUrl(cloudinary_public_id, 'mid_size'),
-          access_type: 'public',
-          size: 'medium',
-          overlay: 'none',
-          description: 'Shop / catalog cards'
-        }
-      };
-      
-      console.log(`✅ Generated ${Object.keys(imageVariants).length} image variants for print fulfillment`);
-      
-    } catch (variantError) {
-      console.error('❌ Failed to generate image variants:', variantError);
-      // Fallback variants using direct URLs
-      imageVariants = {
-        original: { url: cloudinary_secure_url, access_type: 'print_fulfillment_only' },
-        public: { url: cloudinary_secure_url, access_type: 'public' }
-      };
-    }
-
-    // Create image catalog entry
-    const imageData: ImageCatalogCreate = {
-      filename: `${cloudinary_public_id}.${original_filename.split('.').pop()}`,
-      original_filename,
-      file_size,
-      mime_type,
-      storage_path: `cloudinary:${cloudinary_public_id}`,
-      public_url: imageVariants.mid_size?.url || cloudinary_secure_url,
-      prompt_text,
-      description: description || '',
-      tags: Array.isArray(tags) ? tags : [],
-      breed_id: breed_id || undefined,
-      theme_id: theme_id || undefined,
-      style_id: style_id || undefined,
-      format_id: format_id || undefined,
-      coat_id: coat_id || undefined,
-      rating: rating || undefined,
-      is_featured: is_featured || false,
-      is_public: is_public !== false, // Default to true
-      cloudinary_public_id,
-      image_variants: imageVariants
-    };
-
-    console.log('📝 Attempting to save image data:', {
-      filename: imageData.filename,
-      cloudinary_public_id: imageData.cloudinary_public_id,
-      hasRequiredFields: !!(imageData.filename && imageData.storage_path && imageData.public_url && imageData.prompt_text),
-      foreign_keys: {
-        breed_id: breed_id,
-        theme_id: theme_id,
-        style_id: style_id,
-        format_id: format_id,
-        coat_id: coat_id
-      }
+    // Variant URLs, id checks and the image_catalog insert (shared with variation saves)
+    const savedImage = await registerCloudinaryImage(supabaseService.getClient(), {
+      cloudinary_public_id, cloudinary_secure_url, original_filename, file_size, mime_type,
+      prompt_text, description, tags, breed_id, theme_id, style_id, format_id, coat_id,
+      rating, is_featured, is_public,
     });
-
-    // Validate foreign key references exist before inserting
-    if (breed_id) {
-      const { data: breedExists } = await supabaseService.getClient()
-        .from('breeds')
-        .select('id')
-        .eq('id', breed_id)
-        .single();
-      if (!breedExists) {
-        throw new Error(`Breed ID ${breed_id} not found in database`);
-      }
-    }
-
-    if (coat_id) {
-      const { data: coatExists } = await supabaseService.getClient()
-        .from('coats')
-        .select('id')
-        .eq('id', coat_id)
-        .single();
-      if (!coatExists) {
-        throw new Error(`Coat ID ${coat_id} not found in database`);
-      }
-    }
-
-    if (theme_id) {
-      const { data: themeExists } = await supabaseService.getClient()
-        .from('themes')
-        .select('id')
-        .eq('id', theme_id)
-        .single();
-      if (!themeExists) {
-        throw new Error(`Theme ID ${theme_id} not found in database`);
-      }
-    }
-
-    if (style_id) {
-      const { data: styleExists } = await supabaseService.getClient()
-        .from('styles')
-        .select('id')
-        .eq('id', style_id)
-        .single();
-      if (!styleExists) {
-        throw new Error(`Style ID ${style_id} not found in database`);
-      }
-    }
-
-    if (format_id) {
-      const { data: formatExists } = await supabaseService.getClient()
-        .from('formats')
-        .select('id')
-        .eq('id', format_id)
-        .single();
-      if (!formatExists) {
-        throw new Error(`Format ID ${format_id} not found in database`);
-      }
-    }
-    
-    const savedImage = await supabaseService.createImage(imageData);
     
     console.log(`✅ Image catalog entry created: ID ${savedImage.id}`);
     after(() => autoTagNew(serviceClient(), savedImage.id));
-    console.log(`   Print-ready URL: ${imageVariants.original?.url || 'N/A'}`);
+    console.log(`   Print-ready URL: ${cloudinary_secure_url}`);
 
     return NextResponse.json({
       ...savedImage,
