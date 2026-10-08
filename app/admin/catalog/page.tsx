@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Filter, Star, Eye, Download, Tag, Calendar, User, Trash2, X, EyeOff, Wand2, Copy, Wrench, Upload } from 'lucide-react';
+import { Search, Filter, Star, Eye, Download, Tag, Calendar, User, Trash2, X, EyeOff, Wand2, Copy, Wrench, Upload, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
@@ -701,6 +701,21 @@ export default function AdminCatalogPage() {
                     </Badge>
                   )}
                 </div>
+
+                {/* Full-resolution original, for checking detail */}
+                {(image.public_url || (image as any).cloudinary_secure_url) && (
+                  <a
+                    href={(image as any).cloudinary_secure_url || image.public_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 text-xs text-purple-700 hover:underline"
+                    title="Open the full-resolution original in a new tab"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Full size{(image as any).width ? ` · ${(image as any).width}×${(image as any).height}` : ''}
+                  </a>
+                )}
 
                 {/* Generate Variants Button - only show for images with prompts */}
                 {image.prompt_text && (

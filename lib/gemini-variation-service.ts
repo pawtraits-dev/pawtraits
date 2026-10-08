@@ -33,6 +33,8 @@ export class GeminiVariationService {
   private ai: GoogleGenAI;
   /** What these calls are for, in AI cost tracking (callers set it) */
   usage: UsageContext = { feature: 'admin-variation' };
+  /** Output size ('1K' | '2K' | '4K'); undefined = GEMINI_IMAGE_SIZES.preview (2K) */
+  imageSize?: string;
 
   constructor(apiKey?: string) {
     const key = apiKey || process.env.GEMINI_API_KEY;
@@ -71,7 +73,7 @@ export class GeminiVariationService {
         ];
 
         const response = await generateWithUsage(this.ai, this.usage, {
-          config: geminiImageConfig((this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
+          config: geminiImageConfig((this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData), this.imageSize), // reference shape (1:1, 2:3, 3:2, 2:1); 2K unless imageSize is set
           model: GEMINI_IMAGE_MODELS.pro,
           contents: prompt,
         });
@@ -131,7 +133,7 @@ export class GeminiVariationService {
         ];
 
         const response = await generateWithUsage(this.ai, this.usage, {
-          config: geminiImageConfig((originalFormat?.aspect_ratio || this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
+          config: geminiImageConfig((originalFormat?.aspect_ratio || this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData), this.imageSize), // reference shape (1:1, 2:3, 3:2, 2:1); 2K unless imageSize is set
           model: GEMINI_IMAGE_MODELS.pro,
           contents: prompt,
         });
@@ -197,7 +199,7 @@ export class GeminiVariationService {
         ];
 
         const response = await generateWithUsage(this.ai, this.usage, {
-          config: geminiImageConfig((originalFormat?.aspect_ratio || this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
+          config: geminiImageConfig((originalFormat?.aspect_ratio || this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData), this.imageSize), // reference shape (1:1, 2:3, 3:2, 2:1); 2K unless imageSize is set
           model: GEMINI_IMAGE_MODELS.pro,
           contents: prompt,
         });
@@ -268,7 +270,7 @@ export class GeminiVariationService {
         ];
 
         const response = await generateWithUsage(this.ai, this.usage, {
-          config: geminiImageConfig((format.aspect_ratio) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
+          config: geminiImageConfig((format.aspect_ratio) || ratioOfImage(originalImageData), this.imageSize), // reference shape (1:1, 2:3, 3:2, 2:1); 2K unless imageSize is set
           model: GEMINI_IMAGE_MODELS.pro,
           contents: prompt,
         });
@@ -357,7 +359,7 @@ export class GeminiVariationService {
 
       const geminiCallStart = Date.now();
       const response = await generateWithUsage(this.ai, this.usage, {
-        config: geminiImageConfig((format?.aspect_ratio) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
+        config: geminiImageConfig((format?.aspect_ratio) || ratioOfImage(originalImageData), this.imageSize), // reference shape (1:1, 2:3, 3:2, 2:1); 2K unless imageSize is set
         model: GEMINI_IMAGE_MODELS.pro,
         contents: prompt,
       });
@@ -702,7 +704,7 @@ Ensure the ${primaryAnimal.coat.coat_name} coloring is consistent across ALL bod
       
       const geminiCallStart = Date.now();
       const response = await generateWithUsage(this.ai, this.usage, {
-        config: geminiImageConfig((originalFormat?.aspect_ratio || this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
+        config: geminiImageConfig((originalFormat?.aspect_ratio || this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData), this.imageSize), // reference shape (1:1, 2:3, 3:2, 2:1); 2K unless imageSize is set
         model: GEMINI_IMAGE_MODELS.pro,
         contents: prompt,
       });

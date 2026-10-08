@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { requireAdmin } from '@/lib/qr/server';
+import { GEMINI_IMAGE_SIZES } from '@/lib/gemini-models';
 import { loadCatalogImageBase64, uploadVariationPreview } from '@/lib/catalog/variation-previews';
 
 // Nano Banana Pro at 2K can take 20–60 s per image
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     });
 
     const body = await request.json();
-    const { originalImageId, originalPrompt, currentBreed, currentCoat, currentTheme, currentStyle, currentFormat, targetAge, variationConfig, includeImageData } = body;
+    const { originalImageId, originalPrompt, currentBreed, currentCoat, currentTheme, currentStyle, currentFormat, targetAge, variationConfig, includeImageData, imageSize } = body;
     let { originalImageData } = body;
 
     // Preferred: send the design's id and the server loads the image (keeps the request small)
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
     
     const geminiService = new GeminiVariationService();
     geminiService.usage = { feature: 'admin-variation', imageId: originalImageId || null };
+    if (['1K', '2K', '4K'].includes(imageSize)) geminiService.imageSize = imageSize;
     const results = [];
 
     // Load data for variations directly from database
@@ -406,7 +408,8 @@ export async function POST(request: NextRequest) {
       outfit_name: results.find(r => r.metadata.outfit?.id === variation.metadata.outfit_id)?.metadata.outfit?.name,
       format_name: results.find(r => r.metadata.format?.id === variation.metadata.format_id)?.metadata.format?.name,
       theme_id: currentTheme,
-      style_id: currentStyle
+      style_id: currentStyle,
+      image_size: geminiService.imageSize || GEMINI_IMAGE_SIZES.preview
     }));
 
     console.log(`\n🎉 VARIATION GENERATION COMPLETE`);

@@ -1,6 +1,6 @@
 # Batch variations and AI cost tracking: findings and plan
 
-Status: steps 1–2 (cost tracking + Admin → AI costs) built 2026-10-08; steps 3–5 not started.
+Status: steps 1–3 built 2026-10-08 (cost tracking, Admin → AI costs, one-request-per-variation with 2K/4K choice); steps 4–5 not started.
 
 ## 1. Why batch variations have never worked reliably
 
@@ -152,6 +152,25 @@ Customers can't wait hours, so they stay interactive. Tracking (A) will show the
   - `npm run test:ai-usage` (13): price maths, Gemini/Claude token extraction.
   - 6 integration checks: rows written with the right cost, failures logged and rethrown, logging failure doesn't break the call, summary totals.
   - Page checks: admin only, totals match the database, 30 bars, Today, no sideways scroll on a phone.
+
+## Step 3: built (2026-10-08)
+
+- **Variations window** (catalogue card → Generate Variants; also opened from the details window):
+  - It sends **one request per variation, two at a time**. Results appear as they finish, each with its AI description.
+  - A progress bar shows "n of N done" with a **Stop** button. Failures are listed with their reason, and **Try failed again** reruns only those.
+  - Saving is disabled until generation finishes.
+- **Image size picker:** 2K (about $0.05) or **4K (about $0.11, the default)**.
+  - It's sent as `imageSize` to `generate-variations`, which sets `GeminiVariationService.imageSize`.
+  - Each preview shows its size and pixel dimensions, plus a "Full size" link.
+  - Other callers stay at `GEMINI_IMAGE_SIZES.preview` (2K).
+- **Catalogue cards** have a **Full size** link to the original upload (new tab).
+- The old "Background Batch Mode" switch is gone. It started jobs that Vercel froze. The old batch-jobs route remains until step 4 replaces it.
+- **Tests:** 12 browser checks with Gemini faked:
+  - one request per variation, at 4K, with the design id;
+  - never more than 2 at once;
+  - failure reason shown and retry adds only the missing one;
+  - previews, sizes and descriptions shown;
+  - the Full size link on the card.
 
 ## Sources
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,7 +22,16 @@ interface ImageVariantGenerationModalProps {
   onVariationsGenerated?: () => void;
 }
 
+interface GenItem { key: string; label: string; config: { breedCoats?: { breedId: string; coatId: string }[]; outfits?: string[]; formats?: string[] } }
+interface GenProgress { total: number; done: number; running: boolean; stopped: boolean; failed: { item: GenItem; error: string }[] }
+
+/** Per-image price on Nano Banana 2.1 (lib/ai/prices.ts), for the size picker */
+const SIZE_PRICE: Record<string, string> = { '2K': '$0.05', '4K': '$0.11' };
+
 interface VariationPreviewStepProps {
+  progress?: GenProgress | null;
+  onStop?: () => void;
+  onRetryFailed?: () => void;
   image: ImageCatalogWithDetails;
   variations: any[];
   onGenerateAIDescriptions: (selectedIds: string[]) => void;
@@ -37,6 +46,9 @@ interface VariationPreviewStepProps {
 }
 
 function VariationPreviewStep({
+  progress,
+  onStop,
+  onRetryFailed,
   image,
   variations,
   onGenerateAIDescriptions,
@@ -124,6 +136,35 @@ function VariationPreviewStep({
         </Button>
       </div>
 
+      {progress && (progress.running || progress.failed.length > 0) && (
+        <div className="rounded-lg border bg-gray-50 p-3 space-y-2" aria-live="polite">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="font-medium text-gray-800">
+              {progress.running
+                ? `Generating… ${progress.done} of ${progress.total} done${progress.stopped ? ' (stopping after the ones in progress)' : ''}`
+                : `Finished: ${progress.done - progress.failed.length} of ${progress.total} made`}
+              {progress.failed.length > 0 && <span className="text-red-700"> · {progress.failed.length} failed</span>}
+            </span>
+            {progress.running && !progress.stopped && onStop && (
+              <Button variant="outline" size="sm" onClick={onStop}>Stop</Button>
+            )}
+            {!progress.running && progress.failed.length > 0 && onRetryFailed && (
+              <Button variant="outline" size="sm" onClick={onRetryFailed}>
+                <RefreshCw className="w-3 h-3 mr-1" /> Try failed again
+              </Button>
+            )}
+          </div>
+          <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.done}>
+            <div className="h-full bg-purple-600 transition-all" style={{ width: `${(progress.done / Math.max(progress.total, 1)) * 100}%` }} />
+          </div>
+          {progress.failed.length > 0 && (
+            <ul className="text-xs text-red-700 space-y-0.5">
+              {progress.failed.map((f) => <li key={f.item.key}>{f.item.label}: {f.error}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
         {console.log('🎨 Rendering variations in preview:', variations) || 
          console.log('🔢 Variations count:', variations?.length) || 
@@ -144,7 +185,11 @@ function VariationPreviewStep({
                   />
                 </div>
                 <div className="space-y-2">
-                  <p className="font-medium text-sm">{variation.variation_type}</p>
+                  <p className="font-medium text-sm">
+                    {variation.variation_type}
+                    {variation.image_size && <span className="ml-2 text-xs font-normal text-gray-500">{variation.image_size}{variation.width ? ` · ${variation.width}×${variation.height}` : ''}</span>}
+                    {variation.preview_url && <a href={variation.preview_url} target="_blank" rel="noreferrer" className="ml-2 text-xs font-normal text-purple-700 underline">Full size</a>}
+                  </p>
                   <div className="text-xs text-gray-600 space-y-1">
                     {variation.breed_name && <p>Breed: {variation.breed_name}</p>}
                     {variation.coat_name && <p>Coat: {variation.coat_name}</p>}
@@ -204,7 +249,7 @@ function VariationPreviewStep({
             size="sm"
             onClick={toggleSelectAll}
           >
-            {selectedVariations.length === variations.length ? 'Deselect All' : 'Select All'}
+            {selectedVariations.length === variations.length && variations.length > 0 ? 'Deselect All' : 'Select All'}
           </Button>
           <span className="text-sm text-gray-600">
             {selectedVariations.length} of {variations.length} selected
@@ -232,13 +277,13 @@ function VariationPreviewStep({
           <Button
             variant="outline"
             onClick={() => onApproveSelected(selectedVariations)}
-            disabled={selectedVariations.length === 0 || isSaving}
+            disabled={selectedVariations.length === 0 || isSaving || !!progress?.running}
           >
             Save Selected ({selectedVariations.length})
           </Button>
           <Button
             onClick={onApproveAll}
-            disabled={isSaving}
+            disabled={isSaving || variations.length === 0 || !!progress?.running}
             className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
           >
             {isSaving ? (
@@ -283,7 +328,11 @@ export default function ImageVariantGenerationModal({
   const [formatSearch, setFormatSearch] = useState('');
   const [selectedAnimalType, setSelectedAnimalType] = useState<AnimalType | ''>('');
   const [selectedAge, setSelectedAge] = useState<'same' | 'adult' | 'young'>('same');
-  const [useBatchMode, setUseBatchMode] = useState(false);
+  // Output size; 4K on Nano Banana 2.1 costs about what 2K did on Pro
+  const [imageSize, setImageSize] = useState<'2K' | '4K'>('4K');
+  // One request per variation, two at a time (each well inside Vercel's 5-minute limit)
+  const [progress, setProgress] = useState<GenProgress | null>(null);
+  const stopRef = useRef(false);
   
   const [isGenerating, setIsGenerating] = useState(false);
   
@@ -529,112 +578,86 @@ export default function ImageVariantGenerationModal({
     setSelectedBreedCoats(allBreedCoats);
   };
 
-  const handleGenerateVariations = async () => {
-    if (!image?.prompt_text || !image?.id) return;
-    
-    setIsGenerating(true);
-    setGeneratedVariations([]);
-    setShowPreview(false);
-    
+  /** One item per variation, labelled for progress and errors */
+  const buildItems = (): GenItem[] => {
+    const items: GenItem[] = [];
+    for (const pair of getSelectedBreedCoatPairs()) {
+      const breed = breeds.find((b) => b.id === pair.breedId);
+      const coat = (breedCoatsData[pair.breedId] || []).find((c: any) => c.id === pair.coatId);
+      items.push({ key: `bc-${pair.breedId}-${pair.coatId}`, label: `${breed?.name ?? 'Breed'}${coat ? ` · ${coat.coat_name}` : ''}`, config: { breedCoats: [pair] } });
+    }
+    for (const id of selectedOutfits) items.push({ key: `o-${id}`, label: outfits.find((o) => o.id === id)?.name ?? 'Outfit', config: { outfits: [id] } });
+    for (const id of selectedFormats) items.push({ key: `f-${id}`, label: formats.find((f) => f.id === id)?.name ?? 'Format', config: { formats: [id] } });
+    return items;
+  };
+
+  /** Description for one new variation (best effort) */
+  const describe = async (variation: any) => {
     try {
-      // The server loads the design image itself from its id (a 2K original as base64
-      // could exceed the 4.5 MB request limit)
-      
-      const variationConfigToSend = {
-        breedCoats: getSelectedBreedCoatPairs().map(pair => ({
-          breedId: pair.breedId,
-          coatId: pair.coatId
-        })),
-        outfits: selectedOutfits,
-        formats: selectedFormats
-      };
-      
-      console.log('🚀 Sending variationConfig:', variationConfigToSend);
-      console.log('🎯 Breed-coat pairs:', getSelectedBreedCoatPairs());
-      console.log('📊 Selected breed coats state:', selectedBreedCoats);
-      console.log('🗂️ Breed coats data cache:', breedCoatsData);
-      console.log('⚡ Batch mode enabled:', useBatchMode);
-      
-      const apiEndpoint = useBatchMode ? '/api/admin/batch-jobs' : '/api/admin/generate-variations';
-      const response = await fetch(apiEndpoint, {
+      const imageData = variation.imageData || await urlToBase64(variation.preview_thumb_url || variation.preview_url);
+      const res = await fetch('/api/generate-description/base64', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(useBatchMode ? {
-          originalImageId: image.id,
-          originalPrompt: image.prompt_text,
-          currentBreed: image.breed_id || '',
-          currentCoat: image.coat_id || '',
-          currentTheme: image.theme_id || '',
-          currentStyle: image.style_id || '',
-          currentFormat: image.format_id || '',
-          targetAge: selectedAge,
-          variationConfig: variationConfigToSend
-        } : {
-          originalImageId: image.id,
-          originalPrompt: image.prompt_text,
-          currentBreed: image.breed_id || '',
-          currentCoat: image.coat_id || '',
-          currentTheme: image.theme_id || '',
-          currentStyle: image.style_id || '',
-          currentFormat: image.format_id || '',
-          targetAge: selectedAge,
-          variationConfig: variationConfigToSend
-        })
+        body: JSON.stringify({ imageData, breedName: variation.breed_name || image?.breed_name || '' }),
       });
-      
-      if (!response.ok) {
-        if (response.status === 413) {
-          throw new Error('Image too large for processing. Please use a smaller image.');
-        }
-        const errorData = await response.json().catch(() => ({ error: response.statusText }));
-        throw new Error(`Variation generation failed: ${errorData.error || response.statusText}`);
-      }
-      
-      const results = await response.json();
-      
-      if (useBatchMode) {
-        // Handle batch job response
-        console.log('✅ Batch job created:', results);
-        alert(`Batch job started successfully! Job ID: ${results.jobId}\n\nProcessing ${results.totalItems} variations in the background. You can monitor progress in the admin dashboard.`);
-        onClose();
-        return;
-      }
-      
-      // Handle immediate generation response
-      console.log('✅ Received variations from API:', results);
-      console.log('📊 Number of variations received:', results?.length || 0);
-      console.log('🔍 Results structure check:', {
-        isArray: Array.isArray(results),
-        hasLength: results?.length,
-        firstItem: results?.[0],
-        keys: results ? Object.keys(results) : 'null'
-      });
-      
-      // Ensure results is an array
-      const variationsArray = Array.isArray(results) ? results : [];
-      console.log('🎯 Setting variations array:', variationsArray);
-      
-      if (variationsArray.length === 0) {
-        alert('No variations came back. The AI may have declined or failed on every one; check the server log.');
-        return;
-      }
-      setGeneratedVariations(variationsArray);
-      setShowPreview(true);
-      
-      // Auto-generate AI descriptions for all variations
-      if (variationsArray.length > 0) {
-        console.log(`Auto-generating AI descriptions for ${variationsArray.length} variations...`);
-        const allVariationIds = variationsArray.map((v: any) => v.id);
-        await generateAIDescriptions(allVariationIds, variationsArray);
-      }
-      
-    } catch (error) {
-      console.error('Variation generation error:', error);
-      alert(`Failed to generate variations: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsGenerating(false);
+      if (!res.ok) return;
+      const { description } = await res.json();
+      setGeneratedVariations((prev) => prev.map((v) => (v.id === variation.id ? { ...v, aiDescription: description } : v)));
+    } catch (e) {
+      console.warn('Description failed for', variation.id, e);
     }
   };
+
+  const runItems = async (items: GenItem[], keep: boolean) => {
+    if (!image?.prompt_text || !image?.id || items.length === 0) return;
+    stopRef.current = false;
+    setIsGenerating(true);
+    if (!keep) setGeneratedVariations([]);
+    setShowPreview(true);
+    setProgress({ total: items.length, done: 0, running: true, stopped: false, failed: [] });
+
+    const queue = [...items];
+    const worker = async () => {
+      while (queue.length && !stopRef.current) {
+        const item = queue.shift()!;
+        try {
+          const res = await fetch('/api/admin/generate-variations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              originalImageId: image.id,
+              originalPrompt: image.prompt_text,
+              currentBreed: image.breed_id || '',
+              currentCoat: image.coat_id || '',
+              currentTheme: image.theme_id || '',
+              currentStyle: image.style_id || '',
+              currentFormat: image.format_id || '',
+              targetAge: selectedAge,
+              imageSize,
+              variationConfig: { breedCoats: [], outfits: [], formats: [], ...item.config },
+            }),
+          });
+          const body = await res.json().catch(() => null);
+          if (!res.ok) throw new Error(body?.error || (res.status === 504 ? 'timed out' : res.statusText || `error ${res.status}`));
+          const made: any[] = Array.isArray(body) ? body : [];
+          if (made.length === 0) throw new Error('the AI returned no image');
+          setGeneratedVariations((prev) => [...prev, ...made]);
+          made.forEach((v) => { describe(v); });
+          setProgress((p) => p && { ...p, done: p.done + 1 });
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'failed';
+          setProgress((p) => p && { ...p, done: p.done + 1, failed: [...p.failed, { item, error }] });
+        }
+      }
+    };
+    await Promise.all([worker(), worker()]);
+    setProgress((p) => p && { ...p, running: false, total: stopRef.current ? p.done : p.total });
+    setIsGenerating(false);
+  };
+
+  const handleGenerateVariations = () => runItems(buildItems(), false);
+  const handleRetryFailed = () => { const failed = progress?.failed.map((f) => f.item) ?? []; runItems(failed, true); };
+  const handleStop = () => { stopRef.current = true; setProgress((p) => p && { ...p, stopped: true }); };
 
   const urlToBase64 = async (url: string): Promise<string> => {
     const res = await fetch(url);
@@ -700,8 +723,7 @@ export default function ImageVariantGenerationModal({
         return updated || v;
       });
       
-      console.log('🔍 Updated variations with AI descriptions:', newGeneratedVariations);
-      setGeneratedVariations(newGeneratedVariations);
+      setGeneratedVariations((prev) => prev.map((v) => updatedVariations.find((u) => u.id === v.id) || v));
       
     } catch (error) {
       console.error('Error generating AI descriptions:', error);
@@ -858,6 +880,8 @@ export default function ImageVariantGenerationModal({
   };
 
   const handleBackToSelection = () => {
+    stopRef.current = true;
+    setProgress(null);
     setShowPreview(false);
     setGeneratedVariations([]);
     setSaveResults([]);
@@ -891,6 +915,9 @@ export default function ImageVariantGenerationModal({
           </div>
         ) : showPreview ? (
           <VariationPreviewStep 
+            progress={progress}
+            onStop={handleStop}
+            onRetryFailed={handleRetryFailed}
             image={image}
             variations={generatedVariations}
             onGenerateAIDescriptions={generateAIDescriptions}
@@ -1212,46 +1239,34 @@ export default function ImageVariantGenerationModal({
               </div>
             </div>
 
-            {/* Batch Mode Toggle */}
-            {getTotalVariations() > 10 && (
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-yellow-600" />
-                    <span className="text-sm font-medium text-yellow-800">Large batch detected ({getTotalVariations()} variations)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="batch-mode"
-                      checked={useBatchMode}
-                      onCheckedChange={setUseBatchMode}
-                    />
-                    <label htmlFor="batch-mode" className="text-sm font-medium text-yellow-800 cursor-pointer">
-                      Background Batch Mode
-                    </label>
-                  </div>
-                </div>
-                <p className="text-xs text-yellow-700">
-                  {useBatchMode ? (
-                    <>⚡ Batch mode enabled: Processing will run in the background to prevent timeouts. Images will be saved progressively as they're generated.</>
-                  ) : (
-                    <>⚠️ Immediate mode: Large batches may timeout. Enable batch mode for reliable processing of many variations.</>
-                  )}
-                </p>
+            {/* Image size */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg border bg-gray-50">
+              <div>
+                <p className="text-sm font-medium text-gray-800">Image size</p>
+                <p className="text-xs text-gray-500">4K is sharper for large prints; it takes a little longer.</p>
               </div>
-            )}
+              <div className="inline-flex rounded-lg border bg-white p-1" role="group" aria-label="Image size">
+                {(['2K', '4K'] as const).map((sz) => (
+                  <button
+                    key={sz}
+                    type="button"
+                    aria-pressed={imageSize === sz}
+                    onClick={() => setImageSize(sz)}
+                    className={`px-3 py-1.5 text-sm rounded-md ${imageSize === sz ? 'bg-purple-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    {sz} <span className={imageSize === sz ? 'text-purple-100' : 'text-gray-500'}>· about {SIZE_PRICE[sz]} each</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Generate Button */}
             <div className="flex items-center justify-between pt-4 border-t">
               <div className="flex items-center gap-3 text-sm text-gray-600">
                 {getTotalVariations() > 0 && (
                   <span>
-                    Will generate {getTotalVariations()} variation{getTotalVariations() > 1 ? 's' : ''}
-                    {useBatchMode && getTotalVariations() > 10 && (
-                      <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                        Background Processing
-                      </span>
-                    )}
+                    Will generate {getTotalVariations()} variation{getTotalVariations() > 1 ? 's' : ''} at {imageSize}
+                    {getTotalVariations() > 1 && <span className="text-gray-500">, two at a time</span>}
                   </span>
                 )}
                 {getTotalVariations() > 0 && (
@@ -1277,19 +1292,12 @@ export default function ImageVariantGenerationModal({
                 {isGenerating ? (
                   <>
                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    {useBatchMode ? 'Starting Batch Job...' : 'Generating Variations...'}
+                    Generating Variations...
                   </>
                 ) : (
                   <>
-                    {useBatchMode ? (
-                      <Clock className="w-4 h-4 mr-2" />
-                    ) : (
-                      <Wand2 className="w-4 h-4 mr-2" />
-                    )}
-                    {useBatchMode ? 
-                      `Start Batch Job (${getTotalVariations()} variation${getTotalVariations() > 1 ? 's' : ''})` :
-                      `Generate ${getTotalVariations()} Variation${getTotalVariations() > 1 ? 's' : ''}`
-                    }
+                    <Wand2 className="w-4 h-4 mr-2" />
+                    {`Generate ${getTotalVariations()} Variation${getTotalVariations() > 1 ? 's' : ''}`}
                   </>
                 )}
               </Button>
