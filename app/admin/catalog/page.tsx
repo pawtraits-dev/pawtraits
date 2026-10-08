@@ -16,7 +16,6 @@ import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ImageQrPanel from '@/components/admin/ImageQrPanel';
 import { extractDescriptionTitle } from '@/lib/utils';
 import ImageVariantGenerationModal from '@/components/ImageVariantGenerationModal';
-import { VariationsSelector } from '@/components/VariationsSelector';
 
 export default function AdminCatalogPage() {
   const [images, setImages] = useState<ImageCatalogWithDetails[]>([]);
@@ -799,6 +798,12 @@ export default function AdminCatalogPage() {
           outfits={outfits}
           formats={formats}
           availableCoats={availableCoats}
+          onGenerateVariations={(img) => {
+            setShowDetailModal(false);
+            setSelectedImageForDetail(null);
+            setSelectedImageForVariation(img);
+            setShowVariationModal(true);
+          }}
         />
 
         {/* Image Variant Generation Modal */}
@@ -828,7 +833,8 @@ function ImageDetailModal({
   breeds,
   outfits,
   formats,
-  availableCoats
+  availableCoats,
+  onGenerateVariations
 }: {
   image: ImageCatalogWithDetails | null;
   isOpen: boolean;
@@ -838,14 +844,12 @@ function ImageDetailModal({
   outfits: Outfit[];
   formats: Format[];
   availableCoats: BreedCoatDetail[];
+  onGenerateVariations?: (image: ImageCatalogWithDetails) => void;
 }) {
   const [editedDescription, setEditedDescription] = useState('');
   const [editedTags, setEditedTags] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [showVariations, setShowVariations] = useState(false);
-  const [isGeneratingVariations, setIsGeneratingVariations] = useState(false);
-  const [variationResults, setVariationResults] = useState<any[]>([]);
 
   useEffect(() => {
     if (image) {
@@ -887,68 +891,6 @@ function ImageDetailModal({
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleGenerateVariations = async (config: {
-    breeds: string[];
-    coats: string[];
-    outfits: string[];
-    formats: string[];
-  }) => {
-    if (!image?.prompt_text || !image?.id) return;
-    
-    setIsGeneratingVariations(true);
-    setVariationResults([]);
-    
-    try {
-      // Get the Cloudinary URL for the image
-      const imageResponse = await fetch(image.public_url || '');
-      const imageBlob = await imageResponse.blob();
-      const imageData64 = await blobToBase64(imageBlob);
-      
-      const response = await fetch('/api/admin/generate-variations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          originalImageData: imageData64,
-          originalPrompt: image.prompt_text,
-          currentBreed: image.breed_id || '',
-          currentTheme: image.theme_id || '',
-          currentStyle: image.style_id || '',
-          variationConfig: config
-        })
-      });
-      
-      if (!response.ok) {
-        if (response.status === 413) {
-          throw new Error('Image too large for processing. Please use a smaller image.');
-        }
-        const errorData = await response.json().catch(() => ({ error: response.statusText }));
-        throw new Error(`Variation generation failed: ${errorData.error || response.statusText}`);
-      }
-      
-      const results = await response.json();
-      setVariationResults(results);
-      
-    } catch (error) {
-      console.error('Variation generation error:', error);
-      alert(`Failed to generate variations: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsGeneratingVariations(false);
-    }
-  };
-
-  const blobToBase64 = (blob: Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = error => reject(error);
-    });
   };
 
   const copyPromptToClipboard = () => {
@@ -1110,66 +1052,19 @@ function ImageDetailModal({
               </div>
             </div>
 
-            {/* Generate Variations */}
-            <div className="pt-4 border-t">
-              <Button
-                variant="outline"
-                className="w-full mb-4"
-                onClick={() => setShowVariations(!showVariations)}
-              >
-                <Wand2 className="w-4 h-4 mr-2" />
-                {showVariations ? 'Hide' : 'Generate'} Variations
-              </Button>
-              
-              {showVariations && (
-                <div className="space-y-4">
-                  <VariationsSelector
-                    originalImage={null}
-                    originalPrompt={image.prompt_text || ''}
-                    currentBreed={image.breed_id || ''}
-                    currentAnimalType={image.breed_animal_type}
-                    breeds={breeds}
-                    availableCoats={availableCoats}
-                    outfits={outfits}
-                    formats={formats}
-                    onGenerateVariations={handleGenerateVariations}
-                    isGenerating={isGeneratingVariations}
-                  />
-                  
-                  {/* Variation Results */}
-                  {variationResults.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-3">Generated Variations</h4>
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {variationResults.map((result, index) => (
-                          <div key={index} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
-                            <div className="w-12 h-12 bg-gray-200 rounded flex-shrink-0">
-                              {result.cloudinary_url && (
-                                <img
-                                  src={result.cloudinary_url}
-                                  alt={`Variation ${index + 1}`}
-                                  className="w-full h-full object-cover rounded"
-                                />
-                              )}
-                            </div>
-                            <div className="flex-1 text-xs space-y-1">
-                              <p className="font-medium">{result.variation_type}</p>
-                              {result.breed_name && <p>Breed: {result.breed_name}</p>}
-                              {result.coat_name && <p>Coat: {result.coat_name}</p>}
-                              {result.outfit_name && <p>Outfit: {result.outfit_name}</p>}
-                              {result.format_name && <p>Format: {result.format_name}</p>}
-                              <p className={result.success ? 'text-green-600' : 'text-red-600'}>
-                                {result.success ? 'Uploaded to catalog' : result.error}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            {/* Generate Variations: same preview-and-approve flow as the card button */}
+            {image.prompt_text && onGenerateVariations && (
+              <div className="pt-4 border-t">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => onGenerateVariations(image)}
+                >
+                  <Wand2 className="w-4 h-4 mr-2" />
+                  Generate Variations
+                </Button>
+              </div>
+            )}
 
             {/* Sticker QR code */}
             <ImageQrPanel imageId={image.id} />

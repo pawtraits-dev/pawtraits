@@ -137,7 +137,7 @@ function VariationPreviewStep({
               <div className="flex-1">
                 <div className="bg-gray-100 rounded-lg overflow-hidden mb-2" style={{ aspectRatio: variation.metadata.format?.aspect_ratio || '1:1' }}>
                   <img
-                    src={`data:image/png;base64,${variation.imageData}`}
+                    src={variation.preview_thumb_url || variation.preview_url || `data:image/png;base64,${variation.imageData}`}
                     alt={variation.variation_type}
                     className="w-full h-full object-contain"
                   />
@@ -536,10 +536,8 @@ export default function ImageVariantGenerationModal({
     setShowPreview(false);
     
     try {
-      // Get the image data
-      const imageResponse = await fetch(image.public_url || '');
-      const imageBlob = await imageResponse.blob();
-      const imageData64 = await blobToBase64(imageBlob);
+      // The server loads the design image itself from its id (a 2K original as base64
+      // could exceed the 4.5 MB request limit)
       
       const variationConfigToSend = {
         breedCoats: getSelectedBreedCoatPairs().map(pair => ({
@@ -571,7 +569,7 @@ export default function ImageVariantGenerationModal({
           targetAge: selectedAge,
           variationConfig: variationConfigToSend
         } : {
-          originalImageData: imageData64,
+          originalImageId: image.id,
           originalPrompt: image.prompt_text,
           currentBreed: image.breed_id || '',
           currentCoat: image.coat_id || '',
@@ -615,6 +613,10 @@ export default function ImageVariantGenerationModal({
       const variationsArray = Array.isArray(results) ? results : [];
       console.log('🎯 Setting variations array:', variationsArray);
       
+      if (variationsArray.length === 0) {
+        alert('No variations came back. The AI may have declined or failed on every one; check the server log.');
+        return;
+      }
       setGeneratedVariations(variationsArray);
       setShowPreview(true);
       
@@ -631,6 +633,12 @@ export default function ImageVariantGenerationModal({
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const urlToBase64 = async (url: string): Promise<string> => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Could not load ${url}`);
+    return blobToBase64(await res.blob());
   };
 
   const blobToBase64 = (blob: Blob): Promise<string> => {
@@ -665,7 +673,7 @@ export default function ImageVariantGenerationModal({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              imageData: variation.imageData,
+              imageData: variation.imageData || await urlToBase64(variation.preview_thumb_url || variation.preview_url),
               breedName: variation.breed_name || image?.breed_name || ''
             })
           });
@@ -734,11 +742,15 @@ export default function ImageVariantGenerationModal({
 
     try {
       // First, convert base64 data to File objects for Cloudinary upload
-      const filesToUpload = variations.map(variation => {
-        const imageBuffer = Buffer.from(variation.imageData, 'base64');
-        const file = new File([imageBuffer], variation.filename, { type: 'image/png' });
-        return file;
-      });
+      const filesToUpload = await Promise.all(variations.map(async variation => {
+        if (variation.imageData) {
+          const imageBuffer = Buffer.from(variation.imageData, 'base64');
+          return new File([imageBuffer], variation.filename, { type: 'image/png' });
+        }
+        const res = await fetch(variation.preview_url);
+        if (!res.ok) throw new Error(`Could not load preview for ${variation.filename}`);
+        return new File([await res.blob()], variation.filename, { type: 'image/png' });
+      }));
 
       console.log(`Uploading ${filesToUpload.length} variations to Cloudinary...`);
 

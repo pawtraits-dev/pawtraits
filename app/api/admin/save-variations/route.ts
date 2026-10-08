@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from '@/lib/qr/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
   try {
     // Use service role for admin operations
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -25,7 +29,17 @@ export async function POST(request: NextRequest) {
         // Upload buffer to Cloudinary
         const cloudinary = require('cloudinary').v2;
         
-        const imageBuffer = Buffer.from(variation.imageData, 'base64');
+        // Previews are stored on Cloudinary (preview_url); older callers still send imageData
+        let imageBuffer: Buffer;
+        if (variation.imageData) {
+          imageBuffer = Buffer.from(variation.imageData, 'base64');
+        } else if (typeof variation.preview_url === 'string' && variation.preview_url.startsWith('https://res.cloudinary.com/')) {
+          const res = await fetch(variation.preview_url);
+          if (!res.ok) throw new Error(`Could not load preview (${res.status})`);
+          imageBuffer = Buffer.from(await res.arrayBuffer());
+        } else {
+          throw new Error('No image data for this variation');
+        }
         
         const cloudinaryResult = await new Promise((resolve, reject) => {
           cloudinary.uploader.upload_stream(

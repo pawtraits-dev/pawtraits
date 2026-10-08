@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
+import { requireAdmin } from '@/lib/qr/server';
+import { loadCatalogImageBase64, uploadVariationPreview } from '@/lib/catalog/variation-previews';
 
 // Nano Banana Pro at 2K can take 20–60 s per image
 export const maxDuration = 300;
@@ -9,6 +11,9 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
   try {
     // Use service role for admin operations
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -16,13 +21,27 @@ export async function POST(request: NextRequest) {
     });
 
     const body = await request.json();
-    const { originalImageData, originalPrompt, currentBreed, currentCoat, currentTheme, currentStyle, currentFormat, targetAge, variationConfig } = body;
+    const { originalImageId, originalPrompt, currentBreed, currentCoat, currentTheme, currentStyle, currentFormat, targetAge, variationConfig, includeImageData } = body;
+    let { originalImageData } = body;
+
+    // Preferred: send the design's id and the server loads the image (keeps the request small)
+    if (!originalImageData && originalImageId) {
+      const { data: source } = await supabase
+        .from('image_catalog')
+        .select('cloudinary_public_id, public_url')
+        .eq('id', originalImageId)
+        .maybeSingle();
+      if (!source) return NextResponse.json({ error: 'Design not found' }, { status: 404 });
+      try {
+        originalImageData = await loadCatalogImageBase64(source);
+      } catch (e) {
+        return NextResponse.json({ error: e instanceof Error ? e.message : 'Could not load the design image' }, { status: 502 });
+      }
+    }
     
     console.log('🚀 VARIATION GENERATION START');
     console.log('📊 Received variationConfig:', JSON.stringify(variationConfig, null, 2));
     console.log('🎯 Target age:', targetAge);
-    console.log('📏 Image size:', Math.round((originalImageData.length * 3) / 4 / 1024), 'KB');
-
     if (!originalImageData || !originalPrompt) {
       console.error('❌ Missing required data');
       return NextResponse.json({ error: 'Missing required data' }, { status: 400 });
@@ -32,7 +51,7 @@ export async function POST(request: NextRequest) {
     const imageSizeBytes = (originalImageData.length * 3) / 4; // Approximate base64 to bytes
     console.log(`Processing image of size: ${Math.round(imageSizeBytes / 1024)}KB`);
     
-    if (imageSizeBytes > 2 * 1024 * 1024) { // 2MB limit
+    if (!originalImageId && imageSizeBytes > 2 * 1024 * 1024) { // 2MB limit on uploaded data (Vercel request limit)
       return NextResponse.json({ 
         error: 'Image too large. Please compress image to under 2MB.' 
       }, { status: 413 });
@@ -360,10 +379,22 @@ export async function POST(request: NextRequest) {
     // Process variations for preview - just return the generated images with metadata
     const processedVariations = geminiService.processVariationsForUpload(results);
     
-    // Convert image buffers to base64 for frontend preview
-    const previewResults = processedVariations.map((variation) => ({
+    // Store each preview on Cloudinary and return links: four 2K images as base64 are far
+    // over Vercel's 4.5 MB response limit, so the browser received nothing.
+    const previews = await Promise.all(processedVariations.map(async (variation) => {
+      try {
+        return await uploadVariationPreview(variation.imageBuffer, variation.filename);
+      } catch (e) {
+        console.error('Preview upload failed:', variation.filename, e);
+        return null;
+      }
+    }));
+
+    const previewResults = processedVariations.map((variation, i) => ({
       id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      imageData: variation.imageBuffer.toString('base64'),
+      ...(previews[i] || {}),
+      // Fallback when the preview couldn't be stored, or when the caller asks for it
+      ...(!previews[i] || includeImageData ? { imageData: variation.imageBuffer.toString('base64') } : {}),
       filename: variation.filename,
       prompt: variation.metadata.prompt,
       gemini_prompt: variation.metadata.gemini_prompt, // Include Gemini prompt for display

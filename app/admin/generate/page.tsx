@@ -49,6 +49,7 @@ export default function GeneratePromptsPage() {
   // Variations states
   const [isGeneratingVariations, setIsGeneratingVariations] = useState(false);
   const [variationResults, setVariationResults] = useState<any[]>([]);
+  const [savingVariations, setSavingVariations] = useState(false);
   const [showVariationsSection, setShowVariationsSection] = useState(false);
 
   // AI Description Generation
@@ -659,6 +660,36 @@ export default function GeneratePromptsPage() {
     }
   };
 
+  const saveAllVariations = async () => {
+    const pending = variationResults.filter((r) => !r.success && (r.preview_url || r.imageData));
+    if (pending.length === 0) return;
+    setSavingVariations(true);
+    try {
+      const response = await fetch('/api/admin/save-variations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variations: pending }),
+      });
+      const saved = await response.json().catch(() => null);
+      if (!response.ok || !Array.isArray(saved)) {
+        throw new Error(saved?.error || response.statusText);
+      }
+      // save-variations answers in the same order it was sent
+      setVariationResults((prev) => {
+        let i = 0;
+        return prev.map((r) => {
+          if (r.success || !(r.preview_url || r.imageData)) return r;
+          const out = saved[i++];
+          return out ? { ...r, success: out.success, error: out.error, cloudinary_url: out.cloudinary_url || r.cloudinary_url } : r;
+        });
+      });
+    } catch (error) {
+      alert(`Failed to save variations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSavingVariations(false);
+    }
+  };
+
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -1214,18 +1245,27 @@ export default function GeneratePromptsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Generated Variations</CardTitle>
-              <p className="text-sm text-gray-600">
-                {variationResults.length} variation{variationResults.length > 1 ? 's' : ''} generated and uploaded to catalog
-              </p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-gray-600">
+                  {variationResults.length} variation{variationResults.length > 1 ? 's' : ''} generated. Previews only until saved.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={saveAllVariations}
+                  disabled={savingVariations || variationResults.every((r) => r.success)}
+                >
+                  {savingVariations ? 'Saving…' : 'Save all to catalogue'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {variationResults.map((result, index) => (
                   <div key={index} className="space-y-2">
                     <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
-                      {result.cloudinary_url ? (
+                      {(result.cloudinary_url || result.preview_thumb_url || result.preview_url) ? (
                         <img
-                          src={result.cloudinary_url}
+                          src={result.cloudinary_url || result.preview_thumb_url || result.preview_url}
                           alt={`Variation ${index + 1}`}
                           className="w-full h-full object-cover rounded-lg"
                         />
@@ -1239,6 +1279,8 @@ export default function GeneratePromptsPage() {
                       {result.coat_name && <p>Coat: {result.coat_name}</p>}
                       {result.outfit_name && <p>Outfit: {result.outfit_name}</p>}
                       {result.format_name && <p>Format: {result.format_name}</p>}
+                      {result.success === true && <p className="text-green-600">Saved to catalogue</p>}
+                      {result.success === false && <p className="text-red-600">{result.error}</p>}
                     </div>
                   </div>
                 ))}
