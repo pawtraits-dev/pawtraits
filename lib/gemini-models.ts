@@ -4,13 +4,18 @@
  * Change models here (or via env vars) — never hardcode model IDs in routes.
  * Current GA models: https://ai.google.dev/gemini-api/docs/models
  *
- *   pro   → Nano Banana Pro    (gemini-3-pro-image)          highest fidelity, customer-facing
- *   flash → Nano Banana 2      (gemini-3.1-flash-image)      fast, production-scale
+ *   pro   → Nano Banana 2.1   (gemini-nano-banana-2.1)     customer-facing (was Nano Banana Pro,
+ *                                                         gemini-3-pro-image; set
+ *                                                         GEMINI_IMAGE_MODEL_PRO to go back)
+ *   flash → Nano Banana 2.1   (gemini-nano-banana-2.1)     fast, production-scale (mugs)
  *   lite  → Nano Banana 2 Lite (gemini-3.1-flash-lite-image) cheapest/fastest, 1K only
+ *
+ * Nano Banana 2.1 (stable, Oct 2026) halves the per-image price of Nano Banana 2, but input
+ * and thinking tokens cost more, so keep prompts and reference images lean.
  */
 export const GEMINI_IMAGE_MODELS = {
-  pro: process.env.GEMINI_IMAGE_MODEL_PRO || 'gemini-3-pro-image',
-  flash: process.env.GEMINI_IMAGE_MODEL_FLASH || 'gemini-3.1-flash-image',
+  pro: process.env.GEMINI_IMAGE_MODEL_PRO || 'gemini-nano-banana-2.1',
+  flash: process.env.GEMINI_IMAGE_MODEL_FLASH || 'gemini-nano-banana-2.1',
   lite: process.env.GEMINI_IMAGE_MODEL_LITE || 'gemini-3.1-flash-lite-image',
 } as const;
 
@@ -36,8 +41,8 @@ export function toGeminiAspectRatio(ratio?: string | null): string | undefined {
 }
 
 /**
- * Output resolution. Previews (customer + admin) are generated at 2K — on Nano Banana Pro
- * 1K and 2K cost the same — and the 4K print master is made only when a Large is ordered.
+ * Output resolution. Previews (customer + admin) are generated at 2K (on Nano Banana 2.1 about
+ * $0.05 an image, vs $0.034 at 1K) and the 4K print master is made only when a Large is ordered.
  */
 export const GEMINI_IMAGE_SIZES = {
   preview: process.env.GEMINI_PREVIEW_IMAGE_SIZE || '2K',

@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Search, Filter, Plus, Edit, Trash2, Shirt } from 'lucide-react';
 import Link from 'next/link';
 import type { Outfit } from '@/lib/types';
+import { groupOutfits, leagueOf, matchesOutfitSearch } from '@/lib/catalog/outfit-groups';
+import { LEAGUES, type League } from '@/lib/collections/sports-teams';
 
 export default function OutfitsManagement() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -16,6 +18,9 @@ export default function OutfitsManagement() {
   const [animalFilter, setAnimalFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  // 'all' | 'everyday' | a league key (premier-league, nfl, …)
+  const [groupFilter, setGroupFilter] = useState('all');
+  const [expandedLeagues, setExpandedLeagues] = useState<string[]>([]);
   const [outfits, setOutfits] = useState<Outfit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,9 +81,11 @@ export default function OutfitsManagement() {
   // Filter and sort outfits
   const filteredOutfits = outfits
     .filter(outfit => {
-      const matchesSearch = outfit.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           outfit.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           outfit.clothing_description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = matchesOutfitSearch(outfit, searchTerm) ||
+                           !!outfit.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      const league = leagueOf(outfit.slug);
+      const matchesGroup = groupFilter === 'all' ||
+                           (groupFilter === 'everyday' ? !league : league === groupFilter);
       
       const matchesStatus = statusFilter === 'all' || statusFilter === '' || 
                            (statusFilter === 'active' && outfit.is_active) ||
@@ -87,7 +94,7 @@ export default function OutfitsManagement() {
       const matchesAnimal = animalFilter === 'all' || animalFilter === '' || 
                            outfit.animal_compatibility.includes(animalFilter as any);
       
-      return matchesSearch && matchesStatus && matchesAnimal;
+      return matchesSearch && matchesStatus && matchesAnimal && matchesGroup;
     })
     .sort((a, b) => {
       let comparison = 0;
@@ -107,103 +114,15 @@ export default function OutfitsManagement() {
       return sortOrder === 'desc' ? -comparison : comparison;
     });
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-      </div>
-    );
-  }
+  // Everyday outfits first, then team kits in a collapsible section per league
+  const { everyday, leagues } = groupOutfits(filteredOutfits);
+  const leagueCounts = groupOutfits(outfits).leagues.map((g) => ({ league: g.league, name: g.name, count: g.teams.length }));
+  const openAlways = searchTerm.trim() !== '' || groupFilter !== 'all';
+  const isOpen = (l: League) => openAlways || expandedLeagues.includes(l);
+  const toggleLeague = (l: League) =>
+    setExpandedLeagues((e) => (e.includes(l) ? e.filter((x) => x !== l) : [...e, l]));
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-        Error: {error}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <Shirt className="w-8 h-8 text-purple-600" />
-            Pet Outfits
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Manage clothing options for pet portraits
-          </p>
-        </div>
-        <Link href="/admin/outfits/new">
-          <Button className="bg-purple-600 hover:bg-purple-700">
-            <Plus className="w-4 h-4 mr-2" />
-            Add New Outfit
-          </Button>
-        </Link>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search outfits..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={animalFilter} onValueChange={setAnimalFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by animal" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Animals</SelectItem>
-                <SelectItem value="dog">Dogs</SelectItem>
-                <SelectItem value="cat">Cats</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="sort_order">Sort Order</SelectItem>
-                <SelectItem value="created_at">Created Date</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            >
-              {sortOrder === 'asc' ? '↑' : '↓'} {sortOrder.toUpperCase()}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Outfits Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredOutfits.map((outfit) => (
+  const renderCard = (outfit: Outfit) => (
           <Card key={outfit.id} className="hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
@@ -297,8 +216,172 @@ export default function OutfitsManagement() {
               </div>
             </CardContent>
           </Card>
-        ))}
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        Error: {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <Shirt className="w-8 h-8 text-purple-600" />
+            Pet Outfits
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Manage clothing options for pet portraits
+          </p>
+        </div>
+        <Link href="/admin/outfits/new">
+          <Button className="bg-purple-600 hover:bg-purple-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Add New Outfit
+          </Button>
+        </Link>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="Search outfits..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            <Select value={groupFilter} onValueChange={setGroupFilter}>
+              <SelectTrigger aria-label="Filter by group">
+                <SelectValue placeholder="Filter by group" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All outfits</SelectItem>
+                <SelectItem value="everyday">Everyday outfits</SelectItem>
+                {leagueCounts.map((g) => (
+                  <SelectItem key={g.league} value={g.league}>{g.name} ({g.count})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={animalFilter} onValueChange={setAnimalFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filter by animal" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Animals</SelectItem>
+                <SelectItem value="dog">Dogs</SelectItem>
+                <SelectItem value="cat">Cats</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="sort_order">Sort Order</SelectItem>
+                <SelectItem value="created_at">Created Date</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Button 
+              variant="outline" 
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            >
+              {sortOrder === 'asc' ? '↑' : '↓'} {sortOrder.toUpperCase()}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Everyday outfits */}
+      {everyday.length > 0 && (
+        <div className="space-y-3">
+          {leagues.length > 0 && <h2 className="text-lg font-semibold text-gray-900">Everyday outfits <span className="text-sm font-normal text-gray-500">({everyday.length})</span></h2>}
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {everyday.map((outfit) => renderCard(outfit))}
+          </div>
+        </div>
+      )}
+
+      {/* Sports team kits, one collapsible section per league */}
+      {leagues.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Sports team kits</h2>
+            {!openAlways && (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setExpandedLeagues(leagues.map((g) => g.league))}>Expand all</Button>
+                <Button variant="outline" size="sm" onClick={() => setExpandedLeagues([])}>Collapse all</Button>
+              </div>
+            )}
+          </div>
+          {leagues.map((g) => {
+            const open = isOpen(g.league);
+            const active = g.teams.filter((t) => t.outfit.is_active).length;
+            return (
+              <div key={g.league} className="border rounded-lg bg-white">
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => toggleLeague(g.league)}
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 rounded-lg"
+                >
+                  <span className="flex items-center gap-3">
+                    <span className={`transform transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
+                    <span className="font-medium">{g.name}</span>
+                    <span className="text-sm text-gray-500">{g.teams.length} team{g.teams.length === 1 ? '' : 's'}</span>
+                    {active < g.teams.length && (
+                      <Badge variant="secondary" className="text-xs">{g.teams.length - active} inactive</Badge>
+                    )}
+                  </span>
+                  <span className="flex -space-x-1" aria-hidden>
+                    {g.teams.slice(0, 8).map((t) => (
+                      <span key={t.outfit.id} className="w-3 h-3 rounded-full border border-white" style={{ backgroundColor: t.colours[0]?.hex || '#ddd' }} />
+                    ))}
+                  </span>
+                </button>
+                {open && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 p-4 pt-0">
+                    {g.teams.map((t) => renderCard(t.outfit))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Empty State */}
       {filteredOutfits.length === 0 && (

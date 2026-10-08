@@ -496,7 +496,7 @@ export default function GeminiTestPage() {
               </div>
               <div>
                 <p className="font-medium text-gray-700">Gemini Model</p>
-                <p className="text-gray-600">Nano Banana 2 (gemini-3.1-flash-image)</p>
+                <p className="text-gray-600">Nano Banana 2.1 (gemini-nano-banana-2.1)</p>
               </div>
               <div>
                 <p className="font-medium text-gray-700">Environment</p>
