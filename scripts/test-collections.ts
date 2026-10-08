@@ -89,8 +89,14 @@ ok('names: three', joinPetNames(['Bo', 'Rex', 'Luna']) === 'Bo, Rex & Luna');
 ok('names: placeholders dropped', joinPetNames(['Biscuit', 'Uploaded Pet', ' ']) === 'Biscuit' && joinPetNames([null, 'Uploaded Pet']) === 'Uploaded Pet');
 const chiefsRecolour = 'Recolour the pet\'s sports outfit to Chiefs colours (red, gold): red jersey. Keep the same type of garment, cut, folds, pose, background and lighting; change only the colours and stripes.';
 ok('recolour: one pet unchanged', recolourFor(chiefsRecolour, 1) === chiefsRecolour);
-ok('recolour: two pets', recolourFor(chiefsRecolour, 2).startsWith('There are 2 pets. Recolour every pet\'s sports outfit, all in the same team kit, to Chiefs colours') && recolourFor(chiefsRecolour, 2).includes('Keep each pet’s type of garment'));
+ok('recolour: two pets', recolourFor(chiefsRecolour, 2).startsWith('There are 2 pets. Recolour every pet\'s sports outfit (and scarf, if they have one), all in the same team kit, to Chiefs colours') && recolourFor(chiefsRecolour, 2).includes('Keep each pet’s type of garment'));
 const realTeam = allCollections(types).find(c => c.path === 'sports/nfl/kansas-city-chiefs')!.metadata!.recolour_prompt as string;
+{
+  const pl = allCollections(types).filter(c => c.path.startsWith('sports/premier-league/') && c.outfit);
+  const txt = (c: any) => String(c.outfit.clothing_description ?? c.outfit.clothing ?? '');
+  ok('football: 20 Premier League kits', pl.length === 20);
+  ok('football: shirt + scarf only', pl.every(c => /shirt/.test(txt(c)) && /scarf/.test(txt(c)) && !/shorts|socks/.test(txt(c).replace('no shorts, socks or boots', ''))));
+}
 ok('recolour: real team prompt reworded for two', recolourFor(realTeam, 2).startsWith('There are 2 pets.'));
 
 console.log(`${pass} passed, ${fail} failed`);

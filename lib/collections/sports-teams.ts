@@ -2,7 +2,7 @@
  * Sports team outfit definitions (Collections › Sports). One entry per team: name, nicknames for
  * search, colours (name + hex) and the home kit in a sentence. `teamOutfit()` turns an entry into
  * the prompt text used by the outfit-variation step (lib/gemini-variation-service.ts):
- *   - clothing: the league's full outfit (football kit, NFL jersey, NBA vest, NHL sweater,
+ *   - clothing: the league's outfit (football shirt + supporter's scarf, NFL jersey, NBA vest, NHL sweater,
  *     college varsity jacket) in the team's colours — for making a new design for that team
  *   - recolour: garment-agnostic ("recolour the sports outfit to …") — for switching an existing
  *     sports design to another team, so any team works in any sports design
@@ -24,7 +24,7 @@ export interface SportsTeam {
 }
 
 export const LEAGUES: Record<League, { name: string; sport: string; garment: string }> = {
-  'premier-league': { name: 'Premier League', sport: 'football', garment: 'football (soccer) kit: short-sleeved jersey, shorts and long socks' },
+  'premier-league': { name: 'Premier League', sport: 'football', garment: 'football (soccer) shirt: short-sleeved jersey-style top' },
   nfl: { name: 'NFL', sport: 'American football', garment: 'American football uniform: jersey with large shoulder numbers over shoulder pads' },
   nba: { name: 'NBA', sport: 'basketball', garment: 'basketball uniform: sleeveless vest jersey with a large front number and matching shorts' },
   nhl: { name: 'NHL', sport: 'ice hockey', garment: 'ice hockey sweater: loose long-sleeved jersey with hem and sleeve stripes' },
@@ -39,26 +39,26 @@ const WHITE = c('white', '#FFFFFF'), BLACK = c('black', '#101820');
 
 export const SPORTS_TEAMS: SportsTeam[] = [
   // ───────── Premier League 2026–27 ─────────
-  T('premier-league', 'arsenal', 'Arsenal', 'Arsenal', ['gunners', 'the arsenal', 'afc'], [c('red', '#EF0107'), WHITE], 'red jersey with white sleeves and white collar, white shorts, red socks with white tops'),
-  T('premier-league', 'aston-villa', 'Aston Villa', 'Villa', ['villans', 'villa', 'avfc'], [c('claret', '#670E36'), c('sky blue', '#95BFE5'), WHITE], 'claret jersey with sky-blue sleeves, white shorts, sky-blue socks'),
-  T('premier-league', 'bournemouth', 'AFC Bournemouth', 'Bournemouth', ['cherries', 'afcb'], [c('red', '#DA291C'), BLACK], 'red and black vertical-striped jersey, black shorts, black socks'),
-  T('premier-league', 'brentford', 'Brentford', 'Brentford', ['bees'], [c('red', '#E30613'), WHITE, BLACK], 'red and white vertical-striped jersey, black shorts, red socks'),
-  T('premier-league', 'brighton', 'Brighton & Hove Albion', 'Brighton', ['seagulls', 'albion', 'bhafc'], [c('blue', '#0057B8'), WHITE], 'blue and white vertical-striped jersey, blue shorts, blue socks'),
-  T('premier-league', 'chelsea', 'Chelsea', 'Chelsea', ['blues', 'cfc', 'pensioners'], [c('royal blue', '#034694'), WHITE], 'royal-blue jersey with white trim, royal-blue shorts, white socks'),
-  T('premier-league', 'coventry-city', 'Coventry City', 'Coventry', ['sky blues', 'ccfc'], [c('sky blue', '#6CABDD'), WHITE], 'sky-blue jersey with white trim, sky-blue shorts, sky-blue socks'),
-  T('premier-league', 'crystal-palace', 'Crystal Palace', 'Palace', ['eagles', 'cpfc'], [c('red', '#C4122E'), c('blue', '#1B458F')], 'red and blue vertical-striped jersey, blue shorts, blue socks'),
-  T('premier-league', 'everton', 'Everton', 'Everton', ['toffees', 'efc', 'blues'], [c('royal blue', '#003399'), WHITE], 'royal-blue jersey with white trim, white shorts, white socks'),
-  T('premier-league', 'fulham', 'Fulham', 'Fulham', ['cottagers', 'ffc'], [WHITE, BLACK], 'white jersey with black trim, black shorts, white socks'),
-  T('premier-league', 'hull-city', 'Hull City', 'Hull', ['tigers', 'hcafc'], [c('amber', '#F5A12D'), BLACK], 'amber jersey with black trim and thin black stripes, black shorts, amber socks'),
-  T('premier-league', 'ipswich-town', 'Ipswich Town', 'Ipswich', ['tractor boys', 'itfc', 'town'], [c('blue', '#0044A9'), WHITE], 'blue jersey with white collar and trim, white shorts, blue socks'),
-  T('premier-league', 'leeds-united', 'Leeds United', 'Leeds', ['whites', 'lufc', 'peacocks'], [WHITE, c('blue', '#1D428A'), c('yellow', '#FFCD00')], 'all-white kit with blue and yellow trim'),
-  T('premier-league', 'liverpool', 'Liverpool', 'Liverpool', ['reds', 'lfc', 'the kop'], [c('red', '#C8102E'), WHITE], 'all-red kit: red jersey, red shorts, red socks, white trim'),
-  T('premier-league', 'manchester-city', 'Manchester City', 'Man City', ['city', 'citizens', 'cityzens', 'mcfc', 'sky blues'], [c('sky blue', '#6CABDD'), WHITE, c('navy', '#1C2C5B')], 'sky-blue jersey with navy trim, white shorts, sky-blue socks'),
-  T('premier-league', 'manchester-united', 'Manchester United', 'Man United', ['man utd', 'red devils', 'united', 'mufc'], [c('red', '#DA291C'), WHITE, BLACK], 'red jersey with white and black trim, white shorts, black socks'),
-  T('premier-league', 'newcastle-united', 'Newcastle United', 'Newcastle', ['magpies', 'toon', 'nufc'], [BLACK, WHITE], 'black and white vertical-striped jersey, black shorts, black socks'),
-  T('premier-league', 'nottingham-forest', 'Nottingham Forest', 'Forest', ['forest', 'tricky trees', 'nffc'], [c('Garibaldi red', '#DD0000'), WHITE], 'bright red jersey, white shorts, red socks'),
-  T('premier-league', 'sunderland', 'Sunderland', 'Sunderland', ['black cats', 'safc', 'mackems'], [c('red', '#EB172B'), WHITE, BLACK], 'red and white vertical-striped jersey, black shorts, red socks'),
-  T('premier-league', 'tottenham-hotspur', 'Tottenham Hotspur', 'Spurs', ['spurs', 'thfc', 'lilywhites'], [WHITE, c('navy', '#132257')], 'white jersey with navy trim, navy shorts, white socks'),
+  T('premier-league', 'arsenal', 'Arsenal', 'Arsenal', ['gunners', 'the arsenal', 'afc'], [c('red', '#EF0107'), WHITE], 'red shirt with white sleeves and white collar'),
+  T('premier-league', 'aston-villa', 'Aston Villa', 'Villa', ['villans', 'villa', 'avfc'], [c('claret', '#670E36'), c('sky blue', '#95BFE5'), WHITE], 'claret shirt with sky-blue sleeves'),
+  T('premier-league', 'bournemouth', 'AFC Bournemouth', 'Bournemouth', ['cherries', 'afcb'], [c('red', '#DA291C'), BLACK], 'red and black vertical-striped shirt'),
+  T('premier-league', 'brentford', 'Brentford', 'Brentford', ['bees'], [c('red', '#E30613'), WHITE, BLACK], 'red and white vertical-striped shirt'),
+  T('premier-league', 'brighton', 'Brighton & Hove Albion', 'Brighton', ['seagulls', 'albion', 'bhafc'], [c('blue', '#0057B8'), WHITE], 'blue and white vertical-striped shirt'),
+  T('premier-league', 'chelsea', 'Chelsea', 'Chelsea', ['blues', 'cfc', 'pensioners'], [c('royal blue', '#034694'), WHITE], 'royal-blue shirt with white trim'),
+  T('premier-league', 'coventry-city', 'Coventry City', 'Coventry', ['sky blues', 'ccfc'], [c('sky blue', '#6CABDD'), WHITE], 'sky-blue shirt with white trim'),
+  T('premier-league', 'crystal-palace', 'Crystal Palace', 'Palace', ['eagles', 'cpfc'], [c('red', '#C4122E'), c('blue', '#1B458F')], 'red and blue vertical-striped shirt'),
+  T('premier-league', 'everton', 'Everton', 'Everton', ['toffees', 'efc', 'blues'], [c('royal blue', '#003399'), WHITE], 'royal-blue shirt with white trim'),
+  T('premier-league', 'fulham', 'Fulham', 'Fulham', ['cottagers', 'ffc'], [WHITE, BLACK], 'white shirt with black trim'),
+  T('premier-league', 'hull-city', 'Hull City', 'Hull', ['tigers', 'hcafc'], [c('amber', '#F5A12D'), BLACK], 'amber shirt with black trim and thin black stripes'),
+  T('premier-league', 'ipswich-town', 'Ipswich Town', 'Ipswich', ['tractor boys', 'itfc', 'town'], [c('blue', '#0044A9'), WHITE], 'blue shirt with white collar and trim'),
+  T('premier-league', 'leeds-united', 'Leeds United', 'Leeds', ['whites', 'lufc', 'peacocks'], [WHITE, c('blue', '#1D428A'), c('yellow', '#FFCD00')], 'all-white shirt with blue and yellow trim'),
+  T('premier-league', 'liverpool', 'Liverpool', 'Liverpool', ['reds', 'lfc', 'the kop'], [c('red', '#C8102E'), WHITE], 'red shirt with white trim'),
+  T('premier-league', 'manchester-city', 'Manchester City', 'Man City', ['city', 'citizens', 'cityzens', 'mcfc', 'sky blues'], [c('sky blue', '#6CABDD'), WHITE, c('navy', '#1C2C5B')], 'sky-blue shirt with navy trim'),
+  T('premier-league', 'manchester-united', 'Manchester United', 'Man United', ['man utd', 'red devils', 'united', 'mufc'], [c('red', '#DA291C'), WHITE, BLACK], 'red shirt with white and black trim'),
+  T('premier-league', 'newcastle-united', 'Newcastle United', 'Newcastle', ['magpies', 'toon', 'nufc'], [BLACK, WHITE], 'black and white vertical-striped shirt'),
+  T('premier-league', 'nottingham-forest', 'Nottingham Forest', 'Forest', ['forest', 'tricky trees', 'nffc'], [c('Garibaldi red', '#DD0000'), WHITE], 'bright red shirt'),
+  T('premier-league', 'sunderland', 'Sunderland', 'Sunderland', ['black cats', 'safc', 'mackems'], [c('red', '#EB172B'), WHITE, BLACK], 'red and white vertical-striped shirt'),
+  T('premier-league', 'tottenham-hotspur', 'Tottenham Hotspur', 'Spurs', ['spurs', 'thfc', 'lilywhites'], [WHITE, c('navy', '#132257')], 'white shirt with navy trim'),
 
   // ───────── NFL ─────────
   T('nfl', 'buffalo-bills', 'Buffalo Bills', 'Bills', ['bills mafia'], [c('royal blue', '#00338D'), c('red', '#C60C30'), WHITE], 'royal-blue jersey with white numbers and red-white-blue sleeve stripes, white pants'),
@@ -192,7 +192,7 @@ const colourList = (t: SportsTeam) => {
 /** The kit sentence with garment words made generic, so it fits any sports outfit */
 function genericKit(kit: string): string {
   return kit
-    .replace(/\bvarsity jacket\b/g, 'top').replace(/\b(jersey|vest|sweater)\b/g, 'top')
+    .replace(/\bvarsity jacket\b/g, 'top').replace(/\b(jersey|shirt|vest|sweater)\b/g, 'top')
     .replace(/\b(shorts|pants)\b/g, 'bottoms');
 }
 
@@ -200,9 +200,13 @@ function genericKit(kit: string): string {
 export function teamOutfit(t: SportsTeam): { clothing: string; recolour: string } {
   const league = LEAGUES[t.league];
   const noMarks = 'Plain fabric with no logos, crests, badges, lettering or sponsor marks.';
+  // Football: just the shirt plus a knitted supporter's scarf; no shorts or socks
+  const extra = t.league === 'premier-league'
+    ? ` Worn with a knitted supporter's scarf in ${colourList(t)} bar stripes around the neck. Only the shirt and scarf: no shorts, socks or boots.`
+    : '';
   return {
-    clothing: `a ${league.garment}, in ${t.short} colours (${colourList(t)}): ${t.kit}. ${noMarks}`,
-    recolour: `Recolour the pet's sports outfit to ${t.short} colours (${colourList(t)}): ${genericKit(t.kit)}. Keep the same type of garment, cut, folds, pose, background and lighting; change only the colours and stripes. ${noMarks}`,
+    clothing: `a ${league.garment}, in ${t.short} colours (${colourList(t)}): ${t.kit}.${extra} ${noMarks}`,
+    recolour: `Recolour the pet's sports outfit (and its scarf, if it has one) to ${t.short} colours (${colourList(t)}): ${genericKit(t.kit)}. Keep the same type of garment, cut, folds, pose, background and lighting; change only the colours and stripes. ${noMarks}`,
   };
 }
 

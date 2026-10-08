@@ -240,6 +240,6 @@ async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: R
 /** The team's recolour instruction, worded for every pet when the design has more than one */
 export function recolourFor(instruction: string, pets: number): string {
   if (pets <= 1) return instruction;
-  return instruction.replace(/^Recolour the pet's sports outfit/, `There are ${pets} pets. Recolour every pet's sports outfit, all in the same team kit,`)
+  return instruction.replace(/^Recolour the pet's sports outfit( \(and its scarf, if it has one\))?/, `There are ${pets} pets. Recolour every pet's sports outfit (and scarf, if they have one), all in the same team kit,`)
     .replace(/Keep the same type of garment/, 'Keep each pet’s type of garment');
 }
