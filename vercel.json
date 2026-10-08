@@ -2,20 +2,38 @@
   "functions": {
     "app/api/admin/generate-variations/route.ts": {
       "maxDuration": 300,
-      "memory": 512
+      "memory": 1024
     },
     "app/api/customers/generate-variations/route.ts": {
       "maxDuration": 300,
       "memory": 512
+    },
+    "app/api/cron/variation-batches/route.ts": {
+      "maxDuration": 300,
+      "memory": 1769
+    },
+    "app/api/admin/variation-runs/tick/route.ts": {
+      "maxDuration": 300,
+      "memory": 1769
+    },
+    "app/api/admin/variation-runs/route.ts": {
+      "maxDuration": 300,
+      "memory": 1769
     }
   },
   "crons": [
     {
       "path": "/api/messaging/process",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/variation-batches",
+      "schedule": "*/2 * * * *"
     }
   ],
-  "regions": ["cle1"],
+  "regions": [
+    "cle1"
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

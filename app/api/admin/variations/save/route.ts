@@ -50,6 +50,8 @@ export async function POST(request: NextRequest) {
         rating: v.rating ?? 4,
         is_featured: !!v.is_featured,
         is_public: v.is_public !== false,
+        variation_of: typeof v.variation_of === 'string' ? v.variation_of : null,
+        variation_key: typeof v.variation_key === 'string' ? v.variation_key : null,
       });
       after(() => autoTagNew(supabase, saved.id));
       results.push({ ...base, success: true, database_id: saved.id, cloudinary_url: moved.secure_url, width: moved.width, height: moved.height });

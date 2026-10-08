@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { requireAdmin } from '@/lib/qr/server';
 import { GEMINI_IMAGE_SIZES } from '@/lib/gemini-models';
+import { variationKey } from '@/lib/variations/combos';
 import { loadCatalogImageBase64, uploadVariationPreview } from '@/lib/catalog/variation-previews';
 
 // Nano Banana Pro at 2K can take 20–60 s per image
@@ -409,7 +410,15 @@ export async function POST(request: NextRequest) {
       format_name: results.find(r => r.metadata.format?.id === variation.metadata.format_id)?.metadata.format?.name,
       theme_id: currentTheme,
       style_id: currentStyle,
-      image_size: geminiService.imageSize || GEMINI_IMAGE_SIZES.preview
+      image_size: geminiService.imageSize || GEMINI_IMAGE_SIZES.preview,
+      // Which reference and combination this came from, so saved batches can skip it later
+      variation_of: originalImageId || null,
+      variation_key: variationKey({
+        breedId: variation.metadata.variation_type?.startsWith('breed') ? variation.metadata.breed_id : null,
+        coatId: variation.metadata.variation_type?.startsWith('breed') ? variation.metadata.coat_id : null,
+        outfitId: variation.metadata.variation_type === 'outfit' || variation.metadata.variation_type === 'breed_outfit' ? variation.metadata.outfit_id : null,
+        formatId: variation.metadata.variation_type === 'format' ? variation.metadata.format_id : null,
+      }) || null,
     }));
 
     console.log(`\n🎉 VARIATION GENERATION COMPLETE`);

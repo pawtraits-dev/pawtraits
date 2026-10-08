@@ -1,6 +1,6 @@
 # Batch variations and AI cost tracking: findings and plan
 
-Status: steps 1–3 built 2026-10-08 (cost tracking, Admin → AI costs, one-request-per-variation with 2K/4K choice); steps 4–5 not started.
+Status: steps 1–4 built 2026-10-08 (cost tracking, Admin → AI costs, one request per variation with 2K/4K, saved batches through Gemini Batch). Step 5 (live tests) to do.
 
 ## 1. Why batch variations have never worked reliably
 
@@ -171,6 +171,58 @@ Customers can't wait hours, so they stay interactive. Tracking (A) will show the
   - failure reason shown and retry adds only the missing one;
   - previews, sizes and descriptions shown;
   - the Full size link on the card.
+
+## Step 4: saved batches through Gemini Batch — built (2026-10-08)
+
+**Decisions (Steve):**
+- Breed/coats and outfits are **combined**: each breed/coat wears each outfit.
+- Results come back to a **review grid** with bulk approve.
+- A **new reference** gets every combination. A reference that has been used before only gets what it's missing.
+
+- **Migration** `db/migrations/2026-10-17-variation-batches.sql` (safe to re-run):
+  - `variation_recipes`: saved batches (breed/coats, outfits, image size);
+  - `variation_runs`: a recipe on one or more designs;
+  - `variation_run_jobs`: Gemini batch jobs of about 20 images;
+  - `variation_run_items`: one row per image;
+  - the `variation_run_counts` view;
+  - `image_catalog.variation_of` / `variation_key`: the reference and combination each saved variation came from. These are also set by the variations window.
+- **Admin → Variation batches** (`/admin/variation-batches`, under Content):
+  - **Saved batches:**
+    - Name, then breeds and coats: breeds expand to their coats, with All/None, search, dogs/cats, and "add the top N popular combinations".
+    - Then outfits, with team kits grouped by league, and 2K/4K.
+    - Shows "N images per design".
+  - **Run a batch:** pick a saved batch and designs (search with thumbnails).
+    - It shows per design how many will be made and how many are already made or waiting, with an estimate at batch prices.
+    - Multi-pet designs are left out of breed/coat changes, with the reason shown.
+  - **Runs list:** status, images, waiting / to review / approved / failed, and cost so far against the estimate.
+  - **Run page:**
+    - Progress, with Check now, Cancel run and Try failed again.
+    - Tabs: To review / With Gemini / Approved / Rejected / Failed / All.
+    - 4K previews with Full size links, 60 per page.
+    - Select page, then Approve or Reject, or **Approve all**, saving as **public or hidden**.
+- **Variations window:**
+  - "Save these choices as a batch" turns the current selection into a saved batch.
+  - "Run a saved batch on this design" opens the run dialog with that design chosen.
+- **How it runs** (`lib/variations/batch.ts`):
+  - `createRun` expands combinations, skips taken keys and builds every prompt up front with `GeminiVariationService.promptsFor` (a combined breed + coat + kit prompt now uses the kit's full description).
+  - `tick` runs from a new cron every 2 minutes, from "Check now", and straight after a run starts. It:
+    - uploads each reference image to the Gemini File API once per run (refreshed after 40 h);
+    - writes a JSONL file per job (prompt + file reference + `imageConfig` size/shape) and calls `batches.create`;
+    - polls `batches.get`;
+    - streams each finished results file line by line, uploads each image to Cloudinary as a preview, and records usage at batch prices against the run.
+  - It is resumable: a 4-minute budget per tick, a job lock that expires after 6 minutes, and already-finished items are skipped.
+  - Failed submits are retried (up to 5 attempts). Expired, failed or cancelled jobs mark their items with the reason.
+  - **Approve** moves previews into the catalogue on Cloudinary (no re-upload), registers them with `variation_of/key`, then writes a description and auto-tags them. **Reject** deletes the previews.
+- **Retired:** the old "Batch Jobs" (fire-and-forget processor). Its POST returns 410 and its page redirects here.
+- `vercel.json`:
+  - new cron `/api/cron/variation-batches` every 2 minutes;
+  - 1769 MB and 300 s for the batch routes;
+  - `generate-variations` raised to 1 GB for 4K.
+- **Tests:**
+  - `npm run test:variations` (27): combinations, keys, planning, jobs, estimates, JSONL request lines, streaming results parser, prompts.
+  - 23 database integration checks with Gemini and Cloudinary faked: plan, duo exclusion, run and jobs created, reference uploaded once, JSONL contents, results read into previews, failure reasons, usage at batch prices, re-reading skips finished items, approve (hidden, linked), reject, rerun on the same design skips what exists, new design gets everything, retry, cancel.
+  - Browser checks: editor counts, saved card, run dialog with a duo flagged, run page grid, failed tab, both buttons in the variations window.
+- **Not covered here:** the real Gemini Batch calls (file upload, `batches.create/get`, results download). The first live run is the check: start with a small saved batch (e.g. 2 coats × 3 kits on one design).
 
 ## Sources
 

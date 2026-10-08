@@ -40,6 +40,9 @@ export interface RegisterInput {
   rating?: number | null;
   is_featured?: boolean;
   is_public?: boolean;
+  /** Reference design and combination a variation was made from (needs 2026-10-17 migration) */
+  variation_of?: string | null;
+  variation_key?: string | null;
 }
 
 const FK_TABLES: [keyof RegisterInput, string, string][] = [
@@ -83,8 +86,14 @@ export async function registerCloudinaryImage(supabase: SupabaseClient, input: R
     cloudinary_public_id: input.cloudinary_public_id,
     image_variants: variants,
   } as ImageCatalogCreate;
+  if (input.variation_of && input.variation_key) Object.assign(row, { variation_of: input.variation_of, variation_key: input.variation_key });
 
-  const { data, error } = await supabase.from('image_catalog').insert(row).select().single();
+  let { data, error } = await supabase.from('image_catalog').insert(row).select().single();
+  if (error && /variation_(of|key)/.test(error.message || '') && 'variation_of' in row) {
+    // Migration 2026-10-17 not run yet: save without the link back to the reference
+    delete (row as any).variation_of; delete (row as any).variation_key;
+    ({ data, error } = await supabase.from('image_catalog').insert(row).select().single());
+  }
   if (error) throw error;
   return data;
 }

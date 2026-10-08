@@ -873,7 +873,8 @@ Ensure the ${primaryAnimal.coat.coat_name} coloring is consistent across ALL bod
   ): string {
     const { breed, outfit: parsedOutfit } = this.parseOriginalPrompt(originalPrompt);
     // Use target outfit if provided, otherwise use parsed outfit
-    const outfit = targetOutfit ? targetOutfit.name.toLowerCase() : parsedOutfit;
+    // Team kits etc. have a full description; fall back to the name
+    const outfit = targetOutfit ? (targetOutfit.clothing_description || targetOutfit.name.toLowerCase()) : parsedOutfit;
     
     // Detect cross-species transformation
     const isCrossSpecies = originalBreed && originalBreed.animal_type !== targetBreed.animal_type;
@@ -1147,6 +1148,51 @@ Ensure the ${targetCoat.coat_name.toLowerCase()} coloring is consistent across A
       `${themePrompt}, ${targetFormat.prompt_adjustments}` : themePrompt;
     
     return `A ${breed} with ${coat} fur, wearing ${outfit}, ${adjustedTheme}, ${stylePrompt}, --ar ${targetFormat.aspect_ratio}`.replace(/,\s*,/g, ',').trim();
+  }
+
+  /**
+   * Prompts for one variation without calling Gemini (used to build Gemini Batch requests).
+   * Breed + coat (optionally wearing an outfit), or outfit only (keeping the reference's pet).
+   */
+  promptsFor(opts: {
+    originalPrompt: string;
+    targetBreed?: Breed | null;
+    coat?: any | null;
+    outfit?: Outfit | null;
+    theme?: any;
+    style?: any;
+    originalBreed?: Breed | null;
+    originalCoat?: any | null;
+    format?: any;
+    targetAge?: string;
+  }): { geminiPrompt: string; catalogPrompt: string; variationType: string; tags: string[] } {
+    const { originalPrompt, targetBreed, coat, outfit, theme, style, originalBreed, originalCoat, format, targetAge } = opts;
+    if (targetBreed && coat) {
+      const geminiPrompt = this.createBreedVariationPromptWithCoat(originalPrompt, targetBreed, coat, theme, style, originalBreed ?? undefined, targetAge, outfit ?? undefined);
+      const breedPrompt = this.createMidjourneyPromptForBreedWithCoat(originalPrompt, targetBreed, coat, theme, style, originalBreed ?? undefined);
+      // The stored prompt names the new outfit too
+      let catalogPrompt = breedPrompt;
+      if (outfit) {
+        const { aspectRatio } = this.parseOriginalPrompt(originalPrompt);
+        const outfitText = outfit.clothing_description || outfit.name.toLowerCase();
+        catalogPrompt = `A ${targetBreed.name.toLowerCase()} with ${String(coat.coat_name).toLowerCase()} fur, wearing ${outfitText}, ${theme?.base_prompt_template || ''}, ${style?.prompt_suffix || ''}, --ar ${aspectRatio}`.replace(/,\s*,/g, ',').replace(/,\s*,/g, ',').trim();
+      }
+      const variationType = outfit ? 'breed_outfit' : 'breed';
+      const tags = this.generateVariationTags({ imageData: '', prompt: '', metadata: { breed: targetBreed, coat, outfit: outfit ?? undefined, format, variation_type: variationType } } as any);
+      return { geminiPrompt, catalogPrompt, variationType, tags };
+    }
+    if (outfit) {
+      const geminiPrompt = this.createOutfitVariationPrompt(originalPrompt, outfit, theme, style);
+      const catalogPrompt = this.createMidjourneyPromptForOutfit(originalPrompt, outfit, theme, style);
+      const tags = this.generateVariationTags({ imageData: '', prompt: '', metadata: { breed: originalBreed ?? undefined, coat: originalCoat ?? undefined, outfit, format, variation_type: 'outfit' } } as any);
+      return { geminiPrompt, catalogPrompt, variationType: 'outfit', tags };
+    }
+    throw new Error('A variation needs a breed and coat, or an outfit');
+  }
+
+  /** Output shape for a reference (format, then the prompt's --ar, then the image itself) */
+  aspectRatioFor(originalPrompt: string, format?: { aspect_ratio?: string } | null, imageData?: string): string | undefined {
+    return format?.aspect_ratio || this.ratioFromPrompt(originalPrompt) || (imageData ? ratioOfImage(imageData) : undefined);
   }
 
   /**

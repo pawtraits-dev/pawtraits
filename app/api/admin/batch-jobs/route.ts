@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/qr/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function POST(request: NextRequest) {
+  // Replaced by saved variation batches (Gemini Batch API): Admin → Variation batches.
+  // The old processor ran after the response, which Vercel freezes, so jobs never finished.
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  return NextResponse.json({ error: 'Background batch mode has been replaced by Admin → Variation batches.' }, { status: 410 });
+
   try {
     // Use service role for admin operations
     const supabase = createClient(supabaseUrl, serviceRoleKey, {

@@ -210,10 +210,10 @@ export default function AdminDashboard() {
       color: 'from-orange-500 to-red-500'
     },
     {
-      title: 'Batch Jobs',
-      description: 'Monitor background processing',
+      title: 'Variation Batches',
+      description: 'Saved batches, Gemini runs and review',
       icon: Clock,
-      href: '/admin/batch-jobs',
+      href: '/admin/variation-batches',
       color: 'from-indigo-500 to-purple-500'
     }
   ];

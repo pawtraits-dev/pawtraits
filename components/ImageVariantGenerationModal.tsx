@@ -14,6 +14,8 @@ import { Copy, ArrowLeft, CheckCircle, Brain, Clock, Zap } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { uploadImagesDirectBatch } from '@/lib/cloudinary-client';
 import OutfitPicker from '@/components/admin/OutfitPicker';
+import VariationRunDialog, { type RunRecipe } from '@/components/admin/VariationRunDialog';
+import { plainTitle } from '@/lib/variations/combos';
 
 interface ImageVariantGenerationModalProps {
   image: ImageCatalogWithDetails | null;
@@ -333,6 +335,10 @@ export default function ImageVariantGenerationModal({
   // One request per variation, two at a time (each well inside Vercel's 5-minute limit)
   const [progress, setProgress] = useState<GenProgress | null>(null);
   const stopRef = useRef(false);
+  // Saved batches (Gemini Batch API)
+  const [savedBatches, setSavedBatches] = useState<RunRecipe[] | null>(null);
+  const [showRunDialog, setShowRunDialog] = useState(false);
+  const [batchNote, setBatchNote] = useState<string | null>(null);
   
   const [isGenerating, setIsGenerating] = useState(false);
   
@@ -653,6 +659,36 @@ export default function ImageVariantGenerationModal({
     await Promise.all([worker(), worker()]);
     setProgress((p) => p && { ...p, running: false, total: stopRef.current ? p.done : p.total });
     setIsGenerating(false);
+  };
+
+  const openSavedBatches = async () => {
+    try {
+      const res = await fetch('/api/admin/variation-recipes');
+      const list = await res.json();
+      if (!res.ok) throw new Error(list?.error || res.statusText);
+      setSavedBatches(list);
+      if (!list.length) { setBatchNote('No saved batches yet: choose breeds/coats and outfits here, then “Save these choices as a batch”.'); return; }
+      setShowRunDialog(true);
+    } catch (e) {
+      setBatchNote(e instanceof Error ? e.message : 'Could not load saved batches');
+    }
+  };
+
+  const saveChoicesAsBatch = async () => {
+    const name = window.prompt('Name for this saved batch (e.g. “Top coats” or “NFL kits”)');
+    if (!name?.trim()) return;
+    try {
+      const res = await fetch('/api/admin/variation-recipes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, breed_coats: getSelectedBreedCoatPairs(), outfit_ids: selectedOutfits, image_size: imageSize }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error || res.statusText);
+      setBatchNote(`Saved “${body.name}”. Run it on any design from here or from Admin → Variation batches.`);
+    } catch (e) {
+      setBatchNote(e instanceof Error ? e.message : 'Could not save');
+    }
   };
 
   const handleGenerateVariations = () => runItems(buildItems(), false);
@@ -1280,6 +1316,21 @@ export default function ImageVariantGenerationModal({
               </div>
             </div>
 
+            {/* Saved batches: big runs through Gemini Batch, half price */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg border border-dashed">
+              <div>
+                <p className="text-sm font-medium text-gray-800">Saved batches</p>
+                <p className="text-xs text-gray-500">For large sets (e.g. 100 coats, every NFL team): runs through Gemini Batch at half price, results within hours.</p>
+                {batchNote && <p className="text-xs text-purple-800 mt-1" aria-live="polite">{batchNote}</p>}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={saveChoicesAsBatch} disabled={getTotalVariations() === 0 || selectedFormats.length > 0} title={selectedFormats.length ? 'Formats aren’t part of saved batches' : undefined}>
+                  Save these choices as a batch
+                </Button>
+                <Button variant="outline" size="sm" onClick={openSavedBatches}>Run a saved batch on this design</Button>
+              </div>
+            </div>
+
             {/* Generate Button */}
             <div className="flex items-center justify-between pt-4 border-t">
               <div className="flex items-center gap-3 text-sm text-gray-600">
@@ -1324,6 +1375,15 @@ export default function ImageVariantGenerationModal({
             </div>
 
           </div>
+        )}
+        {image && (
+          <VariationRunDialog
+            open={showRunDialog}
+            onClose={() => setShowRunDialog(false)}
+            recipes={savedBatches ?? []}
+            initialRefs={[{ id: image.id, title: plainTitle(image.description, 'This design'), thumb: (image as any).image_variants?.thumbnail?.url || image.public_url || null }]}
+            onStarted={(runId) => { window.location.href = `/admin/variation-batches/${runId}`; }}
+          />
         )}
       </DialogContent>
     </Dialog>

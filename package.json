@@ -18,6 +18,7 @@
     "test:social": "tsx scripts/test-social.ts",
     "test:emails": "tsx scripts/test-emails.ts",
     "build:collections-seed": "npx tsx scripts/build-collections-seed.ts",
+    "test:variations": "npx tsx scripts/test-variations.ts",
     "test:ai-usage": "npx tsx scripts/test-ai-usage.ts",
     "test:collections": "npx tsx scripts/test-collections.ts",
     "test:search": "npx tsx scripts/test-search-tags.ts",
