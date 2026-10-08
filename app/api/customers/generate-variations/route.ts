@@ -203,6 +203,7 @@ export async function POST(request: NextRequest) {
     }
 
     const geminiService = new GeminiVariationService();
+    geminiService.usage = { feature: 'customer-variation', meta: { customerId } };
     const results = [];
 
     // Load reference data from database

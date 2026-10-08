@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ImageDescriptionGenerator } from '@/lib/image-description-generator';
 import Anthropic from '@anthropic-ai/sdk';
+import { createWithUsage } from '@/lib/ai/usage';
 
 const anthropic = new Anthropic({
   apiKey: process.env.CLAUDE_API_KEY!,
@@ -54,7 +55,7 @@ Return ONLY the JSON object, no other text.`;
       else if (file.type === 'image/webp') mediaType = 'image/webp';
       else if (file.type === 'image/gif') mediaType = 'image/gif';
       
-      const response = await anthropic.messages.create({
+      const response = await createWithUsage(anthropic, { feature: 'theme-from-image' }, {
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1000,
         messages: [

@@ -11,6 +11,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { getSetting } from '@/lib/app-settings';
 import { OCCASIONS, ZODIAC } from './definitions';
 import { LEAGUES, SPORTS_TEAMS } from './sports-teams';
+import { createWithUsage } from '@/lib/ai/usage';
 
 const MODEL = 'claude-haiku-4-5-20251001';
 export const MAX_TAGS = 10;
@@ -117,7 +118,7 @@ async function askModel(prompt: string, imageUrl: string | null): Promise<string
     }
   }
   content.push({ type: 'text', text: prompt });
-  const response = await anthropic().messages.create({ model: MODEL, max_tokens: 400, messages: [{ role: 'user', content }] });
+  const response = await createWithUsage(anthropic(), { feature: 'auto-tag' }, { model: MODEL, max_tokens: 400, messages: [{ role: 'user', content }] });
   return response.content.map(c => (c.type === 'text' ? c.text : '')).join('');
 }
 

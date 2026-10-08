@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
     }
     
     const geminiService = new GeminiVariationService();
+    geminiService.usage = { feature: 'admin-variation', imageId: originalImageId || null };
     const results = [];
 
     // Load data for variations directly from database

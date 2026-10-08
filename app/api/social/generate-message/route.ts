@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { createWithUsage } from '@/lib/ai/usage';
 
 const anthropic = new Anthropic({
   apiKey: process.env.CLAUDE_API_KEY!,
@@ -68,7 +69,7 @@ Output Format: Return ONLY a JSON array of 3 strings, no other text or explanati
 Example: ["message1", "message2", "message3"]
 `;
 
-    const response = await anthropic.messages.create({
+    const response = await createWithUsage(anthropic, { feature: 'social-message' }, {
       model: "claude-haiku-4-5-20251001",
       max_tokens: 400,
       messages: [

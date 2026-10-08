@@ -15,6 +15,7 @@ import { serviceClient } from '@/lib/qr/server';
 import { uploadImageBufferToCloudinary } from '@/lib/cloudinary-server';
 import { GEMINI_IMAGE_MODELS, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
 import { LEAGUES, type League } from './sports-teams';
+import { generateWithUsage } from '@/lib/ai/usage';
 
 export const VARIANT_TAG = 'team-variant';
 const UNLISTED_TAG = 'quiz-generated'; // lib/catalog/listing.ts: "link-only, not in listings"
@@ -116,7 +117,7 @@ const geminiRecolour: RecolourFn = async (pngBase64, instruction) => {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error('Gemini API key is required');
   const ai = new GoogleGenAI({ apiKey: key });
-  const response = await ai.models.generateContent({
+  const response = await generateWithUsage(ai, { feature: 'team-version' }, {
     model: GEMINI_IMAGE_MODELS.pro,
     config: geminiImageConfig(ratioOfImage(pngBase64)),
     contents: [

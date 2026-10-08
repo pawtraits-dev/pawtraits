@@ -38,6 +38,7 @@ export class BatchProcessingService {
   async processBatchJob(jobId: string): Promise<void> {
     const overallStartTime = Date.now();
     console.log(`🚀 BATCH PROCESSING START: ${jobId} at ${new Date().toISOString()}`);
+    this.geminiService.usage = { feature: 'admin-variation', batchJobId: jobId };
 
     try {
       // Mark job as running

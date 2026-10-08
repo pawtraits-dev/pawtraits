@@ -7,6 +7,7 @@ import { buildMultiSubjectReplacementPrompt } from '@/lib/variation-prompt-build
 import { loadSlots } from '@/lib/catalog/slots-server';
 import { slotNow } from '@/lib/catalog/slots';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
+import { generateWithUsage } from '@/lib/ai/usage';
 
 // Nano Banana Pro at 2K can take 20–60 s per image
 export const maxDuration = 300;
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
     const geminiStartTime = Date.now();
 
     try {
-      const response = await geminiService.ai.models.generateContent({
+      const response = await generateWithUsage(geminiService.ai, { feature: 'admin-preview', meta: { pets: petImageData.length } }, {
         model: GEMINI_IMAGE_MODELS.pro,
         contents: [
           { text: customPrompt },

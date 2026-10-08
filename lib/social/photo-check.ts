@@ -8,6 +8,7 @@
  * Server only. Never throws: an unusable answer comes back as status 'error' (retried later).
  */
 import Anthropic from '@anthropic-ai/sdk';
+import { createWithUsage } from '@/lib/ai/usage';
 
 export type CheckReason = 'person' | 'child' | 'personal_details' | 'failed_portrait' | 'inappropriate' | 'no_pet' | 'unreadable';
 export interface PhotoCheckResult { status: 'approved' | 'rejected' | 'error'; reasons: CheckReason[]; note?: string }
@@ -63,7 +64,7 @@ export function parseCheckReply(text: string): PhotoCheckResult {
 export async function checkPhotos(beforeUrl: string, afterUrl: string): Promise<PhotoCheckResult> {
   try {
     const [before, after] = await Promise.all([asBase64(beforeUrl), asBase64(afterUrl)]);
-    const response = await anthropic().messages.create({
+    const response = await createWithUsage(anthropic(), { feature: 'photo-check' }, {
       model: MODEL,
       max_tokens: 200,
       messages: [{

@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import sharp from 'sharp';
+import { createWithUsage } from '@/lib/ai/usage';
 
 const anthropic = new Anthropic({
   apiKey: process.env.CLAUDE_API_KEY!,
@@ -65,7 +66,7 @@ Now write a fun description for this image in exactly that style, incorporating 
       const prompt = this.buildDescriptionPrompt(breed, traits);
       
       const imageData = await this.imageToBase64(imageUrl);
-      const response = await anthropic.messages.create({
+      const response = await createWithUsage(anthropic, { feature: 'description' }, {
         model: "claude-haiku-4-5-20251001",
         max_tokens: 500,
         messages: [
@@ -207,7 +208,7 @@ Now write a fun description for this image in exactly that style, incorporating 
         console.log(`Media type corrected: declared ${processedFile.type}, actual ${mediaType}`);
       }
       
-      const response = await anthropic.messages.create({
+      const response = await createWithUsage(anthropic, { feature: 'description' }, {
         model: "claude-haiku-4-5-20251001",
         max_tokens: 500,
         messages: [

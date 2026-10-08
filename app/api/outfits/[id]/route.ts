@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from '@/lib/qr/server';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,14 +33,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 }
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { id } = await params;
     const body = await request.json();
-    
-    // Update slug if name changed
-    if (body.name && !body.slug) {
-      body.slug = body.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
-    }
+
+    // The slug is the outfit's permanent key (team kits are `team-<league>-<team>`, which is how
+    // they're grouped by league), so editing the name or description must never change it.
+    // It changes only when a new slug is sent explicitly.
+    delete body.id;
+    delete body.created_at;
+    if (!body.slug) delete body.slug;
 
     const { data, error } = await supabase
       .from('outfits')
@@ -60,6 +65,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 }
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { id } = await params;
     

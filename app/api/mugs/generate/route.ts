@@ -7,6 +7,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { buildMugPreviewUrl, buildMugPrintUrl } from '@/lib/cloudinary-mug';
 import type { MugColour, MugCatalogEntry } from '@/lib/product-types';
 import { GEMINI_IMAGE_MODELS } from '@/lib/gemini-models';
+import { generateWithUsage } from '@/lib/ai/usage';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -135,7 +136,7 @@ export async function POST(request: NextRequest) {
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-    const geminiResponse = await ai.models.generateContent({
+    const geminiResponse = await generateWithUsage(ai, { feature: 'mug', meta: { generationId } }, {
       model: GEMINI_IMAGE_MODELS.flash,
       contents: [
         {

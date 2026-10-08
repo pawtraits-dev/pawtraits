@@ -115,6 +115,7 @@ async function generateBreedVersion(sourceImageId: string, breedId: string, code
   const base64 = Buffer.from(await res.arrayBuffer()).toString('base64');
 
   const gemini = new GeminiVariationService();
+  gemini.usage = { feature: 'quiz-image' };
   const [variation] = await gemini.generateBreedVariations(base64, source.prompt_text || '', [breed as any], source.themes, source.styles);
   if (!variation?.imageData) throw new Error('The picture service returned no image');
 

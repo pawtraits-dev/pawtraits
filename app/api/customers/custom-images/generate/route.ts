@@ -15,6 +15,7 @@ import { getRequester, setGuestCookie, clientIp } from '@/lib/guest/access';
 import { hashIp } from '@/lib/qr/attribution';
 import { getSetting } from '@/lib/app-settings';
 import { capturePreviews } from '@/lib/social/capture';
+import { generateWithUsage } from '@/lib/ai/usage';
 
 // Generation continues after the response (via after()); give it room to finish.
 export const maxDuration = 300;
@@ -183,7 +184,7 @@ async function generateCustomImage(
     console.log(`🎨 Generating with ${petImageDataArray.length} pet image(s)`);
 
     // Call Gemini via service (same model as admin)
-    const response = await geminiService.ai.models.generateContent({
+    const response = await generateWithUsage(geminiService.ai, { feature: 'customer-painting', customerImageId: customImageId }, {
       model: GEMINI_IMAGE_MODELS.pro,
       contents,
       config: {

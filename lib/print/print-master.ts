@@ -14,6 +14,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
 import { GEMINI_IMAGE_MODELS, GEMINI_IMAGE_SIZES, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
+import { generateWithUsage } from '@/lib/ai/usage';
 
 export const PRINT_MASTER_PROMPT = [
   'Recreate this exact image at a higher resolution for a large fine-art print.',
@@ -77,7 +78,7 @@ export async function ensurePrintMaster(supabase: SupabaseClient, customImageId:
     if (!key) throw new Error('GEMINI_API_KEY not set');
     const ai = new GoogleGenAI({ apiKey: key });
     const started = Date.now();
-    const response = await ai.models.generateContent({
+    const response = await generateWithUsage(ai, { feature: 'print-master', customerImageId: customImageId }, {
       model: GEMINI_IMAGE_MODELS.pro,
       contents: [{ text: PRINT_MASTER_PROMPT }, { inlineData: { mimeType: 'image/png', data: sourceBase64 } }],
       config: { responseModalities: ['IMAGE'], ...geminiImageConfig(ratioOfImage(sourceBase64), GEMINI_IMAGE_SIZES.print) } as any,

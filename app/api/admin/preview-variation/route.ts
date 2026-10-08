@@ -3,6 +3,7 @@ import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
 import { GEMINI_IMAGE_MODELS, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
+import { generateWithUsage } from '@/lib/ai/usage';
 
 // Nano Banana Pro at 2K can take 20–60 s per image
 export const maxDuration = 300;
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
     const geminiStartTime = Date.now();
 
     try {
-      const response = await geminiService.ai.models.generateContent({
+      const response = await generateWithUsage(geminiService.ai, { feature: 'admin-preview' }, {
         model: GEMINI_IMAGE_MODELS.pro,
         contents: [
           { text: customPrompt },

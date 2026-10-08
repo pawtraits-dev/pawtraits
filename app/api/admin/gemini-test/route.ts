@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
     console.log('✅ GEMINI_API_KEY found in environment');
 
     const geminiService = new GeminiVariationService();
+    geminiService.usage = { feature: 'gemini-test' };
     const results = [];
 
     // Get Border Collie breed data

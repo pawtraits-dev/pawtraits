@@ -11,6 +11,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { createWithUsage } from '@/lib/ai/usage';
 
 // ============================================================================
 // Types
@@ -131,7 +132,7 @@ export class ClaudeCompositionAnalyzer {
       const prompt = this.buildAnalysisPrompt(context);
 
       // Call Claude API
-      const response = await this.anthropic.messages.create({
+      const response = await createWithUsage(this.anthropic, { feature: 'composition-analysis' }, {
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 2500,
         messages: [
@@ -185,7 +186,7 @@ export class ClaudeCompositionAnalyzer {
       const prompt = this.buildAnalysisPrompt(request.context);
 
       // Call Claude API
-      const response = await this.anthropic.messages.create({
+      const response = await createWithUsage(this.anthropic, { feature: 'composition-analysis' }, {
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 2500,
         messages: [

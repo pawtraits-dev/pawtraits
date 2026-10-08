@@ -132,6 +132,7 @@ const navigationSections = [
       { name: 'Revenue', href: '/admin/financial/revenue', icon: DollarSign },
       { name: 'Sales', href: '/admin/financial/sales', icon: CreditCard },
       { name: 'Costs', href: '/admin/financial/costs', icon: TrendingUp },
+      { name: 'AI Costs', href: '/admin/ai-costs', icon: Sparkles },
       { name: 'Profit', href: '/admin/financial/profit', icon: PieChart },
       { name: 'Commissions', href: '/admin/financial/commissions', icon: Target },
     ]

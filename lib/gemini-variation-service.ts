@@ -1,6 +1,7 @@
 // lib/gemini-variation-service.ts
 import { GoogleGenAI } from "@google/genai";
 import type { Breed, Coat, Outfit, Format, BreedCoatDetail } from '@/lib/types';
+import { generateWithUsage, type UsageContext } from '@/lib/ai/usage';
 import { GEMINI_IMAGE_MODELS, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
 
 export interface VariationConfig {
@@ -30,6 +31,8 @@ export interface GeneratedVariation {
 
 export class GeminiVariationService {
   private ai: GoogleGenAI;
+  /** What these calls are for, in AI cost tracking (callers set it) */
+  usage: UsageContext = { feature: 'admin-variation' };
 
   constructor(apiKey?: string) {
     const key = apiKey || process.env.GEMINI_API_KEY;
@@ -67,7 +70,7 @@ export class GeminiVariationService {
           },
         ];
 
-        const response = await this.ai.models.generateContent({
+        const response = await generateWithUsage(this.ai, this.usage, {
           config: geminiImageConfig((this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
           model: GEMINI_IMAGE_MODELS.pro,
           contents: prompt,
@@ -127,7 +130,7 @@ export class GeminiVariationService {
           },
         ];
 
-        const response = await this.ai.models.generateContent({
+        const response = await generateWithUsage(this.ai, this.usage, {
           config: geminiImageConfig((originalFormat?.aspect_ratio || this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
           model: GEMINI_IMAGE_MODELS.pro,
           contents: prompt,
@@ -193,7 +196,7 @@ export class GeminiVariationService {
           },
         ];
 
-        const response = await this.ai.models.generateContent({
+        const response = await generateWithUsage(this.ai, this.usage, {
           config: geminiImageConfig((originalFormat?.aspect_ratio || this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
           model: GEMINI_IMAGE_MODELS.pro,
           contents: prompt,
@@ -264,7 +267,7 @@ export class GeminiVariationService {
           },
         ];
 
-        const response = await this.ai.models.generateContent({
+        const response = await generateWithUsage(this.ai, this.usage, {
           config: geminiImageConfig((format.aspect_ratio) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
           model: GEMINI_IMAGE_MODELS.pro,
           contents: prompt,
@@ -353,7 +356,7 @@ export class GeminiVariationService {
       console.log(`📝 Prompt: ${variationPrompt.substring(0, 200)}...`);
 
       const geminiCallStart = Date.now();
-      const response = await this.ai.models.generateContent({
+      const response = await generateWithUsage(this.ai, this.usage, {
         config: geminiImageConfig((format?.aspect_ratio) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
         model: GEMINI_IMAGE_MODELS.pro,
         contents: prompt,
@@ -698,7 +701,7 @@ Ensure the ${primaryAnimal.coat.coat_name} coloring is consistent across ALL bod
       console.log(`📝 Prompt length: ${variationPrompt.length} characters`);
       
       const geminiCallStart = Date.now();
-      const response = await this.ai.models.generateContent({
+      const response = await generateWithUsage(this.ai, this.usage, {
         config: geminiImageConfig((originalFormat?.aspect_ratio || this.ratioFromPrompt(originalPrompt)) || ratioOfImage(originalImageData)), // Pro at 2K, reference shape (1:1, 2:3, 3:2, 2:1)
         model: GEMINI_IMAGE_MODELS.pro,
         contents: prompt,
