@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Copy, ArrowLeft, CheckCircle, Brain, Clock, Zap } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { uploadImagesDirectBatch } from '@/lib/cloudinary-client';
+import OutfitPicker from '@/components/admin/OutfitPicker';
 
 interface ImageVariantGenerationModalProps {
   image: ImageCatalogWithDetails | null;
@@ -1157,58 +1158,8 @@ export default function ImageVariantGenerationModal({
               </div>
             </div>
 
-            {/* Outfit Variations */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-medium text-gray-700">Outfit Variations</h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const allOutfitIds = filteredOutfits.map(outfit => outfit.id);
-                    const allSelected = allOutfitIds.every(id => selectedOutfits.includes(id));
-                    if (allSelected) {
-                      setSelectedOutfits([]);
-                    } else {
-                      setSelectedOutfits(allOutfitIds);
-                    }
-                  }}
-                >
-                  {filteredOutfits.every(outfit => selectedOutfits.includes(outfit.id)) ? 'Deselect All' : 'Select All'}
-                </Button>
-              </div>
-              
-              {/* Outfit Search */}
-              <div className="relative mb-3">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Search outfits (e.g. pyjamas)..."
-                  value={outfitSearch}
-                  onChange={(e) => setOutfitSearch(e.target.value)}
-                  className="pl-10 text-sm"
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                {filteredOutfits.map(outfit => (
-                  <div key={outfit.id} className="flex items-center space-x-2 p-2 border rounded-lg">
-                    <Checkbox
-                      id={`outfit-${outfit.id}`}
-                      checked={selectedOutfits.includes(outfit.id)}
-                      onCheckedChange={() => handleOutfitToggle(outfit.id)}
-                    />
-                    <div className="flex-1">
-                      <label htmlFor={`outfit-${outfit.id}`} className="text-sm cursor-pointer font-medium">
-                        {outfit.name}
-                      </label>
-                      {outfit.clothing_description && (
-                        <p className="text-xs text-gray-500 mt-1">{outfit.clothing_description}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Outfit Variations: everyday outfits, then team kits grouped by league */}
+            <OutfitPicker outfits={outfits} selected={selectedOutfits} onChange={setSelectedOutfits} />
 
             {/* Format Variations */}
             <div>

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Wand2, RefreshCw, Upload, Download } from 'lucide-react';
+import OutfitPicker from '@/components/admin/OutfitPicker';
 import type { Breed, Outfit, Format, BreedCoatDetail, AnimalType } from '@/lib/types';
 
 interface VariationsSelectorProps {
@@ -322,53 +323,8 @@ export function VariationsSelector({
           </div>
         )}
 
-        {/* Outfit Variations */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium text-gray-700">Outfit Variations</h3>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const allOutfitIds = outfits.map(outfit => outfit.id);
-                const allSelected = allOutfitIds.every(id => selectedOutfits.includes(id));
-                if (allSelected) {
-                  setSelectedOutfits([]);
-                } else {
-                  setSelectedOutfits(allOutfitIds);
-                }
-              }}
-            >
-              {outfits.every(outfit => selectedOutfits.includes(outfit.id)) ? 'Deselect All' : 'Select All'}
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {outfits.map(outfit => (
-              <div key={outfit.id} className="flex items-center space-x-2 p-2 border rounded-lg">
-                <Checkbox
-                  id={`outfit-${outfit.id}`}
-                  checked={selectedOutfits.includes(outfit.id)}
-                  onCheckedChange={() => handleOutfitToggle(outfit.id)}
-                />
-                <div className="flex-1">
-                  <label htmlFor={`outfit-${outfit.id}`} className="text-sm cursor-pointer font-medium">
-                    {outfit.name}
-                  </label>
-                  {outfit.clothing_description && (
-                    <p className="text-xs text-gray-500 mt-1">{outfit.clothing_description}</p>
-                  )}
-                  <div className="flex items-center mt-1">
-                    {outfit.animal_compatibility.map(animal => (
-                      <span key={animal} className="text-xs mr-1">
-                        {animal === 'dog' ? '🐕' : '🐱'}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Outfit Variations: everyday outfits, then team kits grouped by league */}
+        <OutfitPicker outfits={outfits} selected={selectedOutfits} onChange={setSelectedOutfits} idPrefix="vs-outfit" />
 
         {/* Format Variations */}
         <div>
