@@ -204,6 +204,49 @@ export interface Deps {
   fetchResults?: ResultsFetcher;
   uploadPreview?: typeof uploadVariationPreview;
   loadReference?: (ref: { cloudinary_public_id?: string | null; public_url?: string | null }) => Promise<string>;
+  describe?: (imageUrl: string, breedName?: string) => Promise<string>;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Descriptions: written by Claude from each preview as soon as it's back, before review
+
+const defaultDescribe = async (imageUrl: string, breedName?: string) => {
+  const { ImageDescriptionGenerator } = await import('@/lib/image-description-generator');
+  return new ImageDescriptionGenerator().generateDescription(imageUrl, breedName);
+};
+
+/** One item's description (the 768 px PNG preview: small, and a format Claude accepts) */
+export async function describeItem(supabase: SupabaseClient, item: { id: string; preview_thumb_url: string | null; preview_url: string | null; metadata: any }, deps: Deps = {}): Promise<string | null> {
+  const url = item.preview_thumb_url || item.preview_url;
+  if (!url) return null;
+  try {
+    const text = (await (deps.describe ?? defaultDescribe)(url, item.metadata?.breed_name ?? undefined))?.trim();
+    if (!text || /^Unable to generate/i.test(text)) throw new Error('No description returned');
+    await supabase.from('variation_run_items').update({ description: text, description_error: null, updated_at: new Date().toISOString() }).eq('id', item.id);
+    return text;
+  } catch (e: any) {
+    await supabase.from('variation_run_items').update({ description_error: String(e?.message || e).slice(0, 300) }).eq('id', item.id);
+    return null;
+  }
+}
+
+/** Describe images waiting for review that don't have one yet, 4 at a time, until the deadline */
+export async function describePending(supabase: SupabaseClient, deadline: number, deps: Deps = {}): Promise<number> {
+  const { data: items, error } = await supabase.from('variation_run_items')
+    .select('id, preview_thumb_url, preview_url, metadata')
+    .eq('status', 'generated').is('description', null).is('description_error', null)
+    .order('created_at').limit(60);
+  if (error) { if (/description/.test(error.message)) return 0; throw new Error(error.message); } // migration not run yet
+  const queue = [...(items ?? [])];
+  let done = 0;
+  const worker = async () => {
+    while (queue.length && Date.now() < deadline) {
+      const item = queue.shift()!;
+      if (await describeItem(supabase, item, deps)) done++;
+    }
+  };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  return done;
 }
 
 async function referenceFile(supabase: SupabaseClient, run: any, refId: string, deps: Deps = {}): Promise<{ uri: string; mimeType: string }> {
@@ -384,7 +427,7 @@ export async function refreshRunStatuses(supabase: SupabaseClient, runIds?: stri
 
 export async function tick(supabase: SupabaseClient, budgetMs = 240_000, deps: Deps = {}) {
   const deadline = Date.now() + budgetMs;
-  const summary = { submitted: 0, checked: 0, processed: 0, partial: 0, errors: [] as string[] };
+  const summary = { submitted: 0, checked: 0, processed: 0, partial: 0, described: 0, errors: [] as string[] };
 
   const { data: queued } = await supabase.from('variation_run_jobs').select('*').eq('state', 'queued').order('created_at').limit(25);
   for (const job of queued ?? []) {
@@ -409,6 +452,9 @@ export async function tick(supabase: SupabaseClient, budgetMs = 240_000, deps: D
     } catch (e: any) { summary.errors.push(`results ${job.id}: ${e?.message || e}`); }
   }
 
+  // Descriptions for whatever is back (also picks up any left over from earlier ticks)
+  try { summary.described = await describePending(supabase, deadline - 10_000, deps); } catch (e: any) { summary.errors.push(`describe: ${e?.message || e}`); }
+
   await refreshRunStatuses(supabase);
   return summary;
 }
@@ -416,12 +462,14 @@ export async function tick(supabase: SupabaseClient, budgetMs = 240_000, deps: D
 // ---------------------------------------------------------------------------------------------
 // Review
 
-export async function approveItems(supabase: SupabaseClient, runId: string, ids: string[], visibility: 'public' | 'hidden') {
+export async function approveItems(supabase: SupabaseClient, runId: string, ids: string[], visibility: 'public' | 'hidden', deps: Deps = {}) {
   const { data: items } = await supabase.from('variation_run_items').select('*').eq('run_id', runId).in('id', ids).eq('status', 'generated');
   const results: { id: string; ok: boolean; imageId?: string; error?: string }[] = [];
   for (const item of items ?? []) {
     try {
       const m = item.metadata ?? {};
+      // The description written (and maybe edited) before review; write one now if it's missing
+      const description = item.description || await describeItem(supabase, item, deps) || '';
       const moved = await promoteVariationPreview(item.preview_public_id, `${m.filename || 'batch'}-${item.id.slice(0, 8)}.png`);
       const saved = await registerCloudinaryImage(supabase, {
         cloudinary_public_id: moved.public_id,
@@ -430,7 +478,7 @@ export async function approveItems(supabase: SupabaseClient, runId: string, ids:
         file_size: moved.bytes,
         mime_type: `image/${moved.format === 'jpg' ? 'jpeg' : moved.format}`,
         prompt_text: m.catalog_prompt || '',
-        description: '',
+        description,
         tags: m.tags || ['variation', 'batch-generated'],
         breed_id: m.breed_id, coat_id: m.coat_id, format_id: m.format_id, theme_id: m.theme_id, style_id: m.style_id,
         rating: 4,

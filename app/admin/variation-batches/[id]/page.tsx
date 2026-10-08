@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, RefreshCw, Check, X, Ban, RotateCcw, ExternalLink } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Check, X, Ban, RotateCcw, ExternalLink, Pencil } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 
-type Item = { id: string; reference_image_id: string; label: string; status: string; preview_url: string | null; preview_thumb_url: string | null; width: number | null; height: number | null; saved_image_id: string | null; error: string | null };
+type Item = { id: string; reference_image_id: string; label: string; status: string; preview_url: string | null; preview_thumb_url: string | null; width: number | null; height: number | null; saved_image_id: string | null; error: string | null; description?: string | null; description_error?: string | null };
 type Data = {
   run: { id: string; name: string; status: string; image_size: string; estimated_cost_usd: number | null; created_at: string; reference_ids: string[] };
   counts: { total: number; waiting: number; to_review: number; approved: number; rejected: number; failed: number; cancelled: number } | null;
@@ -44,6 +46,8 @@ export default function VariationRunPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Item | null>(null);
+  const [draft, setDraft] = useState('');
 
   const load = useCallback(async (f = filter, p = page) => {
     try { setData(await api<Data>(`/api/admin/variation-runs/${id}?filter=${f}&page=${p}&size=60`)); setError(null); }
@@ -97,6 +101,22 @@ export default function VariationRunPage() {
     setBusy('cancel');
     try { await api(`/api/admin/variation-runs/${id}`, { method: 'DELETE' }); } catch (e: any) { setError(e.message); } finally { setBusy(null); load(); }
   };
+  const saveDescription = async () => {
+    if (!editing) return;
+    setBusy('edit');
+    try { await api(`/api/admin/variation-runs/${id}/review`, { method: 'POST', body: JSON.stringify({ edit: { id: editing.id, description: draft } }) }); setEditing(null); load(); }
+    catch (e: any) { setError(e.message); } finally { setBusy(null); }
+  };
+  const describeAgain = async (itemIds: string[]) => {
+    setBusy('describe');
+    try {
+      const { results } = await api(`/api/admin/variation-runs/${id}/review`, { method: 'POST', body: JSON.stringify({ describe: itemIds }) });
+      if (editing && results[0]?.description) setDraft(results[0].description);
+      load();
+    } catch (e: any) { setError(e.message); } finally { setBusy(null); }
+  };
+  const missingDescriptions = reviewable.filter((i) => !i.description).length;
+
   const checkNow = async () => {
     setBusy('check');
     try { await api('/api/admin/variation-runs/tick', { method: 'POST' }); } catch (e: any) { setError(e.message); } finally { setBusy(null); load(); }
@@ -154,6 +174,7 @@ export default function VariationRunPage() {
         </div>
         {filter === 'review' && (c?.to_review ?? 0) > 0 && (
           <div className="flex flex-wrap items-center gap-2">
+            {missingDescriptions > 0 && <span className="text-xs text-gray-500">{missingDescriptions} on this page still waiting for a description (written on approval if needed)</span>}
             <div className="inline-flex rounded-lg border bg-white p-1" role="group" aria-label="Save as">
               {(['public', 'hidden'] as const).map((v) => (
                 <button key={v} type="button" aria-pressed={visibility === v} onClick={() => setVisibility(v)}
@@ -195,6 +216,18 @@ export default function VariationRunPage() {
                   <p className="text-[11px] text-gray-500 truncate" title={refTitle.get(it.reference_image_id)}>{refTitle.get(it.reference_image_id)}</p>
                   {it.width && <p className="text-[11px] text-gray-500">{it.width}×{it.height}</p>}
                   {it.error && <p className="text-[11px] text-red-700 line-clamp-3" title={it.error}>{it.error}</p>}
+                  {it.status === 'generated' && (
+                    it.description ? (
+                      <button type="button" onClick={() => { setEditing(it); setDraft(it.description || ''); }} className="block w-full text-left group" title="Edit description">
+                        <p className="text-[11px] text-gray-700 line-clamp-4 whitespace-pre-line">{it.description.replace(/\*\*/g, '')}</p>
+                        <span className="inline-flex items-center gap-0.5 text-[11px] text-purple-700 group-hover:underline"><Pencil className="w-3 h-3" /> Edit</span>
+                      </button>
+                    ) : it.description_error ? (
+                      <p className="text-[11px] text-amber-800">Description failed · <button type="button" className="underline" onClick={() => describeAgain([it.id])} disabled={!!busy}>Write again</button></p>
+                    ) : (
+                      <p className="text-[11px] text-gray-500 italic">Writing description…</p>
+                    )
+                  )}
                   {it.preview_url && <a href={it.preview_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[11px] text-purple-700 hover:underline"><ExternalLink className="w-3 h-3" /> Full size</a>}
                 </div>
               </div>
@@ -210,6 +243,24 @@ export default function VariationRunPage() {
           <Button variant="outline" size="sm" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>Next</Button>
         </div>
       )}
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Description: {editing?.label}</DialogTitle></DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-4">
+            {editing?.preview_thumb_url && <img src={editing.preview_thumb_url} alt="" className="w-full rounded-lg border" />}
+            <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={10} className="text-sm" aria-label="Description" />
+          </div>
+          <div className="flex justify-between gap-2">
+            <Button variant="outline" onClick={() => editing && describeAgain([editing.id])} disabled={!!busy}>
+              <RefreshCw className={`w-4 h-4 mr-1 ${busy === 'describe' ? 'animate-spin' : ''}`} /> Write again
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+              <Button onClick={saveDescription} disabled={!!busy}>Save description</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

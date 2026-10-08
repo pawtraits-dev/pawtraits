@@ -224,6 +224,20 @@ Customers can't wait hours, so they stay interactive. Tracking (A) will show the
   - Browser checks: editor counts, saved card, run dialog with a duo flagged, run page grid, failed tab, both buttons in the variations window.
 - **Not covered here:** the real Gemini Batch calls (file upload, `batches.create/get`, results download). The first live run is the check: start with a small saved batch (e.g. 2 coats × 3 kits on one design).
 
+### Batch descriptions before review (2026-10-08)
+
+- **Migration** `db/migrations/2026-10-18-batch-descriptions.sql`: `variation_run_items.description` and `description_error`.
+- **When it runs:** every tick, after reading results, describes images waiting for review that have no description yet.
+  - It uses Claude Haiku on the 768 px PNG preview, with the breed, 4 at a time, within the tick's time budget.
+  - A failure stores its reason.
+- **Review page:**
+  - Each card shows its description; clicking it opens an edit window with Save and **Write again**.
+  - Cards without one show "Writing description…", or "Description failed · Write again".
+  - The approve bar says how many on the page still have no description.
+- **Approve** saves the (edited) description with the design. If one is still missing it's written at that moment. Auto-tagging follows.
+- The earlier after-approval description step is gone. It used the mid-size Cloudinary image, served as WebP/AVIF, which Claude may reject.
+- **Tests:** 6 database checks (4 of 5 described, PNG preview + breed used, failure kept and not retried automatically, edited text saved with the design, missing one written on approval) and 5 browser checks (shown without markdown, waiting / failed states, edit saved).
+
 ## Sources
 
 - Gemini Batch API: https://ai.google.dev/gemini-api/docs/batch-mode

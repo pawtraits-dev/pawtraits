@@ -27,17 +27,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const { data: run } = await supabase.from('variation_runs').select('*').eq('id', id).maybeSingle();
   if (!run) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  let q = supabase.from('variation_run_items')
-    .select('id, reference_image_id, variation_key, label, status, preview_url, preview_thumb_url, width, height, saved_image_id, error, updated_at', { count: 'exact' })
-    .eq('run_id', id).order('reference_image_id').order('label').range(page * size, page * size + size - 1);
-  if (filter !== 'all') q = q.in('status', FILTERS[filter]);
-  const [items, counts, jobs, costs, refs] = await Promise.all([
-    q,
+  const BASE = 'id, reference_image_id, variation_key, label, status, preview_url, preview_thumb_url, width, height, saved_image_id, error, updated_at';
+  const itemsQuery = (cols: string) => {
+    let q = supabase.from('variation_run_items').select(cols, { count: 'exact' })
+      .eq('run_id', id).order('reference_image_id').order('label').range(page * size, page * size + size - 1);
+    if (filter !== 'all') q = q.in('status', FILTERS[filter]);
+    return q;
+  };
+  let [items, counts, jobs, costs, refs] = await Promise.all([
+    itemsQuery(`${BASE}, description, description_error`),
     supabase.from('variation_run_counts').select('*').eq('run_id', id).maybeSingle(),
     supabase.from('variation_run_jobs').select('id, state, item_count, error, submitted_at, finished_at, processed_at').eq('run_id', id).order('created_at'),
     supabase.from('ai_usage').select('cost_usd, output_images').eq('batch_job_id', id).limit(20000),
     supabase.from('image_catalog').select('id, description, public_url, image_variants').in('id', run.reference_ids ?? []),
   ]);
+  // Before 2026-10-18-batch-descriptions.sql has run
+  if (items.error && /description/.test(items.error.message)) items = await itemsQuery(BASE) as any;
   const cost = (costs.data ?? []).reduce((s: number, c: any) => s + Number(c.cost_usd ?? 0), 0);
   return NextResponse.json({
     run,
