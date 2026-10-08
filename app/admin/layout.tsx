@@ -73,6 +73,7 @@ const navigationSections = [
       { name: 'Styles', href: '/admin/styles', icon: Eye },
       { name: 'Outfits', href: '/admin/outfits', icon: Shirt },
       { name: 'Variation Batches', href: '/admin/variation-batches', icon: Layers },
+      { name: 'Preview Size Test', href: '/admin/size-test', icon: ImageIcon },
       { name: 'Formats', href: '/admin/formats', icon: FileImage },
       { name: 'Quizzes', href: '/admin/quizzes', icon: Sparkles },
     ]

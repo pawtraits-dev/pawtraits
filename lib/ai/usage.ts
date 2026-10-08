@@ -23,6 +23,7 @@ export type AiFeature =
   | 'print-master'          // 4K print file
   | 'mug'                   // mug artwork
   | 'quiz-image'            // Pawsonality quiz type pictures
+  | 'size-test'             // admin 1K / 2K / 4K comparison
   | 'gemini-test'
   | 'auto-tag'
   | 'photo-check'

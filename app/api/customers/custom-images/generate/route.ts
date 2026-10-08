@@ -16,6 +16,7 @@ import { hashIp } from '@/lib/qr/attribution';
 import { getSetting } from '@/lib/app-settings';
 import { capturePreviews } from '@/lib/social/capture';
 import { generateWithUsage } from '@/lib/ai/usage';
+import { buildPaintingPrompt, paintingRequest, imageFrom } from '@/lib/customise/painting';
 
 // Generation continues after the response (via after()); give it room to finish.
 export const maxDuration = 300;
@@ -117,22 +118,12 @@ async function generateCustomImage(
       console.log('✨ Using AI-detected characteristics:', petCharacteristics);
     }
 
-    const generationPrompt = slotPlan && slotPlan.length > 1 && slotPlan.length === petImageUrls.length
-      ? buildMultiSubjectReplacementPrompt({
-        compositionTemplate: variationPromptTemplate, aspectRatio, sizeInstruction, slots: slotPlan,
-        metadata: { themeName, styleName, formatName: 'portrait' },
-      })
-      : promptBuilder.buildSubjectReplacementPrompt({
-      compositionTemplate: variationPromptTemplate,
-      aspectRatio: aspectRatio, // Pass aspect ratio as direct parameter
-      sizeInstruction: sizeInstruction, // NEW: Relative size instruction for multi-subject
-      metadata: {
-        breedName: customerPetBreedName || catalogBreedName,
-        themeName: themeName,
-        styleName: styleName,
-        formatName: 'portrait',
-        petCharacteristics // NEW: Include AI-detected physical characteristics
-      }
+    const generationPrompt = buildPaintingPrompt({
+      variationPromptTemplate, aspectRatio, sizeInstruction, slotPlan,
+      petCount: petImageUrls.length,
+      themeName, styleName,
+      breedName: customerPetBreedName || catalogBreedName,
+      petCharacteristics, // AI-detected pose, gaze, expression
     });
 
     console.log('📝 Using variation prompt template:', !!variationPromptTemplate);
@@ -159,39 +150,10 @@ async function generateCustomImage(
       console.log('🎨 Using aspect ratio:', aspectRatio, '→', geminiAspectRatio ?? '(unsupported, model default)');
     }
 
-    // Build contents array with catalog image + all pet images
-    const contents: any[] = [
-      { text: generationPrompt },
-      {
-        inlineData: {
-          mimeType: "image/png",
-          data: catalogImageData,
-        },
-      },
-    ];
-
-    // Add all pet images to contents
-    petImageDataArray.forEach((petData, index) => {
-      contents.push({
-        inlineData: {
-          mimeType: "image/png",
-          data: petData,
-        },
-      });
-      console.log(`✅ Added pet ${index + 1} to Gemini contents array`);
-    });
-
-    console.log(`🎨 Generating with ${petImageDataArray.length} pet image(s)`);
-
-    // Call Gemini via service (same model as admin)
-    const response = await generateWithUsage(geminiService.ai, { feature: 'customer-painting', customerImageId: customImageId }, {
-      model: GEMINI_IMAGE_MODELS.pro,
-      contents,
-      config: {
-        responseModalities: ['IMAGE', 'TEXT'],
-        ...geminiImageConfig(aspectRatio || ratioOfImage(catalogImageData)), // 2K, format's shape
-      },
-    });
+    // Prompt, the design, then every pet photo; size from CUSTOMER_PREVIEW_SIZE (lib/customise/painting.ts)
+    const request = paintingRequest({ prompt: generationPrompt, catalogImageData, petImageData: petImageDataArray, aspectRatio });
+    console.log(`🎨 Generating with ${petImageDataArray.length} pet image(s) at ${request.config.imageConfig.imageSize}`);
+    const response = await generateWithUsage(geminiService.ai, { feature: 'customer-painting', customerImageId: customImageId }, request);
 
     const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`✅ Gemini API call completed in ${elapsedSeconds}s`);
@@ -201,13 +163,7 @@ async function generateCustomImage(
     }
 
     // Extract generated image
-    let generatedImageBase64: string | null = null;
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData?.data) {
-        generatedImageBase64 = part.inlineData.data;
-        break;
-      }
-    }
+    const generatedImageBase64 = imageFrom(response);
 
     if (!generatedImageBase64) {
       throw new Error('No image data in Gemini response');
@@ -247,6 +203,7 @@ async function generateCustomImage(
           theme: themeName,
           style: styleName,
           model: GEMINI_IMAGE_MODELS.pro,
+          image_size: request.config.imageConfig.imageSize,
           full_size_url: generatedImageUrl  // Keep full-size URL in metadata
         }
       })

@@ -10,6 +10,8 @@ import { resolveOrderImage, getCustomerDownloadUrl } from '@/lib/orders/order-im
 import { verifyDownload } from '@/lib/orders/entitlements';
 
 export const dynamic = 'force-dynamic';
+// A 4K master may be rendered on the first download of a small preview
+export const maxDuration = 300;
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -35,8 +37,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: 'Activate your account from the email we sent to unlock this download' }, { status: 403 });
   }
 
-  const img = await resolveOrderImage(supabase, (ent.custom_image_id || ent.catalog_image_id)!);
+  let img = await resolveOrderImage(supabase, (ent.custom_image_id || ent.catalog_image_id)!);
   if (!img) return NextResponse.json({ error: 'Image not found' }, { status: 404 });
+  // A small (1K/2K) preview with no 4K master yet (normally made when the order was paid):
+  // make it now so the download is full resolution
+  if (img.kind === 'custom' && !img.printMasterPublicId) {
+    const { customPreviewIsSmall, ensurePrintMaster } = await import('@/lib/print/print-master');
+    if (await customPreviewIsSmall(supabase, img.id)) {
+      const r = await ensurePrintMaster(supabase, img.id);
+      if (r.status === 'pending') return NextResponse.json({ error: 'Your full-resolution file is being prepared. Please try again in a minute.' }, { status: 503 });
+      img = (await resolveOrderImage(supabase, img.id)) ?? img;
+    }
+  }
   const url = await getCustomerDownloadUrl(img, ent.customer_id || ent.email, ent.order_id || ent.id);
 
   await supabase.from('digital_entitlements').update({

@@ -19,6 +19,13 @@
     "app/api/admin/variation-runs/route.ts": {
       "maxDuration": 300,
       "memory": 1769
+    },
+    "app/api/admin/size-test/route.ts": {
+      "maxDuration": 300,
+      "memory": 1769
+    },
+    "app/api/downloads/[id]/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [

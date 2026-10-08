@@ -133,7 +133,9 @@ export async function buildPrintFiles(img: ResolvedOrderImage, productData: any,
 
 /** Customer download: full quality, small brand mark, signed 7-day URL. */
 export async function getCustomerDownloadUrl(img: ResolvedOrderImage, customerRef: string, orderRef: string): Promise<string> {
-  if (!img.cloudinaryPublicId) throw new Error(`No download source for ${img.kind} image ${img.id}`);
+  // A customised portrait's 4K master when there is one; otherwise its preview
+  const source = img.printMasterPublicId || img.cloudinaryPublicId;
+  if (!source) throw new Error(`No download source for ${img.kind} image ${img.id}`);
   const { cloudinaryService } = await import('@/lib/cloudinary');
-  return cloudinaryService.getDownloadUrl(img.cloudinaryPublicId, customerRef, orderRef);
+  return cloudinaryService.getDownloadUrl(source, customerRef, orderRef);
 }

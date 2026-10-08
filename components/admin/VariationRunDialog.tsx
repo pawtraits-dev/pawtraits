@@ -23,7 +23,7 @@ async function api<T = any>(url: string, init?: RequestInit): Promise<T> {
  * see what will be made (combinations already made for a design are skipped) and the
  * estimate, then start. Used on Admin → Variation batches and from a catalogue design.
  */
-function ReferencePicker({ selected, onChange }: { selected: Ref[]; onChange: (r: Ref[]) => void }) {
+export function ReferencePicker({ selected, onChange }: { selected: Ref[]; onChange: (r: Ref[]) => void }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Ref[]>([]);
   const [loading, setLoading] = useState(false);

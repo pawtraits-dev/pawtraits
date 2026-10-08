@@ -38,6 +38,7 @@ const FEATURES: Record<string, string> = {
   'print-master': '4K print masters',
   mug: 'Mugs',
   'quiz-image': 'Quiz pictures',
+  'size-test': 'Size tests (admin)',
   'gemini-test': 'Gemini test page',
   'auto-tag': 'Auto-tagging',
   'photo-check': 'Social photo check',
