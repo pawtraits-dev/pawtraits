@@ -45,15 +45,16 @@ export async function GET(request: NextRequest) {
       count(q => q),
     ]);
 
-    const [{ data: stalls }, { data: removals }, feedEnabled, instagramEnabled, photoCheckEnabled, includePreviews] = await Promise.all([
+    const [{ data: stalls }, { data: removals }, feedEnabled, instagramEnabled, photoCheckEnabled, includePreviews, heroItemId] = await Promise.all([
       supabase.from('stock_locations').select('id, name, town, country, location_type').eq('location_type', 'stall').eq('is_active', true).order('name'),
       supabase.from('social_batches').select('id, ig_permalink, posted_at').eq('needs_removal', true),
       getSetting('social_feed_enabled'), getSetting('social_instagram_enabled'), getSetting('social_photo_check_enabled'),
-      getSetting('social_include_previews'),
+      getSetting('social_include_previews'), getSetting('social_hero_item_id'),
     ]);
 
     return NextResponse.json({
       settings: { social_feed_enabled: feedEnabled, social_instagram_enabled: instagramEnabled, social_photo_check_enabled: photoCheckEnabled, social_include_previews: includePreviews },
+      heroItemId: heroItemId || null,
       counts: { total, featured, rejected, checking, optedOut, hidden },
       items: (items ?? []).map((i: any) => ({
         id: i.id, orderId: i.order_id, orderNumber: i.orders?.order_number ?? null,

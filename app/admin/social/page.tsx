@@ -21,6 +21,7 @@ interface Item {
 }
 interface Data {
   settings: { social_feed_enabled: boolean; social_instagram_enabled: boolean; social_photo_check_enabled: boolean; social_include_previews: boolean };
+  heroItemId: string | null;
   counts: { total: number; featured: number; rejected: number; checking: number; optedOut: number; hidden: number };
   items: Item[];
   stalls: { id: string; name: string; town: string | null; country: string | null }[];
@@ -73,7 +74,7 @@ export default function AdminSocialPage() {
     setData(d => (d ? { ...d, settings: { ...d.settings, [key]: value } } : d));
   }
 
-  async function act(id: string, action: 'hide' | 'unhide' | 'approve' | 'recheck' | 'ig_include') {
+  async function act(id: string, action: 'hide' | 'unhide' | 'approve' | 'recheck' | 'ig_include' | 'set_hero' | 'clear_hero') {
     setBusy(id);
     const r = await new AdminSupabaseService().updateSocialItem(id, action);
     setBusy(null);
@@ -223,7 +224,8 @@ export default function AdminSocialPage() {
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-gray-900">{i.petName ?? <span className="text-gray-500">No usable pet name</span>} <StatusBadge item={i} />
                     {i.source === 'preview' && <span className="ml-1 rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">Preview</span>}
-                    {i.igExcluded && <span className="ml-1 rounded bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">Not on Instagram</span>}</p>
+                    {i.igExcluded && <span className="ml-1 rounded bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">Not on Instagram</span>}
+                    {data?.heroItemId === i.id && <span className="ml-1 rounded bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800">Home page hero</span>}</p>
                   <p className="text-sm text-gray-700">
                     {i.place ?? <span className="text-gray-500">No location</span>}
                     {i.channel === 'stall' && i.stallName ? ` · ${i.stallName}` : ''}
@@ -231,7 +233,12 @@ export default function AdminSocialPage() {
                   </p>
                   {i.checkReasons.length > 0 && <p className="text-sm text-red-700">{i.checkReasons.map(r => REASON_LABELS[r] ?? r).join(' · ')}</p>}
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  {!i.optedOut && (data?.heroItemId === i.id ? (
+                    <button type="button" onClick={() => act(i.id, 'clear_hero')} disabled={busy === i.id} className="rounded-lg border border-purple-300 px-3 py-1.5 text-sm font-semibold text-purple-800 disabled:opacity-50">Stop using as hero</button>
+                  ) : (
+                    <button type="button" onClick={() => act(i.id, 'set_hero')} disabled={busy === i.id} className="rounded-lg border border-purple-300 px-3 py-1.5 text-sm font-semibold text-purple-800 disabled:opacity-50" title="Show at the top of the home page (features it too)">Use as home hero</button>
+                  ))}
                   {i.checkStatus === 'rejected' && !i.optedOut && (
                     <button type="button" onClick={() => act(i.id, 'approve')} disabled={busy === i.id} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold disabled:opacity-50">Feature anyway</button>
                   )}

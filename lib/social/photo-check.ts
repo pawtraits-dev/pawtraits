@@ -24,7 +24,7 @@ Reject if ANY of these apply:
 - "child": a child appears anywhere in either image.
 - "personal_details": readable house numbers, street or road signs, addresses, letters/post, screens, documents, or vehicle number plates in image 1.
 - "no_pet": image 1 does not clearly show a pet.
-- "failed_portrait": image 2 has no clear animal, a deformed or duplicated animal, extra limbs, a garbled face, or obviously broken artwork.
+- "failed_portrait": only for clear AI failures in image 2: no animal, two heads or a duplicated animal, extra or missing legs, a melted or garbled face, or the image visibly broken (glitches, half-rendered). Image 2 is meant to be stylised: pencil or sketch styles, partly coloured artwork, costumes, props, painterly lighting and a pose different from the photo are all normal and are NOT failures. When unsure, do not use this reason.
 - "inappropriate": nudity, violence, injury, blood, offensive gestures or offensive text in either image.
 
 Reply with JSON only, no other text: {"ok": true|false, "reasons": [...], "note": "<max 12 words>"}

@@ -32,22 +32,44 @@ export function afterFrame(publicId: string | null, fallback: string): string {
 
 const BAD_ORDER_STATUSES = ['cancelled', 'canceled', 'refunded', 'on_hold'];
 
+const FEED_COLUMNS = 'id, source, pet_name, town, country, before_public_id, before_url, after_public_id, after_url, paid_at, orders:order_id (payment_status, status), custom:custom_image_id (rating)';
+
+/**
+ * Home page hero: the before/after chosen in Admin → Social ("Use as home hero"), while it is still
+ * featured (approved, not hidden or opted out); otherwise the latest featured one.
+ */
+export async function getHero(): Promise<FeedItem | null> {
+  if (!(await getSetting('social_feed_enabled'))) return null;
+  const pinned = await getSetting('social_hero_item_id');
+  if (pinned) {
+    const { data } = await serviceClient().from('social_items').select(FEED_COLUMNS)
+      .eq('id', pinned).eq('check_status', 'approved').eq('opted_out', false).eq('hidden', false).maybeSingle();
+    const [item] = toFeedItems(data ? [data] : []);
+    if (item) return item;
+  }
+  const [latest] = await getFeed(1);
+  return latest ?? null;
+}
+
 export async function getFeed(limit = 12): Promise<FeedItem[]> {
   const [enabled, includePreviews] = await Promise.all([getSetting('social_feed_enabled'), getSetting('social_include_previews')]);
   if (!enabled) return [];
   let q = serviceClient().from('social_items')
-    .select('id, source, pet_name, town, country, before_public_id, before_url, after_public_id, after_url, paid_at, orders:order_id (payment_status, status), custom:custom_image_id (rating)')
+    .select(FEED_COLUMNS)
     .eq('check_status', 'approved').eq('opted_out', false).eq('hidden', false)
     .order('paid_at', { ascending: false }).limit(limit * 3);
   if (!includePreviews) q = q.eq('source', 'purchase');
   const { data, error } = await q;
   if (error) throw error;
-  return (data ?? [])
+  return toFeedItems(data ?? []).slice(0, limit);
+}
+
+function toFeedItems(rows: any[]): FeedItem[] {
+  return rows
     // Purchases: genuinely paid and not refunded/cancelled. Previews: not rated 1–2 stars by the customer.
     .filter((r: any) => r.source === 'preview'
       ? !(r.custom?.rating && r.custom.rating <= 2)
       : r.orders?.payment_status === 'paid' && !BAD_ORDER_STATUSES.includes(r.orders?.status))
-    .slice(0, limit)
     .map((r: any) => ({
       id: r.id,
       kind: r.source === 'preview' ? 'preview' : 'purchase',

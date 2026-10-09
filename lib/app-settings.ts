@@ -22,6 +22,8 @@ export const SETTING_DEFAULTS = {
   social_photo_check_enabled: true,
   /** Social loop: feature free previews (customisations not yet bought) as well as purchases */
   social_include_previews: false,
+  /** Social loop: the before/after shown at the top of the home page (Admin → Social); '' = the latest */
+  social_hero_item_id: '' as string,
   /** Collections: tag new catalogue designs automatically (collections, team, descriptive tags) */
   auto_tag_enabled: true,
   /** Collections: customers can change a sports design to another team */
@@ -79,6 +81,8 @@ export function validateSetting(key: string, value: unknown): string | null {
       return typeof value === 'number' && value >= 0 && value <= 100 ? null : 'Must be 0–100';
     case 'default_fulfillment_provider':
       return value === 'self_print' || value === 'gelato' ? null : 'Must be "self_print" or "gelato"';
+    case 'social_hero_item_id':
+      return value === '' || (typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value)) ? null : 'Must be a social item id or empty';
     case 'return_address':
       return typeof value === 'string' && value.length <= 160 ? null : 'Must be text, 160 characters max';
     case 'welcome_gift_enabled':

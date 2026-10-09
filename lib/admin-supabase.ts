@@ -705,7 +705,7 @@ export class AdminSupabaseService {
     return adminRequest<any>(`/api/admin/social?view=${encodeURIComponent(view)}&limit=${limit}`);
   }
 
-  async updateSocialItem(id: string, action: 'hide' | 'unhide' | 'approve' | 'recheck' | 'ig_exclude' | 'ig_include'): Promise<AdminResult<any>> {
+  async updateSocialItem(id: string, action: 'hide' | 'unhide' | 'approve' | 'recheck' | 'ig_exclude' | 'ig_include' | 'set_hero' | 'clear_hero'): Promise<AdminResult<any>> {
     return adminRequest<any>(`/api/admin/social/items/${id}`, jsonInit('PATCH', { action }));
   }
 
