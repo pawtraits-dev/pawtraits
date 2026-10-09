@@ -80,7 +80,23 @@ const PROGRESS_IMAGES = [
   'https://res.cloudinary.com/dnhzfz8xv/image/upload/v1770800876/pawcasso-progress-3_sxffsu.png',
 ];
 const FAIL_IMAGE = 'https://res.cloudinary.com/dnhzfz8xv/image/upload/v1770809160/pawcasso-progress-fail_nusyud.png';
-const POLL_MS = 2500;
+// Paintings take ~15s: check every 2.5s at first, then every second so a finished one shows quickly
+const POLL_SLOW_MS = 2500;
+const POLL_FAST_MS = 1000;
+const POLL_FAST_AFTER_MS = 9000;
+const PRELOAD_TIMEOUT_MS = 8000;
+
+/** Load (and decode) an image before showing it, so the result appears all at once */
+function preloadImage(src: string, timeoutMs = PRELOAD_TIMEOUT_MS): Promise<void> {
+  return new Promise(resolve => {
+    const img = new Image();
+    const done = () => resolve();
+    const timer = setTimeout(done, timeoutMs);
+    img.onload = () => { clearTimeout(timer); (img.decode ? img.decode().catch(() => {}) : Promise.resolve()).then(done); };
+    img.onerror = () => { clearTimeout(timer); done(); };
+    img.src = src;
+  });
+}
 const POLL_TIMEOUT_MS = 4 * 60 * 1000;
 const SIZE_LABEL: Record<string, string> = { S: 'Small', M: 'Medium', L: 'Large' };
 
@@ -120,7 +136,9 @@ export default function CustomisePage() {
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
   const [buySheet, setBuySheet] = useState<'catalog' | 'custom' | null>(null);
   const photoSectionRef = useRef<HTMLDivElement>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clockRef = useRef<{ tapped: number; started?: number } | null>(null);
+  const pollGenRef = useRef(0); // bumped to cancel a poll loop (new poll or leaving the page)
 
   const subjectCount = catalogImage?.subjectCount || 1;
   const trackItem = catalogImage ? { id: catalogImage.id, name: catalogImage.description?.slice(0, 80), category: catalogImage.theme?.name } : null;
@@ -169,7 +187,7 @@ export default function CustomisePage() {
     fetch(`/api/stall/offer?imageId=${encodeURIComponent(imageId)}${size ? `&size=${size}` : ''}`, { credentials: 'include' })
       .then(r => r.json()).then(setStallOffer).catch(() => setStallOffer({ available: false }));
 
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => { pollGenRef.current++; if (pollRef.current) clearTimeout(pollRef.current); };
   }, [imageId]);
 
   // progress carousel while generating
@@ -237,31 +255,68 @@ export default function CustomisePage() {
   // ---- generate + poll ----
   const poll = useCallback((id: string) => {
     const started = Date.now();
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(async () => {
+    if (pollRef.current) clearTimeout(pollRef.current);
+    const gen = ++pollGenRef.current;
+    const stop = () => { if (pollGenRef.current === gen) pollGenRef.current++; if (pollRef.current) clearTimeout(pollRef.current); };
+    const next = () => {
+      if (pollGenRef.current !== gen) return;
+      const elapsed = Date.now() - started;
+      pollRef.current = setTimeout(check, elapsed < POLL_FAST_AFTER_MS ? POLL_SLOW_MS : POLL_FAST_MS);
+    };
+    const check = async () => {
       try {
         const r = await fetch(`/api/customers/custom-images/${id}`, { credentials: 'include', cache: 'no-store' });
         if (r.ok) {
           const d: CustomImage = await r.json();
-          setCustomImage(d);
+          if (pollGenRef.current !== gen) return;
           if (d.status === 'complete') {
-            clearInterval(pollRef.current!);
+            stop();
+            const seen = Date.now();
+            // Show the painting only once it has loaded (no blank frame)
+            if (d.generated_image_url) await preloadImage(d.generated_image_url);
+            const shown = Date.now();
+            setCustomImage(d);
             setStep('result');
             if (trackItem) track.previewReady(trackItem);
             window.scrollTo({ top: 0, behavior: 'smooth' });
-          } else if (d.status === 'failed') {
-            clearInterval(pollRef.current!);
+            reportTiming(id, seen, shown);
+            return;
+          }
+          setCustomImage(d);
+          if (d.status === 'failed') {
+            stop();
             setStep('failed');
+            return;
           }
         }
       } catch { /* keep polling */ }
       if (Date.now() - started > POLL_TIMEOUT_MS) {
-        clearInterval(pollRef.current!);
+        stop();
         setStep('failed');
+        return;
       }
-    }, POLL_MS);
+      next();
+    };
+    next();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogImage]);
+
+  /** Phone-side timings (tap → painting on screen), saved next to the server's for Admin > AI costs */
+  function reportTiming(id: string, seen: number, shown: number) {
+    const clock = clockRef.current;
+    clockRef.current = null;
+    if (!clock?.started) return;
+    const body = {
+      submit: clock.started - clock.tapped,  // photo upload + server checks
+      waiting: seen - clock.started,         // until the phone saw "complete"
+      image_load: shown - seen,              // loading the watermarked preview
+      total: shown - clock.tapped,
+    };
+    fetch(`/api/customers/custom-images/${id}/timing`, {
+      method: 'POST', credentials: 'include', keepalive: true,
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }).catch(() => {});
+  }
 
   async function generate() {
     if (!allReady || !catalogImage) return;
@@ -272,6 +327,7 @@ export default function CustomisePage() {
       if (s.pet) fd.append(`petId${n}`, s.pet.pet_id);
       else if (s.file) fd.append(`petPhoto${n}`, s.file);
     });
+    clockRef.current = { tapped: Date.now() };
     setStep('generating');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     if (trackItem) track.previewRequested(trackItem);
@@ -284,6 +340,7 @@ export default function CustomisePage() {
         return;
       }
       if (!res.ok || !data.id) throw new Error(data.error || 'Pawcasso dropped his brush — please try again.');
+      if (clockRef.current) clockRef.current.started = Date.now();
       setCustomImage(data);
       poll(data.id);
     } catch (e: any) {

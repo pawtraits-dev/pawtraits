@@ -41,14 +41,14 @@ export function buildPaintingPrompt(p: PaintingPromptInput): string {
 const strip = (b64: string) => (b64.startsWith('data:') ? b64.split(',')[1] : b64);
 
 /** generateContent request: prompt, the design, then each pet photo */
-export function paintingRequest(opts: { prompt: string; catalogImageData: string; petImageData: string[]; aspectRatio?: string; imageSize?: string }) {
+export function paintingRequest(opts: { prompt: string; catalogImageData: string; petImageData: string[]; aspectRatio?: string; imageSize?: string; catalogMimeType?: string; petMimeTypes?: string[] }) {
   const catalog = strip(opts.catalogImageData);
   return {
     model: GEMINI_IMAGE_MODELS.pro,
     contents: [
       { text: opts.prompt },
-      { inlineData: { mimeType: 'image/png', data: catalog } },
-      ...opts.petImageData.map((d) => ({ inlineData: { mimeType: 'image/png', data: strip(d) } })),
+      { inlineData: { mimeType: opts.catalogMimeType || 'image/png', data: catalog } },
+      ...opts.petImageData.map((d, i) => ({ inlineData: { mimeType: opts.petMimeTypes?.[i] || 'image/png', data: strip(d) } })),
     ],
     config: {
       responseModalities: ['IMAGE', 'TEXT'],
@@ -61,4 +61,16 @@ export function paintingRequest(opts: { prompt: string; catalogImageData: string
 export function imageFrom(response: any): string | null {
   for (const part of response?.candidates?.[0]?.content?.parts ?? []) if (part?.inlineData?.data) return part.inlineData.data;
   return null;
+}
+
+/** Image type from its first bytes (Gemini wants the right mimeType) */
+export function sniffImageType(buf: Buffer, fallback = 'image/png'): string {
+  if (buf[0] === 0xff && buf[1] === 0xd8) return 'image/jpeg';
+  if (buf[0] === 0x89 && buf[1] === 0x50) return 'image/png';
+  if (buf.subarray(0, 4).toString('latin1') === 'RIFF' && buf.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
+  if (buf.subarray(4, 8).toString('latin1') === 'ftyp') {
+    const brand = buf.subarray(8, 12).toString('latin1');
+    if (/^hei|^hev|^mif/.test(brand)) return 'image/heic';
+  }
+  return fallback.split(';')[0] || 'image/png';
 }

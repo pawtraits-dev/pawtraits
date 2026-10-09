@@ -1,22 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { Sparkles, RefreshCw, AlertTriangle } from 'lucide-react';
+import { FEATURES, num, usd, int } from '@/lib/ai/feature-labels';
+import AiCallsTable from '@/components/admin/AiCallsTable';
 
 type Row = {
   day: string; feature: string; model: string; is_batch: boolean; calls: number; failures: number; images: number;
   input_tokens: number; thinking_tokens: number; output_text_tokens: number; output_image_tokens: number;
   cost_input_usd: number; cost_thinking_usd: number; cost_output_usd: number; cost_usd: number; unpriced_calls: number; avg_duration_ms: number;
 };
-type Top = {
-  id: number; created_at: string; feature: string; model: string; is_batch: boolean; image_size: string | null;
-  input_tokens: number; thinking_tokens: number; output_image_tokens: number; output_images: number;
-  cost_usd: number | null; success: boolean; error: string | null; duration_ms: number | null;
-  image_id: string | null; customer_image_id: string | null; batch_job_id: string | null;
-};
 type Data = {
-  from: string; to: string; days: number; rows: Row[]; top: Top[];
+  from: string; to: string; days: number; rows: Row[];
   painting: { count: number; average: number; median: number; highest: number; withRetries: number } | null;
   prices: { asOf: string; models: Record<string, { label: string; input: number; outputText: number; outputImage?: number }> };
 };
@@ -28,32 +23,6 @@ const PERIODS = [
   { days: 90, label: '90 days' },
 ];
 
-const FEATURES: Record<string, string> = {
-  'customer-painting': 'Customer paintings',
-  'customer-variation': 'Customer variations',
-  'public-variation': 'Try-it variations',
-  'admin-variation': 'Admin variations',
-  'admin-preview': 'Admin test variation',
-  'team-version': 'Team versions',
-  'print-master': '4K print masters',
-  mug: 'Mugs',
-  'quiz-image': 'Quiz pictures',
-  'size-test': 'Size tests (admin)',
-  'gemini-test': 'Gemini test page',
-  'auto-tag': 'Auto-tagging',
-  'photo-check': 'Social photo check',
-  'pet-count': 'Pet count check',
-  description: 'Descriptions',
-  'composition-analysis': 'Composition analysis',
-  'theme-from-image': 'Theme from image',
-  'social-message': 'Social messages',
-  'progress-messages': 'Progress messages',
-  other: 'Other',
-};
-
-const num = (v: unknown) => Number(v ?? 0);
-const usd = (v: number) => (v === 0 ? '$0' : Math.abs(v) < 1 ? `$${v.toFixed(v < 0.01 ? 4 : 3)}` : `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
-const int = (v: number) => Math.round(v).toLocaleString('en-GB');
 const pct = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : '–');
 
 function group<K extends string>(rows: Row[], key: (r: Row) => K) {
@@ -67,7 +36,7 @@ function group<K extends string>(rows: Row[], key: (r: Row) => K) {
     e.unpriced += num(r.unpriced_calls); e.durSum += num(r.avg_duration_ms) * num(r.calls);
     m.set(k, e);
   }
-  return [...m.entries()].map(([k, v]) => ({ key: k, ...v })).sort((a, b) => b.cost - a.cost);
+  return Array.from(m.entries()).map(([k, v]) => ({ key: k, ...v })).sort((a, b) => b.cost - a.cost);
 }
 
 function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
@@ -298,44 +267,13 @@ export default function AiCostsPage() {
                 ))}
               </div>
 
-              <div className="bg-white rounded-lg border overflow-hidden">
-                <h2 className="font-semibold text-gray-900 px-4 pt-4 pb-2">Most expensive calls</h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="text-xs text-gray-500 border-b">
-                      <tr>
-                        <th className="text-left font-medium px-4 py-2">When</th>
-                        <th className="text-left font-medium px-2 py-2">What</th>
-                        <th className="text-left font-medium px-2 py-2">Model</th>
-                        <th className="text-right font-medium px-2 py-2">Input</th>
-                        <th className="text-right font-medium px-2 py-2">Thinking</th>
-                        <th className="text-right font-medium px-2 py-2">Image out</th>
-                        <th className="text-right font-medium px-2 py-2">Time</th>
-                        <th className="text-right font-medium px-4 py-2">Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.top.map((c) => (
-                        <tr key={c.id} className="border-b last:border-0 align-top">
-                          <td className="px-4 py-2 text-gray-600 whitespace-nowrap">{new Date(c.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
-                          <td className="px-2 py-2">
-                            {FEATURES[c.feature] ?? c.feature}
-                            {c.image_size && <span className="text-gray-500"> · {c.image_size}</span>}
-                            {c.image_id && <> · <Link className="text-purple-700 underline" href={`/customise/${c.image_id}`}>design</Link></>}
-                            {!c.success && <p className="text-xs text-red-700 max-w-xs truncate" title={c.error ?? ''}>Failed: {c.error}</p>}
-                          </td>
-                          <td className="px-2 py-2 text-gray-600 whitespace-nowrap">{data.prices.models[c.model]?.label ?? c.model}{c.is_batch ? ' · batch' : ''}</td>
-                          <td className="text-right px-2 py-2 tabular-nums">{int(c.input_tokens)}</td>
-                          <td className="text-right px-2 py-2 tabular-nums">{int(c.thinking_tokens)}</td>
-                          <td className="text-right px-2 py-2 tabular-nums">{int(c.output_image_tokens)}</td>
-                          <td className="text-right px-2 py-2 tabular-nums text-gray-600">{c.duration_ms ? `${(c.duration_ms / 1000).toFixed(1)}s` : '–'}</td>
-                          <td className="text-right px-4 py-2 tabular-nums font-medium">{c.cost_usd === null ? 'no price' : usd(Number(c.cost_usd))}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <AiCallsTable
+                days={data.days}
+                refreshKey={data.to}
+                features={view.byFeature.map((f) => f.key)}
+                models={Array.from(new Set(data.rows.map((r) => r.model)))}
+                modelLabels={Object.fromEntries(Object.entries(data.prices.models).map(([id, p]) => [id, p.label]))}
+              />
             </>
           )}
 

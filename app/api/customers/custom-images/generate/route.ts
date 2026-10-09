@@ -7,7 +7,6 @@ import { createClient } from '@supabase/supabase-js';
 import { v2 as cloudinary } from 'cloudinary';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
-import fetch from 'node-fetch';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 import { buildSizeInstruction } from '@/lib/breed-size-mapping';
 import { GEMINI_IMAGE_MODELS, toGeminiAspectRatio, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
@@ -16,7 +15,8 @@ import { hashIp } from '@/lib/qr/attribution';
 import { getSetting } from '@/lib/app-settings';
 import { capturePreviews } from '@/lib/social/capture';
 import { generateWithUsage } from '@/lib/ai/usage';
-import { buildPaintingPrompt, paintingRequest, imageFrom } from '@/lib/customise/painting';
+import { buildPaintingPrompt, paintingRequest, imageFrom, sniffImageType } from '@/lib/customise/painting';
+import { randomUUID } from 'crypto';
 
 // Generation continues after the response (via after()); give it room to finish.
 export const maxDuration = 300;
@@ -32,192 +32,203 @@ const cloudinaryService = new CloudinaryImageService();
 const geminiService = new GeminiVariationService();
 const promptBuilder = new VariationPromptBuilder();
 
-// Helper function to fetch image and convert to base64
-async function imageUrlToBase64(imageUrl: string): Promise<string> {
-  const response = await fetch(imageUrl);
-  const arrayBuffer = await response.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  return buffer.toString('base64');
+type ImageInput = { data: string; mimeType: string };
+type PetUpload = { buffer: Buffer; publicId: string; mimeType: string };
+/** Milliseconds per step, saved in generation_metadata.timings (shown on Admin > AI costs) */
+type Timings = Record<string, number | Record<string, number>>;
+
+const PET_FOLDER = 'customer-custom-pets';
+
+async function fetchImage(url: string): Promise<ImageInput> {
+  // Gemini takes PNG / JPEG / WebP / HEIC (not AVIF), so don't let f_auto pick AVIF
+  const res = await fetch(url, { headers: { Accept: 'image/webp,image/png,image/jpeg' } });
+  if (!res.ok) throw new Error(`Image fetch failed (${res.status}): ${url}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  return { data: buffer.toString('base64'), mimeType: sniffImageType(buffer, res.headers.get('content-type') || 'image/png') };
 }
 
-// Helper function to upload base64 image to Cloudinary
-async function uploadBase64ToCloudinary(base64Data: string, folder: string): Promise<{ url: string; publicId: string }> {
-  const uploadResult = await cloudinary.uploader.upload(
-    `data:image/png;base64,${base64Data}`,
-    {
-      folder: folder,
-      resource_type: 'image',
-      // No transformation - preserve full resolution from Gemini
-      // Gemini typically outputs 1536x1536 or higher resolution images
-    }
+/** Every customer who picks a design sends the same reference: keep recent ones in memory */
+const referenceCache = new Map<string, Promise<ImageInput>>();
+function designReference(url: string): Promise<ImageInput> {
+  let ref = referenceCache.get(url);
+  if (!ref) {
+    ref = fetchImage(url);
+    ref.catch(() => referenceCache.delete(url));
+    referenceCache.set(url, ref);
+    if (referenceCache.size > 40) referenceCache.delete(referenceCache.keys().next().value as string);
+  }
+  return ref;
+}
+
+function uploadBuffer(buffer: Buffer, options: Record<string, unknown>): Promise<any> {
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader
+      .upload_stream({ resource_type: 'image', ...options }, (error, result) => (error ? reject(error) : resolve(result)))
+      .end(buffer);
+  });
+}
+
+/** Customer's photo, stored at the public id already saved on the record */
+function storePetPhoto(pet: PetUpload): Promise<any> {
+  return uploadBuffer(pet.buffer, {
+    public_id: pet.publicId,
+    overwrite: false,
+    transformation: [
+      { width: 1024, height: 1024, crop: 'limit' },
+      { quality: 'auto', fetch_format: 'auto' },
+    ],
+  });
+}
+
+// Typical phone requests: f_auto makes a separate file per format, so build both
+const PHONE_REQUESTS = [
+  { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', Accept: 'image/webp,image/avif,image/jxl,image/heic,image/heic-sequence,video/*;q=0.8,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5' },
+  { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36', Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' },
+];
+
+/** Ask Cloudinary for the watermarked preview so it is being made while the phone polls */
+function warmPreview(url: string): Promise<number> {
+  const started = Date.now();
+  return Promise.allSettled(
+    PHONE_REQUESTS.map((headers) => fetch(url, { headers, signal: AbortSignal.timeout(15000) }).then((r) => r.arrayBuffer())),
+  ).then(() => Date.now() - started);
+}
+
+interface GenerateJob {
+  customImageId: string;
+  catalogImageUrl: string;
+  designRef: Promise<ImageInput>;
+  petImageUrls: string[];
+  petUploads: (PetUpload | null)[];   // photos uploaded with this request (stored in parallel with the painting)
+  variationPromptTemplate?: string;
+  themeName: string;
+  styleName: string;
+  catalogBreedName: string;
+  aspectRatio?: string;
+  customerPetBreedName?: string;
+  aiAnalysisData?: any;
+  sizeInstruction?: string;
+  slotPlan?: SlotReplacement[];        // several pets: which photo replaces which pet (multi-pet plan phase 2)
+  requestStarted: number;
+  timings: Timings;
+}
+
+// Background generation: runs after the response has been sent
+async function generateCustomImage(job: GenerateJob): Promise<void> {
+  const { customImageId, petImageUrls, timings } = job;
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const since = (t: number) => Date.now() - t;
+  timings.queued = since(job.requestStarted) - (timings.request as number);
+
+  // Store new photos while the painting is made (the record already has their URLs)
+  const petStores = job.petUploads.map((pet) =>
+    pet ? storePetPhoto(pet).catch((e) => console.error(`❌ Pet photo upload failed (${pet.publicId}):`, e)) : null,
   );
 
-  return {
-    url: uploadResult.secure_url,
-    publicId: uploadResult.public_id
-  };
-}
-
-// Background generation function
-async function generateCustomImage(
-  customImageId: string,
-  catalogImageUrl: string,
-  petImageUrls: string[], // Changed to array for multi-subject support
-  variationPromptTemplate: string | undefined,
-  themeName: string,
-  styleName: string,
-  catalogBreedName: string,
-  aspectRatio: string | undefined,
-  customerPetBreedName?: string,
-  aiAnalysisData?: any,
-  sizeInstruction?: string, // NEW: Relative size instruction for multi-subject
-  slotPlan?: SlotReplacement[] // several pets: which photo replaces which pet (multi-pet plan phase 2)
-): Promise<void> {
-  console.log('🎨 Starting custom image generation for:', customImageId);
-  console.log('📐 Target aspect ratio:', aspectRatio || 'default (1:1)');
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
-
   try {
-    // Fetch catalog image
-    console.log('📥 Fetching catalog image from:', catalogImageUrl.substring(0, 80) + '...');
-    const catalogImageBase64 = await imageUrlToBase64(catalogImageUrl);
-    console.log('✅ Catalog image fetched, size:', catalogImageBase64.length, 'bytes');
+    let t = Date.now();
+    // The design (usually cached) and the pets, in parallel; new photos are used as uploaded
+    const [design, pets] = await Promise.all([
+      job.designRef,
+      Promise.all(petImageUrls.map((url, i) => {
+        const upload = job.petUploads[i];
+        return upload ? { data: upload.buffer.toString('base64'), mimeType: upload.mimeType } : fetchImage(url);
+      })),
+    ]);
+    timings.inputs = since(t);
 
-    // Fetch all pet images (support for multi-subject)
-    const petImageBase64Array: string[] = [];
-    for (let i = 0; i < petImageUrls.length; i++) {
-      console.log(`📥 Fetching pet ${i + 1} image from:`, petImageUrls[i].substring(0, 80) + '...');
-      const petImageBase64 = await imageUrlToBase64(petImageUrls[i]);
-      petImageBase64Array.push(petImageBase64);
-      console.log(`✅ Pet ${i + 1} image fetched, size:`, petImageBase64.length, 'bytes');
-    }
-
-    // Build prompt using shared service (same as admin)
-    console.log('🤖 Building prompt with variation template...');
-    if (aspectRatio) {
-      console.log('🎯 CRITICAL: Aspect ratio requirement:', aspectRatio);
-      console.log('🎯 Generated output MUST match this aspect ratio:', aspectRatio);
-    }
-
-    // Extract AI-detected characteristics if available
-    let petCharacteristics = undefined;
-    if (aiAnalysisData) {
-      petCharacteristics = {
-        pose: aiAnalysisData.physical_characteristics?.pose,
-        gaze: aiAnalysisData.physical_characteristics?.gaze,
-        expression: aiAnalysisData.physical_characteristics?.expression,
-        detectedBreed: aiAnalysisData.breed_detected,
-        detectedCoat: aiAnalysisData.coat_detected
-      };
-      console.log('✨ Using AI-detected characteristics:', petCharacteristics);
-    }
+    const ai = job.aiAnalysisData;
+    const petCharacteristics = ai ? {
+      pose: ai.physical_characteristics?.pose,
+      gaze: ai.physical_characteristics?.gaze,
+      expression: ai.physical_characteristics?.expression,
+      detectedBreed: ai.breed_detected,
+      detectedCoat: ai.coat_detected,
+    } : undefined;
 
     const generationPrompt = buildPaintingPrompt({
-      variationPromptTemplate, aspectRatio, sizeInstruction, slotPlan,
+      variationPromptTemplate: job.variationPromptTemplate,
+      aspectRatio: job.aspectRatio,
+      sizeInstruction: job.sizeInstruction,
+      slotPlan: job.slotPlan,
       petCount: petImageUrls.length,
-      themeName, styleName,
-      breedName: customerPetBreedName || catalogBreedName,
+      themeName: job.themeName,
+      styleName: job.styleName,
+      breedName: job.customerPetBreedName || job.catalogBreedName,
       petCharacteristics, // AI-detected pose, gaze, expression
     });
 
-    console.log('📝 Using variation prompt template:', !!variationPromptTemplate);
-    if (aspectRatio) {
-      console.log('🎯 Aspect ratio mentioned in prompt:', (generationPrompt.match(new RegExp(aspectRatio.replace(':', '\\:'), 'g')) || []).length, 'times');
-      console.log('🎯 Prompt includes aspect ratio emphasis:', generationPrompt.includes('⚠️'));
-    }
-    console.log(`🤖 Calling Gemini API with model: ${GEMINI_IMAGE_MODELS.pro}`);
-    const startTime = Date.now();
-
-    // Prepare image data (remove data URL prefixes if present)
-    const catalogImageData = catalogImageBase64.startsWith('data:')
-      ? catalogImageBase64.split(',')[1]
-      : catalogImageBase64;
-
-    const petImageDataArray = petImageBase64Array.map(base64 =>
-      base64.startsWith('data:') ? base64.split(',')[1] : base64
-    );
-
-    // Prepare generation config with aspect ratio if available
-    // NB: @google/genai takes `config.imageConfig` — the old `generationConfig` key was silently ignored
-    const geminiAspectRatio = toGeminiAspectRatio(aspectRatio);
-    if (aspectRatio) {
-      console.log('🎨 Using aspect ratio:', aspectRatio, '→', geminiAspectRatio ?? '(unsupported, model default)');
-    }
-
     // Prompt, the design, then every pet photo; size from CUSTOMER_PREVIEW_SIZE (lib/customise/painting.ts)
-    const request = paintingRequest({ prompt: generationPrompt, catalogImageData, petImageData: petImageDataArray, aspectRatio });
-    console.log(`🎨 Generating with ${petImageDataArray.length} pet image(s) at ${request.config.imageConfig.imageSize}`);
+    const request = paintingRequest({
+      prompt: generationPrompt,
+      catalogImageData: design.data,
+      catalogMimeType: design.mimeType,
+      petImageData: pets.map((p) => p.data),
+      petMimeTypes: pets.map((p) => p.mimeType),
+      aspectRatio: job.aspectRatio,
+    });
+
+    t = Date.now();
     const response = await generateWithUsage(geminiService.ai, { feature: 'customer-painting', customerImageId: customImageId }, request);
+    timings.gemini = since(t);
 
-    const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`✅ Gemini API call completed in ${elapsedSeconds}s`);
-
-    if (!response.candidates?.[0]?.content?.parts) {
-      throw new Error('No image generated from Gemini');
-    }
-
-    // Extract generated image
     const generatedImageBase64 = imageFrom(response);
+    if (!generatedImageBase64) throw new Error('No image data in Gemini response');
 
-    if (!generatedImageBase64) {
-      throw new Error('No image data in Gemini response');
-    }
+    // Upload the painting as binary (a base64 data URI is a third bigger)
+    t = Date.now();
+    const uploaded = await uploadBuffer(Buffer.from(generatedImageBase64, 'base64'), { folder: 'customer-custom-images' });
+    timings.save = since(t);
+    const generatedImageUrl: string = uploaded.secure_url;
+    const generatedCloudinaryId: string = uploaded.public_id;
 
-    console.log('✅ Image generated, uploading to Cloudinary...');
+    // Watermarked preview for the customise page; start building it now, alongside the status update
+    const watermarkedUrl = cloudinaryService.getPublicVariantUrl(generatedCloudinaryId, 'catalog_watermarked');
+    const warming = warmPreview(watermarkedUrl);
 
-    // Upload to Cloudinary
-    const { url: generatedImageUrl, publicId: generatedCloudinaryId } = await uploadBase64ToCloudinary(
-      generatedImageBase64,
-      'customer-custom-images'
-    );
-
-    console.log('✅ Uploaded to Cloudinary:', generatedCloudinaryId);
-
-    // Generate watermarked variant URL for preview
-    const watermarkedUrl = cloudinaryService.getPublicVariantUrl(
-      generatedCloudinaryId,
-      'catalog_watermarked'
-    );
-
-    console.log('🖼️ Generated watermarked URL:', watermarkedUrl.substring(0, 100) + '...');
-
-    // Update database record
-    await supabase
+    timings.server_total = since(job.requestStarted);
+    t = Date.now();
+    const { error: updateError } = await supabase
       .from('customer_custom_images')
       .update({
-        generated_image_url: watermarkedUrl,  // Store watermarked URL for preview
+        generated_image_url: watermarkedUrl,  // watermarked URL for preview
         generated_cloudinary_id: generatedCloudinaryId,
         generation_prompt: generationPrompt,
         status: 'complete',
         generated_at: new Date().toISOString(),
         generation_metadata: {
-          catalog_image_url: catalogImageUrl,
-          pet_image_urls: petImageUrls, // Store all pet images for multi-subject
+          catalog_image_url: job.catalogImageUrl,
+          pet_image_urls: petImageUrls,
           subject_count: petImageUrls.length,
-          theme: themeName,
-          style: styleName,
-          model: GEMINI_IMAGE_MODELS.pro,
+          theme: job.themeName,
+          style: job.styleName,
+          model: request.model,
           image_size: request.config.imageConfig.imageSize,
-          full_size_url: generatedImageUrl  // Keep full-size URL in metadata
-        }
+          full_size_url: generatedImageUrl,  // full-size URL
+          timings,
+        },
       })
       .eq('id', customImageId);
+    if (updateError) throw new Error(`Saving the result failed: ${updateError.message}`);
+    const statusMs = since(t);
 
-    console.log('✅ Custom image generation complete:', customImageId);
-
+    timings.preview_build = await warming;
+    await Promise.all(petStores);
+    console.log(`✅ Custom image ${customImageId}: ${JSON.stringify({ ...timings, status_update: statusMs })}`);
   } catch (error) {
+    await Promise.all(petStores);
     console.error('❌ Error in generateCustomImage:', error);
     throw error;
   }
 }
 
 export async function POST(request: NextRequest) {
+  const requestStarted = Date.now();
+  const postTimings: Record<string, number> = {};
+  let mark = requestStarted;
+  const step = (name: string) => { const now = Date.now(); postTimings[name] = now - mark; mark = now; };
   console.log('🎨 [CUSTOM IMAGE GENERATE] Request received at /api/customers/custom-images/generate');
   console.log('🎨 [CUSTOM IMAGE GENERATE] Request method:', request.method);
   console.log('🎨 [CUSTOM IMAGE GENERATE] Request headers:', {
@@ -294,6 +305,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Look the design up while the customer / guest checks run
+    const catalogLookup = Promise.resolve(supabase
+      .from('image_catalog')
+      .select(`
+        id,
+        cloudinary_public_id,
+        public_url,
+        theme_id,
+        style_id,
+        breed_id,
+        format_id,
+        prompt_text,
+        generation_parameters,
+        subjects,
+        breeds (id, name),
+        themes (id, name),
+        styles (id, name),
+        formats (id, name, aspect_ratio)
+      `)
+      .eq('id', catalogImageId)
+      .single());
+    step('auth_and_form');
+
     let customer: { id: string; email: string } | null = null;
     if (!isGuest) {
       const { data: customerRow, error: customerError } = await supabase
@@ -316,22 +350,23 @@ export async function POST(request: NextRequest) {
         getSetting('guest_preview_daily_limit'),
         getSetting('guest_preview_ip_daily_limit'),
       ]);
-      const { count: deviceCount } = await supabase
-        .from('customer_custom_images')
-        .select('id', { count: 'exact', head: true })
-        .eq('guest_session_id', requester.guestId!)
-        .is('customer_id', null)
-        .gte('created_at', since);
-      let ipCount = 0;
-      if (ipHash) {
-        const { count } = await supabase
+      const [{ count: deviceCount }, ipResult] = await Promise.all([
+        supabase
           .from('customer_custom_images')
           .select('id', { count: 'exact', head: true })
-          .eq('ip_hash', ipHash)
+          .eq('guest_session_id', requester.guestId!)
           .is('customer_id', null)
-          .gte('created_at', since);
-        ipCount = count ?? 0;
-      }
+          .gte('created_at', since),
+        ipHash
+          ? supabase
+              .from('customer_custom_images')
+              .select('id', { count: 'exact', head: true })
+              .eq('ip_hash', ipHash)
+              .is('customer_id', null)
+              .gte('created_at', since)
+          : Promise.resolve({ count: 0 }),
+      ]);
+      const ipCount = ipResult.count ?? 0;
       if ((deviceCount ?? 0) >= deviceLimit || ipCount >= ipLimit) {
         console.warn('🚫 Guest preview limit reached', { guestId: requester.guestId, deviceCount, ipCount, deviceLimit, ipLimit });
         return setGuestCookie(NextResponse.json({
@@ -344,26 +379,9 @@ export async function POST(request: NextRequest) {
 
     // Get catalog image details
     console.log('🖼️ Fetching catalog image:', catalogImageId);
-    const { data: catalogImage, error: catalogError } = await supabase
-      .from('image_catalog')
-      .select(`
-        id,
-        cloudinary_public_id,
-        public_url,
-        theme_id,
-        style_id,
-        breed_id,
-        format_id,
-        prompt_text,
-        generation_parameters,
-        subjects,
-        breeds (id, name),
-        themes (id, name),
-        styles (id, name),
-        formats (id, name, aspect_ratio)
-      `)
-      .eq('id', catalogImageId)
-      .single();
+    const { data: catalogImage, error: catalogError } = await catalogLookup;
+
+    step('checks');
 
     if (catalogError) {
       console.error('❌ Catalog image fetch error:', catalogError);
@@ -436,8 +454,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Start fetching the design for Gemini now (cached across requests)
+    const designRef = designReference(catalogImageUrl);
+    designRef.catch(() => {}); // handled in the background job
+
     // Process all pets (multi-subject support)
     const petImageUrls: string[] = [];
+    const petUploads: (PetUpload | null)[] = [];
     const petCloudinaryIds: string[] = [];
     const petsData: any[] = [];
 
@@ -477,6 +500,7 @@ export async function POST(request: NextRequest) {
         console.log(`✅ Pet ${i + 1} found:`, { petId: pet.id, petName: pet.name, hasPhotoUrl: !!pet.primary_photo_url });
         petsData.push(pet);
         petImageUrls.push(pet.primary_photo_url);
+        petUploads.push(null);
 
         // Extract Cloudinary ID from URL if it's a Cloudinary URL
         if (pet.primary_photo_url.includes('cloudinary.com')) {
@@ -492,36 +516,14 @@ export async function POST(request: NextRequest) {
           petCloudinaryIds.push('non-cloudinary');
         }
       } else if (petPhoto) {
-        // Upload new pet photo
-        console.log(`📤 Uploading pet photo for subject ${i + 1} to Cloudinary...`);
-
-        const arrayBuffer = await petPhoto.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        // Upload to Cloudinary
-        const uploadResult = await new Promise<any>((resolve, reject) => {
-          const uploadStream = cloudinary.uploader.upload_stream(
-            {
-              folder: 'customer-custom-pets',
-              resource_type: 'image',
-              transformation: [
-                { width: 1024, height: 1024, crop: 'limit' },
-                { quality: 'auto', fetch_format: 'auto' }
-              ]
-            },
-            (error, result) => {
-              if (error) reject(error);
-              else resolve(result);
-            }
-          );
-          uploadStream.end(buffer);
-        });
-
-        petImageUrls.push(uploadResult.secure_url);
-        petCloudinaryIds.push(uploadResult.public_id);
+        // New photo: goes to Gemini as sent, and is stored on Cloudinary in the background
+        // under a public id chosen now, so the record can point at it straight away
+        const buffer = Buffer.from(await petPhoto.arrayBuffer());
+        const publicId = `${PET_FOLDER}/${randomUUID()}`;
+        petUploads.push({ buffer, publicId, mimeType: sniffImageType(buffer, petPhoto.type || 'image/jpeg') });
+        petImageUrls.push(cloudinary.url(publicId, { secure: true }));
+        petCloudinaryIds.push(publicId);
         petsData.push(null); // No pet data for uploaded photos
-
-        console.log(`✅ Pet photo ${i + 1} uploaded:`, uploadResult.public_id);
       }
     }
 
@@ -572,7 +574,7 @@ export async function POST(request: NextRequest) {
         pet_coat_id: firstPet?.coat_id || null,
         pet_image_url: petImageUrls[0],
         pet_cloudinary_id: petCloudinaryIds[0],
-        status: 'pending',
+        status: 'generating',
         is_public: true, // Make shareable by default
         metadata: {
           catalog_theme: catalogImage.themes?.name,
@@ -603,11 +605,7 @@ export async function POST(request: NextRequest) {
     console.log('✅ Custom image record created:', customImage.id);
     console.log('📦 Custom image object:', JSON.stringify(customImage));
 
-    // Update status to generating
-    await supabase
-      .from('customer_custom_images')
-      .update({ status: 'generating' })
-      .eq('id', customImage.id);
+    step('record');
 
     // Several pets: photo N replaces slot N (left to right), named in the prompt
     let slotPlan: SlotReplacement[] | undefined;
@@ -624,25 +622,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    step('slots');
+    const timings: Timings = { post: postTimings };
+
     // Run generation after the response is sent; after() keeps the function alive until it finishes
     after(() =>
-      generateCustomImage(
-        customImage.id,
+      generateCustomImage({
+        customImageId: customImage.id,
         catalogImageUrl,
-        petImageUrls, // Pass array of pet image URLs for multi-subject support
+        designRef,
+        petImageUrls, // every pet's photo (multi-subject)
+        petUploads,
         variationPromptTemplate,
-        catalogImage.themes?.name || 'Custom',
-        catalogImage.styles?.name || 'Portrait',
-        catalogImage.breeds?.name || 'Pet',
-        catalogImage.formats?.aspect_ratio, // Pass aspect ratio from format
-        firstPet?.breeds?.name,
-        firstPet?.ai_analysis_data, // Pass AI analysis data from first pet
-        sizeInstruction, // NEW: Pass relative size instruction for multi-subject
-        slotPlan
-      ).then(() => capturePreviews({ ids: [customImage.id] })) // social loop: only if "Include free previews" is on
+        themeName: catalogImage.themes?.name || 'Custom',
+        styleName: catalogImage.styles?.name || 'Portrait',
+        catalogBreedName: catalogImage.breeds?.name || 'Pet',
+        aspectRatio: catalogImage.formats?.aspect_ratio, // from the design's format
+        customerPetBreedName: firstPet?.breeds?.name,
+        aiAnalysisData: firstPet?.ai_analysis_data,
+        sizeInstruction, // relative sizes for several pets
+        slotPlan,
+        requestStarted,
+        timings,
+      }).then(() => capturePreviews({ ids: [customImage.id] })) // social loop: only if "Include free previews" is on
       .catch(async (error) => {
         console.error('❌ Error in background generation:', error);
-        // Update record with error status
         await supabase
           .from('customer_custom_images')
           .update({
@@ -653,6 +657,7 @@ export async function POST(request: NextRequest) {
       })
     );
 
+    timings.request = Date.now() - requestStarted;
     const response = {
       ...customImage,
       status: 'generating'
