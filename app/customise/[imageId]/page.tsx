@@ -208,7 +208,7 @@ export default function CustomisePage() {
       return;
     }
     setPreparing(true);
-    const file = await preparePetPhoto(raw);
+    const file = await preparePetPhoto(raw, 1600, 0.85); // ~250 KB: quicker to send; Gemini needs no more
     setPreparing(false);
     if (file.size > 12 * 1024 * 1024) {
       toast({ title: 'Photo too large', description: 'Please pick a smaller photo (under 12MB).', variant: 'destructive' });

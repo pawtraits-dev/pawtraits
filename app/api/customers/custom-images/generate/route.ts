@@ -80,18 +80,23 @@ function storePetPhoto(pet: PetUpload): Promise<any> {
   });
 }
 
-// Typical phone requests: f_auto makes a separate file per format, so build both
-const PHONE_REQUESTS = [
-  { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', Accept: 'image/webp,image/avif,image/jxl,image/heic,image/heic-sequence,video/*;q=0.8,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5' },
-  { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36', Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' },
-];
+/**
+ * Customer previews use a fixed WebP file (every phone browser shows WebP). With f_auto, Safari and
+ * Chrome got AVIF, which Cloudinary is slow to make the first time (~2.5s on the phone).
+ */
+const PREVIEW_FORMAT = process.env.CUSTOMER_PREVIEW_FORMAT || 'webp';
 
-/** Ask Cloudinary for the watermarked preview so it is being made while the phone polls */
-function warmPreview(url: string): Promise<number> {
+/** Have Cloudinary make the watermarked preview before the phone asks for it; ms taken */
+async function buildPreview(url: string): Promise<number> {
   const started = Date.now();
-  return Promise.allSettled(
-    PHONE_REQUESTS.map((headers) => fetch(url, { headers, signal: AbortSignal.timeout(15000) }).then((r) => r.arrayBuffer())),
-  ).then(() => Date.now() - started);
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    await res.arrayBuffer();
+    if (!res.ok) console.warn(`⚠️ Preview build returned ${res.status}: ${url}`);
+  } catch (e) {
+    console.warn('⚠️ Preview build failed (the phone will make it):', e);
+  }
+  return Date.now() - started;
 }
 
 interface GenerateJob {
@@ -184,9 +189,9 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
     const generatedImageUrl: string = uploaded.secure_url;
     const generatedCloudinaryId: string = uploaded.public_id;
 
-    // Watermarked preview for the customise page; start building it now, alongside the status update
-    const watermarkedUrl = cloudinaryService.getPublicVariantUrl(generatedCloudinaryId, 'catalog_watermarked');
-    const warming = warmPreview(watermarkedUrl);
+    // Watermarked preview for the customise page: made now, so the phone just downloads it
+    const watermarkedUrl = cloudinaryService.getPublicVariantUrl(generatedCloudinaryId, 'catalog_watermarked', { format: PREVIEW_FORMAT });
+    timings.preview = await buildPreview(watermarkedUrl);
 
     timings.server_total = since(job.requestStarted);
     t = Date.now();
@@ -214,7 +219,6 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
     if (updateError) throw new Error(`Saving the result failed: ${updateError.message}`);
     const statusMs = since(t);
 
-    timings.preview_build = await warming;
     await Promise.all(petStores);
     console.log(`✅ Custom image ${customImageId}: ${JSON.stringify({ ...timings, status_update: statusMs })}`);
   } catch (error) {

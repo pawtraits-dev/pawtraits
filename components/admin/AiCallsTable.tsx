@@ -7,7 +7,7 @@ import { FEATURES, usd, int } from '@/lib/ai/feature-labels';
 
 type Timings = {
   post?: Record<string, number>;
-  request?: number; queued?: number; inputs?: number; gemini?: number; save?: number; server_total?: number;
+  request?: number; queued?: number; inputs?: number; gemini?: number; save?: number; preview?: number; server_total?: number;
   client?: { submit?: number; waiting?: number; image_load?: number; total?: number };
 };
 type Call = {
@@ -33,6 +33,7 @@ function stepsOf(t: Timings) {
     { key: 'inputs', label: 'Fetch design and photos', ms: t.inputs, tone: 'bg-amber-400' },
     { key: 'gemini', label: 'Gemini painting', ms: t.gemini, tone: 'bg-purple-600' },
     { key: 'save', label: 'Save to Cloudinary', ms: t.save, tone: 'bg-emerald-500' },
+    ...(t.preview != null ? [{ key: 'preview', label: 'Make watermarked preview', ms: t.preview, tone: 'bg-teal-300' }] : []),
   ];
   if (!c?.total) return { steps: server, total: t.server_total, phone: false };
   const upload = c.submit != null && t.request != null ? Math.max(c.submit - t.request, 0) : undefined;

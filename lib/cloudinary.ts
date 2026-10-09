@@ -855,7 +855,7 @@ export class CloudinaryImageService {
   /**
    * Get public variant URL by type with security (signed URLs)
    */
-  getPublicVariantUrl(publicId: string, variant: 'full_size' | 'thumbnail' | 'mid_size' | 'purchased' | 'catalog_watermarked', opts: { width?: number } = {}): string {
+  getPublicVariantUrl(publicId: string, variant: 'full_size' | 'thumbnail' | 'mid_size' | 'purchased' | 'catalog_watermarked', opts: { width?: number; format?: string } = {}): string {
     try {
       ensureCloudinaryConfig();
       
@@ -880,7 +880,7 @@ export class CloudinaryImageService {
             width: 800,
             crop: 'limit', // Maintain aspect ratio, don't crop
             quality: 'auto',
-            fetch_format: 'auto',
+            fetch_format: opts.format || 'auto', // a fixed format makes one file (f_auto makes one per browser type)
             overlay: watermarkId,
             opacity: watermarkOpacity,
             gravity: 'center'
