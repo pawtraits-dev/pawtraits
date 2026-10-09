@@ -9,6 +9,7 @@ import { Package, Eye, Download, Truck, Clock, CheckCircle, ShoppingBag, Loader2
 import Link from 'next/link';
 import Image from 'next/image';
 import { productDescriptionService } from '@/lib/product-utils';
+import ItemDownload from '@/components/orders/ItemDownload';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
 import type { UserProfile } from '@/lib/user-types';
@@ -336,6 +337,7 @@ export default function CustomerOrdersView({ userProfile }: CustomerOrdersViewPr
                           <h3 className="text-sm font-medium text-gray-900">{extractDescriptionTitle(item.image_title) || item.image_title}</h3>
                           <p className="text-sm font-medium text-purple-700">{getProductDescription(item.product_id)}</p>
                           <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                          <ItemDownload download={(item as any).download} />
                           {order.status === 'delivered' && (
                             <Button
                               variant="outline"

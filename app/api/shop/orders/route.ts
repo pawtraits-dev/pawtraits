@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { withDownloads } from '@/lib/orders/order-downloads';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -456,7 +457,8 @@ export async function GET(request: NextRequest) {
           shipping_postcode, shipping_first_name, shipping_last_name, metadata, ...safe } = o;
         return NextResponse.json({ ...safe, shipping_first_name: shipping_first_name || null, redacted: true });
       }
-      return NextResponse.json(orders);
+      const [withDl] = await withDownloads(supabase, [o]);
+      return NextResponse.json(withDl);
     }
 
     // At this point we should have customerEmail from either query param or session
@@ -537,7 +539,7 @@ export async function GET(request: NextRequest) {
       })));
     }
 
-    return NextResponse.json(orders || []);
+    return NextResponse.json(await withDownloads(supabase, orders || []));
 
   } catch (error) {
     console.error('Error fetching orders:', error);

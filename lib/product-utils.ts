@@ -21,17 +21,31 @@ export class ProductDescriptionService {
   async loadProductDetails(orders: any[]): Promise<{[key: string]: any}> {
     try {
       const productDetailsMap: {[key: string]: any} = {};
-      
+
+      // Each order item keeps a copy of its product (product_data) from when it was bought:
+      // use that, and only look up products an item has no copy of
+      for (const item of orders.flatMap(order => order.order_items || [])) {
+        let pd = item.product_data;
+        if (typeof pd === 'string') { try { pd = JSON.parse(pd); } catch { pd = null; } }
+        if (pd && item.product_id && !productDetailsMap[item.product_id]) {
+          productDetailsMap[item.product_id] = pd;
+          this.productCache[item.product_id] = pd;
+        }
+      }
+      if (orders.flatMap(order => order.order_items || []).every(item => productDetailsMap[item.product_id])) {
+        return productDetailsMap;
+      }
+
       // Get current user email for API authentication
       const { data: { user } } = await this.supabaseService.getClient().auth.getUser();
       if (!user?.email) {
         console.warn('No user email found for product details loading');
-        return {};
+        return productDetailsMap;
       }
       
       // Collect all unique product IDs from all orders
       const allOrderItems = orders.flatMap(order => order.order_items || []);
-      const uniqueProductIds = Array.from(new Set(allOrderItems.map(item => item.product_id)));
+      const uniqueProductIds = Array.from(new Set(allOrderItems.map(item => item.product_id))).filter(id => id && !productDetailsMap[id]);
       console.log('Loading product details for IDs:', uniqueProductIds);
       
       // Fetch product details via API with proper URL encoding
