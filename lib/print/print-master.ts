@@ -179,8 +179,12 @@ export async function finishPrintFiles(supabase: SupabaseClient, orderItems: any
   }
 }
 
-/** Longest side of a downloadable / printable original we'll accept without a 4K master */
-export const DOWNLOAD_MIN_PX = 3000;
+/**
+ * Downloads use the preview as bought unless its longest side is below this. 2K previews
+ * (about 1700 × 2500) pass, so the customer gets exactly the picture they approved; 1K
+ * previews (about 850 × 1260) get the 4K master.
+ */
+export const DOWNLOAD_MIN_PX = Number(process.env.DOWNLOAD_MIN_PX) || 2000;
 
 /** A customised portrait whose only image is the (1K/2K) preview, with no 4K master yet */
 export async function customPreviewIsSmall(supabase: SupabaseClient, imageId: string): Promise<boolean> {
