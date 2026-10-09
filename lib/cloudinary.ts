@@ -735,33 +735,21 @@ export class CloudinaryImageService {
   async getDownloadUrl(publicId: string, userId: string, orderId: string): Promise<string> {
     try {
       ensureCloudinaryConfig();
-      // TODO: Verify user has purchased this image
       console.log(`🔄 Generating download URL for user: ${userId}, order: ${orderId}`);
 
-      const brandLogoId = process.env.CLOUDINARY_BRAND_LOGO_PUBLIC_ID || 'brand_assets/pawtraits_brand_logo';
-
-      // Generate signed URL with 7-day expiry for customer downloads
-      // Customers can request a new URL if expired
-      const expiresAt = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 days from now
-
+      // The full-quality file, as bought: no logo or watermark (a missing overlay image made
+      // Cloudinary refuse the whole file). Saved as pawtrait-<order>.png.
+      const expiresAt = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 days
       const signedUrl = cloudinary.url(publicId, {
-        quality: 100,
+        transformation: [{ quality: 100, flags: `attachment:pawtrait-${String(orderId).slice(0, 8)}` }],
         format: 'png',
-        dpi: 300,
-        overlay: brandLogoId,
-        gravity: 'south_east',
-        x: 30,
-        y: 30,
-        width_overlay: 120,
-        height_overlay: 40,
-        opacity: 80,
         sign_url: true,
-        expires_at: expiresAt // 7-day expiry for security
+        expires_at: expiresAt,
+        secure: true,
       });
 
-      console.log(`✅ Download URL generated for user: ${userId} (expires in 7 days)`);
+      console.log(`✅ Download URL generated for user: ${userId}`);
       return signedUrl;
-
     } catch (error) {
       console.error('❌ Download URL generation failed:', error);
       throw new Error(`Download URL generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
