@@ -33,15 +33,16 @@ const geminiService = new GeminiVariationService();
 const promptBuilder = new VariationPromptBuilder();
 
 type ImageInput = { data: string; mimeType: string };
-type PetUpload = { buffer: Buffer; publicId: string; mimeType: string };
+type PetUpload = { publicId: string; stored: Promise<any | null> };
 /** Milliseconds per step, saved in generation_metadata.timings (shown on Admin > AI costs) */
 type Timings = Record<string, number | Record<string, number>>;
 
 const PET_FOLDER = 'customer-custom-pets';
 
 async function fetchImage(url: string): Promise<ImageInput> {
-  // Gemini takes PNG / JPEG / WebP / HEIC (not AVIF), so don't let f_auto pick AVIF
-  const res = await fetch(url, { headers: { Accept: 'image/webp,image/png,image/jpeg' } });
+  // Default Accept (*/*): Cloudinary sends the same cached file as always. Asking for WebP made a
+  // new lossy file per design (slower, and a worse reference for Gemini).
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`Image fetch failed (${res.status}): ${url}`);
   const buffer = Buffer.from(await res.arrayBuffer());
   return { data: buffer.toString('base64'), mimeType: sniffImageType(buffer, res.headers.get('content-type') || 'image/png') };
@@ -69,9 +70,9 @@ function uploadBuffer(buffer: Buffer, options: Record<string, unknown>): Promise
 }
 
 /** Customer's photo, stored at the public id already saved on the record */
-function storePetPhoto(pet: PetUpload): Promise<any> {
-  return uploadBuffer(pet.buffer, {
-    public_id: pet.publicId,
+function storePetPhoto(buffer: Buffer, publicId: string): Promise<any> {
+  return uploadBuffer(buffer, {
+    public_id: publicId,
     overwrite: false,
     transformation: [
       { width: 1024, height: 1024, crop: 'limit' },
@@ -104,7 +105,7 @@ interface GenerateJob {
   catalogImageUrl: string;
   designRef: Promise<ImageInput>;
   petImageUrls: string[];
-  petUploads: (PetUpload | null)[];   // photos uploaded with this request (stored in parallel with the painting)
+  petUploads: (PetUpload | null)[];   // photos sent with this request (upload already under way)
   variationPromptTemplate?: string;
   themeName: string;
   styleName: string;
@@ -127,19 +128,18 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
   const since = (t: number) => Date.now() - t;
   timings.queued = since(job.requestStarted) - (timings.request as number);
 
-  // Store new photos while the painting is made (the record already has their URLs)
-  const petStores = job.petUploads.map((pet) =>
-    pet ? storePetPhoto(pet).catch((e) => console.error(`❌ Pet photo upload failed (${pet.publicId}):`, e)) : null,
-  );
-
   try {
     let t = Date.now();
-    // The design (usually cached) and the pets, in parallel; new photos are used as uploaded
+    // The design (usually cached) and the pets, in parallel. New photos go to Gemini exactly as
+    // before: Cloudinary's 1024px, auto-rotated copy (the upload started as the request arrived)
     const [design, pets] = await Promise.all([
       job.designRef,
-      Promise.all(petImageUrls.map((url, i) => {
+      Promise.all(petImageUrls.map(async (url, i) => {
         const upload = job.petUploads[i];
-        return upload ? { data: upload.buffer.toString('base64'), mimeType: upload.mimeType } : fetchImage(url);
+        if (!upload) return fetchImage(url);
+        const stored = await upload.stored;
+        if (!stored?.secure_url) throw new Error('Pet photo upload failed');
+        return fetchImage(stored.secure_url);
       })),
     ]);
     timings.inputs = since(t);
@@ -169,9 +169,7 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
     const request = paintingRequest({
       prompt: generationPrompt,
       catalogImageData: design.data,
-      catalogMimeType: design.mimeType,
       petImageData: pets.map((p) => p.data),
-      petMimeTypes: pets.map((p) => p.mimeType),
       aspectRatio: job.aspectRatio,
     });
 
@@ -219,10 +217,8 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
     if (updateError) throw new Error(`Saving the result failed: ${updateError.message}`);
     const statusMs = since(t);
 
-    await Promise.all(petStores);
     console.log(`✅ Custom image ${customImageId}: ${JSON.stringify({ ...timings, status_update: statusMs })}`);
   } catch (error) {
-    await Promise.all(petStores);
     console.error('❌ Error in generateCustomImage:', error);
     throw error;
   }
@@ -520,11 +516,12 @@ export async function POST(request: NextRequest) {
           petCloudinaryIds.push('non-cloudinary');
         }
       } else if (petPhoto) {
-        // New photo: goes to Gemini as sent, and is stored on Cloudinary in the background
-        // under a public id chosen now, so the record can point at it straight away
+        // New photo: upload starts now (not awaited) under a public id chosen here, so the record
+        // can point at it and the rest of the request carries on while it uploads
         const buffer = Buffer.from(await petPhoto.arrayBuffer());
         const publicId = `${PET_FOLDER}/${randomUUID()}`;
-        petUploads.push({ buffer, publicId, mimeType: sniffImageType(buffer, petPhoto.type || 'image/jpeg') });
+        const stored = storePetPhoto(buffer, publicId).catch((e) => { console.error(`❌ Pet photo upload failed (${publicId}):`, e); return null; });
+        petUploads.push({ publicId, stored });
         petImageUrls.push(cloudinary.url(publicId, { secure: true }));
         petCloudinaryIds.push(publicId);
         petsData.push(null); // No pet data for uploaded photos
