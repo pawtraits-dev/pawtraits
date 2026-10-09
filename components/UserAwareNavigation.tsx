@@ -31,7 +31,8 @@ import {
   PawPrint,
   Share2,
   Bell,
-  Sparkles
+  Sparkles,
+  Coffee,
 } from 'lucide-react'
 import { SupabaseService } from '@/lib/supabase'
 import { useHybridCart } from '@/lib/hybrid-cart-context'
@@ -115,7 +116,8 @@ export default function UserAwareNavigation({
   // Expandable menu items (from brand/logo click) - exclude admin
   const getExpandableMenuItems = (): NavigationItem[] => {
     const baseItems: NavigationItem[] = [
-      { name: 'Browse', href: '/browse', icon: ShoppingBag }
+      { name: 'Browse', href: '/browse', icon: ShoppingBag },
+      { name: 'Mugs', href: '/mugs', icon: Coffee }
     ]
 
     // Add user-specific items only if user is logged in

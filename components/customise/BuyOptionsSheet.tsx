@@ -27,6 +27,8 @@ export interface BuyTarget {
   title: string;            // basket/order title (never the breed description for custom portraits)
   formatId?: string | null;
   themeName?: string | null;
+  /** Physical products only (e.g. a mug wrap is sold as a mug, not as a download) */
+  physicalOnly?: boolean;
 }
 
 export interface StallOfferView {
@@ -83,7 +85,8 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
     if (!open || products || !target.formatId) return;
     fetch(`/api/public/format-products?formatId=${target.formatId}&country=GB`)
       .then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Could not load prices'); return d.products as ProductRow[]; })
-      .then(rows => {
+      .then(all => {
+        const rows = target.physicalOnly ? all.filter(p => p.product_type !== 'digital_download') : all;
         setProducts(rows);
         // sensible default: the print in their hand, else the download for a custom portrait
         const digital = rows.find(p => p.product_type === 'digital_download');
@@ -92,9 +95,10 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
         else if (target.kind === 'custom' && digital) setSelected(new Set([digital.id]));
         else if (inline && medium) setSelected(new Set([medium.id]));
         else if (inline && digital && !rows.some(p => p.product_type !== 'digital_download')) setSelected(new Set([digital.id]));
+        else if (target.physicalOnly && rows.length === 1) setSelected(new Set([rows[0].id]));
       })
       .catch(e => setLoadError(e.message));
-  }, [open, products, target.formatId, target.kind, stallAvailable]);
+  }, [open, products, target.formatId, target.kind, target.physicalOnly, stallAvailable]);
 
   const digital = (products ?? []).filter(p => p.product_type === 'digital_download');
   const printsByMedium = useMemo(() => (products ?? [])

@@ -258,6 +258,8 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
               )}
             </div>
 
+            <Link href="/mugs" className="text-gray-700 hover:text-purple-600 transition-colors">Mugs</Link>
+
             <Link href="/search" aria-label="Search designs" className="text-gray-700 hover:text-purple-600 transition-colors">
               <Search className="w-5 h-5" />
             </Link>
@@ -366,6 +368,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                 </button>
               </div>
 
+              <Link href="/mugs" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 text-gray-700 hover:text-purple-600">Zodiac mugs</Link>
               <Link href="/search" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-purple-600">
                 <Search className="h-4 w-4" /> Search designs
               </Link>

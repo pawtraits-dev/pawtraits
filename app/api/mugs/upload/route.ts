@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { getRequester, setGuestCookie } from '@/lib/guest/access';
 import { v2 as cloudinary } from 'cloudinary';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 if (!cloudinary.config().cloud_name) {
   cloudinary.config({
@@ -25,7 +21,6 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
-    const sessionId = formData.get('session_id') as string | null;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -46,14 +41,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Auth check — attempt session auth; fall back to guest mode
-    const cookieStore = await cookies();
-    const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore });
-    const { data: { user } } = await supabaseAuth.auth.getUser();
-
-    // If no session_id provided for guest, require auth
-    if (!user && !sessionId) {
-      return NextResponse.json({ error: 'session_id required for guest uploads' }, { status: 400 });
-    }
+    // Signed-in customer or guest (device cookie, created if needed)
+    const requester = await getRequester(request, { createGuest: true });
 
     // Upload to Cloudinary
     const arrayBuffer = await file.arrayBuffer();
@@ -68,16 +57,17 @@ export async function POST(request: NextRequest) {
         resource_type: 'image',
         type: 'upload',
         tags: ['mug-upload', 'pet-photo'],
+        transformation: [{ width: 1600, height: 1600, crop: 'limit' }],
         overwrite: false,
       }
     );
 
-    return NextResponse.json({
+    return setGuestCookie(NextResponse.json({
       public_id: uploadResult.public_id,
       url: uploadResult.secure_url,
       width: uploadResult.width,
       height: uploadResult.height,
-    });
+    }), requester);
 
   } catch (error) {
     console.error('Mug photo upload failed:', error);

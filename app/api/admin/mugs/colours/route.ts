@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from '@/lib/qr/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // GET /api/admin/mugs/colours?activeOnly=false
 export async function GET(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
@@ -29,6 +32,8 @@ export async function GET(request: NextRequest) {
 
 // PATCH /api/admin/mugs/colours — toggle is_active only
 export async function PATCH(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }

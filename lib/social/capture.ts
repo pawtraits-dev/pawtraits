@@ -70,7 +70,8 @@ export async function captureSocialItems(
     const { data: customs } = await supabase.from('customer_custom_images')
       .select('id, catalog_image_id, pet_name, pet_image_url, pet_cloudinary_id, generated_image_url, generated_cloudinary_id, status, metadata')
       .in('id', ids);
-    const ready = (customs ?? []).filter((c: any) => c.generated_image_url && c.status !== 'failed');
+    // Mugs (a 2:1 wrap, not a portrait) aren't featured
+    const ready = (customs ?? []).filter((c: any) => c.generated_image_url && c.status !== 'failed' && c.metadata?.product !== 'mug');
     if (!ready.length) return 0;
 
     const email = order.customer_email?.trim().toLowerCase() || null;
@@ -200,7 +201,7 @@ export async function capturePreviews(opts: { ids?: string[]; days?: number; lim
     const { data: customs, error } = await q;
     if (error) throw error;
 
-    const candidates = (customs ?? []).filter((c: any) => c.pet_image_url && !(c.rating && c.rating <= 2));
+    const candidates = (customs ?? []).filter((c: any) => c.pet_image_url && !(c.rating && c.rating <= 2) && c.metadata?.product !== 'mug');
     if (!candidates.length) return 0;
     const { data: existing } = await supabase.from('social_items').select('custom_image_id').in('custom_image_id', candidates.map((c: any) => c.id));
     const have = new Set((existing ?? []).map((e: any) => e.custom_image_id));

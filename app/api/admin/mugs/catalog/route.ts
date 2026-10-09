@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from '@/lib/qr/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -14,6 +15,8 @@ function getAdminClient() {
 // GET /api/admin/mugs/catalog?id=uuid
 // GET /api/admin/mugs/catalog?colours=true&activeOnly=true
 export async function GET(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabase = getAdminClient();
     const { searchParams } = new URL(request.url);
@@ -53,6 +56,8 @@ export async function GET(request: NextRequest) {
 
 // POST /api/admin/mugs/catalog
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabase = getAdminClient();
     const body = await request.json();
@@ -74,6 +79,8 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/admin/mugs/catalog
 export async function PUT(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabase = getAdminClient();
     const body = await request.json();
@@ -97,6 +104,8 @@ export async function PUT(request: NextRequest) {
 
 // PATCH /api/admin/mugs/catalog — partial update (e.g. toggle is_active)
 export async function PATCH(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabase = getAdminClient();
     const body = await request.json();
@@ -120,6 +129,8 @@ export async function PATCH(request: NextRequest) {
 
 // DELETE /api/admin/mugs/catalog?id=uuid
 export async function DELETE(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabase = getAdminClient();
     const { searchParams } = new URL(request.url);

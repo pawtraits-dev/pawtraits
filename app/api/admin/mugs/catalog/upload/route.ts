@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
+import { requireAdmin } from '@/lib/qr/server';
 
 if (!cloudinary.config().cloud_name) {
   cloudinary.config({
@@ -15,6 +16,8 @@ export const dynamic = 'force-dynamic';
 // Body: FormData with 'file' field (JPEG, PNG, or WebP)
 // Returns: { url, public_id }
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;

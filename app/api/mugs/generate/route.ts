@@ -1,268 +1,170 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { GoogleGenAI } from '@google/genai';
 import { v2 as cloudinary } from 'cloudinary';
-import { buildMugPreviewUrl, buildMugPrintUrl } from '@/lib/cloudinary-mug';
+import { serviceClient } from '@/lib/qr/server';
+import { getRequester, setGuestCookie, clientIp } from '@/lib/guest/access';
+import { hashIp } from '@/lib/qr/attribution';
+import { getSetting } from '@/lib/app-settings';
 import type { MugColour, MugCatalogEntry } from '@/lib/product-types';
-import { GEMINI_IMAGE_MODELS } from '@/lib/gemini-models';
+import { GEMINI_IMAGE_MODELS, geminiImageConfig } from '@/lib/gemini-models';
 import { generateWithUsage } from '@/lib/ai/usage';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-if (!cloudinary.config().cloud_name) {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  });
-}
+import { compositeParams, saveMugAsCustomImage, wideFormatId } from '@/lib/mugs/server';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60; // Allow up to 60s for Gemini + upload
+export const maxDuration = 120; // Gemini + composite + upload
 
-// POST /api/mugs/generate
-// Body: { catalog_slug, pet_photo_public_id, pet_name, mug_colour_slug, customer_email?, session_id? }
+/**
+ * POST /api/mugs/generate
+ * Body: { catalog_slug, pet_photo_public_id, pet_name, mug_colour_slug }
+ * Signed-in customer or guest (device cookie). Paints the pet into the design's scene, builds the
+ * mug wrap, and saves it as a customised Pawtrait so it can be bought like one.
+ * Returns { generation_id, custom_image_id, preview_url, format_id }.
+ */
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+  const supabase = serviceClient();
+  const requester = await getRequester(request, { createGuest: true });
+  const reply = (body: any, init?: ResponseInit) => setGuestCookie(NextResponse.json(body, init), requester);
   let generationId: string | null = null;
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
-
   try {
-    const body = await request.json();
-    const {
-      catalog_slug,
-      pet_photo_public_id,
-      pet_name,
-      mug_colour_slug,
-      customer_email,
-      session_id,
-    } = body;
-
-    // Validate required fields
-    if (!catalog_slug || !pet_photo_public_id || !pet_name || !mug_colour_slug) {
-      return NextResponse.json(
-        { error: 'catalog_slug, pet_photo_public_id, pet_name, and mug_colour_slug are required' },
-        { status: 400 }
-      );
+    const { catalog_slug, pet_photo_public_id, pet_name, mug_colour_slug } = await request.json();
+    const name = String(pet_name || '').trim();
+    if (!catalog_slug || !pet_photo_public_id || !name || !mug_colour_slug) {
+      return reply({ error: 'Choose a design and colour, add a photo and your pet’s name' }, { status: 400 });
     }
+    if (name.length > 20) return reply({ error: 'Pet name must be 20 characters or fewer' }, { status: 400 });
+    // Only photos uploaded through /api/mugs/upload
+    if (!String(pet_photo_public_id).startsWith('pawtraits/mugs/pet-photos/')) return reply({ error: 'Please upload your photo again' }, { status: 400 });
 
-    if (pet_name.length > 20) {
-      return NextResponse.json({ error: 'Pet name must be 20 characters or fewer' }, { status: 400 });
+    // Who is it for?
+    let customer: { id: string; email: string } | null = null;
+    let profileId: string | null = null;
+    if (requester.user?.email) {
+      const email = requester.user.email;
+      const [{ data: c }, { data: p }] = await Promise.all([
+        supabase.from('customers').select('id, email').eq('email', email).maybeSingle(),
+        supabase.from('user_profiles').select('id').eq('email', email).maybeSingle(),
+      ]);
+      customer = c ?? null;
+      profileId = p?.id ?? null;
     }
+    const ipHash = hashIp(clientIp(request));
 
-    if (!customer_email && !session_id) {
-      return NextResponse.json(
-        { error: 'Either customer_email (authenticated) or session_id (guest) is required' },
-        { status: 400 }
-      );
-    }
-
-    // Auth check for authenticated users
-    let authenticatedUserId: string | null = null;
-    if (customer_email) {
-      const cookieStore = await cookies();
-      const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore });
-      const { data: { user } } = await supabaseAuth.auth.getUser();
-
-      if (!user || user.email !== customer_email) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Same daily free-preview limit as customised paintings, for guests
+    if (!requester.user) {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const [limit, { count }] = await Promise.all([
+        getSetting('guest_preview_daily_limit'),
+        supabase.from('mug_generations').select('id', { count: 'exact', head: true }).eq('session_id', requester.guestId!).gte('created_at', since),
+      ]);
+      if ((count ?? 0) >= limit) {
+        return reply({ error: "You've made today's free previews. Create a free account (or come back tomorrow) to make more.", code: 'GUEST_LIMIT_REACHED' }, { status: 429 });
       }
-
-      // Get user_profiles.id (not auth.users.id)
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('email', customer_email)
-        .single();
-
-      authenticatedUserId = profile?.id || null;
     }
 
-    // Fetch catalog entry and colour from DB
-    const [catalogResult, colourResult] = await Promise.all([
-      supabase.from('mug_catalog').select('*').eq('slug', catalog_slug).eq('is_active', true).single(),
-      supabase.from('mug_colours').select('*').eq('slug', mug_colour_slug).eq('is_active', true).single(),
+    const [catalogResult, colourResult, formatId] = await Promise.all([
+      supabase.from('mug_catalog').select('*').eq('slug', catalog_slug).eq('is_active', true).maybeSingle(),
+      supabase.from('mug_colours').select('*').eq('slug', mug_colour_slug).eq('is_active', true).maybeSingle(),
+      wideFormatId(supabase),
     ]);
+    if (!catalogResult.data) return reply({ error: 'Design not found' }, { status: 404 });
+    if (!colourResult.data) return reply({ error: 'Colour not found' }, { status: 404 });
+    const entry = catalogResult.data as MugCatalogEntry;
+    const colour = colourResult.data as MugColour;
 
-    if (catalogResult.error || !catalogResult.data) {
-      return NextResponse.json({ error: 'Catalog entry not found' }, { status: 404 });
+    if (!cloudinary.config().cloud_name) {
+      cloudinary.config({ cloud_name: process.env.CLOUDINARY_CLOUD_NAME, api_key: process.env.CLOUDINARY_API_KEY, api_secret: process.env.CLOUDINARY_API_SECRET, secure: true });
     }
-    if (colourResult.error || !colourResult.data) {
-      return NextResponse.json({ error: 'Mug colour not found' }, { status: 404 });
-    }
-
-    const catalogEntry: MugCatalogEntry = catalogResult.data;
-    const mugColour: MugColour = colourResult.data;
-
-    // Get pet photo URL from Cloudinary public_id
     const petPhotoUrl = cloudinary.url(pet_photo_public_id, { secure: true });
 
-    // Insert mug_generations row with status 'generating'
-    const { data: generation, error: insertError } = await supabase
-      .from('mug_generations')
-      .insert({
-        customer_id: authenticatedUserId,
-        session_id: customer_email ? null : session_id,
-        mug_catalog_id: catalogEntry.id,
-        mug_colour_id: mugColour.id,
-        pet_name: pet_name.trim(),
-        pet_photo_url: petPhotoUrl,
-        pet_photo_public_id,
-        status: 'generating',
-      })
-      .select()
-      .single();
-
-    if (insertError || !generation) {
-      throw new Error(`Failed to create generation record: ${insertError?.message}`);
-    }
-
+    const { data: generation, error: insertError } = await supabase.from('mug_generations').insert({
+      customer_id: profileId,
+      session_id: requester.user ? null : requester.guestId,
+      mug_catalog_id: entry.id,
+      mug_colour_id: colour.id,
+      pet_name: name,
+      pet_photo_url: petPhotoUrl,
+      pet_photo_public_id,
+      status: 'generating',
+    }).select('id').single();
+    if (insertError || !generation) throw new Error(`Failed to create generation record: ${insertError?.message}`);
     generationId = generation.id;
 
-    // ─── Stage 1: Gemini — personalise pet image ─────────────────────────────
-    const geminiPrompt = buildGeminiPrompt(mugColour.hex);
-
-    // Fetch catalog image as base64
-    const catalogImageBase64 = await fetchImageAsBase64(catalogEntry.catalog_image_url);
-
-    // Fetch pet photo as base64
-    const petPhotoBase64 = await fetchImageAsBase64(petPhotoUrl);
-
+    // Stage 1: paint the pet into the design's scene
+    const geminiPrompt = buildGeminiPrompt(colour.hex);
+    const [scene, pet] = await Promise.all([fetchImage(entry.catalog_image_url), fetchImage(petPhotoUrl)]);
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-
-    const geminiResponse = await generateWithUsage(ai, { feature: 'mug', meta: { generationId } }, {
+    const geminiResponse: any = await generateWithUsage(ai, { feature: 'mug', meta: { generationId } }, {
       model: GEMINI_IMAGE_MODELS.flash,
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: geminiPrompt },
-            {
-              inlineData: {
-                mimeType: 'image/jpeg',
-                data: catalogImageBase64,
-              },
-            },
-            {
-              inlineData: {
-                mimeType: 'image/jpeg',
-                data: petPhotoBase64,
-              },
-            },
-          ],
-        },
-      ],
-      config: {
-        responseModalities: ['IMAGE', 'TEXT'],
-      },
-    } as any);
+      contents: [{ role: 'user', parts: [
+        { text: geminiPrompt },
+        { inlineData: { mimeType: scene.mimeType, data: scene.data } },
+        { inlineData: { mimeType: pet.mimeType, data: pet.data } },
+      ] }],
+      config: { responseModalities: ['IMAGE', 'TEXT'], ...geminiImageConfig('1:1', '1K') },
+    });
+    const painted: string | undefined = geminiResponse.candidates?.[0]?.content?.parts?.find((p: any) => p?.inlineData?.data)?.inlineData?.data;
+    if (!painted) throw new Error('Gemini did not return an image');
 
-    // Extract generated image from response
-    let personalisedImageBase64: string | null = null;
-    if (geminiResponse.candidates?.[0]?.content?.parts) {
-      for (const part of geminiResponse.candidates[0].content.parts) {
-        if ((part as any).inlineData?.data) {
-          personalisedImageBase64 = (part as any).inlineData.data;
-          break;
-        }
-      }
-    }
-
-    if (!personalisedImageBase64) {
-      throw new Error('Gemini did not return an image');
-    }
-
-    // Upload Gemini output to Cloudinary
-    const uploadResult = await cloudinary.uploader.upload(
-      `data:image/png;base64,${personalisedImageBase64}`,
-      {
-        folder: 'pawtraits/mugs/generated',
-        resource_type: 'image',
-        type: 'upload',
-        tags: ['mug-generated', `generation-${generationId}`],
-        overwrite: false,
-      }
-    );
-
-    const personalisedImagePublicId = uploadResult.public_id;
-    const personalisedImageUrl = uploadResult.secure_url;
-
-    // ─── Stage 2: Cloudinary composite ───────────────────────────────────────
-    const compositeParams = {
-      personalisedImagePublicId,
-      petName: pet_name.trim(),
-      mugColour,
-      catalogEntry,
-    };
-
-    const previewUrl = buildMugPreviewUrl(compositeParams);
-    const printUrl = buildMugPrintUrl(compositeParams);
-
-    // Update generation record
-    const generationTimeMs = Date.now() - startTime;
-    await supabase
-      .from('mug_generations')
-      .update({
-        personalised_image_url: personalisedImageUrl,
-        personalised_image_public_id: personalisedImagePublicId,
-        composite_preview_url: previewUrl,
-        composite_print_url: printUrl,
-        status: 'complete',
-        gemini_prompt: geminiPrompt,
-        generation_time_ms: generationTimeMs,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', generationId);
-
-    return NextResponse.json({
-      generation_id: generationId,
-      preview_url: previewUrl,
-      print_url: printUrl,
-      personalised_image_public_id: personalisedImagePublicId,
+    const uploadResult: any = await new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream(
+        { folder: 'pawtraits/mugs/generated', resource_type: 'image', tags: ['mug-generated', `generation-${generationId}`] },
+        (e, r) => (e ? reject(e) : resolve(r)),
+      ).end(Buffer.from(painted, 'base64'));
     });
 
+    // Stage 2: the mug wrap, saved as a customised Pawtrait so it can be bought
+    const params = compositeParams(uploadResult.public_id, name, colour, entry);
+    const saved = await saveMugAsCustomImage(supabase, {
+      generationId: generationId!,
+      owner: { customerId: customer?.id ?? null, customerEmail: customer?.email ?? requester.user?.email ?? null, guestId: requester.guestId },
+      params, petPhotoUrl, petPhotoPublicId: pet_photo_public_id, colour, entry, ipHash,
+    });
+
+    await supabase.from('mug_generations').update({
+      personalised_image_url: uploadResult.secure_url,
+      personalised_image_public_id: uploadResult.public_id,
+      composite_preview_url: saved.previewUrl,
+      composite_print_url: saved.printUrl,
+      status: 'complete',
+      gemini_prompt: geminiPrompt,
+      generation_time_ms: Date.now() - startTime,
+      updated_at: new Date().toISOString(),
+    }).eq('id', generationId);
+
+    return reply({
+      generation_id: generationId,
+      custom_image_id: saved.customImageId,
+      preview_url: saved.previewUrl,
+      format_id: formatId,
+    });
   } catch (error) {
     console.error('Mug generation failed:', error);
-
-    // Mark generation as failed if we have an ID
     if (generationId) {
-      const supabaseErr = createClient(supabaseUrl, serviceRoleKey, {
-        auth: { autoRefreshToken: false, persistSession: false }
-      });
-      await supabaseErr
-        .from('mug_generations')
-        .update({
-          status: 'failed',
-          error_message: error instanceof Error ? error.message : 'Unknown error',
-          generation_time_ms: Date.now() - startTime,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', generationId);
+      await supabase.from('mug_generations').update({
+        status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+        generation_time_ms: Date.now() - startTime,
+        updated_at: new Date().toISOString(),
+      }).eq('id', generationId);
     }
-
-    return NextResponse.json({ error: 'Generation failed' }, { status: 500 });
+    return reply({ error: 'Pawcasso dropped his brush. Please try again.' }, { status: 500 });
   }
 }
 
 function buildGeminiPrompt(mugColourHex: string): string {
-  return `Replace the animal in the reference scene image with the specific pet from the uploaded photo. Preserve the exact composition, pose, background, props, and artistic style of the reference scene. Match the uploaded pet's breed, coat colour, markings, and facial features as closely as possible.
+  return `Replace the animal in the reference scene image (first image) with the specific pet from the uploaded photo (second image). Preserve the exact composition, pose, background, props, and artistic style of the reference scene. Match the uploaded pet's breed, build, coat colour, markings, and facial features as closely as possible.
 Recolour all decorative highlight elements (crown, collar, hat, ribbons, scarves, props) to the colour hex #${mugColourHex}.
 Maintain the original artistic style (sketch / illustration / painterly) exactly.
 Do not add any text to the image.
-Output a square image at the same resolution as the reference.`;
+Output a square image.`;
 }
 
-async function fetchImageAsBase64(url: string): Promise<string> {
+async function fetchImage(url: string): Promise<{ data: string; mimeType: string }> {
   const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch image: ${url} (${response.status})`);
-  }
-  const arrayBuffer = await response.arrayBuffer();
-  return Buffer.from(arrayBuffer).toString('base64');
+  if (!response.ok) throw new Error(`Failed to fetch image: ${url} (${response.status})`);
+  const buf = Buffer.from(await response.arrayBuffer());
+  const type = (response.headers.get('content-type') || 'image/jpeg').split(';')[0];
+  return { data: buf.toString('base64'), mimeType: ['image/png', 'image/webp', 'image/jpeg'].includes(type) ? type : 'image/jpeg' };
 }
