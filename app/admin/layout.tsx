@@ -41,7 +41,8 @@ import {
   Printer,
   Sparkles,
   Instagram,
-  Layers
+  Layers,
+  ScanSearch,
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -122,6 +123,7 @@ const navigationSections = [
   {
     title: 'Analytics',
     items: [
+      { name: 'Customer Paintings', href: '/admin/custom-paintings', icon: ScanSearch },
       { name: 'Image Analytics', href: '/admin/image-analytics', icon: BarChart3 },
       { name: 'Liked Images', href: '/admin/liked-images', icon: Heart },
       { name: 'Shared Images', href: '/admin/shared-images', icon: Share2 },
