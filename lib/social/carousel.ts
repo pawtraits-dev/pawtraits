@@ -4,6 +4,7 @@
  * Photos are filled to the frame centred on the pet; Pawtraits are fitted whole with a blurred
  * fill (nothing cropped) and watermarked. A full batch becomes 'ready' (phase 4 publishes it).
  */
+import { blurredFit } from '@/lib/social/feed';
 import { getSetting } from '@/lib/app-settings';
 
 export const BATCH_SIZE = 5;
@@ -23,7 +24,7 @@ export function afterSlide(publicId: string | null, fallback: string): string {
   if (!c || !publicId) return fallback;
   const wm = process.env.CLOUDINARY_WATERMARK_PUBLIC_ID || 'pawtraits_watermark_logo';
   const op = parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '20', 10);
-  return `https://res.cloudinary.com/${c}/image/upload/c_pad,b_blurred:400:15,w_${W},h_${H}/l_${wm},o_${op},g_center,w_0.6,fl_relative/f_jpg,q_90/${publicId}`;
+  return `https://res.cloudinary.com/${c}/image/upload/${blurredFit(publicId, W, H)}/l_${wm},o_${op},g_center,w_0.6,fl_relative/f_jpg,q_90/${publicId}`;
 }
 
 /** Download version of a Cloudinary slide (adds fl_attachment) */

@@ -15,6 +15,14 @@ function cloud() {
   return process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || '';
 }
 
+/**
+ * The picture fitted whole into a W×H frame over a blurred, zoomed copy of itself (no cropping).
+ * (Cloudinary's b_blurred padding isn't available on this account: it returns 400.)
+ */
+export function blurredFit(publicId: string, W: number, H: number): string {
+  return `c_fill,w_${W},h_${H}/e_blur:1500/l_${publicId.replace(/\//g, ':')},c_fit,w_${W},h_${H}/fl_layer_apply,g_center`;
+}
+
 /** Customer photo filling a 4:5 frame, centred on the pet */
 export function beforeFrame(publicId: string | null, fallback: string): string {
   const c = cloud();
@@ -27,7 +35,7 @@ export function afterFrame(publicId: string | null, fallback: string): string {
   if (!c || !publicId) return fallback; // after_url is already the watermarked preview
   const wm = process.env.CLOUDINARY_WATERMARK_PUBLIC_ID || 'pawtraits_watermark_logo';
   const op = parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '20', 10);
-  return `https://res.cloudinary.com/${c}/image/upload/c_pad,b_blurred:400:15,w_${W},h_${H}/l_${wm},o_${op},g_center,w_0.6,fl_relative/f_auto,q_auto/${publicId}`;
+  return `https://res.cloudinary.com/${c}/image/upload/${blurredFit(publicId, W, H)}/l_${wm},o_${op},g_center,w_0.6,fl_relative/f_auto,q_auto/${publicId}`;
 }
 
 const BAD_ORDER_STATUSES = ['cancelled', 'canceled', 'refunded', 'on_hold'];
