@@ -75,6 +75,7 @@ const navigationSections = [
       { name: 'Outfits', href: '/admin/outfits', icon: Shirt },
       { name: 'Variation Batches', href: '/admin/variation-batches', icon: Layers },
       { name: 'Preview Size Test', href: '/admin/size-test', icon: ImageIcon },
+      { name: 'Consistency Test', href: '/admin/consistency-test', icon: ScanSearch },
       { name: 'Formats', href: '/admin/formats', icon: FileImage },
       { name: 'Quizzes', href: '/admin/quizzes', icon: Sparkles },
     ]

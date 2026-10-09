@@ -24,6 +24,7 @@ export type AiFeature =
   | 'mug'                   // mug artwork
   | 'quiz-image'            // Pawsonality quiz type pictures
   | 'size-test'             // admin 1K / 2K / 4K comparison
+  | 'consistency-test'      // admin model / reference / prompt comparison
   | 'gemini-test'
   | 'auto-tag'
   | 'photo-check'

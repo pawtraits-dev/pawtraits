@@ -10,6 +10,7 @@ export const FEATURES: Record<string, string> = {
   mug: 'Mugs',
   'quiz-image': 'Quiz pictures',
   'size-test': 'Size tests (admin)',
+  'consistency-test': 'Consistency tests (admin)',
   'gemini-test': 'Gemini test page',
   'auto-tag': 'Auto-tagging',
   'photo-check': 'Social photo check',
