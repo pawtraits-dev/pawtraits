@@ -56,10 +56,59 @@ async function pool<T>(jobs: (() => Promise<T>)[], size: number): Promise<T[]> {
   return out;
 }
 
+/** Set-ups, plus recent tests rebuilt from the AI call log (each call notes its test, set-up and run) */
 export async function GET() {
   const denied = await requireAdmin();
   if (denied) return denied;
-  return NextResponse.json({ variants: Object.entries(VARIANTS).map(([key, v]) => ({ key, ...v })), size: CUSTOMER_PREVIEW_SIZE, maxCalls: MAX_CALLS });
+  configure();
+  const supabase = serviceClient();
+  const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
+  const { data: calls } = await supabase.from('ai_usage')
+    .select('created_at, image_id, model, image_size, thinking_tokens, cost_usd, duration_ms, success, error, meta')
+    .eq('feature', 'consistency-test').gte('created_at', since).order('created_at', { ascending: false }).limit(300);
+
+  const byTest = new Map<string, any[]>();
+  for (const c of (calls ?? []) as any[]) {
+    const id = c.meta?.testId;
+    if (!id) continue;
+    if (!byTest.has(id)) byTest.set(id, []);
+    byTest.get(id)!.push(c);
+  }
+  const designIds = Array.from(new Set((calls ?? []).map((c: any) => c.image_id).filter(Boolean)));
+  const { data: designs } = designIds.length
+    ? await supabase.from('image_catalog').select('id, cloudinary_public_id, public_url, description, breeds (name), formats (aspect_ratio)').in('id', designIds)
+    : { data: [] as any[] };
+  const designById = new Map((designs ?? []).map((d: any) => [d.id, d]));
+  const one = (v: any) => (Array.isArray(v) ? v[0] : v);
+
+  const history = Array.from(byTest.entries()).slice(0, 20).map(([testId, rows]) => {
+    const d: any = designById.get(rows[0].image_id) ?? {};
+    const keys = Array.from(new Set(rows.map((r) => r.meta.variant))).filter((k) => VARIANTS[k]);
+    keys.sort((a, b) => Object.keys(VARIANTS).indexOf(a) - Object.keys(VARIANTS).indexOf(b));
+    const designUrls: Record<string, string> = {};
+    for (const r of rows) if (r.meta.designUrl) designUrls[VARIANTS[r.meta.variant]?.design ?? 'live'] = r.meta.designUrl;
+    designUrls.live ??= d.public_url;
+    if (!designUrls.clean && d.cloudinary_public_id) designUrls.clean = cloudinary.url(d.cloudinary_public_id, { width: 1024, crop: 'limit', format: 'jpg', quality: 90, secure: true });
+    return {
+      testId,
+      at: rows[rows.length - 1].created_at,
+      size: rows[0].image_size,
+      petUrl: rows.find((r) => r.meta.petUrl)?.meta.petUrl ?? null,
+      design: { id: d.id ?? rows[0].image_id, title: (d.description || '').replace(/\*\*/g, '').slice(0, 80), aspectRatio: one(d.formats)?.aspect_ratio ?? null, animal: one(d.breeds)?.name ?? null },
+      designUrls,
+      prompts: {},
+      variants: keys.map((key) => ({ key, ...VARIANTS[key] })),
+      results: rows.map((r) => ({
+        variant: r.meta.variant, repeat: r.meta.repeat, ok: r.success,
+        seconds: Math.round((r.duration_ms ?? 0) / 100) / 10, thinking: r.thinking_tokens, costUsd: r.cost_usd == null ? null : Number(r.cost_usd),
+        // Saved at a fixed place for each test / set-up / run
+        url: r.success ? cloudinary.url(`${FOLDER}/${testId}/${r.meta.variant}-${r.meta.repeat}`, { secure: true }) : undefined,
+        error: r.error ?? undefined,
+      })),
+    };
+  });
+
+  return NextResponse.json({ variants: Object.entries(VARIANTS).map(([key, v]) => ({ key, ...v })), size: CUSTOMER_PREVIEW_SIZE, maxCalls: MAX_CALLS, history });
 }
 
 export async function POST(request: NextRequest) {
@@ -121,7 +170,7 @@ export async function POST(request: NextRequest) {
       const started = Date.now();
       try {
         const req = { ...paintingRequest({ prompt: prompts[v.prompt], catalogImageData: designB64[v.design], petImageData: [petData], aspectRatio, imageSize: CUSTOMER_PREVIEW_SIZE }), model: v.model };
-        const response = await generateWithUsage(ai, { feature: 'consistency-test', imageId: d.id, meta: { testId, variant: key, repeat: r + 1 } }, req);
+        const response = await generateWithUsage(ai, { feature: 'consistency-test', imageId: d.id, meta: { testId, variant: key, repeat: r + 1, petUrl, designUrl: designUrls[v.design], aspectRatio: aspectRatio ?? null } }, req);
         const seconds = Math.round((Date.now() - started) / 100) / 10;
         const base64 = imageFrom(response);
         if (!base64) throw new Error(`No image (${(response as any)?.candidates?.[0]?.finishReason || 'no reason given'})`);

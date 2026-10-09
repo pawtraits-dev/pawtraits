@@ -8,13 +8,13 @@ import { ReferencePicker, type Ref } from '@/components/admin/VariationRunDialog
 type Variant = { key: string; label: string; model: string; design: 'live' | 'clean'; prompt: 'live' | 'focused' };
 type Result = { variant: string; repeat: number; ok: boolean; seconds: number; url?: string; thinking?: number; input?: number; costUsd?: number | null; error?: string };
 type Test = {
-  testId: string; at: string; size: string; petUrl: string;
+  testId: string; at: string; size: string; petUrl: string | null;
   design: { id: string; title: string; aspectRatio: string | null; animal: string | null };
   designUrls: Record<string, string>; prompts: Record<string, string>; variants: Variant[]; results: Result[];
 };
 type Recent = { id: string; created_at: string; pet_image_url: string; design: { public_url: string } | null };
 
-const DEFAULT_VARIANTS = ['live', 'clean-focused', 'old'];
+const DEFAULT_VARIANTS = ['live', 'clean', 'clean-focused', 'old'];
 const usd = (v?: number | null) => (v == null ? '–' : `$${v.toFixed(3)}`);
 const small = (u: string, w = 500) => (u.includes('/image/upload/') ? u.replace('/image/upload/', `/image/upload/c_limit,w_${w},f_auto,q_auto/`) : u);
 
@@ -54,7 +54,7 @@ function TestResults({ t }: { t: Test }) {
       <div className="flex flex-wrap items-baseline gap-x-4 text-sm">
         <span className="font-semibold text-gray-900">{t.design.title || 'Design'}</span>
         <span className="text-gray-600">{t.design.animal} · {t.design.aspectRatio} · {t.size}</span>
-        <span className="text-gray-500">{new Date(t.at).toLocaleTimeString('en-GB')}</span>
+        <span className="text-gray-500">{new Date(t.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
         <span className="font-medium ml-auto tabular-nums">{usd(t.results.reduce((s, r) => s + (r.costUsd ?? 0), 0))}</span>
       </div>
       <div className="overflow-x-auto">
@@ -75,7 +75,7 @@ function TestResults({ t }: { t: Test }) {
                   <p className="text-xs text-gray-500">{v.model}<br />{v.design === 'clean' ? 'clean 1024px design' : 'design as live'} · {v.prompt} prompt</p>
                 </td>
                 <td className="w-36"><Thumb url={t.designUrls[v.design]} /></td>
-                <td className="w-36"><Thumb url={t.petUrl} /></td>
+                <td className="w-36"><Thumb url={t.petUrl || undefined} sub="not recorded" /></td>
                 {Array.from({ length: repeats }, (_, i) => {
                   const r = t.results.find((x) => x.variant === v.key && x.repeat === i + 1);
                   return (
@@ -115,7 +115,8 @@ export default function ConsistencyTestPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch('/api/admin/consistency-test').then((r) => r.json()).then((b) => { setVariants(b.variants ?? []); setMaxCalls(b.maxCalls ?? 15); }).catch(() => undefined);
+    // Set-ups and earlier tests (kept in the AI call log, so they survive a reload)
+    fetch('/api/admin/consistency-test').then((r) => r.json()).then((b) => { setVariants(b.variants ?? []); setMaxCalls(b.maxCalls ?? 15); setTests(b.history ?? []); }).catch(() => undefined);
     fetch('/api/admin/custom-paintings?limit=12').then((r) => r.json()).then((b) => {
       // One entry per distinct photo
       const seen = new Set<string>();
@@ -139,7 +140,7 @@ export default function ConsistencyTestPage() {
       const res = await fetch('/api/admin/consistency-test', { method: 'POST', body: form });
       const body = await res.json().catch(() => null);
       if (!res.ok) throw new Error(body?.error || (res.status === 504 ? 'Timed out (over 5 minutes); try fewer runs' : res.statusText));
-      setTests((t) => [{ ...body, at: new Date().toISOString() }, ...t]);
+      setTests((t) => [{ ...body, at: new Date().toISOString() }, ...t.filter((x) => x.testId !== body.testId)]);
     } catch (e: any) { setError(e.message); } finally { setRunning(null); }
   };
 

@@ -438,6 +438,11 @@ export async function POST(request: NextRequest) {
 
     // Generate Cloudinary URL if we have the public_id
     let catalogImageUrl = catalogImage.public_url;
+    // CUSTOMER_DESIGN_IMAGE=clean (Vercel): send Gemini the design's original at 1024 px, with no
+    // watermark. Default: the catalogue URL as before (watermarked 800 px or 400 px on older designs).
+    if (process.env.CUSTOMER_DESIGN_IMAGE === 'clean' && catalogImage.cloudinary_public_id) {
+      catalogImageUrl = cloudinary.url(catalogImage.cloudinary_public_id, { width: 1024, crop: 'limit', format: 'jpg', quality: 90, secure: true });
+    }
     if (!catalogImageUrl && catalogImage.cloudinary_public_id) {
       catalogImageUrl = cloudinaryService.getPublicVariantUrl(
         catalogImage.cloudinary_public_id,
