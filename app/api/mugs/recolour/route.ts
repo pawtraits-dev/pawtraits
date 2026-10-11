@@ -3,6 +3,7 @@ import { serviceClient } from '@/lib/qr/server';
 import { getRequester } from '@/lib/guest/access';
 import type { MugColour, MugCatalogEntry } from '@/lib/product-types';
 import { compositeParams, saveMugAsCustomImage } from '@/lib/mugs/server';
+import { mugMockups } from '@/lib/mugs/mockup';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     }).eq('id', generation_id);
 
-    return NextResponse.json({ custom_image_id: saved.customImageId, preview_url: saved.previewUrl });
+    return NextResponse.json({ custom_image_id: saved.customImageId, preview_url: saved.previewUrl, mockups: await mugMockups(saved.wrapPublicId, colour.hex) });
   } catch (error) {
     console.error('Mug recolour failed:', error);
     return NextResponse.json({ error: 'Couldn’t change the colour. Please try again.' }, { status: 500 });

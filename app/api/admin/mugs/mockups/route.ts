@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { requireAdmin } from '@/lib/qr/server';
 import { getSetting, setSetting } from '@/lib/app-settings';
+import { serviceClient } from '@/lib/qr/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,11 +15,30 @@ function configure() {
   }
 }
 
-/** GET /api/admin/mugs/mockups — the blank mug photos the mug mockups are built on */
+/** GET /api/admin/mugs/mockups — the blank mug photos, plus the latest mug wrap to preview them with */
 export async function GET() {
   const denied = await requireAdmin();
   if (denied) return denied;
-  return NextResponse.json({ photos: await getSetting('mug_mockup_photos') });
+  const { data: latest } = await serviceClient().from('mug_generations').select('composite_print_url')
+    .eq('status', 'complete').not('composite_print_url', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
+  // Stored wraps are customer-custom-images/mugs/<id>: the public id from the URL
+  const sampleWrap = latest?.composite_print_url?.match(/\/image\/upload\/(?:v\d+\/)?(customer-custom-images\/mugs\/[^.?]+)/)?.[1] ?? null;
+  return NextResponse.json({ photos: await getSetting('mug_mockup_photos'), sampleWrap });
+}
+
+/** PATCH { side, face: { x, y, w, h } (fractions 0–1), background?: 'e5e5e5' } — where the mug's face is in that photo */
+export async function PATCH(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const { side, face, background } = await request.json().catch(() => ({}));
+  if (!SIDES.includes(side)) return NextResponse.json({ error: 'Unknown side' }, { status: 400 });
+  const ok = face && ['x', 'y', 'w', 'h'].every((k) => typeof face[k] === 'number' && face[k] >= 0 && face[k] <= 1);
+  if (!ok) return NextResponse.json({ error: 'Face must be x, y, w, h between 0 and 1' }, { status: 400 });
+  const photos = { ...(await getSetting('mug_mockup_photos')) };
+  if (!photos[side as Side]) return NextResponse.json({ error: 'Upload a photo first' }, { status: 400 });
+  photos[side as Side] = { ...photos[side as Side]!, face: { x: face.x, y: face.y, w: face.w, h: face.h }, ...(typeof background === 'string' && /^[0-9a-f]{6}$/i.test(background) ? { background } : {}) };
+  await setSetting('mug_mockup_photos', photos);
+  return NextResponse.json({ photos });
 }
 
 /**

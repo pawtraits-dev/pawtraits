@@ -25,7 +25,7 @@ export const SETTING_DEFAULTS = {
   /** Social loop: the before/after shown at the top of the home page (Admin → Social); '' = the latest */
   social_hero_item_id: '' as string,
   /** Mugs: blank mug photos the mug mockups are built on (Admin → Mugs → Mockup photos) */
-  mug_mockup_photos: {} as Partial<Record<'pet' | 'text', { publicId: string; url: string; width: number; height: number; uploadedAt: string }>>,
+  mug_mockup_photos: {} as Partial<Record<'pet' | 'text', { publicId: string; url: string; width: number; height: number; uploadedAt: string; face?: { x: number; y: number; w: number; h: number }; background?: string }>>,
   /** Collections: tag new catalogue designs automatically (collections, team, descriptive tags) */
   auto_tag_enabled: true,
   /** Collections: customers can change a sports design to another team */

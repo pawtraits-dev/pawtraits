@@ -9,6 +9,7 @@ import type { MugColour, MugCatalogEntry } from '@/lib/product-types';
 import { GEMINI_IMAGE_MODELS, geminiImageConfig } from '@/lib/gemini-models';
 import { generateWithUsage } from '@/lib/ai/usage';
 import { compositeParams, saveMugAsCustomImage, wideFormatId } from '@/lib/mugs/server';
+import { mugMockups } from '@/lib/mugs/mockup';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // Gemini + composite + upload
@@ -137,6 +138,7 @@ export async function POST(request: NextRequest) {
       generation_id: generationId,
       custom_image_id: saved.customImageId,
       preview_url: saved.previewUrl,
+      mockups: await mugMockups(saved.wrapPublicId, colour.hex),
       format_id: formatId,
     });
   } catch (error) {

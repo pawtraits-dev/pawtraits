@@ -18,7 +18,7 @@ import { plainText } from '@/lib/text/plain';
 
 interface MugEntry { id: string; slug: string; name: string; sub_heading: string; description: string; description_short?: string | null; catalog_image_url: string }
 interface MugColour { id: string; name: string; slug: string; hex: string }
-interface Result { generationId: string; customImageId: string; previewUrl: string; formatId: string | null; colour: string }
+interface Result { generationId: string; customImageId: string; previewUrl: string; formatId: string | null; colour: string; mockups: { pet?: string; text?: string } }
 
 const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' };
 const PAINTING_LINES = ['Mixing the paints…', 'Sketching your pet…', 'Adding the details…', 'Laying out the mug…'];
@@ -89,8 +89,8 @@ export default function MugPage() {
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || !d.custom_image_id) throw new Error(d.error || 'Pawcasso dropped his brush. Please try again.');
-      await preload(d.preview_url);
-      setResult({ generationId: d.generation_id, customImageId: d.custom_image_id, previewUrl: d.preview_url, formatId: d.format_id, colour });
+      await Promise.all([d.preview_url, d.mockups?.pet, d.mockups?.text].filter(Boolean).map(preload));
+      setResult({ generationId: d.generation_id, customImageId: d.custom_image_id, previewUrl: d.preview_url, formatId: d.format_id, colour, mockups: d.mockups || {} });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       setError(err.message);
@@ -111,8 +111,8 @@ export default function MugPage() {
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error || 'Couldn’t change the colour');
-      await preload(d.preview_url);
-      setResult((r) => (r ? { ...r, previewUrl: d.preview_url, colour: slugValue } : r));
+      await Promise.all([d.preview_url, d.mockups?.pet, d.mockups?.text].filter(Boolean).map(preload));
+      setResult((r) => (r ? { ...r, previewUrl: d.preview_url, colour: slugValue, mockups: d.mockups || {} } : r));
     } catch (err: any) {
       setError(err.message);
       setColour(result.colour);
@@ -156,12 +156,21 @@ export default function MugPage() {
           <div>
             {result ? (
               <div className="space-y-3">
+                {(result.mockups.pet || result.mockups.text) && (
+                  <div className={`relative grid gap-2 ${result.mockups.pet && result.mockups.text ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    {[result.mockups.pet, result.mockups.text].filter(Boolean).map((src, i) => (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img key={i} src={src} alt={i === 0 ? `${title}, ${petName.trim() || 'pet'} side` : `${title}, ${entry.name} side`}
+                        className={`w-full rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 transition-opacity ${recolouring ? 'opacity-40' : ''}`} />
+                    ))}
+                  </div>
+                )}
                 <div className="relative overflow-hidden rounded-2xl bg-white p-2 shadow-sm ring-1 ring-gray-200">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={result.previewUrl} alt={title} className={`w-full rounded-xl transition-opacity ${recolouring ? 'opacity-40' : ''}`} />
                   {recolouring && <Loader2 className="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 animate-spin text-purple-600" />}
                 </div>
-                <p className="text-sm text-gray-600">The full design that wraps around your 11oz mug: {petName.trim() || 'your pet'} on one side, the {entry.name} story on the other.</p>
+                <p className="text-sm text-gray-600">{result.mockups.pet ? 'Above: both sides of the mug. Below: the' : 'The'} full design that wraps around your 11oz mug: {petName.trim() || 'your pet'} on one side, the {entry.name} story on the other.</p>
               </div>
             ) : (
               /* eslint-disable-next-line @next/next/no-img-element */

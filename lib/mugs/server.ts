@@ -59,7 +59,7 @@ export async function saveMugAsCustomImage(supabase: SupabaseClient, opts: {
   colour: MugColour;
   entry: MugCatalogEntry;
   ipHash?: string | null;
-}): Promise<{ customImageId: string; previewUrl: string; printUrl: string }> {
+}): Promise<{ customImageId: string; previewUrl: string; printUrl: string; wrapPublicId: string }> {
   configure();
   const previewUrl = buildMugPreviewUrl(opts.params);
   const printUrl = buildMugPrintUrl(opts.params);
@@ -85,7 +85,7 @@ export async function saveMugAsCustomImage(supabase: SupabaseClient, opts: {
   if (opts.existingCustomImageId) {
     const { error } = await supabase.from('customer_custom_images').update(fields).eq('id', opts.existingCustomImageId);
     if (error) throw new Error(`Saving the mug failed: ${error.message}`);
-    return { customImageId: opts.existingCustomImageId, previewUrl, printUrl: stored.secure_url };
+    return { customImageId: opts.existingCustomImageId, previewUrl, printUrl: stored.secure_url, wrapPublicId: stored.public_id };
   }
   const { data, error } = await supabase.from('customer_custom_images').insert({
     customer_id: opts.owner.customerId,
@@ -101,5 +101,5 @@ export async function saveMugAsCustomImage(supabase: SupabaseClient, opts: {
     ...fields,
   }).select('id').single();
   if (error || !data) throw new Error(`Saving the mug failed: ${error?.message}`);
-  return { customImageId: data.id, previewUrl, printUrl: stored.secure_url };
+  return { customImageId: data.id, previewUrl, printUrl: stored.secure_url, wrapPublicId: stored.public_id };
 }
