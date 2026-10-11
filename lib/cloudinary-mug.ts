@@ -32,11 +32,11 @@ export const MUG_LAYOUT = {
   CANVAS_HEIGHT: 1134,
   CANVAS_PUBLIC_ID: 'pawtraits/mugs/white_canvas_2362x1134',
 
-  // Left panel — personalised pet image
+  // Left panel — personalised pet image, centred in the panel (gravity north, x offset from canvas centre)
   PET_IMAGE_WIDTH: 1020,
-  PET_IMAGE_HEIGHT: 880,
-  PET_IMAGE_X: 80,
-  PET_IMAGE_Y: 80,
+  PET_IMAGE_HEIGHT: 840,
+  PET_IMAGE_X: -591,
+  PET_IMAGE_Y: 70,
 
   // Left panel — pet name text
   // gravity: 'north' anchors at centre-top; x is offset from canvas centre (1181px).
@@ -44,7 +44,7 @@ export const MUG_LAYOUT = {
   PET_NAME_FONT_FAMILY: 'Life Savers',
   PET_NAME_FONT_SIZE: 90,
   PET_NAME_X: -591,
-  PET_NAME_Y: 1000,
+  PET_NAME_Y: 925,   // just under the picture, clear of the mug's bottom edge
   PET_NAME_MAX_WIDTH: 1180,
 
   // Divider (10%–90% of canvas height)
@@ -86,21 +86,37 @@ export interface MugCompositeParams {
   catalogEntry: MugCatalogEntry;
 }
 
+/**
+ * Right panel text block (heading, sub-heading, description) centred vertically. Cloudinary can't
+ * measure text, so the description's height is estimated from its length (~52 characters a line).
+ */
+function rightPanelTops(description: string) {
+  const lines = Math.max(1, Math.ceil(description.length / 52));
+  const descHeight = lines * Math.round(MUG_LAYOUT.DESCRIPTION_FONT_SIZE * 1.35);
+  const subOffset = MUG_LAYOUT.SUBHEADING_Y - MUG_LAYOUT.HEADING_Y;      // heading → sub-heading
+  const descOffset = MUG_LAYOUT.DESCRIPTION_Y - MUG_LAYOUT.HEADING_Y;    // heading → description
+  const block = descOffset + descHeight;
+  const top = Math.max(60, Math.round((MUG_LAYOUT.CANVAS_HEIGHT - block) / 2));
+  return { heading: top, sub: top + subOffset, description: top + descOffset };
+}
+
 function buildTransformationChain(params: MugCompositeParams): object[] {
   const { personalisedImagePublicId, petName, mugColour, catalogEntry } = params;
   const colourHex = mugColour.overlay_hex;
+  const description = catalogEntry.description_short || catalogEntry.description;
+  const tops = rightPanelTops(description);
 
   // Cloudinary requires forward slashes and URL-encoded special chars in overlay public IDs
   const escapedPetImageId = personalisedImagePublicId.replace(/\//g, ':');
 
   return [
-    // LEFT: personalised pet image
+    // LEFT: personalised pet image, centred over the name
     {
       overlay: escapedPetImageId,
       width: MUG_LAYOUT.PET_IMAGE_WIDTH,
       height: MUG_LAYOUT.PET_IMAGE_HEIGHT,
       crop: 'fit',
-      gravity: 'north_west',
+      gravity: 'north',
       x: MUG_LAYOUT.PET_IMAGE_X,
       y: MUG_LAYOUT.PET_IMAGE_Y,
     },
@@ -150,7 +166,7 @@ function buildTransformationChain(params: MugCompositeParams): object[] {
       color: `#${colourHex}`,
       gravity: 'north',
       x: MUG_LAYOUT.HEADING_X,
-      y: MUG_LAYOUT.HEADING_Y,
+      y: tops.heading,
       width: MUG_LAYOUT.HEADING_MAX_WIDTH,
       crop: 'fit',
     },
@@ -167,7 +183,7 @@ function buildTransformationChain(params: MugCompositeParams): object[] {
       color: `rgb:${MUG_LAYOUT.SUBHEADING_COLOUR}`,
       gravity: 'north',
       x: MUG_LAYOUT.SUBHEADING_X,
-      y: MUG_LAYOUT.SUBHEADING_Y,
+      y: tops.sub,
       width: MUG_LAYOUT.SUBHEADING_MAX_WIDTH,
       crop: 'fit',
     },
@@ -179,12 +195,12 @@ function buildTransformationChain(params: MugCompositeParams): object[] {
         font_size: MUG_LAYOUT.DESCRIPTION_FONT_SIZE,
         font_weight: 'normal',
         text_align: 'center',
-        text: catalogEntry.description_short || catalogEntry.description,
+        text: description,
       },
       color: `rgb:${MUG_LAYOUT.DESCRIPTION_COLOUR}`,
       gravity: 'north',
       x: MUG_LAYOUT.DESCRIPTION_X,
-      y: MUG_LAYOUT.DESCRIPTION_Y,
+      y: tops.description,
       width: MUG_LAYOUT.DESCRIPTION_MAX_WIDTH,
       crop: 'fit',
     },
