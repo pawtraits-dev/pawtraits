@@ -230,34 +230,8 @@ export default function MugCatalogAdminPage() {
         </Button>
       </div>
 
-      {/* Right-panel preview modal */}
-      {previewEntry && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setPreviewEntry(null)}>
-          <Card className="max-w-lg w-full" onClick={e => e.stopPropagation()}>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Right Panel Preview
-                <Button variant="ghost" size="sm" onClick={() => setPreviewEntry(null)}><X className="w-4 h-4" /></Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="bg-white p-6 space-y-3">
-              <div className="border-l-4 border-purple-600 pl-4">
-                <p className="text-2xl font-bold text-purple-600 uppercase tracking-wide">{previewEntry.name}</p>
-                <p className="text-sm font-bold text-gray-800 mt-1">{previewEntry.sub_heading}</p>
-              </div>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                {previewEntry.description_short || previewEntry.description}
-              </p>
-              {previewEntry.description_short && (
-                <details className="text-xs text-gray-400">
-                  <summary className="cursor-pointer">Full description</summary>
-                  <p className="mt-2 text-gray-600">{previewEntry.description}</p>
-                </details>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {/* Mug preview modal: mockups with the name "Daisy" */}
+      {previewEntry && <MugPreviewModal entry={previewEntry} onClose={() => setPreviewEntry(null)} />}
 
       {/* Add/Edit Form */}
       {showForm && (
@@ -513,7 +487,7 @@ export default function MugCatalogAdminPage() {
                       <td className="p-4 text-gray-600">{entry.sort_order}</td>
                       <td className="p-4">
                         <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="outline" onClick={() => setPreviewEntry(entry)} title="Preview right panel">
+                          <Button size="sm" variant="outline" onClick={() => setPreviewEntry(entry)} title="Preview mug">
                             <Eye className="w-4 h-4" />
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => handleEdit(entry)}>
@@ -530,6 +504,86 @@ export default function MugCatalogAdminPage() {
               </table>
             </div>
           )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+type PreviewData = { colours: { slug: string; name: string; hex: string }[]; colour: string; name: string; flat: string; mockups: { pet?: string; text?: string } };
+
+/** Pet side, text side and the flat wrap for a design, using the name "Daisy" */
+function MugPreviewModal({ entry, onClose }: { entry: MugCatalogEntry; onClose: () => void }) {
+  const [colour, setColour] = useState<string | null>(null);
+  const [data, setData] = useState<PreviewData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true); setError(null);
+    fetch(`/api/admin/mugs/catalog/${entry.id}/preview${colour ? `?colour=${encodeURIComponent(colour)}` : ''}`)
+      .then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Could not build the preview'); return d; })
+      .then((d) => { if (!cancelled) setData(d); })
+      .catch((e) => { if (!cancelled) setError(e.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [entry.id, colour]);
+
+  const current = colour ?? data?.colour;
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
+      <Card className="max-w-4xl w-full my-8" onClick={e => e.stopPropagation()}>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>{entry.name} mug <span className="text-sm font-normal text-gray-500">· preview with the name “{data?.name ?? 'Daisy'}”</span></span>
+            <Button variant="ghost" size="sm" onClick={onClose}><X className="w-4 h-4" /></Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {data && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-gray-600 mr-1">Colour</span>
+              {data.colours.map((c) => (
+                <button key={c.slug} type="button" onClick={() => setColour(c.slug)} title={c.name} disabled={loading}
+                  className={`w-8 h-8 rounded-full border-2 ${current === c.slug ? 'border-purple-600 ring-2 ring-purple-200' : 'border-gray-200'}`}
+                  style={{ backgroundColor: `#${c.hex}` }} />
+              ))}
+              {loading && <span className="text-sm text-gray-500 ml-2">Building…</span>}
+            </div>
+          )}
+          {error && <p className="text-sm text-red-700">{error}</p>}
+          {!data && loading && <div className="h-64 grid place-items-center text-gray-500 text-sm">Building the preview…</div>}
+          {data && (
+            <div className={loading ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
+              {data.mockups.pet || data.mockups.text ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {(['pet', 'text'] as const).map((side) => data.mockups[side] && (
+                    <figure key={side}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={data.mockups[side]} alt={`${entry.name} mug, ${side} side`} className="w-full rounded-lg bg-gray-100" />
+                      <figcaption className="text-xs text-gray-500 mt-1">{side === 'pet' ? 'Pet side' : 'Text side'}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Upload the blank mug photos in Mugs → Mockup photos to see the mug views.</p>
+              )}
+              <figure className="mt-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={data.flat} alt={`${entry.name} mug wrap`} className="w-full rounded-lg border bg-gray-50" />
+                <figcaption className="text-xs text-gray-500 mt-1">Full wrap (as printed)</figcaption>
+              </figure>
+            </div>
+          )}
+          <details className="text-sm text-gray-600">
+            <summary className="cursor-pointer text-gray-500">Text used</summary>
+            <div className="mt-2 border-l-4 border-purple-600 pl-4">
+              <p className="font-bold text-purple-600 uppercase tracking-wide">{entry.name}</p>
+              <p className="font-bold text-gray-800">{entry.sub_heading}</p>
+              <p className="mt-1">{entry.description_short || entry.description}</p>
+            </div>
+          </details>
         </CardContent>
       </Card>
     </div>
