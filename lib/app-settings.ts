@@ -24,6 +24,8 @@ export const SETTING_DEFAULTS = {
   social_include_previews: false,
   /** Social loop: the before/after shown at the top of the home page (Admin → Social); '' = the latest */
   social_hero_item_id: '' as string,
+  /** Mugs: blank mug photos the mug mockups are built on (Admin → Mugs → Mockup photos) */
+  mug_mockup_photos: {} as Partial<Record<'pet' | 'text', { publicId: string; url: string; width: number; height: number; uploadedAt: string }>>,
   /** Collections: tag new catalogue designs automatically (collections, team, descriptive tags) */
   auto_tag_enabled: true,
   /** Collections: customers can change a sports design to another team */
@@ -81,6 +83,8 @@ export function validateSetting(key: string, value: unknown): string | null {
       return typeof value === 'number' && value >= 0 && value <= 100 ? null : 'Must be 0–100';
     case 'default_fulfillment_provider':
       return value === 'self_print' || value === 'gelato' ? null : 'Must be "self_print" or "gelato"';
+    case 'mug_mockup_photos':
+      return value && typeof value === 'object' && !Array.isArray(value) ? null : 'Must be an object';
     case 'social_hero_item_id':
       return value === '' || (typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value)) ? null : 'Must be a social item id or empty';
     case 'return_address':

@@ -148,6 +148,7 @@ const navigationSections = [
       { name: 'Mug Catalog', href: '/admin/mugs/catalog', icon: Coffee },
       { name: 'Mug Colours', href: '/admin/mugs/colours', icon: Palette },
       { name: 'Mug Generations', href: '/admin/mugs/generations', icon: BarChart3 },
+      { name: 'Mug Mockup Photos', href: '/admin/mugs/mockups', icon: Coffee },
     ]
   },
   {

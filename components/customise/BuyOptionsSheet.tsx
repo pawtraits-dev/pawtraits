@@ -53,6 +53,8 @@ const gbp = (v?: number) => (v === undefined ? '' : `£${(v / 100).toFixed(v % 1
 
 /** Brand-voice line for each Foamex size (shown under the size name) */
 const SIZE_LINES: Record<string, string> = { S: 'Sweet and petite', M: 'Just right', L: 'Large and in charge' };
+/** The 11oz mug Gelato prints (shown instead of the wrap's print size) */
+const MUG_SIZE = 'Height 96 mm · base diameter 80 mm';
 
 export default function BuyOptionsSheet({ open, onClose, target, stallOffer, scannedSize, inline = false }: {
   open: boolean;
@@ -198,6 +200,17 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
               <div className="space-y-2">
                 {rows.map(p => {
                   const sameSize = !!scannedSize && p.size_code === scannedSize;
+                  // Mugs: say what the mug is, not the print area (20×9.6 cm is the wrap, not the mug)
+                  const mug = /mug/i.test(medium);
+                  if (mug) {
+                    return (
+                      <Option key={p.id} checked={selected.has(p.id)} onClick={() => toggle(p.id)}
+                        title={`${p.size_name && !/\d+\s*[x×]\s*\d+/.test(p.size_name) ? p.size_name : '11 oz'} ceramic mug`}
+                        subtitle={MUG_SIZE}
+                        perk="Includes bonus digital copy"
+                        price={gbp(pence(p.pricing))} />
+                    );
+                  }
                   return (
                     <Option key={p.id} checked={selected.has(p.id)} onClick={() => toggle(p.id)}
                       highlight={sameSize && !stallAvailable}
