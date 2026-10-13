@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server';
-import { serviceClient } from '@/lib/qr/server';
+import { serviceClient, requireAdmin } from '@/lib/qr/server';
 import { autoTagNew } from '@/lib/collections/auto-tag';
 import { createClient } from '@supabase/supabase-js';
 import { CloudinaryImageService } from '@/lib/cloudinary';
@@ -21,6 +21,8 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
  * Uploads to Cloudinary and saves metadata to database
  */
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     console.log('📥 [ADMIN CATALOG SAVE] Request received');
     console.log('📊 [ADMIN CATALOG SAVE] Request headers:', {

@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/qr/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { ClaudeCompositionAnalyzer } from '@/lib/claude-composition-analyzer';
 import { createClient } from '@supabase/supabase-js';
@@ -15,6 +16,8 @@ const supabase = createClient(
  * Analyzes an uploaded image using Claude AI (following established pattern from /api/generate-description/file)
  */
 export async function POST(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     console.log('🎨 [Analyze API] Received composition analysis request');
 
