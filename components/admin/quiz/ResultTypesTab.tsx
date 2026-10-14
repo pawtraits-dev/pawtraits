@@ -10,11 +10,13 @@ import { ArrowUp, Check, Copy, X } from 'lucide-react';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { poleLabel, type AdminResultTypeRow } from '@/lib/quiz/admin';
+import TypeDesignUpload from './TypeDesignUpload';
 import type { Pole } from '@/lib/quiz/types';
 
 const field = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200';
 
 type Design = { id: string; description: string | null; breed: string | null; style: string | null };
+type DesignList = { theme: string | null; themeId?: string | null; designs: Design[] };
 
 export default function ResultTypesTab({ quizId, animal, types, onChange, onError }: {
   quizId: string;
@@ -24,7 +26,7 @@ export default function ResultTypesTab({ quizId, animal, types, onChange, onErro
   onError: (msg: string | null) => void;
 }) {
   const [code, setCode] = useState<string>(types[0]?.code ?? 'ESTB');
-  const [designs, setDesigns] = useState<{ theme: string | null; designs: Design[] } | null>(null);
+  const [designs, setDesigns] = useState<DesignList | null>(null);
   const selected = types.find(t => t.code === code) ?? null;
 
   useEffect(() => {
@@ -54,6 +56,7 @@ export default function ResultTypesTab({ quizId, animal, types, onChange, onErro
       <div className="lg:sticky lg:top-4 lg:self-start">
         {selected && (
           <TypeEditor key={selected.code} quizId={quizId} animal={animal} type={selected} designs={designs}
+            onDesignAdded={d => setDesigns(cur => ({ theme: cur?.theme ?? null, themeId: cur?.themeId ?? null, designs: [d, ...(cur?.designs ?? [])] }))}
             onSaved={row => onChange(types.map(t => (t.code === row.code ? row : t)))} onError={onError} />
         )}
       </div>
@@ -61,11 +64,12 @@ export default function ResultTypesTab({ quizId, animal, types, onChange, onErro
   );
 }
 
-function TypeEditor({ quizId, animal, type, designs, onSaved, onError }: {
+function TypeEditor({ quizId, animal, type, designs, onDesignAdded, onSaved, onError }: {
   quizId: string;
   animal: 'dog' | 'cat';
   type: AdminResultTypeRow;
-  designs: { theme: string | null; designs: Design[] } | null;
+  designs: DesignList | null;
+  onDesignAdded: (d: Design) => void;
   onSaved: (row: AdminResultTypeRow) => void;
   onError: (msg: string | null) => void;
 }) {
@@ -86,6 +90,15 @@ function TypeEditor({ quizId, animal, type, designs, onSaved, onError }: {
   const toggle = (id: string) => setIds(designIds.includes(id) ? designIds.filter(x => x !== id) : [...designIds, id]);
   const makeMain = (id: string) => setIds([id, ...designIds.filter(x => x !== id)]);
   const designById = new Map((designs?.designs ?? []).map(d => [d.id, d]));
+  /** A design uploaded here: add it to the list and link it to the type straight away */
+  async function linkUploaded(d: Design) {
+    onDesignAdded(d);
+    const next = [...designIds.filter(x => x !== d.id), d.id];
+    setDesignIds(next);
+    const r = await new AdminSupabaseService().updateQuizResultType(quizId, type.code, { design_image_ids: next });
+    if (!r.ok) { onError(`Saved to the catalogue, but linking failed: ${r.error}. Press Save to draft to link it.`); return; }
+    onError(null); onSaved(r.data);
+  }
   async function copyPrompt() {
     try { await navigator.clipboard.writeText(form.image_prompt); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* ignore */ }
   }
@@ -205,6 +218,8 @@ function TypeEditor({ quizId, animal, type, designs, onSaved, onError }: {
             </div>
           </>
         )}
+        <TypeDesignUpload animal={animal} themeId={designs?.themeId ?? null} onSaved={linkUploaded}
+          type={{ code: type.code, name: form.name || type.name, tagline: form.tagline || null, traits: form.traits.split('\n').map(t => t.trim()).filter(Boolean), signature_move: form.signature_move || null, owner_reality: form.owner_reality || null }} />
         <div className="flex gap-2">
           <label htmlFor="t-design" className="sr-only">Catalogue image id</label>
           <input id="t-design" value={pasteId} onChange={e => setPasteId(e.target.value)}

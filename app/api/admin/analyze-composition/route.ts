@@ -26,6 +26,9 @@ export async function POST(req: NextRequest) {
     const file = formData.get('image') as File;
     const themeId = formData.get('themeId') as string | null;
     const styleId = formData.get('styleId') as string | null;
+    // Optional: what the picture is for (e.g. a quiz result type) and the exact title to use
+    const brief = String(formData.get('brief') || '').slice(0, 1000) || undefined;
+    const title = String(formData.get('title') || '').slice(0, 80) || undefined;
 
     console.log('📦 [Analyze API] Request data:', {
       hasFile: !!file,
@@ -76,7 +79,9 @@ export async function POST(req: NextRequest) {
     const analysis = await analyzer.analyzeImageFromFile(file, {
       theme: theme?.display_name || theme?.name,
       style: style?.display_name || style?.name,
-      knownBreeds: breeds.map((b: any) => b.name)
+      knownBreeds: breeds.map((b: any) => b.name),
+      brief,
+      title,
     });
 
     console.log('✅ [Analyze API] Analysis complete');

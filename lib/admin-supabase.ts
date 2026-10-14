@@ -592,7 +592,7 @@ export class AdminSupabaseService {
     return adminRequest<any>(`/api/admin/quizzes/${quizId}/breed-images`, jsonInit('POST', { code, breedId }));
   }
 
-  async getPawsonalityDesigns(animal: 'dog' | 'cat'): Promise<AdminResult<{ theme: string | null; designs: { id: string; description: string | null; breed: string | null; style: string | null }[] }>> {
+  async getPawsonalityDesigns(animal: 'dog' | 'cat'): Promise<AdminResult<{ theme: string | null; themeId?: string | null; designs: { id: string; description: string | null; breed: string | null; style: string | null }[] }>> {
     return adminRequest(`/api/admin/quizzes/designs?animal=${animal}`);
   }
 

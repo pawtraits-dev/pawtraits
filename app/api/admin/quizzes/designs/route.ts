@@ -30,5 +30,5 @@ export async function GET(request: NextRequest) {
     // Type pictures are repainted as one pet's breed, so only single-pet designs qualify
     .filter((d: any) => Math.max(Array.isArray(d.subjects) ? d.subjects.length : 0, Array.isArray(d.generation_parameters?.subjects) ? d.generation_parameters.subjects.length : 0) <= 1)
     .map((d: any) => ({ id: d.id, description: d.description, breed: d.breeds?.name ?? null, style: d.styles?.name ?? null }));
-  return NextResponse.json({ theme: themes[0].name, designs });
+  return NextResponse.json({ theme: themes[0].name, themeId: themes[0].id, designs });
 }

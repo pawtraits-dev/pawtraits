@@ -24,6 +24,10 @@ export interface CompositionAnalysisRequest {
     theme?: string; // e.g., "Christmas", "Beach", "Formal"
     style?: string; // e.g., "Oil Painting", "Watercolor", "Photograph"
     knownBreeds?: string[]; // List of breed names to help AI identification
+    /** What the picture is for, e.g. a quiz result type: shapes the marketing description */
+    brief?: string;
+    /** Exact bold opening line for the marketing description */
+    title?: string;
   };
 }
 
@@ -108,7 +112,7 @@ export class ClaudeCompositionAnalyzer {
    */
   async analyzeImageFromFile(
     file: File,
-    context?: { theme?: string; style?: string; knownBreeds?: string[] }
+    context?: { theme?: string; style?: string; knownBreeds?: string[]; brief?: string; title?: string }
   ): Promise<CompositionAnalysisResponse> {
     console.log('🎨 [Claude Analyzer] Starting image analysis from file...');
     const startTime = Date.now();
@@ -235,7 +239,10 @@ export class ClaudeCompositionAnalyzer {
       ? `\nContext provided:
 - Theme: ${context.theme || 'Not specified'}
 - Style: ${context.style || 'Not specified'}
-- Known breeds in system: ${context.knownBreeds?.join(', ') || 'Not provided'}`
+- Known breeds in system: ${context.knownBreeds?.join(', ') || 'Not provided'}${context.brief ? `
+- What this picture is for: ${context.brief}
+  Write the marketing description about this personality as shown in the picture.` : ''}${context.title ? `
+- The bold opening line of the marketing description MUST be exactly: **${context.title}**` : ''}`
       : '';
 
     return `You are analyzing a pet portrait image for a print-on-demand business. Provide a comprehensive analysis in JSON format.
