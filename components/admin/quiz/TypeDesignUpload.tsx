@@ -4,7 +4,7 @@
  * Upload a design straight onto a quiz result type: same AI analysis and catalogue save as
  * Admin → Catalogue → Upload, but the title is the type's name and the description is written
  * about the type's personality. Saved into the Pawsonalities theme, then linked to the type.
- * No style needs choosing: a type can have any number of designs, in any mix of styles.
+ * Style is optional (just a label); a type can have any number of designs, in any mix of styles.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, Upload, X } from 'lucide-react';
@@ -41,14 +41,17 @@ export default function TypeDesignUpload({ animal, type, themeId, onSaved }: {
 }) {
   const [formats, setFormats] = useState<{ id: string; name: string; aspect_ratio: string }[]>([]);
   const [breeds, setBreeds] = useState<(Opt & { animal_type: string })[]>([]);
+  const [styles, setStyles] = useState<Opt[]>([]);
+  const [styleId, setStyleId] = useState(''); // optional
   const [isPublic, setIsPublic] = useState(true);
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    Promise.all(['/api/formats', '/api/breeds'].map(u => fetch(u).then(r => r.json())))
-      .then(([f, b]) => {
+    Promise.all(['/api/formats', '/api/breeds', '/api/styles'].map(u => fetch(u).then(r => r.json())))
+      .then(([f, b, st]) => {
+        setStyles(st.filter((x: any) => x.is_active).sort((a: any, z: any) => a.name.localeCompare(z.name)));
         setFormats(f.filter((x: any) => x.is_active));
         setBreeds(b.filter((x: any) => x.is_active && (x.animal_type ?? animal) === animal).sort((a: any, z: any) => a.name.localeCompare(z.name)));
       })
@@ -75,6 +78,7 @@ export default function TypeDesignUpload({ animal, type, themeId, onSaved }: {
       const fd = new FormData();
       fd.append('image', small);
       if (themeId) fd.append('themeId', themeId);
+      if (styleId) fd.append('styleId', styleId);
       fd.append('brief', brief);
       fd.append('title', type.name);
       const res = await fetch('/api/admin/analyze-composition', { method: 'POST', body: fd });
@@ -112,6 +116,7 @@ export default function TypeDesignUpload({ animal, type, themeId, onSaved }: {
       fd.append('isMultiSubject', String(subjects.length > 1));
       fd.append('subjects', JSON.stringify(subjects));
       if (themeId) fd.append('themeId', themeId);
+      if (styleId) fd.append('styleId', styleId);
       fd.append('formatId', pending.formatId);
       fd.append('tags', JSON.stringify(Array.from(new Set(['pawsonality', type.name.replace(/^The\s+/i, '').toLowerCase(), ...(a.tags || [])])).slice(0, 10)));
       fd.append('isFeatured', 'false');
@@ -125,7 +130,7 @@ export default function TypeDesignUpload({ animal, type, themeId, onSaved }: {
         id: data.imageId,
         description: withTitle(pending.description, type.name),
         breed: breeds.find(b => b.id === pending.breedId)?.name ?? null,
-        style: null,
+        style: styles.find(s => s.id === styleId)?.name ?? null,
       });
       URL.revokeObjectURL(pending.preview);
       setPending(null);
@@ -141,6 +146,12 @@ export default function TypeDesignUpload({ animal, type, themeId, onSaved }: {
     <div className="space-y-2 rounded-lg border border-dashed border-purple-300 bg-purple-50/40 p-3">
       <p className="text-sm font-medium text-gray-900">Upload a design for {type.name}</p>
       {!themeId && <p className="text-xs text-amber-700">No Pawsonalities theme found. Create one in Themes first, so uploaded designs are filed under it.</p>}
+      <label className="block text-xs text-gray-600">Style <span className="text-gray-500">(optional)</span>
+        <select value={styleId} onChange={e => setStyleId(e.target.value)} disabled={busy} className={`${field} mt-0.5 py-1.5`}>
+          <option value="">None</option>
+          {styles.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
+        </select>
+      </label>
       <label className="flex items-center gap-2 text-sm text-gray-700">
         <input type="checkbox" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} className="h-4 w-4 accent-purple-600" /> Public in the catalogue
       </label>
