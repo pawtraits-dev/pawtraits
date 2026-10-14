@@ -93,9 +93,10 @@ export default function SwipeCard({
       }}
     >
       <div className="relative flex h-full flex-col overflow-hidden rounded-[22px] border border-purple-100 bg-white shadow-[0_12px_32px_-14px_rgba(29,24,40,0.35)]">
-        <div className={`relative h-[56%] shrink-0 ${imageUrl ? 'bg-white' : 'bg-purple-50'}`}>
+        {/* Square picture area (capped so the question always has room); the picture is inset from
+            the card's rounded edge and never cropped */}
+        <div className={`relative aspect-square max-h-[62%] w-full shrink-0 ${imageUrl ? 'bg-white px-4 pt-4' : 'h-[56%] bg-purple-50'}`}>
           {imageUrl ? (
-            // Whole picture, never cropped: square drawings sit centred on white (their own background)
             <img src={imageUrl} alt="" draggable={false} className="h-full w-full object-contain" />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-[repeating-linear-gradient(135deg,#efe9f8_0_14px,#f6f2fc_14px_28px)]" aria-hidden="true">
@@ -110,7 +111,7 @@ export default function SwipeCard({
           <span className="absolute right-4 top-4 max-w-[75%] truncate rounded-lg border-[2.5px] border-gray-700 bg-white px-3 py-1 text-sm font-extrabold tracking-wide text-gray-700"
             style={{ opacity: no, transform: 'rotate(8deg)' }} aria-hidden="true">NOT {petLabel.toUpperCase()}</span>
         </div>
-        <div className="flex flex-1 flex-col justify-center gap-1.5 px-5 py-4">
+        <div className={`flex flex-1 flex-col gap-1.5 px-5 py-4 ${imageUrl ? 'justify-start pt-3' : 'justify-center'}`}>
           <p className="text-sm font-bold uppercase tracking-wide text-purple-700">{lead}</p>
           <p className="text-[1.35rem] font-semibold leading-snug text-gray-900">{statement}</p>
         </div>
