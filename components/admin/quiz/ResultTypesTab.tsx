@@ -2,12 +2,12 @@
 
 /**
  * Admin → Quizzes → Result types: the 16 types, each with copy, a picture prompt (composition only;
- * the style is added separately) and its Pawsonalities designs (several allowed, e.g. one per style;
- * the first is the main design used for results and breed pictures).
+ * the style is added separately) and its Pawsonalities designs (any number; the first is the main
+ * design used for results and breed pictures).
  */
 import { useEffect, useState } from 'react';
 import { ArrowUp, Check, Copy, X } from 'lucide-react';
-import { CatalogImage } from '@/components/CloudinaryImageDisplay';
+import { designTitle } from '@/lib/text/plain';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { poleLabel, type AdminResultTypeRow } from '@/lib/quiz/admin';
 import TypeDesignUpload from './TypeDesignUpload';
@@ -16,6 +16,12 @@ import type { Pole } from '@/lib/quiz/types';
 const field = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200';
 
 type Design = { id: string; description: string | null; breed: string | null; style: string | null };
+/** Small fixed-size thumbnail (a 200px-wide copy, never the full image) */
+function Thumb({ id, alt, className }: { id: string; alt: string; className: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={`/api/secure-images/${id}?variant=mid_size&w=200`} alt={alt} loading="lazy" decoding="async"
+    className={`${className} bg-gray-100 object-cover`} />;
+}
 type DesignList = { theme: string | null; themeId?: string | null; designs: Design[] };
 
 export default function ResultTypesTab({ quizId, animal, types, onChange, onError }: {
@@ -164,7 +170,7 @@ function TypeEditor({ quizId, animal, type, designs, onDesignAdded, onSaved, onE
       </div>
 
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">Pawsonalities designs <span className="font-normal text-gray-600">(one per style; the first is the main one)</span></legend>
+        <legend className="text-sm font-medium">Pawsonalities designs <span className="font-normal text-gray-600">(as many as you like; the first is the main one)</span></legend>
 
         {designIds.length > 0 ? (
           <ol className="space-y-1.5">
@@ -172,12 +178,13 @@ function TypeEditor({ quizId, animal, type, designs, onDesignAdded, onSaved, onE
               const d = designById.get(id);
               return (
                 <li key={id} className="flex items-center gap-2 rounded-lg border border-gray-200 p-1.5">
-                  <span className="h-14 w-10 shrink-0 overflow-hidden rounded [&>div]:h-full">
-                    <CatalogImage imageId={id} alt={d?.description ?? 'Design'} sizes="60px" className="h-full w-full object-cover !shadow-none !rounded-none" />
-                  </span>
+                  <Thumb id={id} alt={d?.description ? designTitle(d.description) : 'Design'} className="h-14 w-10 shrink-0 rounded" />
                   <span className="min-w-0 flex-1 text-xs">
-                    <span className="block font-medium text-gray-900">{d?.style ?? 'Style not set'}{i === 0 && <span className="ml-1.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold text-purple-800">Main</span>}</span>
-                    <span className="block truncate text-gray-600">{d?.breed ?? ''}{d?.breed && d?.description ? ' · ' : ''}{d?.description ?? (d ? '' : id)}</span>
+                    <span className="block truncate font-medium text-gray-900">
+                      {i === 0 && <span className="mr-1.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold text-purple-800">Main</span>}
+                      {d?.description ? designTitle(d.description) : 'Design'}
+                    </span>
+                    <span className="block truncate text-gray-600">{[d?.breed, d?.style].filter(Boolean).join(' · ') || (d ? '' : id)}</span>
                   </span>
                   {i > 0 && (
                     <button type="button" onClick={() => makeMain(id)} title="Make main design" aria-label="Make main design" className="rounded p-1 text-gray-600 hover:bg-gray-100">
@@ -202,15 +209,14 @@ function TypeEditor({ quizId, animal, type, designs, onDesignAdded, onSaved, onE
         {designs && designs.designs.length > 0 && (
           <>
             <p className="text-xs text-gray-600">Click to add or remove:</p>
-            <div className="grid max-h-56 grid-cols-4 gap-2 overflow-y-auto rounded-lg border border-gray-100 p-2">
+            <div className="flex max-h-56 flex-wrap gap-2 overflow-y-auto rounded-lg border border-gray-100 p-2">
               {designs.designs.map(d => {
                 const on = designIds.includes(d.id);
                 return (
                   <button key={d.id} type="button" onClick={() => toggle(d.id)}
-                    aria-pressed={on} title={[d.style, d.breed, d.description].filter(Boolean).join(' · ') || d.id}
-                    className={`relative overflow-hidden rounded-md border-2 ${on ? 'border-purple-600' : 'border-transparent'} [&>div]:h-full`}>
-                    <CatalogImage imageId={d.id} alt={d.description ?? 'Design'} sizes="100px" className="aspect-[2/3] h-full w-full object-cover !shadow-none !rounded-none" />
-                    {d.style && <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1 py-0.5 text-[10px] text-white">{d.style}</span>}
+                    aria-pressed={on} title={[d.description ? designTitle(d.description) : null, d.breed, d.style].filter(Boolean).join(' · ') || d.id}
+                    className={`relative shrink-0 overflow-hidden rounded-md border-2 ${on ? 'border-purple-600' : 'border-transparent'}`}>
+                    <Thumb id={d.id} alt={d.description ? designTitle(d.description) : 'Design'} className="block h-20 w-14" />
                     {on && <span className="absolute right-1 top-1 rounded-full bg-purple-600 p-0.5 text-white"><Check className="h-3 w-3" aria-hidden="true" /></span>}
                   </button>
                 );
