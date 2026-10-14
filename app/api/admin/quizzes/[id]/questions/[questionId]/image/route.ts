@@ -1,7 +1,10 @@
 /**
  * POST   /api/admin/quizzes/[id]/questions/[questionId]/image — multipart `file` (jpg/png/webp, ≤ 10 MB)
- *        Uploads the question's base picture to Cloudinary at
- *        quiz/<slug>_<animal>/<questionId>/base (spec 5.8 naming) and stores the public id.
+ *        Uploads the question's picture to Cloudinary at
+ *        quiz/<slug>_<animal>/<questionId>/base-<timestamp> and stores the public id.
+ *        Every upload gets a NEW public id: re-using one id ("base") meant browsers and the CDN kept
+ *        serving the old picture, and it also silently changed the picture in already-published
+ *        quiz versions. Old pictures are kept, as earlier published versions may still use them.
  * DELETE same path — clears the picture (placeholder shows).
  */
 import { NextRequest, NextResponse } from 'next/server';
@@ -47,7 +50,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const uploaded: any = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream(
-        { public_id: 'base', folder, overwrite: true, invalidate: true, resource_type: 'image', tags: ['quiz', q.quizzes.slug, q.quizzes.animal_type] },
+        { public_id: `base-${Date.now()}`, folder, overwrite: false, resource_type: 'image', tags: ['quiz', q.quizzes.slug, q.quizzes.animal_type] },
         (err, res) => (err ? reject(err) : resolve(res)),
       ).end(buffer);
     });
@@ -58,7 +61,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
       .eq('id', questionId).select('*').single();
     if (error) throw error;
     await supabase.from('quizzes').update({ has_unpublished_changes: true, updated_at: new Date().toISOString() }).eq('id', id);
-    return NextResponse.json({ ...data, image_url: `${questionImageUrl(data.image_public_id, 400)}?v=${uploaded.version}` });
+    return NextResponse.json({ ...data, image_url: questionImageUrl(data.image_public_id, 400) });
   } catch (err) {
     console.error('quiz picture upload failed', err);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
