@@ -66,7 +66,7 @@ export default function QuestionsTab({ quizId, animal, questions, onChange, onEr
                     <button type="button" onClick={() => { setSelectedId(q.id); setCreating(null); }}
                       className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-current={selectedId === q.id ? 'true' : undefined}>
                       {q.image_url
-                        ? <img src={q.image_url} alt="" className="h-11 w-11 shrink-0 rounded-md object-cover" />
+                        ? <img src={q.image_url} alt="" className="h-11 w-11 shrink-0 rounded-md border bg-white object-contain" />
                         : <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-400"><ImageIcon className="h-5 w-5" aria-hidden="true" /></span>}
                       <span className="min-w-0">
                         <span className={`block text-sm ${q.is_active ? 'text-gray-900' : 'text-gray-500 line-through'}`}>{q.statement}</span>
@@ -230,7 +230,7 @@ function QuestionEditor({ quizId, animal, initial, onSaved, onDeleted, onCancel,
           <span className="text-sm font-medium">Picture</span>
           <div className="flex items-center gap-3">
             {imageUrl
-              ? <img src={imageUrl} alt="Question picture" className="h-24 w-24 rounded-lg object-cover" />
+              ? <img src={imageUrl} alt="Question picture" className="h-24 w-24 rounded-lg border bg-white object-contain" />
               : <span className="flex h-24 w-24 items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-500">No picture</span>}
             <div className="flex flex-col gap-2">
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"

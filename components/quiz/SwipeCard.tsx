@@ -93,9 +93,10 @@ export default function SwipeCard({
       }}
     >
       <div className="relative flex h-full flex-col overflow-hidden rounded-[22px] border border-purple-100 bg-white shadow-[0_12px_32px_-14px_rgba(29,24,40,0.35)]">
-        <div className="relative h-[56%] shrink-0 bg-purple-50">
+        <div className={`relative h-[56%] shrink-0 ${imageUrl ? 'bg-white' : 'bg-purple-50'}`}>
           {imageUrl ? (
-            <img src={imageUrl} alt="" draggable={false} className="h-full w-full object-cover" />
+            // Whole picture, never cropped: square drawings sit centred on white (their own background)
+            <img src={imageUrl} alt="" draggable={false} className="h-full w-full object-contain" />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-[repeating-linear-gradient(135deg,#efe9f8_0_14px,#f6f2fc_14px_28px)]" aria-hidden="true">
               <span className="relative flex h-24 w-24 items-center justify-center rounded-full bg-white/80">
