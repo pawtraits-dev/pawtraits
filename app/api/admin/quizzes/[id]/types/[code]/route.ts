@@ -25,6 +25,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { data: imgs } = await supabase.from('image_catalog').select('id').in('id', ids);
     if ((imgs ?? []).length !== ids.length) return NextResponse.json({ error: 'A chosen design is not in the catalogue' }, { status: 400 });
   }
+  // A design belongs to one type only
+  if (ids.length) {
+    const { data: others } = await supabase.from('quiz_result_types').select('code, design_image_id, design_image_ids').eq('quiz_id', id).neq('code', code);
+    const clash = (others ?? []).find((o: any) => ids.some(x => x === o.design_image_id || (o.design_image_ids ?? []).includes(x)));
+    if (clash) return NextResponse.json({ error: `A chosen design already belongs to ${clash.code}. Remove it there first.` }, { status: 409 });
+  }
   // Setting only the single design keeps the list in step (it becomes the first)
   if (parsed.value.design_image_ids === undefined && parsed.value.design_image_id !== undefined) {
     const { data: cur } = await supabase.from('quiz_result_types').select('design_image_ids').eq('quiz_id', id).eq('code', code).maybeSingle();

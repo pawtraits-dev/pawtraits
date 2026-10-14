@@ -62,6 +62,7 @@ export default function ResultTypesTab({ quizId, animal, types, onChange, onErro
       <div className="lg:sticky lg:top-4 lg:self-start">
         {selected && (
           <TypeEditor key={selected.code} quizId={quizId} animal={animal} type={selected} designs={designs}
+            takenBy={takenBy(types, selected.code)}
             onDesignAdded={d => setDesigns(cur => ({ theme: cur?.theme ?? null, themeId: cur?.themeId ?? null, designs: [d, ...(cur?.designs ?? [])] }))}
             onSaved={row => onChange(types.map(t => (t.code === row.code ? row : t)))} onError={onError} />
         )}
@@ -70,11 +71,22 @@ export default function ResultTypesTab({ quizId, animal, types, onChange, onErro
   );
 }
 
-function TypeEditor({ quizId, animal, type, designs, onDesignAdded, onSaved, onError }: {
+/** Designs already linked to another type (a design belongs to one type only): id → that type's code */
+function takenBy(types: AdminResultTypeRow[], except: string): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const t of types) {
+    if (t.code === except) continue;
+    for (const id of t.design_image_ids?.length ? t.design_image_ids : t.design_image_id ? [t.design_image_id] : []) m.set(id, t.code);
+  }
+  return m;
+}
+
+function TypeEditor({ quizId, animal, type, designs, takenBy, onDesignAdded, onSaved, onError }: {
   quizId: string;
   animal: 'dog' | 'cat';
   type: AdminResultTypeRow;
   designs: DesignList | null;
+  takenBy: Map<string, string>;
   onDesignAdded: (d: Design) => void;
   onSaved: (row: AdminResultTypeRow) => void;
   onError: (msg: string | null) => void;
@@ -201,16 +213,18 @@ function TypeEditor({ quizId, animal, type, designs, onDesignAdded, onSaved, onE
         ) : <p className="text-xs text-gray-600">No designs linked yet.</p>}
 
         {designs === null && <p className="text-xs text-gray-600">Loading designs…</p>}
-        {designs && designs.designs.length === 0 && (
+        {designs && designs.designs.filter(d => !takenBy.has(d.id)).length === 0 && (
           <p className="text-xs text-gray-600">
-            No designs found in a Pawsonalities theme yet. Add the theme and its designs in the catalogue, then pick them here, or paste a catalogue image id below.
+            {designs.designs.length === 0
+              ? 'No designs found in a Pawsonalities theme yet. Upload one below, or add designs in the catalogue and pick them here.'
+              : 'Every design in the Pawsonalities theme already belongs to a type. Upload a new one below.'}
           </p>
         )}
-        {designs && designs.designs.length > 0 && (
+        {designs && designs.designs.some(d => !takenBy.has(d.id)) && (
           <>
-            <p className="text-xs text-gray-600">Click to add or remove:</p>
+            <p className="text-xs text-gray-600">Unused designs: click to add or remove{takenBy.size ? ` (designs linked to other types are hidden)` : ''}:</p>
             <div className="flex max-h-56 flex-wrap gap-2 overflow-y-auto rounded-lg border border-gray-100 p-2">
-              {designs.designs.map(d => {
+              {designs.designs.filter(d => !takenBy.has(d.id)).map(d => {
                 const on = designIds.includes(d.id);
                 return (
                   <button key={d.id} type="button" onClick={() => toggle(d.id)}
@@ -231,7 +245,11 @@ function TypeEditor({ quizId, animal, type, designs, onDesignAdded, onSaved, onE
           <input id="t-design" value={pasteId} onChange={e => setPasteId(e.target.value)}
             placeholder="Or paste a catalogue image id" className={`${field} font-mono text-xs`} />
           <button type="button" disabled={!pasteId.trim() || designIds.includes(pasteId.trim())}
-            onClick={() => { setIds([...designIds, pasteId.trim()]); setPasteId(''); }}
+            onClick={() => {
+              const id = pasteId.trim();
+              if (takenBy.has(id)) { onError(`That design already belongs to ${takenBy.get(id)}. Remove it there first.`); return; }
+              setIds([...designIds, id]); setPasteId('');
+            }}
             className="shrink-0 rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">Add</button>
         </div>
       </fieldset>
