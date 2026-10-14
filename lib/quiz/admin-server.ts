@@ -54,6 +54,8 @@ export interface ResultTypeInput {
   owner_reality?: string | null;
   share_quote?: string | null;
   design_image_id?: string | null;
+  design_image_ids?: string[];
+  image_prompt?: string | null;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -71,6 +73,16 @@ export function parseResultTypeInput(body: any): Parsed<ResultTypeInput> {
   if (body.traits !== undefined) {
     if (!Array.isArray(body.traits)) return { error: 'Traits must be a list' };
     out.traits = body.traits.map((t: unknown) => cleanText(t)).filter(Boolean).slice(0, 6) as string[];
+  }
+  if (body.image_prompt !== undefined) out.image_prompt = cleanText(body.image_prompt, 2000);
+  if (body.design_image_ids !== undefined) {
+    if (!Array.isArray(body.design_image_ids)) return { error: 'Designs must be a list' };
+    const ids = Array.from(new Set(body.design_image_ids.map((v: unknown) => String(v ?? '').trim()).filter(Boolean))) as string[];
+    if (ids.some(v => !UUID_RE.test(v))) return { error: 'Designs must be catalogue image ids' };
+    if (ids.length > 12) return { error: 'Up to 12 designs per type' };
+    out.design_image_ids = ids;
+    out.design_image_id = ids[0] ?? null; // the first is the main design
+    return { value: out };
   }
   if (body.design_image_id !== undefined) {
     if (body.design_image_id === null || body.design_image_id === '') out.design_image_id = null;

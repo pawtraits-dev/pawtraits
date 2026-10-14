@@ -1,6 +1,7 @@
 /**
  * PATCH /api/admin/quizzes/[id]/types/[code] — edit a result type in the draft
- * (name, tagline, traits[], signature_move, owner_reality, share_quote, design_image_id).
+ * (name, tagline, traits[], signature_move, owner_reality, share_quote, image_prompt,
+ * design_image_ids[] — the first is the main design, mirrored into design_image_id).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
@@ -19,9 +20,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
   const supabase = serviceClient();
-  if (parsed.value.design_image_id) {
-    const { data: img } = await supabase.from('image_catalog').select('id').eq('id', parsed.value.design_image_id).maybeSingle();
-    if (!img) return NextResponse.json({ error: 'That design is not in the catalogue' }, { status: 400 });
+  const ids = parsed.value.design_image_ids ?? (parsed.value.design_image_id ? [parsed.value.design_image_id] : []);
+  if (ids.length) {
+    const { data: imgs } = await supabase.from('image_catalog').select('id').in('id', ids);
+    if ((imgs ?? []).length !== ids.length) return NextResponse.json({ error: 'A chosen design is not in the catalogue' }, { status: 400 });
+  }
+  // Setting only the single design keeps the list in step (it becomes the first)
+  if (parsed.value.design_image_ids === undefined && parsed.value.design_image_id !== undefined) {
+    const { data: cur } = await supabase.from('quiz_result_types').select('design_image_ids').eq('quiz_id', id).eq('code', code).maybeSingle();
+    const rest = ((cur?.design_image_ids ?? []) as string[]).filter(x => x !== parsed.value.design_image_id);
+    parsed.value.design_image_ids = parsed.value.design_image_id ? [parsed.value.design_image_id, ...rest] : rest;
+    if (!parsed.value.design_image_id && rest.length) parsed.value.design_image_id = rest[0];
   }
 
   const { data, error } = await supabase.from('quiz_result_types')

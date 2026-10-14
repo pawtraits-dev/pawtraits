@@ -1,9 +1,12 @@
 'use client';
 
 /**
- * Admin → Quizzes → Result types: the 16 types, each with copy and its Pawsonalities design.
+ * Admin → Quizzes → Result types: the 16 types, each with copy, a picture prompt (composition only;
+ * the style is added separately) and its Pawsonalities designs (several allowed, e.g. one per style;
+ * the first is the main design used for results and breed pictures).
  */
 import { useEffect, useState } from 'react';
+import { ArrowUp, Check, Copy, X } from 'lucide-react';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { poleLabel, type AdminResultTypeRow } from '@/lib/quiz/admin';
@@ -11,7 +14,7 @@ import type { Pole } from '@/lib/quiz/types';
 
 const field = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200';
 
-type Design = { id: string; description: string | null; breed: string | null };
+type Design = { id: string; description: string | null; breed: string | null; style: string | null };
 
 export default function ResultTypesTab({ quizId, animal, types, onChange, onError }: {
   quizId: string;
@@ -40,7 +43,10 @@ export default function ResultTypesTab({ quizId, animal, types, onChange, onErro
               className={`w-full rounded-xl border p-3 text-left transition ${t.code === code ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
               <span className="inline-flex rounded bg-gray-900 px-1.5 py-0.5 text-xs font-bold tracking-wider text-white">{t.code}</span>
               <span className="mt-2 block text-sm font-semibold text-gray-900">{t.name}</span>
-              <span className="block text-xs text-gray-600">{t.design_image_id ? 'Design linked' : 'No design yet'}</span>
+              <span className="block text-xs text-gray-600">
+                {(() => { const n = t.design_image_ids?.length || (t.design_image_id ? 1 : 0); return n ? `${n} design${n === 1 ? '' : 's'}` : 'No design yet'; })()}
+                {t.image_prompt ? ' · prompt' : ''}
+              </span>
             </button>
           </li>
         ))}
@@ -66,11 +72,23 @@ function TypeEditor({ quizId, animal, type, designs, onSaved, onError }: {
   const [form, setForm] = useState({
     name: type.name, tagline: type.tagline ?? '', traits: (type.traits || []).join('\n'),
     signature_move: type.signature_move ?? '', owner_reality: type.owner_reality ?? '',
-    share_quote: type.share_quote ?? '', design_image_id: type.design_image_id ?? '',
+    share_quote: type.share_quote ?? '', image_prompt: type.image_prompt ?? '',
   });
+  const [designIds, setDesignIds] = useState<string[]>(
+    type.design_image_ids?.length ? type.design_image_ids : type.design_image_id ? [type.design_image_id] : [],
+  );
+  const [pasteId, setPasteId] = useState('');
+  const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const set = (k: keyof typeof form, v: string) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); };
+  const setIds = (next: string[]) => { setDesignIds(next); setSaved(false); };
+  const toggle = (id: string) => setIds(designIds.includes(id) ? designIds.filter(x => x !== id) : [...designIds, id]);
+  const makeMain = (id: string) => setIds([id, ...designIds.filter(x => x !== id)]);
+  const designById = new Map((designs?.designs ?? []).map(d => [d.id, d]));
+  async function copyPrompt() {
+    try { await navigator.clipboard.writeText(form.image_prompt); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* ignore */ }
+  }
   const letters = type.code.split('').map(p => poleLabel(p as Pole, animal)).join(' · ');
 
   async function save(e: React.FormEvent) {
@@ -79,7 +97,7 @@ function TypeEditor({ quizId, animal, type, designs, onSaved, onError }: {
     const r = await new AdminSupabaseService().updateQuizResultType(quizId, type.code, {
       ...form,
       traits: form.traits.split('\n').map(s => s.trim()).filter(Boolean),
-      design_image_id: form.design_image_id.trim() || null,
+      design_image_ids: designIds,
     });
     setSaving(false);
     if (!r.ok) { onError(r.error); return; }
@@ -119,28 +137,82 @@ function TypeEditor({ quizId, animal, type, designs, onSaved, onError }: {
         <input id="t-quote" value={form.share_quote} onChange={e => set('share_quote', e.target.value)} className={field} />
       </div>
 
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <label htmlFor="t-prompt" className="text-sm font-medium">Picture prompt <span className="font-normal text-gray-600">(composition only: add the style yourself)</span></label>
+          {form.image_prompt && (
+            <button type="button" onClick={copyPrompt} className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 hover:underline">
+              {copied ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />} {copied ? 'Copied' : 'Copy'}
+            </button>
+          )}
+        </div>
+        <textarea id="t-prompt" rows={5} value={form.image_prompt} onChange={e => set('image_prompt', e.target.value)}
+          placeholder={`What the ${animal} is doing and wearing, and the setting`} className={field} />
+      </div>
+
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">Pawsonalities design</legend>
+        <legend className="text-sm font-medium">Pawsonalities designs <span className="font-normal text-gray-600">(one per style; the first is the main one)</span></legend>
+
+        {designIds.length > 0 ? (
+          <ol className="space-y-1.5">
+            {designIds.map((id, i) => {
+              const d = designById.get(id);
+              return (
+                <li key={id} className="flex items-center gap-2 rounded-lg border border-gray-200 p-1.5">
+                  <span className="h-14 w-10 shrink-0 overflow-hidden rounded [&>div]:h-full">
+                    <CatalogImage imageId={id} alt={d?.description ?? 'Design'} sizes="60px" className="h-full w-full object-cover !shadow-none !rounded-none" />
+                  </span>
+                  <span className="min-w-0 flex-1 text-xs">
+                    <span className="block font-medium text-gray-900">{d?.style ?? 'Style not set'}{i === 0 && <span className="ml-1.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold text-purple-800">Main</span>}</span>
+                    <span className="block truncate text-gray-600">{d?.breed ?? ''}{d?.breed && d?.description ? ' · ' : ''}{d?.description ?? (d ? '' : id)}</span>
+                  </span>
+                  {i > 0 && (
+                    <button type="button" onClick={() => makeMain(id)} title="Make main design" aria-label="Make main design" className="rounded p-1 text-gray-600 hover:bg-gray-100">
+                      <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  )}
+                  <button type="button" onClick={() => toggle(id)} title="Remove" aria-label="Remove design" className="rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-red-700">
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        ) : <p className="text-xs text-gray-600">No designs linked yet.</p>}
+
         {designs === null && <p className="text-xs text-gray-600">Loading designs…</p>}
         {designs && designs.designs.length === 0 && (
           <p className="text-xs text-gray-600">
-            No designs found in a Pawsonalities theme yet. Add the theme and its designs in the catalogue, then pick one here, or paste a catalogue image id below.
+            No designs found in a Pawsonalities theme yet. Add the theme and its designs in the catalogue, then pick them here, or paste a catalogue image id below.
           </p>
         )}
         {designs && designs.designs.length > 0 && (
-          <div className="grid max-h-56 grid-cols-4 gap-2 overflow-y-auto rounded-lg border border-gray-100 p-2">
-            {designs.designs.map(d => (
-              <button key={d.id} type="button" onClick={() => set('design_image_id', d.id)}
-                aria-pressed={form.design_image_id === d.id} title={d.description ?? d.id}
-                className={`overflow-hidden rounded-md border-2 ${form.design_image_id === d.id ? 'border-purple-600' : 'border-transparent'} [&>div]:h-full`}>
-                <CatalogImage imageId={d.id} alt={d.description ?? 'Design'} sizes="100px" className="aspect-[2/3] h-full w-full object-cover !shadow-none !rounded-none" />
-              </button>
-            ))}
-          </div>
+          <>
+            <p className="text-xs text-gray-600">Click to add or remove:</p>
+            <div className="grid max-h-56 grid-cols-4 gap-2 overflow-y-auto rounded-lg border border-gray-100 p-2">
+              {designs.designs.map(d => {
+                const on = designIds.includes(d.id);
+                return (
+                  <button key={d.id} type="button" onClick={() => toggle(d.id)}
+                    aria-pressed={on} title={[d.style, d.breed, d.description].filter(Boolean).join(' · ') || d.id}
+                    className={`relative overflow-hidden rounded-md border-2 ${on ? 'border-purple-600' : 'border-transparent'} [&>div]:h-full`}>
+                    <CatalogImage imageId={d.id} alt={d.description ?? 'Design'} sizes="100px" className="aspect-[2/3] h-full w-full object-cover !shadow-none !rounded-none" />
+                    {d.style && <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1 py-0.5 text-[10px] text-white">{d.style}</span>}
+                    {on && <span className="absolute right-1 top-1 rounded-full bg-purple-600 p-0.5 text-white"><Check className="h-3 w-3" aria-hidden="true" /></span>}
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
-        <label htmlFor="t-design" className="sr-only">Catalogue image id</label>
-        <input id="t-design" value={form.design_image_id} onChange={e => set('design_image_id', e.target.value)}
-          placeholder="Catalogue image id" className={`${field} font-mono text-xs`} />
+        <div className="flex gap-2">
+          <label htmlFor="t-design" className="sr-only">Catalogue image id</label>
+          <input id="t-design" value={pasteId} onChange={e => setPasteId(e.target.value)}
+            placeholder="Or paste a catalogue image id" className={`${field} font-mono text-xs`} />
+          <button type="button" disabled={!pasteId.trim() || designIds.includes(pasteId.trim())}
+            onClick={() => { setIds([...designIds, pasteId.trim()]); setPasteId(''); }}
+            className="shrink-0 rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">Add</button>
+        </div>
       </fieldset>
 
       <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-3">

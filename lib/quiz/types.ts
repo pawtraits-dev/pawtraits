@@ -43,6 +43,8 @@ export interface QuizResultType {
   shareQuote?: string | null;
   /** image_catalog design shown for this type (Pawsonalities theme) */
   designImageId?: string | null;
+  /** All designs for this type, one per style (first = designImageId) */
+  designImageIds?: string[];
 }
 
 /** A published quiz version: what customers take and what results are scored against. */

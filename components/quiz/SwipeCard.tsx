@@ -112,7 +112,7 @@ export default function SwipeCard({
             style={{ opacity: no, transform: 'rotate(8deg)' }} aria-hidden="true">NOT {petLabel.toUpperCase()}</span>
         </div>
         <div className={`flex flex-1 flex-col gap-1.5 px-5 py-4 ${imageUrl ? 'justify-start pt-3' : 'justify-center'}`}>
-          <p className="text-sm font-bold uppercase tracking-wide text-purple-700">{lead}</p>
+          {lead && <p className="text-sm font-bold uppercase tracking-wide text-purple-700">{lead}</p>}
           <p className="text-[1.35rem] font-semibold leading-snug text-gray-900">{statement}</p>
         </div>
       </div>

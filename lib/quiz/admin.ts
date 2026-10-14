@@ -29,6 +29,10 @@ export interface AdminResultTypeRow {
   owner_reality: string | null;
   share_quote: string | null;
   design_image_id: string | null;
+  /** Every design for the type (one per style); the first is the main one, mirrored in design_image_id */
+  design_image_ids?: string[] | null;
+  /** Picture prompt: composition only (the art style is added separately). Admin only. */
+  image_prompt?: string | null;
   updated_at?: string;
 }
 
@@ -55,6 +59,7 @@ export function toSnapshotType(r: AdminResultTypeRow): QuizResultType {
   return {
     code: r.code, name: r.name, tagline: r.tagline, traits: r.traits || [], signatureMove: r.signature_move,
     ownerReality: r.owner_reality, shareQuote: r.share_quote, designImageId: r.design_image_id,
+    designImageIds: r.design_image_ids?.length ? r.design_image_ids : r.design_image_id ? [r.design_image_id] : [],
   };
 }
 

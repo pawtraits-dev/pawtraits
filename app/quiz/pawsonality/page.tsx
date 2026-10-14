@@ -64,7 +64,19 @@ function save(p: Progress | null) {
 function split(statement: string, petName: string) {
   const text = withPetName(statement, petName);
   const m = text.match(/^(.*?\b(?:ALWAYS|NEVER)\s*(?:…|\.\.\.))\s*(.*)$/);
-  return m ? { lead: m[1], rest: m[2] } : { lead: petName, rest: text };
+  if (m) return { lead: m[1], rest: m[2] };
+  // No ALWAYS/NEVER: when the statement opens with the name ("Dodger… seems to…"), the name
+  // (and its ellipsis) is the lead, so the question doesn't repeat it
+  const name = petName.trim().slice(0, 30) || 'Your pet'; // as withPetName fills it in
+  if (text.toLowerCase().startsWith(name.toLowerCase())) {
+    const after = text.slice(name.length);
+    const e = after.match(/^\s*(…|\.\.\.)?\s*[,:–-]?\s*/);
+    const rest = after.slice(e?.[0].length ?? 0);
+    if (rest) return { lead: `${text.slice(0, name.length)}…`, rest };
+  }
+  // The name appears later in the sentence: no separate name label
+  if (text.toLowerCase().includes(name.toLowerCase())) return { lead: '', rest: text };
+  return { lead: petName, rest: text };
 }
 
 export default function PawsonalityQuizPage() {
