@@ -48,12 +48,20 @@ export default function ResultTypesTab({ quizId, animal, types, onChange, onErro
         {types.map(t => (
           <li key={t.code}>
             <button type="button" onClick={() => setCode(t.code)} aria-current={t.code === code ? 'true' : undefined}
-              className={`w-full rounded-xl border p-3 text-left transition ${t.code === code ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-              <span className="inline-flex rounded bg-gray-900 px-1.5 py-0.5 text-xs font-bold tracking-wider text-white">{t.code}</span>
-              <span className="mt-2 block text-sm font-semibold text-gray-900">{t.name}</span>
-              <span className="block text-xs text-gray-600">
-                {(() => { const n = t.design_image_ids?.length || (t.design_image_id ? 1 : 0); return n ? `${n} design${n === 1 ? '' : 's'}` : 'No design yet'; })()}
-                {t.image_prompt ? ' · prompt' : ''}
+              className={`flex w-full gap-3 rounded-xl border p-3 text-left transition ${t.code === code ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+              {(() => {
+                const main = t.design_image_ids?.[0] ?? t.design_image_id;
+                return main
+                  ? <Thumb id={main} alt={t.name} className="h-16 w-11 shrink-0 rounded-md" />
+                  : <span className="flex h-16 w-11 shrink-0 items-center justify-center rounded-md border border-dashed border-gray-300 text-[10px] text-gray-400">None</span>;
+              })()}
+              <span className="min-w-0">
+                <span className="inline-flex rounded bg-gray-900 px-1.5 py-0.5 text-xs font-bold tracking-wider text-white">{t.code}</span>
+                <span className="mt-1.5 block text-sm font-semibold leading-tight text-gray-900">{t.name}</span>
+                <span className="block text-xs text-gray-600">
+                  {(() => { const n = t.design_image_ids?.length || (t.design_image_id ? 1 : 0); return n ? `${n} design${n === 1 ? '' : 's'}` : 'No design yet'; })()}
+                  {t.image_prompt ? ' · prompt' : ''}
+                </span>
               </span>
             </button>
           </li>
