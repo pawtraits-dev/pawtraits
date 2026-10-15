@@ -33,6 +33,10 @@ export interface AdminResultTypeRow {
   design_image_ids?: string[] | null;
   /** Picture prompt: composition only (the art style is added separately). Admin only. */
   image_prompt?: string | null;
+  /** Pawsonalities pages: longer description, fitting breeds/characters, compatible type codes */
+  about?: string | null;
+  famous_examples?: string[] | null;
+  best_buddies?: string[] | null;
   updated_at?: string;
 }
 
@@ -60,6 +64,7 @@ export function toSnapshotType(r: AdminResultTypeRow): QuizResultType {
     code: r.code, name: r.name, tagline: r.tagline, traits: r.traits || [], signatureMove: r.signature_move,
     ownerReality: r.owner_reality, shareQuote: r.share_quote, designImageId: r.design_image_id,
     designImageIds: r.design_image_ids?.length ? r.design_image_ids : r.design_image_id ? [r.design_image_id] : [],
+    about: r.about ?? null, famousExamples: r.famous_examples ?? [], bestBuddies: r.best_buddies ?? [],
   };
 }
 

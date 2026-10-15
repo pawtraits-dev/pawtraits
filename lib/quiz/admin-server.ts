@@ -56,6 +56,9 @@ export interface ResultTypeInput {
   design_image_id?: string | null;
   design_image_ids?: string[];
   image_prompt?: string | null;
+  about?: string | null;
+  famous_examples?: string[];
+  best_buddies?: string[];
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -75,6 +78,17 @@ export function parseResultTypeInput(body: any): Parsed<ResultTypeInput> {
     out.traits = body.traits.map((t: unknown) => cleanText(t)).filter(Boolean).slice(0, 6) as string[];
   }
   if (body.image_prompt !== undefined) out.image_prompt = cleanText(body.image_prompt, 2000);
+  if (body.about !== undefined) out.about = cleanText(body.about, 1500);
+  if (body.famous_examples !== undefined) {
+    if (!Array.isArray(body.famous_examples)) return { error: 'Famous examples must be a list' };
+    out.famous_examples = body.famous_examples.map((t: unknown) => cleanText(t, 80)).filter(Boolean).slice(0, 6) as string[];
+  }
+  if (body.best_buddies !== undefined) {
+    if (!Array.isArray(body.best_buddies)) return { error: 'Best buddies must be a list' };
+    const codes = body.best_buddies.map((c: unknown) => String(c ?? '').trim().toUpperCase()).filter(Boolean);
+    if (codes.some((c: string) => !/^[EI][SN][TF][BC]$/.test(c))) return { error: 'Best buddies must be type codes like ESTB' };
+    out.best_buddies = Array.from(new Set(codes)).slice(0, 3) as string[];
+  }
   if (body.design_image_ids !== undefined) {
     if (!Array.isArray(body.design_image_ids)) return { error: 'Designs must be a list' };
     const ids = Array.from(new Set(body.design_image_ids.map((v: unknown) => String(v ?? '').trim()).filter(Boolean))) as string[];

@@ -102,6 +102,10 @@ export default function ResultView({ r }: { r: PublicQuizResult }) {
           {t.shareQuote && (
             <blockquote className="mt-5 rounded-xl bg-[#F6F2FC] px-5 py-4 text-lg leading-snug">&ldquo;{withPetName(t.shareQuote, name)}&rdquo;</blockquote>
           )}
+          {/* By code: redirects to the type's current page even if it has been renamed */}
+          <Link href={`/pawsonalities/${r.animalType}/${r.code.toLowerCase()}`} className="mt-4 inline-block font-semibold text-purple-800 hover:underline">
+            More about {typeName} &rarr;
+          </Link>
         </section>
       )}
 

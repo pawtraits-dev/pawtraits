@@ -45,6 +45,10 @@ export interface QuizResultType {
   designImageId?: string | null;
   /** All designs for this type, one per style (first = designImageId) */
   designImageIds?: string[];
+  /** Pawsonalities pages */
+  about?: string | null;
+  famousExamples?: string[];
+  bestBuddies?: string[];
 }
 
 /** A published quiz version: what customers take and what results are scored against. */

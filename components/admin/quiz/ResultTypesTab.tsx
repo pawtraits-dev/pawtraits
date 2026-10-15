@@ -95,6 +95,7 @@ function TypeEditor({ quizId, animal, type, designs, takenBy, onDesignAdded, onS
     name: type.name, tagline: type.tagline ?? '', traits: (type.traits || []).join('\n'),
     signature_move: type.signature_move ?? '', owner_reality: type.owner_reality ?? '',
     share_quote: type.share_quote ?? '', image_prompt: type.image_prompt ?? '',
+    about: type.about ?? '', famous_examples: (type.famous_examples || []).join('\n'), best_buddies: (type.best_buddies || []).join(', '),
   });
   const [designIds, setDesignIds] = useState<string[]>(
     type.design_image_ids?.length ? type.design_image_ids : type.design_image_id ? [type.design_image_id] : [],
@@ -129,6 +130,8 @@ function TypeEditor({ quizId, animal, type, designs, takenBy, onDesignAdded, onS
       ...form,
       traits: form.traits.split('\n').map(s => s.trim()).filter(Boolean),
       design_image_ids: designIds,
+      famous_examples: form.famous_examples.split('\n').map(s => s.trim()).filter(Boolean),
+      best_buddies: form.best_buddies.split(/[\s,]+/).map(s => s.trim().toUpperCase()).filter(Boolean),
     });
     setSaving(false);
     if (!r.ok) { onError(r.error); return; }
@@ -167,6 +170,24 @@ function TypeEditor({ quizId, animal, type, designs, takenBy, onDesignAdded, onS
         <label htmlFor="t-quote" className="text-sm font-medium">Share quote <span className="font-normal text-gray-600">(use [PET_NAME])</span></label>
         <input id="t-quote" value={form.share_quote} onChange={e => set('share_quote', e.target.value)} className={field} />
       </div>
+
+      <fieldset className="space-y-3 rounded-lg border border-gray-100 p-3">
+        <legend className="px-1 text-sm font-medium">Pawsonalities page</legend>
+        <div className="space-y-1.5">
+          <label htmlFor="t-about" className="text-sm font-medium">About <span className="font-normal text-gray-600">(the longer description on the type&apos;s page)</span></label>
+          <textarea id="t-about" rows={5} value={form.about} onChange={e => set('about', e.target.value)} className={field} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label htmlFor="t-famous" className="text-sm font-medium">Famous examples <span className="font-normal text-gray-600">(one per line)</span></label>
+            <textarea id="t-famous" rows={3} value={form.famous_examples} onChange={e => set('famous_examples', e.target.value)} className={field} />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="t-buddies" className="text-sm font-medium">Best buddies <span className="font-normal text-gray-600">(type codes)</span></label>
+            <input id="t-buddies" value={form.best_buddies} onChange={e => set('best_buddies', e.target.value)} placeholder="ESFB, ENTB" className={`${field} font-mono`} />
+          </div>
+        </div>
+      </fieldset>
 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">

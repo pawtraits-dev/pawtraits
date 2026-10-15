@@ -382,6 +382,9 @@ export default function PawsonalityQuizPage() {
             className="mt-1 h-[52px] rounded-xl bg-purple-700 text-base font-bold text-white hover:bg-purple-800 disabled:opacity-60">
             {loading ? 'Getting the questions…' : 'Start the quiz'}
           </button>
+          <a href={`/pawsonalities${animal === 'cat' ? '?animal=cat' : ''}`} className="text-center text-sm font-medium text-purple-800 hover:underline">
+            Meet the 16 types first
+          </a>
         </form>
       </main>
     </div>

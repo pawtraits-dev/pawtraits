@@ -117,7 +117,8 @@ export default function UserAwareNavigation({
   const getExpandableMenuItems = (): NavigationItem[] => {
     const baseItems: NavigationItem[] = [
       { name: 'Browse', href: '/browse', icon: ShoppingBag },
-      { name: 'Mugs', href: '/mugs', icon: Coffee }
+      { name: 'Mugs', href: '/mugs', icon: Coffee },
+      { name: 'Pawsonalities', href: '/pawsonalities', icon: Sparkles }
     ]
 
     // Add user-specific items only if user is logged in
