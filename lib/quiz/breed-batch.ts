@@ -108,11 +108,44 @@ export async function planBreedRun(supabase: SupabaseClient, quizId: string, kin
 // ---------------------------------------------------------------------------------------------
 // Prompt
 
-export function breedPrompt(animal: 'dog' | 'cat', breed: { name: string }, coat?: string | null): string {
+export function breedPrompt(animal: 'dog' | 'cat', breed: { name: string }, coat?: string | null, monochrome = false): string {
+  if (monochrome) {
+    // Naming a coat colour invites colour: describe it as light/dark tones instead
+    const coatText = coat ? ` (its ${coat.toLowerCase()} coat shown only as light and dark grey tones)` : '';
+    return `This is a BLACK AND WHITE drawing. Repaint the ${animal} in it as a ${breed.name}${coatText}. Give it the ${breed.name}'s true head shape, muzzle, ears, eyes, body build, proportions, coat length, texture and markings, so an owner would recognise their own breed.
+The result MUST stay strictly black and white / greyscale, exactly like the original: black ink on a white background, with shading only in shades of grey. Do not add any colour anywhere: no coloured fur, eyes, nose, tongue, clothing, props or background, and no tint, sepia or colour wash.
+Keep everything else exactly the same: the pose and expression, any clothing and accessories, props, people, background, framing and composition, and the drawing style (line work, hatching, shading and level of detail).
+Do not add any text, signature or border.`;
+  }
   const coatText = coat ? ` with a ${coat.toLowerCase()} coat` : ' with a typical coat colour for the breed';
   return `Repaint the ${animal} in this picture as a ${breed.name}${coatText}. Give it the ${breed.name}'s true head shape, muzzle, ears, eyes, body build, proportions, coat length, texture and markings, so an owner would recognise their own breed.
-Keep everything else exactly the same: the pose and expression, any clothing and accessories, props, people, background, framing and composition, and the art style (line work, shading, colours and level of detail).
+Keep everything else exactly the same: the pose and expression, any clothing and accessories, props, people, background, framing and composition, and the art style (line work, shading, colours and level of detail). Keep the original's colour treatment: don't add colour it doesn't have.
 Do not add any text, signature or border.`;
+}
+
+/** True when a picture has (practically) no colour: a black and white / greyscale drawing */
+export async function isMonochrome(bytes: Uint8Array | Buffer): Promise<boolean> {
+  const sharp = (await import('sharp')).default;
+  const { data, info } = await sharp(Buffer.from(bytes)).resize(96, 96, { fit: 'inside' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  let coloured = 0;
+  const pixels = info.width * info.height;
+  for (let i = 0; i < data.length; i += 3) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    if (Math.max(r, g, b) - Math.min(r, g, b) > 24) coloured++;
+  }
+  return coloured / pixels < 0.01; // under 1% noticeably coloured pixels
+}
+
+/** Which sources are black and white (a small copy of each, checked in parallel) */
+async function monochromeSources(publicIds: string[]): Promise<Map<string, boolean>> {
+  const out = new Map<string, boolean>();
+  await Promise.all(publicIds.map(async (pid) => {
+    try {
+      const res = await fetch(`https://res.cloudinary.com/${cloudName()}/image/upload/c_limit,w_256/f_png/${pid}`, { signal: AbortSignal.timeout(15_000) });
+      out.set(pid, res.ok ? await isMonochrome(new Uint8Array(await res.arrayBuffer())) : false);
+    } catch { out.set(pid, false); }
+  }));
+  return out;
 }
 
 /** Each breed's most common coat name, for the prompt */
@@ -134,9 +167,10 @@ export async function createBreedRun(supabase: SupabaseClient, quizId: string, k
   if (!planned.make.length) return { run: null, planned };
   const { data: quiz } = await supabase.from('quizzes').select('animal_type').eq('id', quizId).single();
   const ids = Array.from(new Set(planned.make.map(m => m.breedId)));
-  const [{ data: breeds }, coats] = await Promise.all([
+  const [{ data: breeds }, coats, mono] = await Promise.all([
     supabase.from('breeds').select('id, name').in('id', ids),
     commonCoats(supabase, ids),
+    monochromeSources(Array.from(new Set(planned.make.map(m => m.source.publicId)))),
   ]);
   const breedById = new Map((breeds ?? []).map((b: any) => [b.id, b]));
 
@@ -153,7 +187,7 @@ export async function createBreedRun(supabase: SupabaseClient, quizId: string, k
     source_image_id: m.source.sourceImageId ?? null,
     source_public_id: m.source.publicId,
     breed_id: m.breedId,
-    prompt: breedPrompt(quiz!.animal_type, breedById.get(m.breedId), coats.get(m.breedId)),
+    prompt: breedPrompt(quiz!.animal_type, breedById.get(m.breedId), coats.get(m.breedId), mono.get(m.source.publicId) ?? false),
     status: 'queued',
   }));
   const jobChunks = chunk(items, JOB_SIZE);
@@ -182,7 +216,8 @@ async function referenceFile(supabase: SupabaseClient, run: any, publicId: strin
   const aspect = dims ? toGeminiAspectRatio(nearestAllowedRatio(dims.width, dims.height).ratio) : undefined;
   const file = await gemini().files.upload({ file: new Blob([bytes], { type: 'image/png' }), config: { mimeType: 'image/png', displayName: `quiz-src-${publicId.split('/').slice(-2).join('-')}` } });
   if (!file.uri) throw new Error('Gemini did not return a file uri');
-  const entry = { uri: file.uri, mimeType: file.mimeType || 'image/png', aspect, uploadedAt: new Date().toISOString() };
+  const mono = await isMonochrome(bytes).catch(() => false);
+  const entry = { uri: file.uri, mimeType: file.mimeType || 'image/png', aspect, mono, uploadedAt: new Date().toISOString() };
   run.reference_files = { ...(run.reference_files ?? {}), [publicId]: entry };
   await supabase.from('quiz_image_runs').update({ reference_files: run.reference_files }).eq('id', run.id);
   return entry;
@@ -246,6 +281,11 @@ async function fetchResults(fileName: string): Promise<ReadableStream<Uint8Array
 
 /** Store one finished picture where the quiz reads it */
 async function storeResult(supabase: SupabaseClient, run: any, quiz: any, item: any, buffer: Buffer, breed: any) {
+  // Belt and braces: a black and white original always gives a black and white version
+  if (run.reference_files?.[item.source_public_id]?.mono) {
+    const sharp = (await import('sharp')).default;
+    buffer = await sharp(buffer).grayscale().png().toBuffer();
+  }
   if (run.kind === 'question') {
     configureCloudinary();
     const uploaded: any = await new Promise((resolve, reject) => {
