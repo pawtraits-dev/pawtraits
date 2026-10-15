@@ -30,6 +30,7 @@ import MoreLikeThis from '@/components/customise/MoreLikeThis';
 import DesignChips, { useDesignCollections } from '@/components/customise/DesignChips';
 import TeamPicker from '@/components/customise/TeamPicker';
 import DesignQuizLink from '@/components/quiz/DesignQuizLink';
+import { collectionHref } from '@/lib/collections/href';
 
 interface Pet {
   pet_id: string;
@@ -438,7 +439,7 @@ export default function CustomisePage() {
   return (
     <Shell>
       <div className="mx-auto max-w-xl px-4 pt-3 md:pt-6">
-        <Link href={fromCollection ? `/collections/${fromCollection}` : '/browse'} className="inline-flex items-center gap-1 text-sm text-gray-600 py-2">
+        <Link href={fromCollection ? collectionHref(fromCollection) : '/browse'} className="inline-flex items-center gap-1 text-sm text-gray-600 py-2">
           <ArrowLeft className="h-4 w-4" /> {fromCollection ? `Back to ${chips?.collections.find(c => c.path === fromCollection)?.name ?? 'collection'}` : 'All designs'}
         </Link>
 

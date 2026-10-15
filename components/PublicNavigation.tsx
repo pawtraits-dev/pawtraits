@@ -15,6 +15,7 @@ import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
 import CountrySelector from '@/components/CountrySelector';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
+import { collectionHref } from '@/lib/collections/href';
 
 interface Breed {
   id: string;
@@ -243,13 +244,13 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                     <div className="border-b border-gray-100 pb-1">
                       <p className="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-purple-700">In season</p>
                       {inSeason.map(c => (
-                        <button key={c.id} onClick={() => handleDropdownClick(`/collections/${c.path}`)}
+                        <button key={c.id} onClick={() => handleDropdownClick(collectionHref(c.path))}
                           className="w-full text-left px-4 py-2 text-sm font-medium text-gray-800 hover:bg-purple-50 hover:text-purple-600 transition-colors">{c.name}</button>
                       ))}
                     </div>
                   )}
                   {topCollections.map(c => (
-                    <button key={c.id} onClick={() => handleDropdownClick(`/collections/${c.path}`)}
+                    <button key={c.id} onClick={() => handleDropdownClick(collectionHref(c.path))}
                       className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors">{c.name}</button>
                   ))}
                   <button onClick={() => handleDropdownClick('/collections')}
@@ -355,7 +356,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
                 {[...inSeason, ...topCollections].map((c) => (
                   <button
                     key={c.id}
-                    onClick={() => handleDropdownClick(`/collections/${c.path}`)}
+                    onClick={() => handleDropdownClick(collectionHref(c.path))}
                     className="block w-full text-left px-6 py-1 text-sm text-gray-600 hover:text-purple-600"
                   >
                     {c.name}{c.inSeason && c.depth > 0 ? ' · in season' : ''}

@@ -7,6 +7,7 @@
  */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { collectionHref } from '@/lib/collections/href';
 
 interface Data { collections: { name: string; shortName: string | null; path: string; kind: string }[]; tags: string[] }
 
@@ -25,7 +26,7 @@ export default function DesignChips({ data }: { data: Data | null }) {
   return (
     <div className="mt-3 flex flex-wrap gap-2" aria-label="More like this">
       {data.collections.slice(0, 3).map(c => (
-        <Link key={c.path} href={`/collections/${c.path}`} className="inline-flex h-8 items-center rounded-full bg-purple-100 px-3 text-sm font-medium text-purple-900 hover:bg-purple-200">
+        <Link key={c.path} href={collectionHref(c.path)} className="inline-flex h-8 items-center rounded-full bg-purple-100 px-3 text-sm font-medium text-purple-900 hover:bg-purple-200">
           {c.name}
         </Link>
       ))}

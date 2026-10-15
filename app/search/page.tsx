@@ -14,6 +14,7 @@ import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
 import DesignGrid, { GridSkeleton, PetCountFilter } from '@/components/collections/DesignGrid';
 import { track } from '@/lib/tracking/events';
+import { collectionHref } from '@/lib/collections/href';
 
 const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' };
 const IDEAS = ['Christmas', 'Halloween', 'Birthday', 'Crown', 'Football', 'Leo'];
@@ -126,7 +127,7 @@ function SearchContent() {
             <p className="text-sm text-gray-600">Jump to</p>
             <ul className="mt-2 flex flex-wrap gap-2">
               {result.collections.map(c => (
-                <li key={c.path}><Link href={`/collections/${c.path}`} className="inline-flex h-9 items-center rounded-full bg-purple-100 px-4 text-sm font-medium text-purple-900 hover:bg-purple-200">{c.name}</Link></li>
+                <li key={c.path}><Link href={collectionHref(c.path)} className="inline-flex h-9 items-center rounded-full bg-purple-100 px-4 text-sm font-medium text-purple-900 hover:bg-purple-200">{c.name}</Link></li>
               ))}
               {result.breeds.map(b => (
                 <li key={b.slug}><Link href={`/browse?type=${b.animal_type === 'cat' ? 'cats' : 'dogs'}&breed=${b.id}`} className="inline-flex h-9 items-center rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-900 hover:bg-gray-200">{b.name}</Link></li>

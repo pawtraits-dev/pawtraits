@@ -79,6 +79,21 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url, 308)
   }
 
+  // The Pawsonalities collection is the /pawsonalities pages: /collections/pawsonalities → /pawsonalities,
+  // /collections/pawsonalities/enfb → /pawsonalities/dog/enfb (which redirects to the type's named page)
+  const pawsonality = req.nextUrl.pathname.match(/^\/collections\/pawsonalities(?:\/([a-z]{4}))?\/?$/i)
+  if (pawsonality) {
+    const url = req.nextUrl.clone()
+    const animal = url.searchParams.get('animal') === 'cat' ? 'cat' : 'dog'
+    const code = pawsonality[1]?.toLowerCase()
+    url.pathname = code ? `/pawsonalities/${animal}/${code}` : '/pawsonalities'
+    const breed = url.searchParams.get('breed')
+    url.search = ''
+    if (!code && animal === 'cat') url.searchParams.set('animal', 'cat')
+    if (breed && /^[0-9a-f-]{36}$/i.test(breed)) url.searchParams.set('breed', breed) // collection pages use breed slugs; ids only here
+    return NextResponse.redirect(url, 308)
+  }
+
   const browseTarget = BROWSE_REDIRECTS[req.nextUrl.pathname.replace(/\/$/, '') || '/']
   if (browseTarget) {
     const url = req.nextUrl.clone()

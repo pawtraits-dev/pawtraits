@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import { designTitle } from '@/lib/text/plain';
 import { PetsBadge } from '@/components/collections/DesignGrid';
+import { collectionHref } from '@/lib/collections/href';
 
 interface Item { id: string; description?: string; public_url?: string; image_url?: string; subject_count?: number }
 
@@ -49,7 +50,7 @@ export default function MoreLikeThis({ imageId, breedId, collection, tag, max = 
     <section aria-labelledby="more-heading" className="mt-8">
       <div className="mb-3 flex items-baseline justify-between">
         <h2 id="more-heading" className="text-lg font-bold text-gray-900">More like this</h2>
-        <Link href={collection ? `/collections/${collection.path}` : '/browse'} className="text-sm font-semibold text-purple-700">{collection ? `More ${collection.name}` : 'See all'}</Link>
+        <Link href={collection ? collectionHref(collection.path) : '/browse'} className="text-sm font-semibold text-purple-700">{collection ? `More ${collection.name}` : 'See all'}</Link>
       </div>
       <div className="grid grid-cols-2 gap-x-3 gap-y-5">
         {items.map(img => (

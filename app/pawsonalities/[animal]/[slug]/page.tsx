@@ -10,7 +10,7 @@ import { Suspense } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import BreedPicker from '@/components/pawsonalities/BreedPicker';
-import { breedVersions, FAMILIES, getPawsonalities, pictureUrl, speciesBreeds, typeHref, type PawsonalityType } from '@/lib/quiz/pawsonalities';
+import { breedVersions, collectionDesigns, FAMILIES, getPawsonalities, pictureUrl, speciesBreeds, typeHref, type PawsonalityType } from '@/lib/quiz/pawsonalities';
 import { poleLabel } from '@/lib/quiz/admin';
 import { withPetName } from '@/lib/quiz/scoring';
 import type { AnimalType, Pole } from '@/lib/quiz/types';
@@ -58,14 +58,20 @@ export default async function PawsonalityTypePage({ params, searchParams }: Prop
 
   const pet = animal === 'cat' ? 'cat' : 'dog';
   const breedId = sp.breed && /^[0-9a-f-]{36}$/i.test(sp.breed) ? sp.breed : null;
-  const [breeds, versionsMap] = await Promise.all([speciesBreeds(animal), breedVersions(t.mainImageId ? [t.mainImageId] : [])]);
+  const [breeds, versionsMap, fromCollection] = await Promise.all([
+    speciesBreeds(animal), breedVersions(t.mainImageId ? [t.mainImageId] : []), collectionDesigns(t.code, animal).catch(() => []),
+  ]);
   const versions = t.mainImageId ? versionsMap.get(t.mainImageId) ?? [] : [];
   const rank = new Map(breeds.map((b, i) => [b.id, i]));
   const breedName = new Map(breeds.map(b => [b.id, b.name]));
   versions.sort((a, b) => (rank.get(a.breedId) ?? 9999) - (rank.get(b.breedId) ?? 9999));
   const pickable = breeds.filter(b => versions.some(v => v.breedId === b.id));
   const chosen = breedId ? versions.find(v => v.breedId === breedId) ?? null : null;
-  const heroImage = chosen?.imageId ?? t.mainImageId;
+  // The type's own designs first, then other designs filed in its collection
+  const versionIds = new Set(versions.map(v => v.imageId));
+  const ownIds = new Set(t.pictures.map(p => p.id));
+  const pictures = [...t.pictures, ...fromCollection.filter(p => !ownIds.has(p.id) && !versionIds.has(p.id))];
+  const heroImage = chosen?.imageId ?? t.mainImageId ?? pictures[0]?.id ?? null;
   const shownVersions = breedId ? versions.filter(v => v.breedId === breedId) : versions.slice(0, 12);
 
   const family = FAMILIES.find(f => t.code.startsWith(f.prefix));
@@ -158,12 +164,12 @@ export default async function PawsonalityTypePage({ params, searchParams }: Prop
         </div>
       </section>
 
-      {t.pictures.length > 0 && (
+      {pictures.length > 0 && (
         <section className="mx-auto max-w-5xl px-5 py-8" aria-labelledby="pictures">
           <h2 id="pictures" className="text-xl font-bold">{t.name} pictures</h2>
           <p className="text-sm text-gray-600">Pick one and we&apos;ll paint your own {pet} into it.</p>
           <ul className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {t.pictures.map(p => (
+            {pictures.map(p => (
               <li key={p.id}>
                 <Link href={`/customise/${p.id}?src=pawsonalities`} className="group block">
                   <div className="aspect-[2/3] overflow-hidden rounded-xl bg-[#F6F2FC]">

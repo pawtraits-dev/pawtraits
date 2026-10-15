@@ -10,6 +10,8 @@ import UserAwareNavigation from '@/components/UserAwareNavigation';
 import BreedPicker from '@/components/pawsonalities/BreedPicker';
 import { breedVersions, dimensionGuide, FAMILIES, getPawsonalities, pictureUrl, speciesBreeds, typeHref } from '@/lib/quiz/pawsonalities';
 import type { AnimalType } from '@/lib/quiz/types';
+import { serviceClient } from '@/lib/qr/server';
+import { loadPublicTree } from '@/lib/collections/public';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +29,9 @@ export default async function PawsonalitiesPage({ searchParams }: Props) {
   const sp = await searchParams;
   const animal: AnimalType = sp.animal === 'cat' ? 'cat' : 'dog';
   const breedId = sp.breed && /^[0-9a-f-]{36}$/i.test(sp.breed) ? sp.breed : null;
-  const [types, breeds] = await Promise.all([getPawsonalities(animal), speciesBreeds(animal)]);
+  const [types, breeds, tree] = await Promise.all([getPawsonalities(animal), speciesBreeds(animal), loadPublicTree(serviceClient()).catch(() => [])]);
+  // Types with no linked design yet borrow their collection's picture
+  const collectionHero = new Map(tree.filter(c => c.path.startsWith('pawsonalities/')).map(c => [c.path.split('/')[1].toUpperCase(), c.heroImageId]));
 
   // Breeds that have at least one type painted as them; the chosen breed's versions
   const mains = (types ?? []).map(t => t.mainImageId).filter(Boolean) as string[];
@@ -113,7 +117,7 @@ export default async function PawsonalitiesPage({ searchParams }: Props) {
                 <ul className="mt-3 grid grid-cols-2 gap-4 lg:grid-cols-4">
                   {fam.map(t => {
                     const version = t.mainImageId ? chosen.get(t.mainImageId)?.[0]?.imageId : null;
-                    const img = version ?? t.mainImageId;
+                    const img = version ?? t.mainImageId ?? collectionHero.get(t.code) ?? null;
                     return (
                       <li key={t.code}>
                         <Link href={`${typeHref(animal, t)}${qs({ animal: null })}`} className="group block">

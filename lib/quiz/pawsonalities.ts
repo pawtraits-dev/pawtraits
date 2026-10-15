@@ -99,3 +99,22 @@ export async function breedVersions(sourceImageIds: string[], breedId?: string |
   }
   return out;
 }
+
+/**
+ * Other catalogue designs filed in the type's collection (pawsonalities/<code>), for this species.
+ * The type page shows them after the type's own linked designs.
+ */
+export async function collectionDesigns(code: string, animal: AnimalType, limit = 48): Promise<TypePicture[]> {
+  const supabase = serviceClient();
+  const { data: hits, error } = await supabase.rpc('collection_designs', {
+    p_path: `pawsonalities/${code.toLowerCase()}`, p_animal: animal, p_breed_id: null, p_limit: limit, p_offset: 0, p_pets: null,
+  });
+  if (error || !hits?.length) return [];
+  const ids = hits.map((h: any) => h.id);
+  const { data: imgs } = await supabase.from('image_catalog').select('id, description, tags, styles:style_id (name)').in('id', ids);
+  const byId = new Map((imgs ?? []).map((i: any) => [i.id, i]));
+  return ids
+    .map((id: string) => byId.get(id))
+    .filter((i: any) => i && !(i.tags ?? []).includes('quiz-generated')) // breed versions have their own section
+    .map((i: any) => ({ id: i.id, title: titleOf(i.description), style: i.styles?.name ?? null }));
+}

@@ -8,6 +8,7 @@
  */
 import Link from 'next/link';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
+import { collectionHref } from '@/lib/collections/href';
 
 export interface CardCollection {
   path: string; name: string; shortName?: string | null; designs: number; heroImageId: string | null;
@@ -18,7 +19,7 @@ export default function CollectionCircle({ c, showCount = false }: { c: CardColl
   const colours: { hex: string; name: string }[] = Array.isArray(c.details?.colours) ? c.details!.colours : [];
   const label = c.details?.symbol ? `${c.details.symbol} ${c.name}` : c.name;
   return (
-    <Link href={`/collections/${c.path}`} className="group flex w-[76px] shrink-0 flex-col items-center gap-1.5 text-center text-xs font-medium text-gray-800">
+    <Link href={collectionHref(c.path)} className="group flex w-[76px] shrink-0 flex-col items-center gap-1.5 text-center text-xs font-medium text-gray-800">
       <span className={`block h-[68px] w-[68px] overflow-hidden rounded-full border-2 bg-purple-50 [&>div]:h-full ${c.inSeason ? 'border-purple-500' : 'border-purple-100'}`}>
         {c.heroImageId ? (
           <CatalogImage imageId={c.heroImageId} alt="" sizes="68px" className="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-105" />

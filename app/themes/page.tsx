@@ -4,6 +4,7 @@
  */
 import { redirect } from 'next/navigation';
 import { serviceClient } from '@/lib/qr/server';
+import { collectionHref } from '@/lib/collections/href';
 
 export const dynamic = 'force-dynamic';
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -16,7 +17,7 @@ export default async function ThemesRedirect({ searchParams }: { searchParams: P
       const q = serviceClient().from('themes').select('collections:default_collection_id (path, is_active)');
       const { data } = await (UUID.test(theme) ? q.eq('id', theme) : q.eq('slug', theme.slice(0, 80))).maybeSingle();
       const c = (data as any)?.collections;
-      if (c?.path && c.is_active) target = `/collections/${c.path}`;
+      if (c?.path && c.is_active) target = collectionHref(c.path);
     } catch { /* fall back to all collections */ }
   }
   redirect(target);

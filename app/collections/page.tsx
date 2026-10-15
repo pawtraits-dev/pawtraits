@@ -11,6 +11,7 @@ import { ArrowRight, Search } from 'lucide-react';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
 import { CollectionCircles, type CardCollection } from '@/components/collections/CollectionCard';
+import { collectionHref } from '@/lib/collections/href';
 
 interface C extends CardCollection { id: string; kind: string; parentPath: string | null; depth: number; description: string | null }
 const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' };
@@ -54,7 +55,7 @@ function CollectionsContent() {
             <section key={top.id} className="mt-10" aria-labelledby={`h-${top.id}`}>
               <div className="flex items-baseline justify-between gap-3">
                 <h2 id={`h-${top.id}`} className="text-xl font-bold text-gray-900">{top.name}</h2>
-                <Link href={`/collections/${top.path}`} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-purple-700">All {top.designs} <ArrowRight className="h-4 w-4" /></Link>
+                <Link href={collectionHref(top.path)} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-purple-700">All {top.designs} <ArrowRight className="h-4 w-4" /></Link>
               </div>
               {top.description && <p className="mt-0.5 text-sm text-gray-600">{top.description}</p>}
               {top.kind === 'pawsonality' && (
