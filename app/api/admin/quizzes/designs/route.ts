@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     .select('id, description, created_at, subjects, generation_parameters, breeds:breed_id (name, animal_type), styles:style_id (name)')
     .in('theme_id', themes.map(t => t.id))
     .or('is_customer_generated.is.null,is_customer_generated.eq.false')
+    .not('tags', 'cs', '{quiz-generated}') // breed versions made from type designs are not designs to link
     .order('created_at', { ascending: false })
     .limit(300);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

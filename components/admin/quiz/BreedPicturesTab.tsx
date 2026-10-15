@@ -9,11 +9,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Check, Loader2 } from 'lucide-react';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
+import BreedBatchPanel from './BreedBatchPanel';
 
 interface Job { type_code: string; breed_id: string; image_id: string | null; status: 'pending' | 'running' | 'done' | 'failed'; error: string | null }
 interface Data { animal: 'dog' | 'cat'; breeds: { id: string; name: string }[]; types: { code: string; name: string; design_image_id: string }[]; jobs: Job[] }
 
 export default function BreedPicturesTab({ quizId }: { quizId: string }) {
+  return (
+    <div className="space-y-6">
+      <BreedBatchPanel quizId={quizId} />
+      <details className="rounded-xl border border-gray-200 bg-white p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-gray-900">Result type pictures one at a time (full price, made straight away)</summary>
+        <div className="mt-4"><TypePictureGrid quizId={quizId} /></div>
+      </details>
+    </div>
+  );
+}
+
+function TypePictureGrid({ quizId }: { quizId: string }) {
   const [top, setTop] = useState(20);
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);

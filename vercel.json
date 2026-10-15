@@ -26,6 +26,14 @@
     },
     "app/api/downloads/[id]/route.ts": {
       "maxDuration": 300
+    },
+    "app/api/cron/quiz-images/route.ts": {
+      "maxDuration": 300,
+      "memory": 1769
+    },
+    "app/api/admin/quizzes/breed-batch/tick/route.ts": {
+      "maxDuration": 300,
+      "memory": 1769
     }
   },
   "crons": [
@@ -35,6 +43,10 @@
     },
     {
       "path": "/api/cron/variation-batches",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/quiz-images",
       "schedule": "*/2 * * * *"
     }
   ],

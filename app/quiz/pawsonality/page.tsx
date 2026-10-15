@@ -119,7 +119,7 @@ export default function PawsonalityQuizPage() {
     if (saved && saved.history.length > 0) {
       setAnimal(saved.animal); setPetName(saved.petName); setBreedName(saved.breedName);
       (async () => {
-        const q = await fetchQuiz(saved.animal);
+        const q = await fetchQuiz(saved.animal, saved.breedId);
         if (q && q.version === saved.version) { setQuiz(q); setProgress(saved); setStep('cards'); }
         else save(null);
       })();
@@ -144,9 +144,10 @@ export default function PawsonalityQuizPage() {
     [breeds, animal],
   );
 
-  async function fetchQuiz(a: AnimalType): Promise<PublicQuiz | null> {
+  /** With a breed, question pictures painted as that breed are used where they exist */
+  async function fetchQuiz(a: AnimalType, breedId?: string | null): Promise<PublicQuiz | null> {
     try {
-      const r = await fetch(`/api/public/quiz/${SLUG}?animal=${a}`);
+      const r = await fetch(`/api/public/quiz/${SLUG}?animal=${a}${breedId ? `&breed=${breedId}` : ''}`);
       if (!r.ok) return null;
       return await r.json();
     } catch { return null; }
@@ -157,10 +158,10 @@ export default function PawsonalityQuizPage() {
     const name = petName.trim();
     if (!NAME_RE.test(name)) { setError("Please give your pet's name (letters only, up to 30)."); return; }
     setLoading(true); setError(null);
-    const q = await fetchQuiz(animal);
+    const breed = speciesBreeds.find(b => b.name.toLowerCase() === breedName.trim().toLowerCase()) ?? null;
+    const q = await fetchQuiz(animal, breed?.id);
     setLoading(false);
     if (!q) { setError('The quiz is having a nap. Please try again in a moment.'); return; }
-    const breed = speciesBreeds.find(b => b.name.toLowerCase() === breedName.trim().toLowerCase()) ?? null;
     const p: Progress = {
       animal, petName: name, breedId: breed?.id ?? null, breedName: breed?.name ?? '',
       version: q.version, seed: Math.random().toString(36).slice(2), history: [], answers: {},

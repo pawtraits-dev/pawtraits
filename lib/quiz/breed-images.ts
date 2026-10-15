@@ -119,8 +119,31 @@ async function generateBreedVersion(sourceImageId: string, breedId: string, code
   const [variation] = await gemini.generateBreedVariations(base64, source.prompt_text || '', [breed as any], source.themes, source.styles);
   if (!variation?.imageData) throw new Error('The picture service returned no image');
 
+  return saveBreedDesign({ source, breed, code, buffer: Buffer.from(variation.imageData, 'base64'), prompt: variation.prompt });
+}
+
+/** Load what saveBreedDesign needs about a type design */
+export async function loadTypeDesign(sourceImageId: string) {
+  const { data } = await serviceClient().from('image_catalog')
+    .select('id, prompt_text, description, cloudinary_public_id, public_url, theme_id, style_id, format_id')
+    .eq('id', sourceImageId).maybeSingle();
+  return data;
+}
+
+/**
+ * Save a breed version of a type design to the catalogue (a normal, buyable design).
+ * Used by on-the-spot generation and by the batch runs (lib/quiz/breed-batch.ts).
+ */
+export async function saveBreedDesign({ source, breed, code, buffer, prompt }: {
+  source: { prompt_text?: string | null; description?: string | null; theme_id?: string | null; style_id?: string | null; format_id?: string | null };
+  breed: { id: string; name: string; slug?: string | null };
+  code: string;
+  buffer: Buffer;
+  prompt?: string | null;
+}): Promise<string> {
+  const supabase = serviceClient();
   const filename = `pawsonality-${code.toLowerCase()}-${breed.slug || breed.id}.png`;
-  const uploaded = await uploadImageBufferToCloudinary(Buffer.from(variation.imageData, 'base64'), filename, {
+  const uploaded = await uploadImageBufferToCloudinary(buffer, filename, {
     folder: 'pawtraits/pawsonality', tags: ['pawsonality', `pawsonality-${code.toLowerCase()}`], breed: breed.name,
   });
 
@@ -131,7 +154,7 @@ async function generateBreedVersion(sourceImageId: string, breedId: string, code
     mime_type: 'image/png',
     storage_path: `cloudinary:${uploaded.public_id}`,
     public_url: uploaded.secure_url,
-    prompt_text: variation.prompt || source.prompt_text || '',
+    prompt_text: prompt || source.prompt_text || '',
     description: source.description,
     tags: ['pawsonality', `pawsonality:${code}`, 'quiz-generated'],
     breed_id: breed.id,
