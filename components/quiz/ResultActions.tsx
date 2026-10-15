@@ -16,12 +16,14 @@ export interface ResultActionsProps {
   shareCode: string; animal: 'dog' | 'cat'; code: string; typeName: string;
   petName: string; breedId: string | null; breedName: string | null;
   imageId: string | null; imageKind: 'breed' | 'design' | null; canPaintBreed: boolean;
+  extraImageIds?: string[];
 }
 
 export function ResultHeroPicture(p: ResultActionsProps & { onImage?: (id: string) => void }) {
   return (
     <ResultPicture shareCode={p.shareCode} animal={p.animal} code={p.code} breedId={p.breedId} breedName={p.breedName}
-      petName={p.petName} initialImageId={p.imageId} initialKind={p.imageKind} canPaintBreed={p.canPaintBreed} onImage={p.onImage} />
+      petName={p.petName} initialImageId={p.imageId} initialKind={p.imageKind} canPaintBreed={p.canPaintBreed} onImage={p.onImage}
+      extraImageIds={p.extraImageIds ?? []} />
   );
 }
 

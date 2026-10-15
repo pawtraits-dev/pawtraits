@@ -25,6 +25,8 @@ export interface PublicQuizResult {
   imagePublicId: string | null;
   /** 'breed' = painted as their breed; 'design' = the type's standard design; null = no picture yet */
   imageKind: 'breed' | 'design' | null;
+  /** The type's other designs (other styles), shown after the main picture in the result carousel */
+  extraImageIds: string[];
   /** True when a breed version could still be painted (breed given, design exists, not made yet) */
   canPaintBreed: boolean;
   completedAt: string;
@@ -65,6 +67,7 @@ export async function getPublicResult(shareCode: string): Promise<PublicQuizResu
     imageId,
     imagePublicId,
     imageKind,
+    extraImageIds: (type?.designImageIds ?? []).filter(id => id !== type?.designImageId && id !== imageId),
     canPaintBreed: !!(breed && type?.designImageId && !r.result_image_id),
     completedAt: r.completed_at,
   };

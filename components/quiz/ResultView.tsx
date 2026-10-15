@@ -39,7 +39,7 @@ export default function ResultView({ r }: { r: PublicQuizResult }) {
   const common = {
     shareCode: r.shareCode, animal: r.animalType, code: r.code, typeName, petName: name,
     breedId: r.breed?.id ?? null, breedName: r.breed?.name ?? null,
-    imageId: r.imageId, imageKind: r.imageKind, canPaintBreed: r.canPaintBreed,
+    imageId: r.imageId, imageKind: r.imageKind, canPaintBreed: r.canPaintBreed, extraImageIds: r.extraImageIds ?? [],
   };
 
   return (

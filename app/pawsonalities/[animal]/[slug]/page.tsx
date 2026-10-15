@@ -10,6 +10,7 @@ import { Suspense } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import BreedPicker from '@/components/pawsonalities/BreedPicker';
+import PutPetCta from '@/components/quiz/PutPetCta';
 import { breedVersions, collectionDesigns, FAMILIES, getPawsonalities, pictureUrl, speciesBreeds, typeHref, type PawsonalityType } from '@/lib/quiz/pawsonalities';
 import { poleLabel } from '@/lib/quiz/admin';
 import { withPetName } from '@/lib/quiz/scoring';
@@ -95,7 +96,8 @@ export default async function PawsonalityTypePage({ params, searchParams }: Prop
 
       <section className="mx-auto grid max-w-5xl gap-8 px-5 pb-8 pt-4 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         <div>
-          <div className="aspect-[2/3] overflow-hidden rounded-2xl bg-[#F6F2FC]">
+          <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#F6F2FC]">
+            {heroImage && <PutPetCta imageId={heroImage} petName={`your ${pet}`} src="pawsonalities" />}
             {heroImage
               // eslint-disable-next-line @next/next/no-img-element
               ? <img src={pictureUrl(heroImage, 800)} srcSet={`${pictureUrl(heroImage, 600)} 600w, ${pictureUrl(heroImage, 800)} 800w, ${pictureUrl(heroImage, 1200)} 1200w`}
@@ -171,8 +173,9 @@ export default async function PawsonalityTypePage({ params, searchParams }: Prop
           <ul className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {pictures.map(p => (
               <li key={p.id}>
-                <Link href={`/customise/${p.id}?src=pawsonalities`} className="group block">
-                  <div className="aspect-[2/3] overflow-hidden rounded-xl bg-[#F6F2FC]">
+                <Link href={`/customise/${p.id}?start=photo&src=pawsonalities`} className="group block">
+                  <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-[#F6F2FC]">
+                    <CornerTab pet={pet} />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={pictureUrl(p.id, 400)} alt={p.title ?? t.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
                   </div>
@@ -196,8 +199,9 @@ export default async function PawsonalityTypePage({ params, searchParams }: Prop
           <ul className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {shownVersions.map(v => (
               <li key={v.imageId}>
-                <Link href={`/customise/${v.imageId}?src=pawsonalities`} className="group block">
-                  <div className="aspect-[2/3] overflow-hidden rounded-xl bg-[#F6F2FC]">
+                <Link href={`/customise/${v.imageId}?start=photo&src=pawsonalities`} className="group block">
+                  <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-[#F6F2FC]">
+                    <CornerTab pet={pet} />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={pictureUrl(v.imageId, 400)} alt={`${t.name} as a ${breedName.get(v.breedId) ?? pet}`} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
                   </div>
@@ -259,5 +263,14 @@ function TypeRow({ animal, list }: { animal: AnimalType; list: PawsonalityType[]
         </li>
       ))}
     </ul>
+  );
+}
+
+/** The "Put your pet in this picture" corner tab, inside a tile that already links to the design */
+function CornerTab({ pet }: { pet: string }) {
+  return (
+    <span className="absolute right-0 top-0 z-10 max-w-[90%] truncate rounded-bl-xl bg-purple-700/95 px-2.5 py-1.5 text-xs font-bold text-white shadow-md">
+      Put your {pet} in this picture
+    </span>
   );
 }
