@@ -8,10 +8,8 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import BreedPicker from '@/components/pawsonalities/BreedPicker';
-import { breedVersions, dimensionGuide, FAMILIES, getPawsonalities, pictureUrl, speciesBreeds, typeHref } from '@/lib/quiz/pawsonalities';
+import { breedVersions, collectionDesigns, dimensionGuide, FAMILIES, getPawsonalities, pictureUrl, speciesBreeds, typeHref } from '@/lib/quiz/pawsonalities';
 import type { AnimalType } from '@/lib/quiz/types';
-import { serviceClient } from '@/lib/qr/server';
-import { loadPublicTree } from '@/lib/collections/public';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,9 +27,14 @@ export default async function PawsonalitiesPage({ searchParams }: Props) {
   const sp = await searchParams;
   const animal: AnimalType = sp.animal === 'cat' ? 'cat' : 'dog';
   const breedId = sp.breed && /^[0-9a-f-]{36}$/i.test(sp.breed) ? sp.breed : null;
-  const [types, breeds, tree] = await Promise.all([getPawsonalities(animal), speciesBreeds(animal), loadPublicTree(serviceClient()).catch(() => [])]);
-  // Types with no linked design yet borrow their collection's picture
-  const collectionHero = new Map(tree.filter(c => c.path.startsWith('pawsonalities/')).map(c => [c.path.split('/')[1].toUpperCase(), c.heroImageId]));
+  const [types, breeds] = await Promise.all([getPawsonalities(animal), speciesBreeds(animal)]);
+  // Types with no linked design yet borrow a design from their collection, for this species only
+  // (the collections are shared by dogs and cats, so their cover picture may be a dog)
+  const collectionHero = new Map<string, string>();
+  await Promise.all((types ?? []).filter(t => !t.mainImageId).map(async t => {
+    const first = (await collectionDesigns(t.code, animal, 1).catch(() => []))[0];
+    if (first) collectionHero.set(t.code, first.id);
+  }));
 
   // Breeds that have at least one type painted as them; the chosen breed's versions
   const mains = (types ?? []).map(t => t.mainImageId).filter(Boolean) as string[];
