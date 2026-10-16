@@ -1210,18 +1210,19 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                   <span className="text-gray-600">Subtotal</span>
                   <span className="font-medium">£{orderSummary.subtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">{isDigitalOnly ? 'Delivery' : 'Tracked delivery'}</span>
-                  <span className="font-medium">
-                    {isDigitalOnly ? (
-                      <span className="text-gray-500">None — nothing to post</span>
-                    ) : deliveryQuote ? (
-                      deliveryQuote.price === 0 ? 'Free' : `£${orderSummary.shipping.toFixed(2)}`
-                    ) : (
-                      <span className="text-gray-500">{shippingSummary()}</span>
-                    )}
-                  </span>
-                </div>
+                {/* Downloads only: nothing to post, so no delivery line at all */}
+                {!isDigitalOnly && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Tracked delivery</span>
+                    <span className="font-medium">
+                      {deliveryQuote ? (
+                        deliveryQuote.price === 0 ? 'Free' : `£${orderSummary.shipping.toFixed(2)}`
+                      ) : (
+                        <span className="text-gray-500">{shippingSummary()}</span>
+                      )}
+                    </span>
+                  </div>
+                )}
                 {/* Show partner discount */}
                 {userProfile?.user_type === 'partner' && discount > 0 && (
                   <div className="flex justify-between text-green-600">

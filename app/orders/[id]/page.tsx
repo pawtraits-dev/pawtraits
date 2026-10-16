@@ -213,7 +213,7 @@ export default function OrderDetailPage() {
               {order.subtotal_amount != null && <div className="flex justify-between"><span className="text-gray-600">Subtotal</span><span>{money(order.subtotal_amount, cur)}</span></div>}
               {!!order.discount_amount && <div className="flex justify-between text-green-700"><span>Discount</span><span>−{money(order.discount_amount, cur)}</span></div>}
               {!!order.credit_applied && <div className="flex justify-between text-green-700"><span>Credit</span><span>−{money(order.credit_applied, cur)}</span></div>}
-              {order.shipping_amount != null && <div className="flex justify-between"><span className="text-gray-600">Delivery</span><span>{order.shipping_amount ? money(order.shipping_amount, cur) : 'Free'}</span></div>}
+              {order.shipping_amount != null && (order.shipping_amount > 0 || !!(order.shipping_city || order.shipping_address_line_1 || order.shipping_address)) && <div className="flex justify-between"><span className="text-gray-600">Delivery</span><span>{order.shipping_amount ? money(order.shipping_amount, cur) : 'Free'}</span></div>}
               <div className="flex justify-between items-center border-t pt-3">
                 <span className="text-lg font-semibold">Total</span>
                 <span className="text-2xl font-bold text-purple-700">{money(order.total_amount, cur)}</span>

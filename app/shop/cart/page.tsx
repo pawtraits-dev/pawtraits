@@ -12,7 +12,7 @@ import { formatPrice } from "@/lib/product-types"
 import { useUserRouting } from "@/hooks/use-user-routing"
 // Removed getSupabaseClient import - using API endpoints for auth checks
 import { extractDescriptionTitle } from '@/lib/utils'
-import { describeCartItem, isStallProductId, includesFreeDigital, redundantDigitalLines } from '@/lib/cart/items'
+import { describeCartItem, isStallProductId, includesFreeDigital, redundantDigitalLines, itemNeedsShipping } from '@/lib/cart/items'
 import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider } from '@/lib/country-context'
 import { shippingSummary } from '@/lib/shipping/rates'
@@ -291,9 +291,12 @@ function ShoppingCartPageContent() {
                   <span>£{total.toFixed(2)}</span>
                 </div>
 
-                <div className="text-sm text-gray-500 text-center">
-                  <p>Tracked delivery per order: {shippingSummary()}</p>
-                </div>
+                {/* Nothing to post (downloads only): no delivery charge to mention */}
+                {items.some((item: any) => itemNeedsShipping(item)) && (
+                  <div className="text-sm text-gray-500 text-center">
+                    <p>Tracked delivery per order: {shippingSummary()}</p>
+                  </div>
+                )}
 
                 <Link href="/shop/checkout" className="block">
                   <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 text-lg font-semibold">
