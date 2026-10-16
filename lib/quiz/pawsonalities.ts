@@ -9,32 +9,36 @@ import { typeSlug } from '@/lib/quiz/type-slug';
 
 export const QUIZ_SLUG = 'pawsonality';
 
-/** Families of four, by the first two letters */
+/** Families of four, by the first two letters (energy + social) */
 export const FAMILIES: { prefix: string; name: string; blurb: string }[] = [
-  { prefix: 'ES', name: 'Energetic & Social', blurb: 'Busy, bouncy and happiest with company.' },
-  { prefix: 'EN', name: 'Energetic & Independent', blurb: 'Plenty of get-up-and-go, on their own terms.' },
-  { prefix: 'IS', name: 'Calm & Social', blurb: 'Laid-back souls who love their people.' },
+  { prefix: 'ES', name: 'Energetic & Social', blurb: 'Busy, bouncy and happiest in a crowd.' },
+  { prefix: 'EN', name: 'Energetic & Independent', blurb: 'Full of get-up-and-go, on their own terms.' },
+  { prefix: 'IS', name: 'Calm & Social', blurb: 'Laid-back souls who adore their people.' },
   { prefix: 'IN', name: 'Calm & Independent', blurb: 'Quiet, self-contained and quietly fascinating.' },
 ];
 
-/** What each letter means (cats' third dimension is Responsive / Own Agenda) */
-export function dimensionGuide(animal: AnimalType): { title: string; poles: { letter: Pole; name: string; text: string }[] }[] {
-  const pet = animal === 'cat' ? 'cat' : 'dog';
+/**
+ * The four dimensions, each with two ends (eight letters in all). A Pawsonality takes one letter
+ * from each dimension. Cats' third dimension is Responsive / Own Agenda.
+ */
+export function dimensionGuide(animal: AnimalType): { title: string; question: string; poles: { letter: Pole; name: string; text: string }[] }[] {
   return [
-    { title: 'Energy', poles: [
-      { letter: 'E', name: 'Energetic', text: 'Gets a buzz from activity and action.' },
-      { letter: 'I', name: 'Internal', text: 'Recharges with rest and a calm spot.' } ] },
-    { title: 'Social', poles: [
-      { letter: 'S', name: 'Social', text: 'Thrives on company, human or animal.' },
-      { letter: 'N', name: 'Neutral', text: 'Content with or without a crowd.' } ] },
-    { title: animal === 'cat' ? 'Responsiveness' : 'Training', poles: animal === 'cat' ? [
-      { letter: 'T', name: 'Responsive', text: 'Comes when called and likes a routine.' },
-      { letter: 'F', name: 'Own Agenda', text: 'Does things their way, thank you.' } ] : [
-      { letter: 'T', name: 'Trainable', text: 'Loves structure, learns quickly.' },
-      { letter: 'F', name: 'Free-spirit', text: 'Prefers to make their own decisions.' } ] },
-    { title: 'Boldness', poles: [
-      { letter: 'B', name: 'Bold', text: `First to investigate anything new.` },
-      { letter: 'C', name: 'Cautious', text: `A careful ${pet} who likes the familiar.` } ] },
+    { title: 'Energy', question: 'Where do they get their get-up-and-go?', poles: [
+      { letter: 'E', name: 'Energetic', text: 'Charged up by action, play and adventure.' },
+      { letter: 'I', name: 'Internal', text: 'Recharges with rest, routine and a sunny spot.' } ] },
+    { title: 'Social', question: 'How much company do they want?', poles: [
+      { letter: 'S', name: 'Social', text: 'Happiest with company, human or furry.' },
+      { letter: 'N', name: 'Neutral', text: 'Just as content with or without a crowd.' } ] },
+    animal === 'cat'
+      ? { title: 'Responsiveness', question: 'Will they come when called?', poles: [
+          { letter: 'T', name: 'Responsive', text: 'Answers to their name and loves a routine.' },
+          { letter: 'F', name: 'Own Agenda', text: 'Does things their way, thank you very much.' } ] }
+      : { title: 'Training', question: 'How do they take to rules?', poles: [
+          { letter: 'T', name: 'Trainable', text: 'Loves structure and picks things up fast.' },
+          { letter: 'F', name: 'Free-spirit', text: 'Would rather make their own decisions.' } ] },
+    { title: 'Boldness', question: 'How do they meet something new?', poles: [
+      { letter: 'B', name: 'Bold', text: 'First in, nose first, no hesitation.' },
+      { letter: 'C', name: 'Cautious', text: 'Takes a careful look before diving in.' } ] },
   ];
 }
 

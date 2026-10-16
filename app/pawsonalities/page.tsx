@@ -20,7 +20,7 @@ type Props = { searchParams: Promise<{ animal?: string; breed?: string }> };
 
 export const metadata: Metadata = {
   title: 'The 16 Pawsonalities | Pawtraits',
-  description: 'Meet the 16 Pawsonality types for dogs and cats: from The Golden Retriever to The Window Philosopher. Which one is your pet? Take the free 90-second quiz.',
+  description: 'Four dimensions, two ends each, 16 Pawsonalities for dogs and cats, from The Golden Retriever to The Window Philosopher. Which one is your pet? Take the free 90-second quiz.',
   alternates: { canonical: '/pawsonalities' },
   openGraph: { title: 'The 16 Pawsonalities', description: 'Which one is your pet? Meet all 16 types, then take the free quiz.', siteName: 'Pawtraits', locale: 'en_GB', type: 'website' },
 };
@@ -48,6 +48,9 @@ export default async function PawsonalitiesPage({ searchParams }: Props) {
     return s ? `?${s}` : '';
   };
   const pet = animal === 'cat' ? 'cat' : 'dog';
+  const guide = dimensionGuide(animal);
+  // Worked example: the first end of each dimension (ESTB)
+  const example = { code: guide.map(d => d.poles[0].letter).join(''), names: guide.map(d => d.poles[0].name).join(', ').replace(/, ([^,]*)$/, ' and $1') };
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -55,10 +58,10 @@ export default async function PawsonalitiesPage({ searchParams }: Props) {
 
       <section className="bg-[#F6F2FC] px-5 pb-10 pt-8">
         <div className="mx-auto max-w-5xl text-center">
-          <p className="inline-flex rounded-full border border-purple-200 bg-white px-3 py-1 text-sm font-semibold text-purple-800">16 types · dogs &amp; cats</p>
+          <p className="inline-flex rounded-full border border-purple-200 bg-white px-3 py-1 text-sm font-semibold text-purple-800">16 Pawsonalities · for dogs and cats</p>
           <h1 className="mt-4 text-[2.5rem] leading-[1.05] sm:text-6xl" style={lifeSavers}>Meet the 16 Pawsonalities</h1>
           <p className="mx-auto mt-3 max-w-2xl text-lg text-gray-700">
-            Four letters, sixteen personalities, one suspiciously accurate answer. Find your {pet} below, or let the quiz decide in about 90 seconds.
+            Every {pet} has a personality, and most have opinions too. Four dimensions, two ends to each, sixteen possible combinations: one of them is unmistakably your {pet}. Browse them below, or let the 90-second quiz work it out.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Link href={`/quiz/pawsonality?animal=${animal}&src=pawsonalities`} className="inline-flex h-12 items-center rounded-xl bg-purple-700 px-6 text-base font-bold text-white hover:bg-purple-800">
@@ -76,13 +79,17 @@ export default async function PawsonalitiesPage({ searchParams }: Props) {
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-5 py-8" aria-labelledby="letters">
-        <h2 id="letters" className="text-xl font-bold">What the four letters mean</h2>
+      <section className="mx-auto max-w-5xl px-5 py-8" aria-labelledby="dimensions">
+        <h2 id="dimensions" className="text-xl font-bold">The four dimensions</h2>
+        <p className="mt-1 max-w-3xl text-gray-700">
+          Each dimension has two ends, and each end has its own letter. A Pawsonality takes one letter from each dimension, so <strong>{example.code}</strong> means {example.names}. Two ends across four dimensions makes sixteen Pawsonalities.
+        </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {dimensionGuide(animal).map(d => (
+          {guide.map(d => (
             <div key={d.title} className="rounded-xl border border-gray-200 p-4">
               <p className="text-sm font-semibold uppercase tracking-wide text-purple-700">{d.title}</p>
-              <ul className="mt-2 space-y-2">
+              <p className="mt-0.5 text-sm font-medium text-gray-900">{d.question}</p>
+              <ul className="mt-3 space-y-2">
                 {d.poles.map(p => (
                   <li key={p.letter} className="flex gap-2">
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-900 text-sm font-bold text-white">{p.letter}</span>
@@ -102,10 +109,13 @@ export default async function PawsonalitiesPage({ searchParams }: Props) {
       {types && (
         <section className="mx-auto max-w-5xl px-5 pb-12" aria-label="The 16 types">
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-6">
-            <h2 className="text-xl font-bold">The 16 {pet} Pawsonalities</h2>
+            <div>
+              <h2 className="text-xl font-bold">The 16 {pet} Pawsonalities</h2>
+              <p className="text-sm text-gray-600">In four families, by their first two letters: how much energy they have, and how much company they want.</p>
+            </div>
             <Suspense><BreedPicker breeds={pickable} value={breedId} /></Suspense>
           </div>
-          {breedName && <p className="mt-2 text-sm text-gray-600">Showing each type painted as a {breedName} where we&apos;ve painted one.</p>}
+          {breedName && <p className="mt-2 text-sm text-gray-600">Showing each Pawsonality painted as a {breedName}, wherever we&apos;ve painted one so far.</p>}
 
           {FAMILIES.map(f => {
             const fam = types.filter(t => t.code.startsWith(f.prefix));
@@ -143,10 +153,10 @@ export default async function PawsonalitiesPage({ searchParams }: Props) {
       )}
 
       <section className="bg-[#F6F2FC] px-5 py-10 text-center">
-        <h2 className="text-2xl" style={lifeSavers}>Not sure which one your {pet} is?</h2>
-        <p className="mt-2 text-gray-700">20 quick swipes. Free, no sign-up, and the result comes painted as a Pawtrait.</p>
+        <h2 className="text-2xl" style={lifeSavers}>Still not sure which one is your {pet}?</h2>
+        <p className="mt-2 text-gray-700">Twenty quick swipes, about 90 seconds, free and no sign-up. Their result comes painted as a Pawtrait you can keep.</p>
         <Link href={`/quiz/pawsonality?animal=${animal}&src=pawsonalities`} className="mt-5 inline-flex h-12 items-center rounded-xl bg-purple-700 px-6 text-base font-bold text-white hover:bg-purple-800">
-          Find their Pawsonality
+          Find my {pet}&apos;s Pawsonality
         </Link>
       </section>
     </div>

@@ -115,7 +115,7 @@ export default async function PawsonalityTypePage({ params, searchParams }: Prop
           <h1 className="mt-3 text-[2.5rem] leading-[1.05] sm:text-5xl" style={lifeSavers}>{t.name}</h1>
           {t.tagline && <p className="mt-1 text-xl font-semibold text-purple-800">{t.tagline}</p>}
 
-          <ul className="mt-4 flex flex-wrap gap-2" aria-label="The four letters">
+          <ul className="mt-4 flex flex-wrap gap-2" aria-label="Its four dimensions">
             {t.code.split('').map(p => (
               <li key={p} className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-[#F6F2FC] py-1 pl-1 pr-3 text-sm">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-700 text-xs font-bold text-white">{p}</span>
