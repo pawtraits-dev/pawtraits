@@ -2,7 +2,8 @@
  * Pawsonality share cards (server only), drawn with next/og:
  *   'story' 1080×1920 (Instagram/WhatsApp status, downloaded or shared as a file)
  *   'og'    1200×630  (link previews: WhatsApp, iMessage, Facebook)
- * Brand purple ground, the result picture (breed version or type design, watermarked), the
+ * Brand purple ground, the result picture (breed version or type design) with the Pawtraits logo
+ * and wordmark in its top-right corner, the
  * pet's name and type, and the share quote. Text is added here, never baked into AI images.
  */
 import { ImageResponse } from 'next/og';
@@ -21,10 +22,30 @@ export const CARD_SIZES = {
 function pictureUrl(publicId: string | null, w: number, h: number): string | null {
   const cloud = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   if (!publicId || !cloud) return null;
-  const wm = process.env.CLOUDINARY_WATERMARK_PUBLIC_ID || 'pawtraits_watermark_logo';
-  const op = parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '20', 10);
   // jpg: the card renderer can't read WebP/AVIF
-  return `https://res.cloudinary.com/${cloud}/image/upload/c_fill,g_auto,w_${w},h_${h}/l_${wm},o_${op},g_center,w_0.6,fl_relative/f_jpg,q_80/${publicId}`;
+  return `https://res.cloudinary.com/${cloud}/image/upload/c_fill,g_auto,w_${w},h_${h}/f_jpg,q_80/${publicId}`;
+}
+
+/** The Pawtraits paw logo as a small PNG (the stored logo is an SVG; .png rasterises it) */
+function logoUrl(size: number): string | null {
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  const id = process.env.CLOUDINARY_WATERMARK_PUBLIC_ID || 'pawtraits_watermark_logo';
+  return cloud ? `https://res.cloudinary.com/${cloud}/image/upload/c_scale,w_${size * 2}/${id.replace(/\.(png|svg)$/i, '')}.png` : null;
+}
+
+/** Logo + "Pawtraits" wordmark, for the top-right corner of the picture */
+function CornerBrand({ logo, scale, hf }: { logo: string | null; scale: number; hf: { fontFamily?: string } }) {
+  const icon = Math.round(34 * scale);
+  return (
+    <div style={{
+      position: 'absolute', top: Math.round(20 * scale), right: Math.round(20 * scale), display: 'flex', alignItems: 'center',
+      gap: Math.round(10 * scale), padding: `${Math.round(8 * scale)}px ${Math.round(18 * scale)}px ${Math.round(8 * scale)}px ${Math.round(10 * scale)}px`,
+      background: 'rgba(42,26,82,0.72)', borderRadius: 999, color: '#fff', fontSize: Math.round(30 * scale), ...hf, fontWeight: 800,
+    }}>
+      {logo ? <img src={logo} width={icon} height={icon} /> : <Paw size={icon} color="#fff" />}
+      <span>Pawtraits</span>
+    </div>
+  );
 }
 
 /** Fetch the picture up front so a failed fetch falls back to the paw instead of breaking the card */
@@ -72,12 +93,15 @@ export async function renderResultCard(r: PublicQuizResult, format: keyof typeof
   const hf = font ? { fontFamily: 'LifeSavers' } : {};
 
   if (format === 'og') {
-    const pic = await pictureData(pictureUrl(r.imagePublicId, 420, 630));
+    const [pic, logo] = await Promise.all([pictureData(pictureUrl(r.imagePublicId, 420, 630)), pictureData(logoUrl(26))]);
     return new ImageResponse(
       (
         <div style={{ width, height, display: 'flex', background: INK, color: '#fff' }}>
           {pic
-            ? <img src={pic} width={420} height={630} style={{ objectFit: 'cover' }} />
+            ? <div style={{ position: 'relative', display: 'flex', width: 420, height: 630 }}>
+                <img src={pic} width={420} height={630} style={{ objectFit: 'cover' }} />
+                <CornerBrand logo={logo} scale={0.75} hf={hf} />
+              </div>
             : <div style={{ width: 420, height: 630, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#3B2A6B' }}><Paw size={160} color={SOFT} /></div>}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '48px 56px', gap: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -96,16 +120,16 @@ export async function renderResultCard(r: PublicQuizResult, format: keyof typeof
     );
   }
 
-  const pic = await pictureData(pictureUrl(r.imagePublicId, 1000, 1050));
+  const [pic, logo] = await Promise.all([pictureData(pictureUrl(r.imagePublicId, 1000, 1050)), pictureData(logoUrl(40))]);
   return new ImageResponse(
     (
       <div style={{ width, height, display: 'flex', flexDirection: 'column', background: INK, color: '#fff', padding: '80px 40px 60px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 44, ...hf, fontWeight: 800 }}>
-          <Paw size={56} color={SOFT} /> Pawtraits
-        </div>
         {pic
-          ? <img src={pic} width={1000} height={1050} style={{ marginTop: 44, borderRadius: 36, objectFit: 'cover' }} />
-          : <div style={{ marginTop: 44, width: 1000, height: 1050, borderRadius: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#3B2A6B' }}><Paw size={320} color={SOFT} /></div>}
+          ? <div style={{ position: 'relative', display: 'flex', marginTop: 100, width: 1000, height: 1050 }}>
+              <img src={pic} width={1000} height={1050} style={{ borderRadius: 36, objectFit: 'cover' }} />
+              <CornerBrand logo={logo} scale={1.2} hf={hf} />
+            </div>
+          : <div style={{ marginTop: 100, width: 1000, height: 1050, borderRadius: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#3B2A6B' }}><Paw size={320} color={SOFT} /></div>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 44 }}>
           <div style={{ display: 'flex', background: '#fff', color: INK, fontSize: 38, fontWeight: 800, letterSpacing: 4, padding: '8px 18px', borderRadius: 12 }}>{r.code}</div>
           {r.type?.tagline && <div style={{ fontSize: 38, color: LILAC }}>{r.type.tagline}</div>}

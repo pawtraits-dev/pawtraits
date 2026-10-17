@@ -29,13 +29,11 @@ export function beforeFrame(publicId: string | null, fallback: string): string {
   return c && publicId ? `https://res.cloudinary.com/${c}/image/upload/c_fill,g_auto,w_${W},h_${H}/f_auto,q_auto/${publicId}` : fallback;
 }
 
-/** Portrait fitted whole into the 4:5 frame (blurred fill at the edges, nothing cropped), watermarked */
+/** Portrait fitted whole into the 4:5 frame (blurred fill at the edges, nothing cropped), unwatermarked */
 export function afterFrame(publicId: string | null, fallback: string): string {
   const c = cloud();
   if (!c || !publicId) return fallback; // after_url is already the watermarked preview
-  const wm = process.env.CLOUDINARY_WATERMARK_PUBLIC_ID || 'pawtraits_watermark_logo';
-  const op = parseInt(process.env.CLOUDINARY_WATERMARK_OPACITY || '20', 10);
-  return `https://res.cloudinary.com/${c}/image/upload/${blurredFit(publicId, W, H)}/l_${wm},o_${op},g_center,w_0.6,fl_relative/f_auto,q_auto/${publicId}`;
+  return `https://res.cloudinary.com/${c}/image/upload/${blurredFit(publicId, W, H)}/f_auto,q_auto/${publicId}`;
 }
 
 const BAD_ORDER_STATUSES = ['cancelled', 'canceled', 'refunded', 'on_hold'];
