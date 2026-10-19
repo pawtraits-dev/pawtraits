@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 import QRCode from 'qrcode';
+import { watermarkTiles } from '@/lib/watermark';
 
 // Environment variables are automatically loaded by Next.js
 
@@ -294,15 +295,13 @@ export class CloudinaryImageService {
 
       // 3. FULL SIZE - watermarked for detail views (secured access)
       const fullSizeUrl = cloudinary.url(publicId, {
-        ...baseTransform,
         ...securityConfig,
-        width: 1200,
-        crop: 'limit', // Maintain aspect ratio, don't crop
-        quality: 85,
-        format: 'auto',
-        overlay: watermarkId,
-        opacity: watermarkOpacity,
-        gravity: 'center'
+        ...baseTransform,
+        transformation: [
+          { width: 1200, crop: 'limit' }, // Maintain aspect ratio, don't crop
+          { raw_transformation: watermarkTiles() },          // small paws repeated over the picture
+          { quality: 85, fetch_format: 'auto' },
+        ],
       });
 
       // 4. THUMBNAIL - small, no overlay for rows/carts (secured access)
@@ -865,26 +864,23 @@ export class CloudinaryImageService {
         case 'catalog_watermarked':
           generatedUrl = cloudinary.url(publicId, {
             ...baseConfig,
-            width: 800,
-            crop: 'limit', // Maintain aspect ratio, don't crop
-            quality: 'auto',
-            fetch_format: opts.format || 'auto', // a fixed format makes one file (f_auto makes one per browser type)
-            overlay: watermarkId,
-            opacity: watermarkOpacity,
-            gravity: 'center'
+            transformation: [
+              { width: 800, crop: 'limit' }, // Maintain aspect ratio, don't crop
+              { raw_transformation: watermarkTiles() }, // small paws repeated over the picture
+              // a fixed format makes one file (f_auto makes one per browser type)
+              { quality: 'auto', fetch_format: opts.format || 'auto' },
+            ],
           });
           break;
 
         case 'full_size':
           generatedUrl = cloudinary.url(publicId, {
             ...baseConfig,
-            width: 1200,
-            crop: 'limit', // Maintain aspect ratio, don't crop
-            quality: 'auto',
-            fetch_format: 'auto',
-            overlay: watermarkId,
-            opacity: watermarkOpacity,
-            gravity: 'center'
+            transformation: [
+              { width: 1200, crop: 'limit' }, // Maintain aspect ratio, don't crop
+              { raw_transformation: watermarkTiles() }, // small paws repeated over the picture
+              { quality: 'auto', fetch_format: 'auto' },
+            ],
           });
           break;
         
@@ -948,7 +944,7 @@ export class CloudinaryImageService {
       secure: true,
       transformation: [
         { width: 1200, height: 630, crop: 'pad', background: 'rgb:F6F2FC' },
-        { overlay: watermarkId, opacity: watermarkOpacity, gravity: 'center', width: 400, crop: 'scale' },
+        { raw_transformation: watermarkTiles() },
         { fetch_format: 'jpg', quality: 'auto' },
       ],
     });

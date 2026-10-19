@@ -120,9 +120,11 @@ export async function POST(request: NextRequest) {
 
     // 4. Download catalog image from Cloudinary as base64
     console.log('📥 [GENERATE API] Downloading catalog image from Cloudinary...');
+    // The design without its watermark: Gemini would copy the repeated paws into the result
     const catalogImageUrl = cloudinaryService.getPublicVariantUrl(
       catalogImage.cloudinary_public_id,
-      'full_size'
+      'mid_size',
+      { width: 800 }
     );
     console.log('🔗 [GENERATE API] Catalog image URL:', catalogImageUrl.substring(0, 100));
 
