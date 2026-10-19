@@ -323,6 +323,10 @@ export default function CustomisePage() {
     if (!allReady || !catalogImage) return;
     const fd = new FormData();
     fd.append('catalogImageId', imageId);
+    // Where the visitor came from (?src=… or a collection page), for Admin > Customisations
+    const qs = new URLSearchParams(window.location.search);
+    const source = qs.get('src') || (qs.get('from') ? 'collection' : '');
+    if (source) fd.append('source', source);
     subjects.forEach((s, i) => {
       const n = subjectCount > 1 ? String(i + 1) : '';
       if (s.pet) fd.append(`petId${n}`, s.pet.pet_id);
@@ -368,10 +372,17 @@ export default function CustomisePage() {
   async function share() {
     if (!customImage?.share_token) return;
     const url = `${window.location.origin}/share/custom/${customImage.share_token}`;
+    let channel: 'native' | 'copy' | null = null;
     try {
-      if (navigator.share) await navigator.share({ title: 'My Pawtrait', text: 'Look what Pawcasso made of my pet! 🐾', url });
-      else { await navigator.clipboard.writeText(url); toast({ title: 'Link copied!' }); }
+      if (navigator.share) { await navigator.share({ title: 'My Pawtrait', text: 'Look what Pawcasso made of my pet! 🐾', url }); channel = 'native'; }
+      else { await navigator.clipboard.writeText(url); toast({ title: 'Link copied!' }); channel = 'copy'; }
     } catch { /* user cancelled */ }
+    // Count the share for Admin > Customisations
+    if (channel) {
+      fetch(`/api/customers/custom-images/${customImage.id}/share`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel }),
+      }).catch(() => {});
+    }
   }
 
   // ---- buy ----

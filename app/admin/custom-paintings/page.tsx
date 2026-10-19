@@ -83,7 +83,9 @@ export default function CustomPaintingsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/admin/custom-paintings?limit=${limit}`, { cache: 'no-store' });
+      // ?id=… (from Admin > Customisations): just that painting
+      const one = new URLSearchParams(window.location.search).get('id');
+      const r = await fetch(`/api/admin/custom-paintings?limit=${limit}${one && /^[0-9a-f-]{36}$/i.test(one) ? `&id=${one}` : ''}`, { cache: 'no-store' });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || r.statusText);
       setRows(j.paintings); setError(null);

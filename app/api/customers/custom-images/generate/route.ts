@@ -9,6 +9,7 @@ import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 import { buildSizeInstruction } from '@/lib/breed-size-mapping';
+import { detectPetBreed } from '@/lib/customise/detect-breed';
 import { GEMINI_IMAGE_MODELS, toGeminiAspectRatio, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
 import { getRequester, setGuestCookie, clientIp } from '@/lib/guest/access';
 import { hashIp } from '@/lib/qr/attribution';
@@ -255,6 +256,9 @@ export async function POST(request: NextRequest) {
     // Parse FormData
     const formData = await request.formData();
     const catalogImageId = formData.get('catalogImageId') as string;
+    // Where the visitor came from (?src= on the customise page), for Admin > Customisations
+    const sourceRaw = String(formData.get('source') || '').toLowerCase();
+    const source = /^[a-z0-9_-]{1,32}$/.test(sourceRaw) ? sourceRaw : 'direct';
 
     // Check for multi-subject support (petId1, petId2, etc. OR petPhoto1, petPhoto2, etc.)
     const petIds: (string | null)[] = [];
@@ -438,9 +442,9 @@ export async function POST(request: NextRequest) {
 
     // Generate Cloudinary URL if we have the public_id
     let catalogImageUrl = catalogImage.public_url;
-    // CUSTOMER_DESIGN_IMAGE=clean (Vercel): send Gemini the design's original at 1024 px, with no
-    // watermark. Default: the catalogue URL as before (watermarked 800 px or 400 px on older designs).
-    if (process.env.CUSTOMER_DESIGN_IMAGE === 'clean' && catalogImage.cloudinary_public_id) {
+    // Gemini gets the design's original at 1024 px, with no watermark (the repeated paws would be
+    // copied into the painting). CUSTOMER_DESIGN_IMAGE=watermarked goes back to the stored catalogue URL.
+    if (process.env.CUSTOMER_DESIGN_IMAGE !== 'watermarked' && catalogImage.cloudinary_public_id) {
       catalogImageUrl = cloudinary.url(catalogImage.cloudinary_public_id, { width: 1024, crop: 'limit', format: 'jpg', quality: 90, secure: true });
     }
     if (!catalogImageUrl && catalogImage.cloudinary_public_id) {
@@ -589,6 +593,8 @@ export async function POST(request: NextRequest) {
           subject_count: petImageUrls.length,
           all_pet_ids: petIds.filter(id => id !== null),
           all_pet_names: petsData.map(p => p?.name || 'Uploaded Pet'),
+          source,
+          ...(firstPet?.breed_id ? { breed_source: 'profile' } : {}),
         }
       })
       .select(`
@@ -651,6 +657,8 @@ export async function POST(request: NextRequest) {
         requestStarted,
         timings,
       }).then(() => capturePreviews({ ids: [customImage.id] })) // social loop: only if "Include free previews" is on
+      // Uploaded photos have no breed: detect it for Admin > Customisations (never throws)
+      .then(() => (firstPet?.breed_id ? undefined : detectPetBreed(customImage.id, supabase).then(() => undefined)))
       .catch(async (error) => {
         console.error('❌ Error in background generation:', error);
         await supabase

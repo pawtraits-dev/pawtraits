@@ -29,6 +29,7 @@ export type AiFeature =
   | 'auto-tag'
   | 'photo-check'
   | 'pet-count'
+  | 'pet-breed'             // breed of an uploaded pet photo (customisation analytics)
   | 'description'
   | 'composition-analysis'
   | 'theme-from-image'
