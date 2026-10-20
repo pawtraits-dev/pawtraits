@@ -44,3 +44,29 @@ export function mockupUrl(side: MockupSide, photo: MockupPhoto, wrapPublicId: st
   return `${cloudBase(photo)}/${steps.join('/')}/${photo.publicId}`;
 }
 
+
+/**
+ * A wraparound design (or a customer's painting of one) on the mug photo, for any picture size:
+ * the wrap (plus an optional overlay such as the team motto) is cropped to this side's half,
+ * fitted to the mug's face, padded with white to the photo's size at the face's position, and
+ * the photo is laid over it with "multiply" (white × photo = the photo, so only the face shows
+ * the picture, with the photo's shading). White mug. `extra` = more transformations on the wrap
+ * before cropping (e.g. the watermark on a customer's preview).
+ */
+export function wrapMockupUrl(side: MockupSide, photo: MockupPhoto, wrapPublicId: string, opts: { overlay?: string; extra?: string; width?: number } = {}): string {
+  const face = photo.face ?? DEFAULT_FACES[side];
+  const x = Math.round(face.x * photo.width), y = Math.round(face.y * photo.height);
+  const w = Math.round(face.w * photo.width), h = Math.round(face.h * photo.height);
+  const steps = [
+    'c_fill,ar_2:1,g_center,w_2000',                      // 2:1 (Gemini's 21:9 wraps are centre-cropped, as in print)
+    ...(opts.overlay ? [opts.overlay] : []),
+    ...(opts.extra ? [opts.extra] : []),
+    `c_crop,w_0.5,h_1.0,${side === 'pet' ? 'g_west' : 'g_east'},fl_relative`,
+    `c_fill,w_${w},h_${h}`,
+    `c_mpad,w_${x + w},h_${y + h},g_south_east,b_white`,   // mpad: pad without enlarging
+    `c_mpad,w_${photo.width},h_${photo.height},g_north_west,b_white`,
+    `l_${photo.publicId.replace(/\//g, ':')}/e_multiply,fl_layer_apply,g_north_west`,
+    `c_fill,ar_1:1,g_center/c_limit,w_${opts.width ?? 700}/f_auto,q_auto`,
+  ];
+  return `${cloudBase(photo)}/${steps.join('/')}/${wrapPublicId}`;
+}

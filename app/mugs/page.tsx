@@ -11,7 +11,7 @@ import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
 import { plainText } from '@/lib/text/plain';
 
-interface WrapDesign { id: string; title: string; imageUrl: string; teams: boolean; personalised: boolean }
+interface WrapDesign { id: string; title: string; imageUrl: string; mockups?: { pet?: string; text?: string }; teams: boolean; personalised: boolean }
 interface MugEntry { id: string; type: string; slug: string; name: string; sub_heading: string; catalog_image_url: string; animal_type?: string | null }
 
 const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' };
@@ -51,8 +51,18 @@ export default function MugsPage() {
                 {wraps.map((w) => (
                   <li key={w.id}>
                     <Link href={`/customise/${w.id}?src=mugs`} className="group block overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 hover:ring-purple-300">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={w.imageUrl} alt={`${w.title} mug design`} className="aspect-[2/1] w-full object-cover transition-transform group-hover:scale-[1.02]" loading="lazy" />
+                      {w.mockups?.pet ? (
+                        // Both sides of the mug: the pet, and the motto round the back
+                        <div className="grid grid-cols-2 bg-white">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={w.mockups.pet} alt={`${w.title} mug, pet side`} className="aspect-square w-full object-cover transition-transform group-hover:scale-[1.02]" loading="lazy" />
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          {w.mockups.text && <img src={w.mockups.text} alt={`${w.title} mug, back`} className="aspect-square w-full object-cover transition-transform group-hover:scale-[1.02]" loading="lazy" />}
+                        </div>
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={w.imageUrl} alt={`${w.title} mug design`} className="aspect-[2/1] w-full object-cover transition-transform group-hover:scale-[1.02]" loading="lazy" />
+                      )}
                       <div className="flex flex-wrap items-center gap-2 p-3">
                         <p className="mr-auto font-semibold text-gray-900">{w.title}</p>
                         {w.teams && <span className="rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-800">Any team</span>}

@@ -4,6 +4,7 @@ import { CloudinaryImageService } from '@/lib/cloudinary';
 import { loadSlots, subjectsOf } from '@/lib/catalog/slots-server';
 import { readKit } from '@/lib/collections/kit-lettering';
 import { designMotto } from '@/lib/collections/slogan-server';
+import { wrapMockups } from '@/lib/mugs/mockup';
 import { sloganLayer } from '@/lib/collections/slogan';
 
 // Use service role client to bypass RLS for public catalog data
@@ -127,8 +128,15 @@ export async function GET(
       ? cloudinaryService.getPublicVariantUrl(catalogImage.cloudinary_public_id, 'full_size', { overlay: sloganLayer(motto) })
       : imageUrl;
 
+    // Wraparound (2:1) designs: the design on the mug photos, both sides, motto included
+    const isWrap = (catalogImage.format as any)?.aspect_ratio === '2:1' || (Array.isArray(catalogImage.format) && (catalogImage.format as any)[0]?.aspect_ratio === '2:1');
+    const mugMockups = isWrap && catalogImage.cloudinary_public_id
+      ? await wrapMockups(catalogImage.cloudinary_public_id, { overlay: motto ? sloganLayer(motto) : undefined }).catch(() => ({}))
+      : {};
+
     // Format response
     const response = {
+      mugMockups,
       kit: kit ? { name: kit.name, number: kit.number, motto } : null,
       id: catalogImage.id,
       cloudinaryPublicId: catalogImage.cloudinary_public_id,

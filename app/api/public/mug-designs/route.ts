@@ -1,5 +1,5 @@
 /**
- * GET /api/public/mug-designs → { designs: [{ id, title, imageUrl, teams, personalised }] }
+ * GET /api/public/mug-designs → { designs: [{ id, title, imageUrl, mockups: { pet, text }, teams, personalised }] }
  * Catalogue designs made for mugs (2:1 wraparound format, e.g. the football designs), for the
  * /mugs page alongside the zodiac mugs. Listed, public designs only: team versions and other
  * link-only designs are left out (customers reach them through the team picker).
@@ -7,6 +7,9 @@
 import { NextResponse } from 'next/server';
 import { serviceClient } from '@/lib/qr/server';
 import { LISTED_ONLY } from '@/lib/catalog/listing';
+import { wrapMockups } from '@/lib/mugs/mockup';
+import { designMotto } from '@/lib/collections/slogan-server';
+import { sloganLayer } from '@/lib/collections/slogan';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +21,7 @@ export async function GET() {
     if (!formatIds.length) return NextResponse.json({ designs: [] });
 
     const { data: rows, error } = await supabase.from('image_catalog')
-      .select('id, description, team_switch, is_featured, created_at')
+      .select('id, description, cloudinary_public_id, team_switch, is_featured, created_at')
       .in('format_id', formatIds).eq('is_public', true).or(LISTED_ONLY)
       .not('is_customer_generated', 'is', true)
       .order('is_featured', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false })
@@ -34,8 +37,16 @@ export async function GET() {
     const sport = new Set((links ?? []).filter((l: any) => l.collections?.kind === 'sport').map((l: any) => l.image_id));
     const kit = new Set((kits ?? []).filter((k: any) => k.kit_personalisation?.name).map((k: any) => k.id));
 
+    // Each design on the mug photos (pet side and motto side)
+    const mockups = new Map<string, Partial<Record<'pet' | 'text', string>>>();
+    await Promise.all((rows ?? []).map(async r => {
+      const motto = kit.has(r.id) ? await designMotto(supabase, r.id).catch(() => null) : null;
+      mockups.set(r.id, await wrapMockups(r.cloudinary_public_id, { overlay: motto ? sloganLayer(motto) : undefined, width: 600 }).catch(() => ({})));
+    }));
+
     return NextResponse.json({
       designs: (rows ?? []).map(r => ({
+        mockups: mockups.get(r.id) ?? {},
         id: r.id,
         title: (r.description || '').match(/\*\*(.+?)\*\*/)?.[1]?.trim() || 'Pawtraits mug',
         imageUrl: `/api/secure-images/${r.id}?variant=mid_size&w=800`,   // same (watermarked) route as Browse

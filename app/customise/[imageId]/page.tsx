@@ -52,6 +52,8 @@ interface CatalogImage {
   format?: { id: string; name: string; aspectRatio: string };
   isMultiSubject?: boolean;
   subjectCount?: number;
+  /** Wraparound (2:1) designs: the design on a mug, both sides */
+  mugMockups?: { pet?: string; text?: string };
   /** Personalised football kit: the customer chooses the name and number on the shirt */
   kit?: { name: string; number: number | null; motto?: string | null } | null;
   /** One per pet in the picture, left to right: photo N replaces slot N (multi-pet plan phase 2) */
@@ -60,6 +62,7 @@ interface CatalogImage {
 
 interface CustomImage {
   id: string;
+  mugMockups?: { pet?: string; text?: string };   // wraparound designs: the finished painting on a mug
   pet_name?: string | null;
   generated_image_url: string | null;
   share_token: string | null;
@@ -492,6 +495,23 @@ export default function CustomisePage() {
             )}
           </div>
         )}
+
+        {/* Wraparound designs: how it looks on the mug, both sides (their painting once it's made) */}
+        {(step === 'choose' || step === 'result') && (() => {
+          const m = step === 'result' && customImage?.mugMockups?.pet ? customImage.mugMockups : catalogImage.mugMockups;
+          if (!m?.pet) return null;
+          return (
+            <div className="mt-3">
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-gray-500">{step === 'result' ? 'Your mug' : 'On the mug'}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[m.pet, m.text].filter(Boolean).map((src, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={i} src={src} alt={i === 0 ? 'The mug, pet side' : 'The mug, back'} className="aspect-square w-full rounded-xl bg-white object-cover ring-1 ring-gray-200" loading="lazy" draggable={false} onContextMenu={e => e.preventDefault()} />
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* CHOOSE — the design page (spec: docs/specs/customer-ux-round-1.md) */}
         {step === 'choose' && (
