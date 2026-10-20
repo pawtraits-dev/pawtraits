@@ -30,19 +30,23 @@ function fontName(): string {
 }
 
 /**
- * Raw Cloudinary transformation adding the slogan on the right of the picture.
- * The text is set at 100 px in a 760 px column (Bowlby is wide: room for "BISCUITS" on one line;
- * longer text wraps, line breaks force new lines), then the whole block is scaled to 30% of the
- * picture's width and placed 4% in from the right edge, centred vertically.
+ * Raw Cloudinary transformation adding the slogan on the right of a 2:1 mug wrap.
+ *
+ * The right half of the wrap is the mug's "text side", so the block is centred at 71% of the
+ * width (clear of the handle join at the edges). The text is set at 100 px in an 800 px column
+ * (about 9 Bowlby capitals; longer lines wrap, line breaks force new lines), padded to a fixed
+ * 800×600 box so every motto comes out the same letter size, and the box is scaled to 48% of the
+ * width: letters ~6% of the width, ~12% of a 2:1 picture's height (4 lines ≈ half the height).
  */
-export function sloganLayer(text: string, opts: { colour?: string; width?: number; inset?: number } = {}): string {
+export function sloganLayer(text: string, opts: { colour?: string; centre?: number; scale?: number } = {}): string {
   const colour = (opts.colour || 'ffffff').replace('#', '');
-  const width = opts.width ?? 0.3;
-  const inset = opts.inset ?? 0.04;
+  const scale = opts.scale ?? 0.48;
+  const offset = Math.round(((opts.centre ?? 0.71) - 0.5) * 1000) / 1000;   // from the middle
   return [
-    `l_text:${fontName()}_100_center_line_spacing_-10:${escapeText(text)},co_rgb:${colour},c_fit,w_760`,
+    `l_text:${fontName()}_100_center_line_spacing_-10:${escapeText(text)},co_rgb:${colour},c_fit,w_800`,
     `e_shadow:35,x_5,y_5,co_rgb:000000`,
-    `c_scale,w_${width},fl_relative`,
-    `fl_layer_apply,g_east,x_${inset}`,
+    `c_mpad,w_800,h_600`,
+    `c_scale,w_${scale},fl_relative`,
+    `fl_layer_apply,g_center,x_${offset}`,
   ].join('/');
 }

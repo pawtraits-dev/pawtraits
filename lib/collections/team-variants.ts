@@ -222,6 +222,13 @@ async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: R
   const instruction = sportsTeam ? sceneRecolour(sportsTeam, pets) : recolourFor(team.recolour, pets);
   const painted = await recolour(base64, instruction, { scene: !!sportsTeam });
   if (!painted) throw new Error('The picture service returned no image');
+  // Format from the picture's real shape (a 2:1 mug wrap stays a mug even if the original design
+  // was saved with the wrong format); the original's format when the shape isn't recognised
+  const shape = ratioOfImage(base64);
+  const { data: shapeFormat } = shape
+    ? await supabase.from('formats').select('id').eq('aspect_ratio', shape).eq('is_active', true).limit(1).maybeSingle()
+    : { data: null };
+  const formatId = shapeFormat?.id ?? source.format_id;
   // Lettering and logo check (shown in Admin → Team versions)
   const check = kit ? await readShirt(painted, 'image/png', { imageId: sourceId }) : null;
 
@@ -239,7 +246,7 @@ async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: R
     description: source.description, marketing_description: source.marketing_description,
     tags: [VARIANT_TAG, `team:${team.path}`, UNLISTED_TAG],
     display_tags: source.display_tags ?? [],
-    breed_id: source.breed_id, coat_id: source.coat_id, theme_id: source.theme_id, style_id: source.style_id, format_id: source.format_id,
+    breed_id: source.breed_id, coat_id: source.coat_id, theme_id: source.theme_id, style_id: source.style_id, format_id: formatId,
     outfit_id: team.outfitId,
     is_multi_subject: pets > 1, subjects: source.subjects, generation_parameters: source.generation_parameters ?? {}, composition_metadata: source.composition_metadata,
     variation_prompt_template: source.variation_prompt_template,

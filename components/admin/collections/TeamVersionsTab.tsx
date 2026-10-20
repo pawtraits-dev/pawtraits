@@ -366,7 +366,7 @@ function TeamMottos() {
       <button onClick={() => setOpen(o => !o)} className="flex items-center gap-1 font-semibold text-gray-900">
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />} Team mottos
       </button>
-      <p className="mt-1 text-gray-600">The big words on the right of personalised-kit designs (when “Show the team motto” is ticked). Press Enter for a new line. Up to 32 characters.</p>
+      <p className="mt-1 text-gray-600">The big words on the right half of the mug wrap (designs with “Show the team motto” ticked). Stack short lines like a poster: press Enter for a new line, about 9 capitals per line at most (longer lines wrap). Up to 32 characters.</p>
       {open && !teams && !err && <p className="mt-2 text-gray-600">Loading…</p>}
       {open && teams && (
         <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
