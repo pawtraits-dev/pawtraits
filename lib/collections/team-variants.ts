@@ -14,7 +14,8 @@ import { GoogleGenAI } from '@google/genai';
 import { serviceClient } from '@/lib/qr/server';
 import { uploadImageBufferToCloudinary } from '@/lib/cloudinary-server';
 import { GEMINI_IMAGE_MODELS, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
-import { LEAGUES, type League } from './sports-teams';
+import { LEAGUES, sceneRecolour, teamByPath, type League } from './sports-teams';
+import { letteringMatches, readKit, readShirt } from './kit-lettering';
 import { generateWithUsage } from '@/lib/ai/usage';
 
 export const VARIANT_TAG = 'team-variant';
@@ -38,6 +39,9 @@ export interface TeamContext {
   currentTeamPath: string | null;
   teams: OfferedTeam[];
 }
+
+/** Lettering and logo check of a personalised-kit team version */
+export interface KitCheck { name: string | null; number: number | null; logos: boolean; ok: boolean }
 
 export type VariantResult =
   | { status: 'done'; imageId: string }
@@ -103,7 +107,8 @@ export function groupByLeague(teams: OfferedTeam[]) {
   return LEAGUE_ORDER.map(lg => ({ league: lg, name: LEAGUES[lg].name, teams: teams.filter(t => t.league === lg) })).filter(g => g.teams.length);
 }
 
-export type RecolourFn = (pngBase64: string, instruction: string) => Promise<string | null>;
+/** scene: the instruction is complete (whole-scene recolour), so don't add the keep-the-background rule */
+export type RecolourFn = (pngBase64: string, instruction: string, opts?: { scene?: boolean }) => Promise<string | null>;
 export type UploadFn = (buffer: Buffer, filename: string, opts: { folder?: string; tags?: string[] }) => Promise<{ public_id: string; secure_url: string; bytes: number; version?: number | string; signature?: string }>;
 
 async function fetchAsBase64(url: string): Promise<string> {
@@ -113,7 +118,7 @@ async function fetchAsBase64(url: string): Promise<string> {
 }
 
 /** Gemini edit: same picture, outfit recoloured */
-const geminiRecolour: RecolourFn = async (pngBase64, instruction) => {
+const geminiRecolour: RecolourFn = async (pngBase64, instruction, opts) => {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error('Gemini API key is required');
   const ai = new GoogleGenAI({ apiKey: key });
@@ -121,7 +126,7 @@ const geminiRecolour: RecolourFn = async (pngBase64, instruction) => {
     model: GEMINI_IMAGE_MODELS.pro,
     config: geminiImageConfig(ratioOfImage(pngBase64)),
     contents: [
-      { text: `${instruction} Keep every animal exactly as it is: same breed, face, markings, expression, pose and place in the picture, and the same number of animals. Keep the art style, composition, background and every other detail unchanged.` },
+      { text: opts?.scene ? instruction : `${instruction} Keep every animal exactly as it is: same breed, face, markings, expression, pose and place in the picture, and the same number of animals. Keep the art style, composition, background and every other detail unchanged.` },
       { inlineData: { mimeType: 'image/png', data: pngBase64 } },
     ],
   });
@@ -166,8 +171,8 @@ export async function ensureTeamVariant(input: {
   }
 
   try {
-    const imageId = await paintTeamVersion(input.sourceId, input.team, input.recolour ?? geminiRecolour, input.upload ?? uploadImageBufferToCloudinary, input.fetchImage ?? fetchAsBase64);
-    await supabase.from('design_team_variants').update({ status: 'done', image_id: imageId, error: null, updated_at: new Date().toISOString() }).eq('id', jobId);
+    const { imageId, check } = await paintTeamVersion(input.sourceId, input.team, input.recolour ?? geminiRecolour, input.upload ?? uploadImageBufferToCloudinary, input.fetchImage ?? fetchAsBase64);
+    await supabase.from('design_team_variants').update({ status: 'done', image_id: imageId, error: null, ...(check ? { kit_check: check } : {}), updated_at: new Date().toISOString() }).eq('id', jobId);
     return { status: 'done', imageId };
   } catch (err) {
     const message = err instanceof Error ? err.message.slice(0, 500) : 'Unknown error';
@@ -188,12 +193,15 @@ export async function peekTeamVariant(sourceId: string, teamId: string): Promise
   return { status: 'pending' };
 }
 
-async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: RecolourFn, upload: UploadFn, fetchImage: (url: string) => Promise<string>): Promise<string> {
+async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: RecolourFn, upload: UploadFn, fetchImage: (url: string) => Promise<string>): Promise<{ imageId: string; check: KitCheck | null }> {
   const supabase = serviceClient();
   const { data: source } = await supabase.from('image_catalog')
     .select('id, prompt_text, description, marketing_description, cloudinary_public_id, public_url, breed_id, coat_id, theme_id, style_id, format_id, display_tags, is_multi_subject, subjects, generation_parameters, composition_metadata, variation_prompt_template')
     .eq('id', sourceId).maybeSingle();
   if (!source) throw new Error('Design not found');
+  // Separate read: works before the 2026-10-20 migration has added the column
+  const { data: kitRow } = await supabase.from('image_catalog').select('kit_personalisation').eq('id', sourceId).maybeSingle();
+  const kitSettings = (kitRow as any)?.kit_personalisation ?? null;
 
   const cloud = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   const url = source.cloudinary_public_id && cloud
@@ -204,8 +212,14 @@ async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: R
   // Several pets: every one of them changes kit (multi-pet plan phase 1)
   const pets = Math.max(1, Array.isArray(source.subjects) ? source.subjects.length : 0,
     Array.isArray(source.generation_parameters?.subjects) ? source.generation_parameters.subjects.length : 0);
-  const painted = await recolour(base64, recolourFor(team.recolour, pets));
+  // Personalised-kit designs: the whole scene changes team (players and fans), lettering kept
+  const kit = readKit(kitSettings);
+  const sportsTeam = kit?.scene ? teamByPath(team.path) : null;
+  const instruction = sportsTeam ? sceneRecolour(sportsTeam, pets) : recolourFor(team.recolour, pets);
+  const painted = await recolour(base64, instruction, { scene: !!sportsTeam });
   if (!painted) throw new Error('The picture service returned no image');
+  // Lettering and logo check (shown in Admin → Team versions)
+  const check = kit ? await readShirt(painted, 'image/png', { imageId: sourceId }) : null;
 
   const slug = team.path.split('/').slice(1).join('-');
   const filename = `team-${slug}-${sourceId.slice(0, 8)}.png`;
@@ -216,7 +230,8 @@ async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: R
   const { data: saved, error } = await supabase.from('image_catalog').insert({
     filename, original_filename: filename, file_size: uploaded.bytes, mime_type: 'image/png',
     storage_path: `cloudinary:${uploaded.public_id}`, public_url: uploaded.secure_url,
-    prompt_text: `${source.prompt_text || ''}\n\n[Team version] ${team.recolour}`.trim(),
+    prompt_text: `${source.prompt_text || ''}\n\n[Team version] ${instruction}`.trim(),
+    ...(kitSettings ? { kit_personalisation: kitSettings } : {}),
     description: source.description, marketing_description: source.marketing_description,
     tags: [VARIANT_TAG, `team:${team.path}`, UNLISTED_TAG],
     display_tags: source.display_tags ?? [],
@@ -235,7 +250,7 @@ async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: R
   if (petRows?.length) {
     await supabase.from('image_catalog_subjects').insert(petRows.map((r: any) => ({ ...r, image_catalog_id: saved.id, outfit_id: team.outfitId })));
   }
-  return saved.id;
+  return { imageId: saved.id, check: check && kit ? { name: check.name, number: check.number, logos: check.logos, ok: letteringMatches(check, kit.name, kit.number) && !check.logos } : null };
 }
 
 /** The team's recolour instruction, worded for every pet when the design has more than one */

@@ -221,3 +221,57 @@ export function findTeam(query: string): SportsTeam[] {
   return SPORTS_TEAMS.filter(t =>
     [t.name, t.short, t.slug.replace(/-/g, ' '), ...t.nicknames].some(s => s.toLowerCase().replace(/[^a-z0-9& ]/g, '').includes(q)));
 }
+
+// ---------------------------------------------------------------------------------------------
+// Personalised kits (image_catalog.kit_personalisation): designs with a name and number on the
+// pet's shirt, where switching team recolours the whole scene (players and fans too).
+
+/** A team from its collection path, "sports/premier-league/arsenal" */
+export function teamByPath(path: string): SportsTeam | null {
+  const [, league, slug] = path.split('/');
+  return SPORTS_TEAMS.find(t => t.league === league && t.slug === slug) ?? null;
+}
+
+const withArticle = (s: string) => `${/^[aeiou]/i.test(s) ? 'an' : 'a'} ${s}`;
+const NO_MARKS_SCENE = 'No club crests, badges, sponsor names, kit-maker logos or league patches anywhere in the picture: not on the pet, the players or the fans. All fabric is plain apart from colours, stripes and the shirt lettering.';
+
+/**
+ * Team switch for a personalised-kit design: the pet's kit, every player and the crowd change
+ * to the team's colours; the name and number stay exactly as they are, in a contrasting colour.
+ */
+export function sceneRecolour(t: SportsTeam, pets = 1): string {
+  const colours = colourList(t);
+  const sport = LEAGUES[t.league].sport;
+  const whose = pets > 1 ? `There are ${pets} pets: each pet's` : `The pet's`;
+  return [
+    `Recolour this whole ${sport} scene to ${t.short} colours (${colours}).`,
+    `${whose} ${t.league === 'premier-league' ? 'shirt' : 'kit'} becomes ${withArticle(t.kit.replace(/^(an?|the)\s+/i, ''))}, keeping the same cut, collar, folds and fit${pets > 1 ? ', all in the same kit' : ''}; a scarf, if there is one, takes ${colours} bar stripes.`,
+    `Every player in the picture wears the same ${t.short} kit. Fans in the crowd wear ${t.short} shirts and scarves in ${colours}; flags and banners are in ${colours} too.`,
+    `Keep any name and number on the pet's shirt exactly as they are (same letters, digits, font, size and position), recoloured to a colour from ${colours} that stands out clearly against the new shirt.`,
+    `Keep every animal exactly as it is (breed, face, fur, markings, expression, pose and place in the picture), and keep the stadium, lighting, composition and painting style unchanged. Change only the colours of clothing, scarves and flags.`,
+    NO_MARKS_SCENE,
+  ].join(' ');
+}
+
+/** Shirt lettering rules: capitals, letters/space/hyphen/apostrophe, up to 12; number 0–99 or none */
+export function cleanKitName(raw: unknown): string | null {
+  const s = String(raw ?? '').toUpperCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
+  return /^[A-Z](?:[A-Z '\-]{0,10}[A-Z])?$/.test(s) ? s : null;
+}
+export function cleanKitNumber(raw: unknown): number | null | undefined {
+  if (raw === null || raw === undefined || raw === '') return null;   // no number
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 && n <= 99 ? n : undefined;     // undefined = invalid
+}
+
+/** Replace the lettering on the pet's shirt with this name (and number) */
+export function kitLettering(name: string, num: number | null, opts: { keepRest?: boolean } = {}): string {
+  const reads = num === null ? `"${name}" with no number` : `"${name}" above the number "${num}"`;
+  return [
+    `Change the lettering on the back of the pet's shirt so it reads exactly ${reads}.`,
+    `Use the same style as the existing lettering: bold block capitals in the same colour and finish, painted into the fabric so it follows the folds and the brushwork, the name centred across the shoulders${num === null ? '' : ' with the number large below it'}.`,
+    `Spell it exactly ${name.split('').map(ch => (ch === ' ' ? '(space)' : ch)).join('-')}, with no extra or missing letters${num === null ? '' : `, and the number exactly ${num}`}.`,
+    opts.keepRest === false ? '' : 'Change nothing else: same animal, shirt colours, background, lighting and painting style.',
+    NO_MARKS_SCENE,
+  ].filter(Boolean).join(' ');
+}

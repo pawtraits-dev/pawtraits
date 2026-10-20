@@ -695,8 +695,18 @@ export class AdminSupabaseService {
     return adminRequest<{ ok: true }>(`/api/admin/collections/team-versions/${id}`, jsonInit('PATCH', { team_switch: teamSwitch }));
   }
 
-  async makeTeamVersion(id: string, team: string): Promise<AdminResult<{ status: string; imageId?: string; error?: string }>> {
-    return adminRequest<{ status: string; imageId?: string; error?: string }>(`/api/admin/collections/team-versions/${id}`, jsonInit('POST', { team }));
+  async makeTeamVersion(id: string, team: string, redo = false): Promise<AdminResult<{ status: string; imageId?: string; error?: string }>> {
+    return adminRequest<{ status: string; imageId?: string; error?: string }>(`/api/admin/collections/team-versions/${id}`, jsonInit('POST', { team, ...(redo ? { redo: true } : {}) }));
+  }
+
+  /** Personalised kit settings for a sports design (null turns it off) */
+  async setKitPersonalisation(id: string, kit: { name: string; number: number | null; scene: boolean } | null): Promise<AdminResult<{ ok: true }>> {
+    return adminRequest<{ ok: true }>(`/api/admin/collections/team-versions/${id}`, jsonInit('PATCH', { kit_personalisation: kit }));
+  }
+
+  /** Paint a name and number onto the design (or a team's version) and read it back */
+  async testKitLettering(id: string, name: string, number: number | null, team?: string | null): Promise<AdminResult<{ test: any }>> {
+    return adminRequest<{ test: any }>(`/api/admin/collections/team-versions/${id}/lettering`, jsonInit('POST', { name, number, team: team || undefined }));
   }
 
   // ===== SOCIAL LOOP (Admin → Social) =====

@@ -16,6 +16,8 @@ export const FEATURES: Record<string, string> = {
   'photo-check': 'Social photo check',
   'pet-count': 'Pet count check',
   'pet-breed': 'Pet breed detection',
+  'kit-lettering': 'Shirt name & number',
+  'kit-check': 'Shirt lettering check',
   description: 'Descriptions',
   'composition-analysis': 'Composition analysis',
   'theme-from-image': 'Theme from image',

@@ -8,12 +8,15 @@
  * Data: /api/admin/collections/team-versions* via AdminSupabaseService.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronRight, RefreshCw, Shirt, Sparkles } from 'lucide-react';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 
 interface Row { id: string; title: string; thumb: string; home: { path: string; name: string; isTeam: boolean }; league: string; scope: 'league' | 'any' | 'off'; offered: number; made: number; failed: number; isPublic: boolean }
-interface Team { path: string; name: string; short: string; colours: { name: string; hex: string }[]; status: 'ready' | 'running' | 'failed' | 'none'; imageId: string | null; thumb: string | null; error: string | null }
-interface Detail { scope: string; home: string | null; groups: { league: string; name: string; teams: Team[] }[] }
+interface Team { path: string; name: string; short: string; colours: { name: string; hex: string }[]; status: 'ready' | 'running' | 'failed' | 'none'; imageId: string | null; thumb: string | null; error: string | null; check: KitCheck | null }
+interface KitCheck { name: string | null; number: number | null; logos: boolean; ok: boolean }
+interface Kit { name: string; number: number | null; scene: boolean }
+interface KitTest { id?: string; design_id: string; kit_name: string; kit_number: number | null; image_url: string | null; thumb?: string | null; read_name: string | null; read_number: number | null; logos: boolean | null; matches: boolean | null; error: string | null; duration_ms: number | null; created_at?: string }
+interface Detail { scope: string; home: string | null; sourceId: string; kit: Kit | null; tests: KitTest[]; groups: { league: string; name: string; teams: Team[] }[] }
 
 const STATUS: Record<Team['status'], { label: string; cls: string }> = {
   ready: { label: 'Ready', cls: 'border-green-300 bg-green-50' },
@@ -37,9 +40,9 @@ function DesignRow({ row, onChanged }: { row: Row; onChanged: () => void }) {
   }, [row.id]);
   useEffect(() => { if (open) load(); }, [open, load]);
 
-  const make = async (t: Team) => {
+  const make = async (t: Team, redo = false) => {
     setBusy(t.path); setError(null);
-    const r = await svc().makeTeamVersion(row.id, t.path);
+    const r = await svc().makeTeamVersion(row.id, t.path, redo);
     setBusy(null);
     if (!r.ok) setError(r.error);
     else if (r.data.status === 'failed') setError(`${t.short}: ${r.data.error || 'failed'}`);
@@ -100,6 +103,7 @@ function DesignRow({ row, onChanged }: { row: Row; onChanged: () => void }) {
           {detail && detail.groups.length === 0 && <p className="text-sm text-gray-600">Team switching is off for this design.</p>}
           {detail && detail.groups.length > 0 && (
             <>
+              <KitPanel rowId={row.id} detail={detail} reload={load} />
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 {missing > 0 && !busy && (
                   <button onClick={makeAll} className="flex items-center gap-1 rounded bg-purple-600 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-700">
@@ -123,6 +127,17 @@ function DesignRow({ row, onChanged }: { row: Row; onChanged: () => void }) {
                         </div>
                         <p className="mt-1 truncate text-xs font-semibold text-gray-900" title={t.name}>{t.short}{t.path === detail.home ? ' (original)' : ''}</p>
                         <p className="text-[11px] text-gray-700" title={t.error ?? undefined}>{busy === t.path ? 'Painting…' : STATUS[t.status].label}</p>
+                        {t.check && busy !== t.path && (
+                          <p className={`flex items-center gap-0.5 text-[11px] ${t.check.ok ? 'text-green-700' : 'text-red-700'}`} title="What the shirt reads (checked automatically)">
+                            {t.check.ok ? <Check className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                            {t.check.ok ? `${t.check.name ?? ''} ${t.check.number ?? ''}` : `reads ${t.check.name ?? '?'} ${t.check.number ?? ''}${t.check.logos ? ' · logo' : ''}`}
+                          </p>
+                        )}
+                        {t.status === 'ready' && t.path !== detail.home && !busy && (
+                          <button onClick={() => make(t, true)} className="mt-1 flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-purple-700 hover:underline">
+                            <RefreshCw className="h-3 w-3" /> Redo
+                          </button>
+                        )}
                         {(t.status === 'none' || t.status === 'failed') && !busy && (
                           <button onClick={() => make(t)} className="mt-1 flex items-center gap-1 text-xs font-medium text-purple-700 hover:underline">
                             <RefreshCw className="h-3 w-3" /> {t.status === 'failed' ? 'Try again' : 'Make'}
@@ -140,6 +155,117 @@ function DesignRow({ row, onChanged }: { row: Row; onChanged: () => void }) {
         </div>
       )}
     </li>
+  );
+}
+
+/** Personalised kit: name and number on the pet's shirt, whole-scene team switch, lettering tests */
+function KitPanel({ rowId, detail, reload }: { rowId: string; detail: Detail; reload: () => Promise<void> | void }) {
+  const kit = detail.kit;
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ name: kit?.name ?? '', number: kit?.number?.toString() ?? '', scene: kit?.scene ?? true });
+  const [test, setTest] = useState({ name: 'MAX', number: '4', team: '' });
+  const [running, setRunning] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const svc = () => new AdminSupabaseService();
+  const ready = detail.groups.flatMap(g => g.teams).filter(t => t.status === 'ready' && t.path !== detail.home);
+  const num = (v: string) => (v.trim() === '' ? null : Number(v));
+
+  const save = async (off = false) => {
+    setMsg(null);
+    const r = await svc().setKitPersonalisation(rowId, off ? null : { name: form.name, number: num(form.number), scene: form.scene });
+    if (!r.ok) { setMsg(r.error); return; }
+    setEditing(false);
+    await reload();
+  };
+
+  const runTests = async (list: { name: string; number: number | null }[], team: string) => {
+    setMsg(null);
+    for (let i = 0; i < list.length; i++) {
+      const t = list[i];
+      setRunning(`Painting ${t.name}${t.number === null ? '' : ` ${t.number}`}${list.length > 1 ? ` (${i + 1} of ${list.length})` : ''}… about a minute`);
+      const r = await svc().testKitLettering(rowId, t.name, t.number, team || null);
+      if (!r.ok) setMsg(r.error);
+      await reload();
+    }
+    setRunning(null);
+  };
+
+  return (
+    <div className="mb-4 rounded-lg border border-purple-100 bg-purple-50/40 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Shirt className="h-4 w-4 text-purple-700" />
+        <p className="text-sm font-semibold text-gray-900">Personalised kit</p>
+        {kit && !editing && (
+          <>
+            <span className="text-sm text-gray-700">Shirt reads <strong>{kit.name}{kit.number === null ? '' : ` ${kit.number}`}</strong> · {kit.scene ? 'team switch recolours players and fans too' : 'team switch recolours the pet only'}</span>
+            <button onClick={() => { setForm({ name: kit.name, number: kit.number?.toString() ?? '', scene: kit.scene }); setEditing(true); }} className="text-sm text-purple-700 hover:underline">Edit</button>
+            <button onClick={() => save(true)} className="text-sm text-gray-500 hover:underline">Turn off</button>
+          </>
+        )}
+        {!kit && !editing && (
+          <button onClick={() => setEditing(true)} className="text-sm text-purple-700 hover:underline">The pet&apos;s shirt has a name and number: set it up</button>
+        )}
+      </div>
+
+      {editing && (
+        <div className="mt-2 flex flex-wrap items-end gap-3 text-sm">
+          <label className="block">Name on the design
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value.toUpperCase() }))} maxLength={12} className="mt-0.5 block w-36 rounded border border-gray-300 px-2 py-1 uppercase" />
+          </label>
+          <label className="block">Number
+            <input value={form.number} onChange={e => setForm(f => ({ ...f, number: e.target.value.replace(/\D/g, '').slice(0, 2) }))} inputMode="numeric" className="mt-0.5 block w-16 rounded border border-gray-300 px-2 py-1" />
+          </label>
+          <label className="flex items-center gap-2 pb-1">
+            <input type="checkbox" checked={form.scene} onChange={e => setForm(f => ({ ...f, scene: e.target.checked }))} />
+            Team switch recolours the players and fans too
+          </label>
+          <button onClick={() => save()} className="rounded bg-purple-600 px-3 py-1.5 font-semibold text-white hover:bg-purple-700">Save</button>
+          <button onClick={() => setEditing(false)} className="rounded border border-gray-300 px-3 py-1.5">Cancel</button>
+          <p className="basis-full text-xs text-gray-600">Team versions made before this was set up used the pet-only recolour: use Redo on them.</p>
+        </div>
+      )}
+
+      {kit && (
+        <div className="mt-3 border-t border-purple-100 pt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Lettering tests</p>
+          <p className="text-xs text-gray-600">Paints another name and number onto the design (or a team version) and reads the shirt back to check the spelling. About a minute and ~13p each.</p>
+          <div className="mt-2 flex flex-wrap items-end gap-2 text-sm">
+            <input value={test.name} onChange={e => setTest(t => ({ ...t, name: e.target.value.toUpperCase() }))} maxLength={12} aria-label="Test name" className="w-36 rounded border border-gray-300 px-2 py-1 uppercase" />
+            <input value={test.number} onChange={e => setTest(t => ({ ...t, number: e.target.value.replace(/\D/g, '').slice(0, 2) }))} aria-label="Test number" placeholder="No." className="w-16 rounded border border-gray-300 px-2 py-1" />
+            <select value={test.team} onChange={e => setTest(t => ({ ...t, team: e.target.value }))} aria-label="Paint on" className="rounded border border-gray-300 px-2 py-1">
+              <option value="">On the original</option>
+              {ready.map(t => <option key={t.path} value={t.path}>On the {t.short} version</option>)}
+            </select>
+            <button disabled={!!running} onClick={() => runTests([{ name: test.name, number: num(test.number) }], test.team)} className="rounded bg-purple-600 px-3 py-1.5 font-semibold text-white hover:bg-purple-700 disabled:opacity-50">Paint test</button>
+            <button disabled={!!running} onClick={() => runTests([{ name: 'MAX', number: 4 }, { name: 'BISCUIT', number: 10 }, { name: 'WELLINGTON', number: 99 }], test.team)} className="rounded border border-purple-300 px-3 py-1.5 font-medium text-purple-800 hover:bg-purple-50 disabled:opacity-50">Run the 3 standard tests</button>
+          </div>
+          {running && <p role="status" className="mt-2 text-sm text-gray-800">{running}</p>}
+          {detail.tests.length > 0 && (
+            <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+              {detail.tests.map((t, i) => (
+                <li key={t.id ?? i} className={`rounded-lg border p-2 ${t.error ? 'border-red-200 bg-red-50' : t.matches ? 'border-green-200 bg-white' : 'border-amber-300 bg-amber-50'}`}>
+                  {t.image_url ? (
+                    <a href={t.image_url} target="_blank" rel="noreferrer" className="block aspect-[4/5] overflow-hidden rounded bg-gray-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={t.thumb ?? t.image_url} alt={`${t.kit_name} test`} className="h-full w-full object-cover" loading="lazy" />
+                    </a>
+                  ) : <div className="flex aspect-[4/5] items-center justify-center rounded bg-gray-100 text-xs text-red-700">Failed</div>}
+                  <p className="mt-1 text-xs font-semibold text-gray-900">{t.kit_name}{t.kit_number === null ? '' : ` ${t.kit_number}`}{t.design_id !== detail.sourceId ? <span className="font-normal text-gray-500"> · team version</span> : null}</p>
+                  {t.error
+                    ? <p className="text-[11px] text-red-700" title={t.error}>{t.error.slice(0, 60)}</p>
+                    : <p className={`flex items-center gap-0.5 text-[11px] ${t.matches ? 'text-green-700' : 'text-amber-800'}`}>
+                        {t.matches ? <Check className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                        reads {t.read_name ?? '?'}{t.read_number === null ? '' : ` ${t.read_number}`}{t.logos ? ' · logo seen' : ''}
+                      </p>}
+                </li>
+              ))}
+            </ul>
+          )}
+          {msg && <p role="alert" className="mt-2 text-sm text-red-700">{msg}</p>}
+        </div>
+      )}
+      {!kit && msg && <p role="alert" className="mt-2 text-sm text-red-700">{msg}</p>}
+    </div>
   );
 }
 

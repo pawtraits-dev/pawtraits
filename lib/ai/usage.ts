@@ -29,6 +29,8 @@ export type AiFeature =
   | 'auto-tag'
   | 'photo-check'
   | 'pet-count'
+  | 'kit-lettering'         // name + number on a personalised football shirt (Gemini edit)
+  | 'kit-check'             // reading the shirt lettering back (Claude Haiku)
   | 'pet-breed'             // breed of an uploaded pet photo (customisation analytics)
   | 'description'
   | 'composition-analysis'
