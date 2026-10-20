@@ -704,8 +704,18 @@ export class AdminSupabaseService {
     return adminRequest<{ ok: true; description?: string }>(`/api/admin/collections/team-versions/${id}`, jsonInit('POST', { team, action, description }));
   }
 
+  /** Team mottos (Premier League teams): the admin's wording and the default */
+  async getTeamMottos(): Promise<AdminResult<{ teams: { path: string; name: string; motto: string | null; default: string | null }[] }>> {
+    return adminRequest(`/api/admin/collections/team-mottos`);
+  }
+
+  /** Save a team's motto (null goes back to the default) */
+  async setTeamMotto(path: string, motto: string | null): Promise<AdminResult<{ ok: true; motto: string | null }>> {
+    return adminRequest(`/api/admin/collections/team-mottos`, jsonInit('PATCH', { path, motto }));
+  }
+
   /** Personalised kit settings for a sports design (null turns it off) */
-  async setKitPersonalisation(id: string, kit: { name: string; number: number | null; scene: boolean } | null): Promise<AdminResult<{ ok: true }>> {
+  async setKitPersonalisation(id: string, kit: { name: string; number: number | null; scene: boolean; slogan?: boolean } | null): Promise<AdminResult<{ ok: true }>> {
     return adminRequest<{ ok: true }>(`/api/admin/collections/team-versions/${id}`, jsonInit('PATCH', { kit_personalisation: kit }));
   }
 

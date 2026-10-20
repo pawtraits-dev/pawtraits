@@ -842,7 +842,7 @@ export class CloudinaryImageService {
   /**
    * Get public variant URL by type with security (signed URLs)
    */
-  getPublicVariantUrl(publicId: string, variant: 'full_size' | 'thumbnail' | 'mid_size' | 'purchased' | 'catalog_watermarked', opts: { width?: number; format?: string } = {}): string {
+  getPublicVariantUrl(publicId: string, variant: 'full_size' | 'thumbnail' | 'mid_size' | 'purchased' | 'catalog_watermarked', opts: { width?: number; format?: string; overlay?: string } = {}): string {
     try {
       ensureCloudinaryConfig();
       
@@ -866,6 +866,7 @@ export class CloudinaryImageService {
             ...baseConfig,
             transformation: [
               { width: 800, crop: 'limit' }, // Maintain aspect ratio, don't crop
+              ...(opts.overlay ? [{ raw_transformation: opts.overlay }] : []), // e.g. a team motto (lib/collections/slogan.ts)
               { raw_transformation: watermarkTiles() }, // small paws repeated over the picture
               // a fixed format makes one file (f_auto makes one per browser type)
               { quality: 'auto', fetch_format: opts.format || 'auto' },
@@ -878,6 +879,7 @@ export class CloudinaryImageService {
             ...baseConfig,
             transformation: [
               { width: 1200, crop: 'limit' }, // Maintain aspect ratio, don't crop
+              ...(opts.overlay ? [{ raw_transformation: opts.overlay }] : []), // e.g. a team motto (lib/collections/slogan.ts)
               { raw_transformation: watermarkTiles() }, // small paws repeated over the picture
               { quality: 'auto', fetch_format: 'auto' },
             ],

@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 import { loadSlots, subjectsOf } from '@/lib/catalog/slots-server';
 import { readKit } from '@/lib/collections/kit-lettering';
+import { designMotto } from '@/lib/collections/slogan-server';
+import { sloganLayer } from '@/lib/collections/slogan';
 
 // Use service role client to bypass RLS for public catalog data
 const supabaseServiceRole = createClient(
@@ -119,13 +121,18 @@ export async function GET(
     // designs only). Separate read so the page still works before the 2026-10-20 migration.
     const { data: kitRow } = await supabaseServiceRole.from('image_catalog').select('kit_personalisation').eq('id', catalogImage.id).maybeSingle();
     const kit = !isMultiSubject ? readKit((kitRow as any)?.kit_personalisation) : null;
+    // Team motto as big text on the right (designs with "Show the team motto" ticked)
+    const motto = kit?.slogan ? await designMotto(supabaseServiceRole as any, catalogImage.id).catch(() => null) : null;
+    const displayUrl = motto && catalogImage.cloudinary_public_id
+      ? cloudinaryService.getPublicVariantUrl(catalogImage.cloudinary_public_id, 'full_size', { overlay: sloganLayer(motto) })
+      : imageUrl;
 
     // Format response
     const response = {
-      kit: kit ? { name: kit.name, number: kit.number } : null,
+      kit: kit ? { name: kit.name, number: kit.number, motto } : null,
       id: catalogImage.id,
       cloudinaryPublicId: catalogImage.cloudinary_public_id,
-      imageUrl,
+      imageUrl: displayUrl,
       thumbnailUrl,
       prompt: catalogImage.prompt_text,
       description: catalogImage.description,

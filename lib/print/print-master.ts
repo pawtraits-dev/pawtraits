@@ -85,8 +85,11 @@ export async function ensurePrintMaster(supabase: SupabaseClient, customImageId:
   try {
     const { cloudinaryService } = await import('@/lib/cloudinary');
     const cloudinary = (await import('cloudinary')).v2;
-    const sourceUrl = custom.generated_cloudinary_id
-      ? cloudinary.url(custom.generated_cloudinary_id, { secure: true, type: 'upload', format: 'png', sign_url: false })
+    // A painting with a slogan drawn on: re-render the clean painting, then draw the slogan again
+    const slogan: string | null = custom.generation_metadata?.slogan && custom.generation_metadata?.clean_cloudinary_id ? custom.generation_metadata.slogan : null;
+    const sourceId: string | null = slogan ? custom.generation_metadata.clean_cloudinary_id : custom.generated_cloudinary_id;
+    const sourceUrl = sourceId
+      ? cloudinary.url(sourceId, { secure: true, type: 'upload', format: 'png', sign_url: false })
       : custom.generation_metadata?.full_size_url;
     if (!sourceUrl) throw new Error('No unwatermarked preview to re-render');
     const sourceBase64 = await fetchAsBase64(sourceUrl);
@@ -97,7 +100,12 @@ export async function ensurePrintMaster(supabase: SupabaseClient, customImageId:
     const started = Date.now();
     const imageData = await renderPrintMaster(ai, sourceBase64, { feature: 'print-master', customerImageId: customImageId });
 
-    const uploaded = await cloudinaryService.uploadPrintMaster(imageData, `master-${customImageId}`);
+    let uploaded = await cloudinaryService.uploadPrintMaster(imageData, `master-${customImageId}`);
+    if (slogan) {
+      const { bakeSlogan } = await import('@/lib/collections/slogan-server');
+      const baked = await bakeSlogan(uploaded.publicId, slogan, 'print-masters');
+      uploaded = { ...uploaded, publicId: baked.public_id, width: baked.width, height: baked.height };
+    }
     console.log(`🖼️ 4K print master for ${customImageId}: ${uploaded.width}×${uploaded.height} in ${((Date.now() - started) / 1000).toFixed(1)}s`);
 
     await setStatus({

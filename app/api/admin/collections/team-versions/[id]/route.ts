@@ -69,7 +69,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const number = cleanKitNumber(k.number);
       if (!name) return NextResponse.json({ error: 'Name: capital letters, spaces, hyphens or apostrophes, up to 12' }, { status: 400 });
       if (number === undefined) return NextResponse.json({ error: 'Number: 0 to 99, or leave it empty' }, { status: 400 });
-      value = { name, number, scene: k.scene !== false };
+      value = { name, number, scene: k.scene !== false, slogan: k.slogan === true };
     }
     const { error } = await serviceClient().from('image_catalog').update({ kit_personalisation: value }).eq('id', id);
     if (error) return NextResponse.json({ error: error.message.includes('kit_personalisation') ? 'Run the 2026-10-20-personalised-kits migration first' : 'Could not save' }, { status: 500 });

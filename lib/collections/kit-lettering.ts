@@ -15,12 +15,13 @@ export interface KitPersonalisation {
   name: string;            // sample lettering on the design, e.g. "DAISY"
   number: number | null;   // e.g. 7
   scene: boolean;          // team switch recolours players and fans too
+  slogan: boolean;         // show the team motto (or the customer's slogan) as big text on the right
 }
 
 /** image_catalog.kit_personalisation → settings, or null when the design has none */
 export function readKit(v: any): KitPersonalisation | null {
   if (!v || typeof v !== 'object' || !v.name) return null;
-  return { name: String(v.name), number: Number.isInteger(v.number) ? v.number : null, scene: v.scene !== false };
+  return { name: String(v.name), number: Number.isInteger(v.number) ? v.number : null, scene: v.scene !== false, slogan: v.slogan === true };
 }
 
 /** Gemini edit: the same picture with new shirt lettering. Returns PNG base64. */

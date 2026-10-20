@@ -14,7 +14,7 @@ import { AdminSupabaseService } from '@/lib/admin-supabase';
 interface Row { id: string; title: string; thumb: string; home: { path: string; name: string; isTeam: boolean }; league: string; scope: 'league' | 'any' | 'off'; offered: number; made: number; failed: number; isPublic: boolean }
 interface Team { path: string; name: string; short: string; colours: { name: string; hex: string }[]; status: 'ready' | 'running' | 'failed' | 'none'; imageId: string | null; thumb: string | null; error: string | null; check: KitCheck | null; description: string | null; published: boolean }
 interface KitCheck { name: string | null; number: number | null; logos: boolean; ok: boolean }
-interface Kit { name: string; number: number | null; scene: boolean }
+interface Kit { name: string; number: number | null; scene: boolean; slogan?: boolean }
 interface KitTest { id?: string; design_id: string; kit_name: string; kit_number: number | null; image_url: string | null; thumb?: string | null; read_name: string | null; read_number: number | null; logos: boolean | null; matches: boolean | null; error: string | null; duration_ms: number | null; created_at?: string }
 interface Detail { scope: string; home: string | null; sourceId: string; kit: Kit | null; tests: KitTest[]; groups: { league: string; name: string; teams: Team[] }[] }
 
@@ -226,7 +226,7 @@ function DesignRow({ row, onChanged }: { row: Row; onChanged: () => void }) {
 function KitPanel({ rowId, detail, reload }: { rowId: string; detail: Detail; reload: () => Promise<void> | void }) {
   const kit = detail.kit;
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ name: kit?.name ?? '', number: kit?.number?.toString() ?? '', scene: kit?.scene ?? true });
+  const [form, setForm] = useState({ name: kit?.name ?? '', number: kit?.number?.toString() ?? '', scene: kit?.scene ?? true, slogan: kit?.slogan ?? false });
   const [test, setTest] = useState({ name: 'MAX', number: '4', team: '' });
   const [running, setRunning] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -236,7 +236,7 @@ function KitPanel({ rowId, detail, reload }: { rowId: string; detail: Detail; re
 
   const save = async (off = false) => {
     setMsg(null);
-    const r = await svc().setKitPersonalisation(rowId, off ? null : { name: form.name, number: num(form.number), scene: form.scene });
+    const r = await svc().setKitPersonalisation(rowId, off ? null : { name: form.name, number: num(form.number), scene: form.scene, slogan: form.slogan });
     if (!r.ok) { setMsg(r.error); return; }
     setEditing(false);
     await reload();
@@ -261,8 +261,8 @@ function KitPanel({ rowId, detail, reload }: { rowId: string; detail: Detail; re
         <p className="text-sm font-semibold text-gray-900">Personalised kit</p>
         {kit && !editing && (
           <>
-            <span className="text-sm text-gray-700">Shirt reads <strong>{kit.name}{kit.number === null ? '' : ` ${kit.number}`}</strong> · {kit.scene ? 'team switch recolours players and fans too' : 'team switch recolours the pet only'}</span>
-            <button onClick={() => { setForm({ name: kit.name, number: kit.number?.toString() ?? '', scene: kit.scene }); setEditing(true); }} className="text-sm text-purple-700 hover:underline">Edit</button>
+            <span className="text-sm text-gray-700">Shirt reads <strong>{kit.name}{kit.number === null ? '' : ` ${kit.number}`}</strong> · {kit.scene ? 'team switch recolours players and fans too' : 'team switch recolours the pet only'}{kit.slogan ? ' · shows the team motto' : ''}</span>
+            <button onClick={() => { setForm({ name: kit.name, number: kit.number?.toString() ?? '', scene: kit.scene, slogan: !!kit.slogan }); setEditing(true); }} className="text-sm text-purple-700 hover:underline">Edit</button>
             <button onClick={() => save(true)} className="text-sm text-gray-500 hover:underline">Turn off</button>
           </>
         )}
@@ -282,6 +282,10 @@ function KitPanel({ rowId, detail, reload }: { rowId: string; detail: Detail; re
           <label className="flex items-center gap-2 pb-1">
             <input type="checkbox" checked={form.scene} onChange={e => setForm(f => ({ ...f, scene: e.target.checked }))} />
             Team switch recolours the players and fans too
+          </label>
+          <label className="flex items-center gap-2 pb-1">
+            <input type="checkbox" checked={form.slogan} onChange={e => setForm(f => ({ ...f, slogan: e.target.checked }))} />
+            Show the team motto as big text on the right (customers can write their own)
           </label>
           <button onClick={() => save()} className="rounded bg-purple-600 px-3 py-1.5 font-semibold text-white hover:bg-purple-700">Save</button>
           <button onClick={() => setEditing(false)} className="rounded border border-gray-300 px-3 py-1.5">Cancel</button>
@@ -333,6 +337,63 @@ function KitPanel({ rowId, detail, reload }: { rowId: string; detail: Detail; re
   );
 }
 
+/** The big text on personalised-kit designs: each team's motto, editable */
+function TeamMottos() {
+  const [open, setOpen] = useState(false);
+  const [teams, setTeams] = useState<{ path: string; name: string; motto: string | null; default: string | null }[] | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [saved, setSaved] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open || teams) return;
+    new AdminSupabaseService().getTeamMottos().then(r => {
+      if (!r.ok) { setErr(r.error); return; }
+      setTeams(r.data.teams);
+      setDrafts(Object.fromEntries(r.data.teams.map(t => [t.path, t.motto ?? t.default ?? ''])));
+    });
+  }, [open, teams]);
+  const save = async (path: string, value: string | null) => {
+    setErr(null); setSaved(null);
+    const r = await new AdminSupabaseService().setTeamMotto(path, value);
+    if (!r.ok) { setErr(r.error); return; }
+    const t = teams?.find(x => x.path === path);
+    setTeams(ts => ts?.map(x => (x.path === path ? { ...x, motto: r.data.motto } : x)) ?? null);
+    setDrafts(d => ({ ...d, [path]: r.data.motto ?? t?.default ?? '' }));
+    setSaved(path);
+  };
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
+      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-1 font-semibold text-gray-900">
+        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />} Team mottos
+      </button>
+      <p className="mt-1 text-gray-600">The big words on the right of personalised-kit designs (when “Show the team motto” is ticked). Press Enter for a new line. Up to 32 characters.</p>
+      {open && !teams && !err && <p className="mt-2 text-gray-600">Loading…</p>}
+      {open && teams && (
+        <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {teams.map(t => {
+            const value = drafts[t.path] ?? '';
+            const changed = value !== (t.motto ?? t.default ?? '');
+            return (
+              <li key={t.path} className="rounded border border-gray-200 p-2">
+                <p className="text-xs font-semibold text-gray-900">{t.name}</p>
+                <textarea value={value} rows={3} onChange={e => setDrafts(d => ({ ...d, [t.path]: e.target.value.toUpperCase() }))}
+                  className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-semibold uppercase leading-tight" aria-label={`${t.name} motto`} />
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                  {changed && <button onClick={() => save(t.path, value)} className="rounded bg-purple-600 px-2 py-1 font-semibold text-white">Save</button>}
+                  {t.motto && t.default && t.motto !== t.default && <button onClick={() => save(t.path, null)} className="text-gray-600 hover:underline">Back to default</button>}
+                  {saved === t.path && !changed && <span className="text-green-700">Saved</span>}
+                  {!t.motto && !t.default && <span className="text-gray-500">No motto yet</span>}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {err && <p role="alert" className="mt-2 text-red-700">{err}</p>}
+    </div>
+  );
+}
+
 export default function TeamVersionsTab() {
   const [q, setQ] = useState('');
   const [page, setPage] = useState(0);
@@ -372,6 +433,7 @@ export default function TeamVersionsTab() {
           <span className="text-gray-600">(ready ones are unlimited; 0 = only ready ones)</span>
         </label>
       </div>
+      <TeamMottos />
       <input type="search" value={q} onChange={e => { setQ(e.target.value); setPage(0); }} placeholder="Find a design or team" aria-label="Find a sports design" className="rounded border border-gray-300 px-3 py-1.5 text-sm" />
       {error && <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
       {!data && !error && <p className="text-sm text-gray-700">Loading…</p>}

@@ -317,3 +317,38 @@ export function kitLettering(name: string, num: number | null, opts: { keepRest?
     NO_MARKS_SCENE,
   ].filter(Boolean).join(' ');
 }
+
+/**
+ * Default team mottos for personalised-kit designs: puns on each club's motto, chant or song,
+ * shown as big block text on the right of the picture. Admin can override any of them
+ * (collections.metadata.motto, Admin → Collections → Team versions → Team mottos).
+ * A line break forces a new line; otherwise the text wraps by itself.
+ */
+export const DEFAULT_MOTTOS: Record<string, string> = {
+  'tottenham-hotspur': 'TO WOOF\nIS TO DO',
+  chelsea: 'BLUE IS\nTHE COLLAR',
+  arsenal: 'NORTH LONDON\nFUR EVER',
+  liverpool: "YOU'LL NEVER\nWOOF ALONE",
+  'manchester-city': 'HOWL AT THE\nBLUE MOON',
+  'manchester-united': 'THEATRE\nOF TREATS',
+  'newcastle-united': 'HOWL-AY\nTHE LADS',
+  sunderland: "HA'WOOF\nTHE LADS",
+  'aston-villa': 'PREPARED\nFOR WALKIES',
+  everton: 'NOTHING BUT\nTHE BEST\nBISCUITS',
+  brighton: 'CHASING\nSEAGULLS\nSINCE 1901',
+  'crystal-palace': 'WAG\nALL OVER',
+  fulham: 'COME ON\nYOU WOOFS',
+  bournemouth: 'LIFE IS A\nBOWL OF\nCHERRIES',
+  brentford: 'BEE-HAVE\nYOURSELF',
+  'coventry-city': 'PLAY FETCH,\nSKY BLUES',
+  'hull-city': 'PART TIGER,\nMOSTLY DOG',
+  'ipswich-town': 'TRACTOR\nDOG',
+  'leeds-united': 'WALKING ON\nTOGETHER',
+  'nottingham-forest': 'ROBIN\nHOUND',
+};
+
+/** A team's default motto from its collection path ("sports/premier-league/arsenal"), or null */
+export function defaultMotto(path: string): string | null {
+  const t = teamByPath(path);
+  return t ? DEFAULT_MOTTOS[t.slug] ?? null : null;
+}

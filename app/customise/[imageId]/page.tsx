@@ -30,6 +30,7 @@ import MoreLikeThis from '@/components/customise/MoreLikeThis';
 import DesignChips, { useDesignCollections } from '@/components/customise/DesignChips';
 import TeamPicker from '@/components/customise/TeamPicker';
 import { cleanKitName } from '@/lib/collections/sports-teams';
+import { cleanSlogan, SLOGAN_MAX } from '@/lib/collections/slogan';
 import DesignQuizLink from '@/components/quiz/DesignQuizLink';
 import { collectionHref } from '@/lib/collections/href';
 
@@ -52,7 +53,7 @@ interface CatalogImage {
   isMultiSubject?: boolean;
   subjectCount?: number;
   /** Personalised football kit: the customer chooses the name and number on the shirt */
-  kit?: { name: string; number: number | null } | null;
+  kit?: { name: string; number: number | null; motto?: string | null } | null;
   /** One per pet in the picture, left to right: photo N replaces slot N (multi-pet plan phase 2) */
   slots?: { label: string; breedName: string | null; animalType: 'dog' | 'cat' | null; pose: string | null }[];
 }
@@ -135,6 +136,8 @@ export default function CustomisePage() {
   // Personalised kit: name and number on the shirt
   const [kitName, setKitName] = useState('');
   const [kitNumber, setKitNumber] = useState('');
+  const [slogan, setSlogan] = useState('');            // big text on the right; starts as the team motto
+  const [sloganTouched, setSloganTouched] = useState(false);
   const [subjects, setSubjects] = useState<Array<{ pet: Pet | null; file: File | null; preview: string | null; warning?: string | null }>>([{ pet: null, file: null, preview: null }]);
   const [preparing, setPreparing] = useState(false);
   const [customImage, setCustomImage] = useState<CustomImage | null>(null);
@@ -177,6 +180,7 @@ export default function CustomisePage() {
         const data: CatalogImage = await res.json();
         setCatalogImage(data);
         if (data.kit) setKitNumber(data.kit.number === null || data.kit.number === undefined ? '' : String(data.kit.number));
+        if (data.kit?.motto) setSlogan(String(data.kit.motto).replace(/\n/g, ' '));
         const n = data.subjectCount || 1;
         setSubjects(Array.from({ length: n }, () => ({ pet: null, file: null, preview: null })));
         track.viewCustomise({ id: data.id, name: data.description?.slice(0, 80), category: data.theme?.name }, qs.get('src') || undefined);
@@ -257,7 +261,9 @@ export default function CustomisePage() {
 
   const hasKit = !!catalogImage?.kit && subjectCount === 1;
   const kitNameOk = !hasKit || !!cleanKitName(kitName);
-  const allReady = subjects.length > 0 && subjects.every(s => s.pet || s.file) && kitNameOk;
+  const showSlogan = hasKit && !!catalogImage?.kit?.motto;
+  const sloganOk = !showSlogan || !sloganTouched || !slogan.trim() || !!cleanSlogan(slogan);
+  const allReady = subjects.length > 0 && subjects.every(s => s.pet || s.file) && kitNameOk && sloganOk;
 
   function startCustomise() {
     setStep('photo');
@@ -339,6 +345,8 @@ export default function CustomisePage() {
     const source = qs.get('src') || (qs.get('from') ? 'collection' : '');
     if (source) fd.append('source', source);
     if (hasKit) { fd.append('kitName', kitName.trim().toUpperCase()); fd.append('kitNumber', kitNumber); }
+    // Their own slogan (left alone, the team motto is used, with its own line breaks)
+    if (showSlogan && sloganTouched && slogan.trim()) fd.append('slogan', slogan.trim());
     subjects.forEach((s, i) => {
       const n = subjectCount > 1 ? String(i + 1) : '';
       if (s.pet) fd.append(`petId${n}`, s.pet.pet_id);
@@ -643,6 +651,22 @@ export default function CustomisePage() {
                 </div>
                 <p className="mt-2 text-xs text-gray-500">Up to 12 letters. Leave the number empty for just the name.</p>
                 {kitName.trim() && !cleanKitName(kitName) && <p role="alert" className="mt-1 text-sm text-red-700">Letters only please (spaces, hyphens and apostrophes are fine), and nothing rude.</p>}
+                {showSlogan && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-800">The big words on the right
+                      <input value={slogan} onChange={e => { setSlogan(e.target.value.toUpperCase().slice(0, SLOGAN_MAX)); setSloganTouched(true); }}
+                        maxLength={SLOGAN_MAX} autoCapitalize="characters" autoComplete="off"
+                        className="mt-1 block h-12 w-full rounded-xl border border-gray-300 bg-white px-3 text-base font-semibold uppercase tracking-wide" />
+                    </label>
+                    <p className="mt-1 text-xs text-gray-500">
+                      That&apos;s the team&apos;s motto. Keep it, or write your own (up to {SLOGAN_MAX} characters).
+                      {sloganTouched && slogan.trim() !== String(catalogImage.kit?.motto ?? '').replace(/\n/g, ' ') && (
+                        <button type="button" onClick={() => { setSlogan(String(catalogImage.kit?.motto ?? '').replace(/\n/g, ' ')); setSloganTouched(false); }} className="ml-1 text-purple-700 underline">Use the team motto</button>
+                      )}
+                    </p>
+                    {!sloganOk && <p role="alert" className="mt-1 text-sm text-red-700">Letters, numbers and simple punctuation only, and nothing rude.</p>}
+                  </div>
+                )}
               </div>
             )}
             {preparing && <p className="mt-3 text-sm text-gray-500">Getting your photo ready…</p>}

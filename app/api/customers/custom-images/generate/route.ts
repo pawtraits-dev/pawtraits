@@ -12,6 +12,8 @@ import { buildSizeInstruction } from '@/lib/breed-size-mapping';
 import { detectPetBreed } from '@/lib/customise/detect-breed';
 import { letteringMatches, paintLettering, readKit, readShirt } from '@/lib/collections/kit-lettering';
 import { cleanKitName, cleanKitNumber, kitLettering } from '@/lib/collections/sports-teams';
+import { cleanSlogan } from '@/lib/collections/slogan';
+import { bakeSlogan, designMotto } from '@/lib/collections/slogan-server';
 import { GEMINI_IMAGE_MODELS, toGeminiAspectRatio, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
 import { getRequester, setGuestCookie, clientIp } from '@/lib/guest/access';
 import { hashIp } from '@/lib/qr/attribution';
@@ -119,6 +121,7 @@ interface GenerateJob {
   sizeInstruction?: string;
   slotPlan?: SlotReplacement[];        // several pets: which photo replaces which pet (multi-pet plan phase 2)
   kit?: { name: string; number: number | null } | null;  // personalised football kit: the customer's name and number
+  slogan?: string | null;              // team motto or the customer's own slogan, drawn on the right
   requestStarted: number;
   timings: Timings;
 }
@@ -211,8 +214,23 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
     t = Date.now();
     const uploaded = await uploadBuffer(Buffer.from(generatedImageBase64, 'base64'), { folder: 'customer-custom-images' });
     timings.save = since(t);
-    const generatedImageUrl: string = uploaded.secure_url;
-    const generatedCloudinaryId: string = uploaded.public_id;
+    let generatedImageUrl: string = uploaded.secure_url;
+    let generatedCloudinaryId: string = uploaded.public_id;
+    // Team motto / customer slogan: drawn on a stored copy (print files and downloads use it);
+    // the clean painting is kept so the slogan can be redrawn (4K print masters)
+    let sloganMeta: Record<string, unknown> | null = null;
+    if (job.slogan) {
+      t = Date.now();
+      try {
+        const baked = await bakeSlogan(generatedCloudinaryId, job.slogan);
+        sloganMeta = { slogan: job.slogan, clean_cloudinary_id: generatedCloudinaryId, clean_url: generatedImageUrl };
+        generatedCloudinaryId = baked.public_id;
+        generatedImageUrl = baked.secure_url;
+      } catch (e) {
+        console.warn('slogan failed; keeping the painting without it', customImageId, e);
+      }
+      timings.slogan = since(t);
+    }
 
     // Watermarked preview for the customise page: made now, so the phone just downloads it
     const watermarkedUrl = cloudinaryService.getPublicVariantUrl(generatedCloudinaryId, 'catalog_watermarked', { format: PREVIEW_FORMAT });
@@ -238,6 +256,7 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
           image_size: request.config.imageConfig.imageSize,
           full_size_url: generatedImageUrl,  // full-size URL
           ...(kitResult ? { kit: kitResult } : {}),
+          ...(sloganMeta ?? {}),
           timings,
         },
       })
@@ -290,6 +309,11 @@ export async function POST(request: NextRequest) {
     const kitNameRaw = formData.get('kitName');
     const kitName = kitNameRaw ? cleanKitName(kitNameRaw) : null;
     const kitNumber = cleanKitNumber(formData.get('kitNumber') ?? '');
+    const sloganRaw = formData.get('slogan');
+    const customSlogan = sloganRaw && String(sloganRaw).trim() ? cleanSlogan(sloganRaw) : null;
+    if (sloganRaw && String(sloganRaw).trim() && !customSlogan) {
+      return NextResponse.json({ error: 'Please check the slogan: up to 32 letters, numbers and simple punctuation, and nothing rude.' }, { status: 400 });
+    }
     if (kitNameRaw && (!kitName || kitNumber === undefined)) {
       return NextResponse.json({ error: 'Please check the name and number for the shirt: letters only for the name (up to 12), and a number from 0 to 99.' }, { status: 400 });
     }
@@ -606,6 +630,8 @@ export async function POST(request: NextRequest) {
     // Personalised kit: the customer's name and number replace the design's (one pet only)
     const kit = designKit && kitName && petImageUrls.length === 1 ? { name: kitName, number: kitNumber ?? null } : null;
     // An uploaded photo has no name: the name on the shirt is the pet's name ("Biscuit")
+    // Slogan: the customer's own, else the team motto (designs with "Show the team motto" ticked)
+    const slogan = designKit?.slogan ? (customSlogan ?? await designMotto(supabase as any, catalogImageId).catch(() => null)) : null;
     const kitPetName = kit ? kit.name.toLowerCase().replace(/(^|[\s'-])([a-z])/g, (_m, a, b) => a + b.toUpperCase()) : null;
     const firstPetId = petIds[0];
 
@@ -636,6 +662,7 @@ export async function POST(request: NextRequest) {
           source,
           ...(firstPet?.breed_id ? { breed_source: 'profile' } : {}),
           ...(kit ? { kit } : {}),
+          ...(slogan ? { slogan } : {}),
         }
       })
       .select(`
@@ -696,6 +723,7 @@ export async function POST(request: NextRequest) {
         sizeInstruction, // relative sizes for several pets
         slotPlan,
         kit,
+        slogan,
         requestStarted,
         timings,
       }).then(() => capturePreviews({ ids: [customImage.id] })) // social loop: only if "Include free previews" is on
