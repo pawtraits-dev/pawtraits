@@ -232,6 +232,40 @@ export function teamByPath(path: string): SportsTeam | null {
   return SPORTS_TEAMS.find(t => t.league === league && t.slug === slug) ?? null;
 }
 
+/**
+ * Traditional home shorts and socks of the football teams, so players in a whole-scene recolour
+ * wear the full kit (the pet only wears the shirt). Colours only; check against the current kits
+ * if a team changes.
+ */
+const FOOTBALL_KIT: Record<string, { shorts: string; socks: string }> = {
+  arsenal: { shorts: 'white', socks: 'white' },
+  'aston-villa': { shorts: 'white', socks: 'sky-blue' },
+  bournemouth: { shorts: 'black', socks: 'black' },
+  brentford: { shorts: 'black', socks: 'red' },
+  brighton: { shorts: 'white', socks: 'white' },
+  chelsea: { shorts: 'royal-blue', socks: 'white' },
+  'coventry-city': { shorts: 'sky-blue', socks: 'sky-blue' },
+  'crystal-palace': { shorts: 'blue', socks: 'blue' },
+  everton: { shorts: 'white', socks: 'white' },
+  fulham: { shorts: 'black', socks: 'white' },
+  'hull-city': { shorts: 'black', socks: 'amber' },
+  'ipswich-town': { shorts: 'white', socks: 'blue' },
+  'leeds-united': { shorts: 'white', socks: 'white' },
+  liverpool: { shorts: 'red', socks: 'red' },
+  'manchester-city': { shorts: 'white', socks: 'sky-blue' },
+  'manchester-united': { shorts: 'white', socks: 'black' },
+  'newcastle-united': { shorts: 'black', socks: 'black' },
+  'nottingham-forest': { shorts: 'white', socks: 'red' },
+  sunderland: { shorts: 'black', socks: 'red' },
+  'tottenham-hotspur': { shorts: 'navy', socks: 'white' },
+};
+
+/** "red shirt with white trim, red shorts and red socks" for players; the shirt alone otherwise */
+export function playerKit(t: SportsTeam): string {
+  const k = t.league === 'premier-league' ? FOOTBALL_KIT[t.slug] : undefined;
+  return k ? `${t.kit}, ${k.shorts} shorts and ${k.socks} socks` : t.kit;
+}
+
 const withArticle = (s: string) => `${/^[aeiou]/i.test(s) ? 'an' : 'a'} ${s}`;
 const NO_MARKS_SCENE = 'No club crests, badges, sponsor names, kit-maker logos or league patches anywhere in the picture: not on the pet, the players or the fans. All fabric is plain apart from colours, stripes and the shirt lettering.';
 
@@ -246,7 +280,7 @@ export function sceneRecolour(t: SportsTeam, pets = 1): string {
   return [
     `Recolour this whole ${sport} scene to ${t.short} colours (${colours}).`,
     `${whose} ${t.league === 'premier-league' ? 'shirt' : 'kit'} becomes ${withArticle(t.kit.replace(/^(an?|the)\s+/i, ''))}, keeping the same cut, collar, folds and fit${pets > 1 ? ', all in the same kit' : ''}; a scarf, if there is one, takes ${colours} bar stripes.`,
-    `Every player in the picture wears the same ${t.short} kit. Fans in the crowd wear ${t.short} shirts and scarves in ${colours}; flags and banners are in ${colours} too.`,
+    `Every player in the picture wears the full ${t.short} kit: ${playerKit(t)}, all exactly the same, with no players in any other colours. Fans in the crowd wear ${t.short} shirts and scarves in ${colours}; flags and banners are in ${colours} too.`,
     `Keep any name and number on the pet's shirt exactly as they are (same letters, digits, font, size and position), recoloured to a colour from ${colours} that stands out clearly against the new shirt (on stripes, a thin outline in the other team colour is fine). The lettering stays painted with the same loose brushwork and soft edges as the rest of the picture, bending with the fabric; it must not look crisp, printed or pasted on.`,
     `Keep every animal exactly as it is (breed, face, fur, markings, expression, pose and place in the picture), and keep the stadium, lighting, composition and painting style unchanged. Change only the colours of clothing, scarves and flags.`,
     NO_MARKS_SCENE,

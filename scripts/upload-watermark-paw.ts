@@ -1,6 +1,6 @@
 /**
- * Uploads the watermark paw (public/assets/watermarks/pawtraits-paw.png: the blue site paw,
- * right way up) to Cloudinary as "pawtraits_watermark_paw", used by lib/watermark.ts.
+ * Uploads the watermark paw (public/assets/watermarks/pawtraits-paw.png: the brand-purple site paw,
+ * right way up) to Cloudinary as "pawtraits_watermark_paw_purple" (a new name, so pictures already cached with the old blue paw are remade), used by lib/watermark.ts.
  *   npx tsx scripts/upload-watermark-paw.ts
  */
 import { config } from 'dotenv';
@@ -14,6 +14,6 @@ cloudinary.config({
 });
 
 cloudinary.uploader.upload('public/assets/watermarks/pawtraits-paw.png', {
-  public_id: 'pawtraits_watermark_paw', overwrite: true, invalidate: true, resource_type: 'image',
+  public_id: 'pawtraits_watermark_paw_purple', overwrite: true, invalidate: true, resource_type: 'image',
 }).then(r => console.log(`✅ Uploaded ${r.public_id} (${r.width}×${r.height}): ${r.secure_url}`))
   .catch(e => { console.error('❌ Upload failed:', e?.message || e); process.exit(1); });
