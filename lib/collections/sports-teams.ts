@@ -269,9 +269,10 @@ export function kitLettering(name: string, num: number | null, opts: { keepRest?
   const reads = num === null ? `"${name}" with no number` : `"${name}" above the number "${num}"`;
   return [
     `Change the lettering on the back of the pet's shirt so it reads exactly ${reads}.`,
-    `Use the same style as the existing lettering: bold block capitals in the same colour and finish, painted into the fabric so it follows the folds and the brushwork, the name centred across the shoulders${num === null ? '' : ' with the number large below it'}.`,
+    `Use the same style as the existing lettering: block capitals in the same colour, the same letter height and the same overall size as the letters and digits being replaced (a longer name gets narrower letters, not a bigger area), the name centred across the shoulders${num === null ? '' : ' with the number below it'}.`,
+    `Paint the lettering with the same loose brushwork, soft edges and texture as the rest of the painting: it is part of the fabric, bending with the folds, darker where the shirt is in shadow and catching the same light. It must not look crisp, flat, printed or pasted on.`,
     `Spell it exactly ${name.split('').map(ch => (ch === ' ' ? '(space)' : ch)).join('-')}, with no extra or missing letters${num === null ? '' : `, and the number exactly ${num}`}.`,
-    opts.keepRest === false ? '' : 'Change nothing else: same animal, shirt colours, background, lighting and painting style.',
+    opts.keepRest === false ? '' : 'Change nothing else: keep the same framing and crop, the same animal with the same face, expression and pose, and the same shirt colours, background, lighting and painting style.',
     NO_MARKS_SCENE,
   ].filter(Boolean).join(' ');
 }
