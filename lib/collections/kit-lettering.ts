@@ -6,6 +6,7 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenAI } from '@google/genai';
+import sharp from 'sharp';
 import { GEMINI_IMAGE_MODELS, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
 import { createWithUsage, generateWithUsage } from '@/lib/ai/usage';
 import { kitLettering } from './sports-teams';
@@ -42,16 +43,18 @@ export async function paintLettering(pngBase64: string, name: string, num: numbe
 export interface ShirtReading { name: string | null; number: number | null; logos: boolean; raw: string }
 
 /** What the shirt says, read by Claude Haiku (never throws: null fields when it can't tell) */
-export async function readShirt(base64: string, media: 'image/png' | 'image/jpeg' = 'image/png', ctx: { imageId?: string | null; customerImageId?: string | null } = {}): Promise<ShirtReading> {
+export async function readShirt(base64: string, _media: 'image/png' | 'image/jpeg' = 'image/png', ctx: { imageId?: string | null; customerImageId?: string | null } = {}): Promise<ShirtReading> {
   const empty: ShirtReading = { name: null, number: null, logos: false, raw: '' };
   try {
     const apiKey = process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return empty;
     const client = new Anthropic({ apiKey });
+    // Gemini's PNGs are often over Claude's 5 MB image limit: send a 1280px JPEG instead
+    const small = await sharp(Buffer.from(base64, 'base64')).resize(1280, 1280, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
     const res: any = await createWithUsage(client, { feature: 'kit-check', ...ctx }, {
       model: 'claude-haiku-4-5-20251001', max_tokens: 120,
       messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: media, data: base64 } },
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: small.toString('base64') } },
         { type: 'text', text: 'This is a painting of a pet wearing a sports shirt with a name and number on it. Read the lettering on the PET\'s shirt exactly as painted, letter by letter (do not correct spelling). Also say whether any club crest, badge, sponsor name or brand logo appears anywhere in the picture (on the pet, players or fans). Reply with JSON only: {"name": "<letters as painted, or null>", "number": <digits as painted, or null>, "logos": true | false}' },
       ] }],
     });
@@ -68,7 +71,7 @@ export async function readShirt(base64: string, media: 'image/png' | 'image/jpeg
     };
   } catch (err) {
     console.warn('readShirt failed', err);
-    return empty;
+    return { ...empty, raw: String((err as any)?.message || err).slice(0, 200) };
   }
 }
 

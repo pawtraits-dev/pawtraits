@@ -247,7 +247,7 @@ export function sceneRecolour(t: SportsTeam, pets = 1): string {
     `Recolour this whole ${sport} scene to ${t.short} colours (${colours}).`,
     `${whose} ${t.league === 'premier-league' ? 'shirt' : 'kit'} becomes ${withArticle(t.kit.replace(/^(an?|the)\s+/i, ''))}, keeping the same cut, collar, folds and fit${pets > 1 ? ', all in the same kit' : ''}; a scarf, if there is one, takes ${colours} bar stripes.`,
     `Every player in the picture wears the same ${t.short} kit. Fans in the crowd wear ${t.short} shirts and scarves in ${colours}; flags and banners are in ${colours} too.`,
-    `Keep any name and number on the pet's shirt exactly as they are (same letters, digits, font, size and position), recoloured to a colour from ${colours} that stands out clearly against the new shirt.`,
+    `Keep any name and number on the pet's shirt exactly as they are (same letters, digits, font, size and position), recoloured to a colour from ${colours} that stands out clearly against the new shirt (on stripes, a thin outline in the other team colour is fine). The lettering stays painted with the same loose brushwork and soft edges as the rest of the picture, bending with the fabric; it must not look crisp, printed or pasted on.`,
     `Keep every animal exactly as it is (breed, face, fur, markings, expression, pose and place in the picture), and keep the stadium, lighting, composition and painting style unchanged. Change only the colours of clothing, scarves and flags.`,
     NO_MARKS_SCENE,
   ].join(' ');
