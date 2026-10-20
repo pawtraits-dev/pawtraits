@@ -24,7 +24,7 @@ function detectImageMediaType(base64: string, fallback: string = 'image/jpeg'): 
 }
 
 export class ImageDescriptionGenerator {
-  private buildDescriptionPrompt(breed?: string, traits?: string[]): string {
+  private buildDescriptionPrompt(breed?: string, traits?: string[], extraContext?: string): string {
     const breedInfo = breed ? `
 BREED CONTEXT:
 - This is a ${breed}
@@ -54,16 +54,18 @@ BREED-SPECIFIC EXAMPLE:
 "**The Labrador's Professional Food Quality Assessment**
 This distinguished Labrador has clearly appointed himself as Chief Treat Inspector, and judging by that focused expression, he's taking his responsibilities very seriously. His gentle but determined gaze suggests he's mentally cataloguing every snack in a five-mile radius while maintaining the patient dignity that only a true food enthusiast can muster."
 
+${extraContext ? `\nIMPORTANT CONTEXT FOR THIS IMAGE:\n${extraContext}\n` : ''}
 Now write a fun description for this image in exactly that style, incorporating the breed's personality traits naturally.`;
   }
 
   async generateDescription(
     imageUrl: string, 
     breed?: string, 
-    traits?: string[]
+    traits?: string[],
+    extraContext?: string   // e.g. the team a team version is painted for
   ): Promise<string> {
     try {
-      const prompt = this.buildDescriptionPrompt(breed, traits);
+      const prompt = this.buildDescriptionPrompt(breed, traits, extraContext);
       
       const imageData = await this.imageToBase64(imageUrl);
       const response = await createWithUsage(anthropic, { feature: 'description' }, {

@@ -699,6 +699,11 @@ export class AdminSupabaseService {
     return adminRequest<{ status: string; imageId?: string; error?: string }>(`/api/admin/collections/team-versions/${id}`, jsonInit('POST', { team, ...(redo ? { redo: true } : {}) }));
   }
 
+  /** Team version actions: publish / unpublish on its team page, (re)write or save its description */
+  async teamVersionAction(id: string, team: string, action: 'publish' | 'unpublish' | 'describe' | 'save-description', description?: string): Promise<AdminResult<{ ok: true; description?: string }>> {
+    return adminRequest<{ ok: true; description?: string }>(`/api/admin/collections/team-versions/${id}`, jsonInit('POST', { team, action, description }));
+  }
+
   /** Personalised kit settings for a sports design (null turns it off) */
   async setKitPersonalisation(id: string, kit: { name: string; number: number | null; scene: boolean } | null): Promise<AdminResult<{ ok: true }>> {
     return adminRequest<{ ok: true }>(`/api/admin/collections/team-versions/${id}`, jsonInit('PATCH', { kit_personalisation: kit }));

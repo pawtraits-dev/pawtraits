@@ -12,7 +12,7 @@ import { AlertTriangle, Check, ChevronDown, ChevronRight, RefreshCw, Shirt, Spar
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 
 interface Row { id: string; title: string; thumb: string; home: { path: string; name: string; isTeam: boolean }; league: string; scope: 'league' | 'any' | 'off'; offered: number; made: number; failed: number; isPublic: boolean }
-interface Team { path: string; name: string; short: string; colours: { name: string; hex: string }[]; status: 'ready' | 'running' | 'failed' | 'none'; imageId: string | null; thumb: string | null; error: string | null; check: KitCheck | null }
+interface Team { path: string; name: string; short: string; colours: { name: string; hex: string }[]; status: 'ready' | 'running' | 'failed' | 'none'; imageId: string | null; thumb: string | null; error: string | null; check: KitCheck | null; description: string | null; published: boolean }
 interface KitCheck { name: string | null; number: number | null; logos: boolean; ok: boolean }
 interface Kit { name: string; number: number | null; scene: boolean }
 interface KitTest { id?: string; design_id: string; kit_name: string; kit_number: number | null; image_url: string | null; thumb?: string | null; read_name: string | null; read_number: number | null; logos: boolean | null; matches: boolean | null; error: string | null; duration_ms: number | null; created_at?: string }
@@ -33,6 +33,8 @@ function DesignRow({ row, onChanged }: { row: Row; onChanged: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const stop = useRef(false);
   const svc = () => new AdminSupabaseService();
+  const [editing, setEditing] = useState<string | null>(null);   // team path whose description is open
+  const [draft, setDraft] = useState('');
 
   const load = useCallback(async () => {
     const r = await svc().getTeamVersions(row.id);
@@ -64,6 +66,31 @@ function DesignRow({ row, onChanged }: { row: Row; onChanged: () => void }) {
     setBusy(null);
     setProgress(`${done} made${failed ? `, ${failed} failed` : ''}${stop.current ? ' (stopped)' : ''}.`);
     onChanged();
+  };
+
+  const act = async (t: Team, action: 'publish' | 'unpublish' | 'describe' | 'save-description', description?: string) => {
+    setBusy(t.path); setError(null);
+    const r = await svc().teamVersionAction(row.id, t.path, action, description);
+    setBusy(null);
+    if (!r.ok) setError(`${t.short}: ${r.error}`);
+    else if (r.data.description && editing === t.path) setDraft(r.data.description);
+    await load();
+  };
+
+  /** Publish every ready version, writing a description first where there isn't one */
+  const publishAll = async () => {
+    if (!detail) return;
+    stop.current = false; setError(null);
+    const todo = detail.groups.flatMap(g => g.teams).filter(t => t.status === 'ready' && t.path !== detail.home && (!t.published || !t.description));
+    let n = 0;
+    for (const t of todo) {
+      if (stop.current) break;
+      setBusy(t.path); setProgress(`${t.short}: ${t.description ? 'publishing' : 'writing the description'} (${++n} of ${todo.length})…`);
+      if (!t.description) { const r = await svc().teamVersionAction(row.id, t.path, 'describe'); if (!r.ok) { setError(`${t.short}: ${r.error}`); continue; } }
+      if (!t.published) { const r = await svc().teamVersionAction(row.id, t.path, 'publish'); if (!r.ok) setError(`${t.short}: ${r.error}`); }
+    }
+    setBusy(null); setProgress(`${n} published${stop.current ? ' (stopped)' : ''}.`);
+    await load();
   };
 
   const setScope = async (scope: Row['scope']) => {
@@ -110,6 +137,14 @@ function DesignRow({ row, onChanged }: { row: Row; onChanged: () => void }) {
                     <Sparkles className="h-4 w-4" /> Make all missing ({missing}, about {missing} min)
                   </button>
                 )}
+                {(() => {
+                  const n = detail.groups.flatMap(g => g.teams).filter(t => t.status === 'ready' && t.path !== detail.home && (!t.published || !t.description)).length;
+                  return n > 0 && !busy ? (
+                    <button onClick={publishAll} className="rounded border border-purple-300 px-3 py-2 text-sm font-semibold text-purple-800 hover:bg-purple-50">
+                      Describe &amp; publish ready versions ({n})
+                    </button>
+                  ) : null;
+                })()}
                 {busy && progress && <button onClick={() => { stop.current = true; }} className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800">Stop after this one</button>}
                 {progress && <p role="status" className="text-sm text-gray-800">{progress}</p>}
               </div>
@@ -138,6 +173,19 @@ function DesignRow({ row, onChanged }: { row: Row; onChanged: () => void }) {
                             <RefreshCw className="h-3 w-3" /> Redo
                           </button>
                         )}
+                        {t.status === 'ready' && t.path !== detail.home && (
+                          <div className="mt-1 space-y-0.5 border-t border-gray-200 pt-1 text-[11px]">
+                            <p className={t.published ? 'font-medium text-green-700' : 'text-gray-500'}>{t.published ? 'On the team page' : 'Not published'}</p>
+                            <button onClick={() => { setEditing(editing === t.path ? null : t.path); setDraft(t.description ?? ''); }} className="block max-w-full truncate text-left text-purple-700 hover:underline" title={t.description ?? ''}>
+                              {t.description ? (/\*\*(.+?)\*\*/.exec(t.description)?.[1] ?? 'Description') : 'No description yet'}
+                            </button>
+                            {!busy && (
+                              <button onClick={() => act(t, t.published ? 'unpublish' : 'publish')} className="text-gray-600 hover:text-purple-700 hover:underline">
+                                {t.published ? 'Unpublish' : 'Publish'}
+                              </button>
+                            )}
+                          </div>
+                        )}
                         {(t.status === 'none' || t.status === 'failed') && !busy && (
                           <button onClick={() => make(t)} className="mt-1 flex items-center gap-1 text-xs font-medium text-purple-700 hover:underline">
                             <RefreshCw className="h-3 w-3" /> {t.status === 'failed' ? 'Try again' : 'Make'}
@@ -149,6 +197,22 @@ function DesignRow({ row, onChanged }: { row: Row; onChanged: () => void }) {
                   </ul>
                 </div>
               ))}
+              {editing && (() => {
+                const t = detail.groups.flatMap(g => g.teams).find(x => x.path === editing);
+                if (!t) return null;
+                return (
+                  <div className="mt-2 rounded-lg border border-purple-200 bg-white p-3">
+                    <p className="text-sm font-semibold text-gray-900">{t.short} version: title and description</p>
+                    <p className="text-xs text-gray-600">Bold the title with **double asterisks** on the first line. Customers see this on the design page.</p>
+                    <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={6} className="mt-2 w-full rounded border border-gray-300 p-2 text-sm" />
+                    <div className="mt-2 flex flex-wrap gap-2 text-sm">
+                      <button disabled={!!busy || !draft.trim()} onClick={() => act(t, 'save-description', draft)} className="rounded bg-purple-600 px-3 py-1.5 font-semibold text-white hover:bg-purple-700 disabled:opacity-50">Save</button>
+                      <button disabled={!!busy} onClick={() => act(t, 'describe')} className="rounded border border-purple-300 px-3 py-1.5 font-medium text-purple-800 hover:bg-purple-50 disabled:opacity-50">{busy === t.path ? 'Writing…' : 'Write a new one'}</button>
+                      <button onClick={() => setEditing(null)} className="rounded border border-gray-300 px-3 py-1.5">Close</button>
+                    </div>
+                  </div>
+                );
+              })()}
             </>
           )}
           {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}

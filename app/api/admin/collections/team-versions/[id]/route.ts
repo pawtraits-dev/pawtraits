@@ -5,10 +5,13 @@
  *       { kit_personalisation: { name, number, scene } | null } — personalised kit settings
  * POST  { team: "<collection path>", redo?: true } — make that team's version now (retries
  *       failed ones; redo paints a ready one again)
+ *       { team, action: 'publish' | 'unpublish' } — show it on its team's collection page or not
+ *       { team, action: 'describe' } — write a fresh title and description from the picture
+ *       { team, action: 'save-description', description } — save an edited description
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
-import { ensureTeamVariant, groupByLeague, teamContext } from '@/lib/collections/team-variants';
+import { describeTeamVersion, ensureTeamVariant, groupByLeague, setTeamVersionPublished, teamContext } from '@/lib/collections/team-variants';
 import { readKit } from '@/lib/collections/kit-lettering';
 import { cleanKitName, cleanKitNumber } from '@/lib/collections/sports-teams';
 
@@ -26,7 +29,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const ctx = await teamContext(supabase, id);
     if (!ctx) return NextResponse.json({ error: 'Not a sports design' }, { status: 404 });
     const imageIds = ctx.teams.map(t => t.imageId).filter(Boolean) as string[];
-    const { data: imgs } = imageIds.length ? await supabase.from('image_catalog').select('id, cloudinary_public_id, public_url').in('id', imageIds) : { data: [] };
+    const { data: imgs } = imageIds.length ? await supabase.from('image_catalog').select('id, cloudinary_public_id, public_url, description').in('id', imageIds) : { data: [] };
+    const descOf = new Map((imgs ?? []).map((r: any) => [r.id, r.description as string | null]));
+    const { data: pub } = imageIds.length ? await supabase.from('design_collections').select('image_id').eq('source', 'team').in('image_id', imageIds) : { data: [] };
+    const published = new Set((pub ?? []).map((r: any) => r.image_id));
     const cloud = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const thumbOf = new Map((imgs ?? []).map((r: any) => [r.id, cloud && r.cloudinary_public_id ? `https://res.cloudinary.com/${cloud}/image/upload/c_fill,w_160,h_200,g_auto/f_auto,q_auto/${r.cloudinary_public_id}` : r.public_url]));
     const { data: rows } = await supabase.from('design_team_variants').select('*').eq('source_image_id', ctx.sourceId);
@@ -41,7 +47,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       tests: (tests ?? []).map((t: any) => ({ ...t, thumb: cloud && t.cloudinary_public_id ? `https://res.cloudinary.com/${cloud}/image/upload/c_fill,w_240,h_300,g_auto/f_auto,q_auto/${t.cloudinary_public_id}` : t.image_url })),
       groups: groupByLeague(ctx.teams).map(g => ({
         league: g.league, name: g.name,
-        teams: g.teams.map(t => ({ path: t.path, name: t.name, short: t.short, colours: t.colours, status: t.status, imageId: t.imageId, thumb: t.imageId ? thumbOf.get(t.imageId) ?? null : null, error: errorOf.get(t.id) ?? null, check: checkOf.get(t.id) ?? null })),
+        teams: g.teams.map(t => ({ path: t.path, name: t.name, short: t.short, colours: t.colours, status: t.status, imageId: t.imageId, thumb: t.imageId ? thumbOf.get(t.imageId) ?? null : null, error: errorOf.get(t.id) ?? null, check: checkOf.get(t.id) ?? null, description: t.imageId && t.path !== ctx.homeTeamPath ? descOf.get(t.imageId) ?? null : null, published: !!t.imageId && (t.path === ctx.homeTeamPath || published.has(t.imageId)) })),
       })),
     });
   } catch (e) {
@@ -86,6 +92,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     let ctx = await teamContext(supabase, id);
     let team = ctx?.teams.find(t => t.path === body.team);
     if (!ctx || !team) return NextResponse.json({ error: 'That team isn’t offered for this design' }, { status: 400 });
+    // Publish, unpublish and descriptions of a ready version (not the original)
+    if (typeof body.action === 'string') {
+      if (!team.imageId || team.path === ctx.homeTeamPath) return NextResponse.json({ error: 'Make that team’s version first' }, { status: 400 });
+      if (body.action === 'publish' || body.action === 'unpublish') {
+        await setTeamVersionPublished(team.imageId, team.id, body.action === 'publish');
+        return NextResponse.json({ ok: true });
+      }
+      if (body.action === 'describe') {
+        const description = await describeTeamVersion(team.imageId, team);
+        return description ? NextResponse.json({ ok: true, description }) : NextResponse.json({ error: 'Could not write a description' }, { status: 500 });
+      }
+      if (body.action === 'save-description') {
+        const description = String(body.description ?? '').trim().slice(0, 4000);
+        if (!description) return NextResponse.json({ error: 'The description is empty' }, { status: 400 });
+        await supabase.from('image_catalog').update({ description }).eq('id', team.imageId);
+        return NextResponse.json({ ok: true, description });
+      }
+      return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+    }
     // Redo a ready version (not the original): mark it failed so it's painted again
     if (body.redo === true && team.path !== ctx.homeTeamPath) {
       await supabase.from('design_team_variants').update({ status: 'failed', attempts: 0, error: 'Redone by admin', updated_at: new Date().toISOString() })

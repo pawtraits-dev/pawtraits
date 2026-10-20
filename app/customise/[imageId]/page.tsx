@@ -29,6 +29,7 @@ import { designTitle, plainText } from '@/lib/text/plain';
 import MoreLikeThis from '@/components/customise/MoreLikeThis';
 import DesignChips, { useDesignCollections } from '@/components/customise/DesignChips';
 import TeamPicker from '@/components/customise/TeamPicker';
+import { cleanKitName } from '@/lib/collections/sports-teams';
 import DesignQuizLink from '@/components/quiz/DesignQuizLink';
 import { collectionHref } from '@/lib/collections/href';
 
@@ -50,6 +51,8 @@ interface CatalogImage {
   format?: { id: string; name: string; aspectRatio: string };
   isMultiSubject?: boolean;
   subjectCount?: number;
+  /** Personalised football kit: the customer chooses the name and number on the shirt */
+  kit?: { name: string; number: number | null } | null;
   /** One per pet in the picture, left to right: photo N replaces slot N (multi-pet plan phase 2) */
   slots?: { label: string; breedName: string | null; animalType: 'dog' | 'cat' | null; pose: string | null }[];
 }
@@ -129,6 +132,9 @@ export default function CustomisePage() {
   const chips = useDesignCollections(imageId);
 
   const [step, setStep] = useState<Step>('choose');
+  // Personalised kit: name and number on the shirt
+  const [kitName, setKitName] = useState('');
+  const [kitNumber, setKitNumber] = useState('');
   const [subjects, setSubjects] = useState<Array<{ pet: Pet | null; file: File | null; preview: string | null; warning?: string | null }>>([{ pet: null, file: null, preview: null }]);
   const [preparing, setPreparing] = useState(false);
   const [customImage, setCustomImage] = useState<CustomImage | null>(null);
@@ -170,6 +176,7 @@ export default function CustomisePage() {
         if (!res.ok) throw new Error('We couldn’t find that design.');
         const data: CatalogImage = await res.json();
         setCatalogImage(data);
+        if (data.kit) setKitNumber(data.kit.number === null || data.kit.number === undefined ? '' : String(data.kit.number));
         const n = data.subjectCount || 1;
         setSubjects(Array.from({ length: n }, () => ({ pet: null, file: null, preview: null })));
         track.viewCustomise({ id: data.id, name: data.description?.slice(0, 80), category: data.theme?.name }, qs.get('src') || undefined);
@@ -241,12 +248,16 @@ export default function CustomisePage() {
 
   function choosePet(pet: Pet, idx: number) {
     setSubjects(prev => prev.map((s, i) => (i === idx ? { pet, file: null, preview: pet.primary_photo_url || null, warning: null } : s)));
+    // The shirt shows the pet's name unless the customer has typed one
+    if (catalogImage?.kit && !kitName.trim() && pet.name) setKitName(pet.name.toUpperCase().replace(/[^A-Z '\-]/g, '').slice(0, 12));
   }
   function clearSubject(idx: number) {
     setSubjects(prev => prev.map((s, i) => (i === idx ? { pet: null, file: null, preview: null, warning: null } : s)));
   }
 
-  const allReady = subjects.length > 0 && subjects.every(s => s.pet || s.file);
+  const hasKit = !!catalogImage?.kit && subjectCount === 1;
+  const kitNameOk = !hasKit || !!cleanKitName(kitName);
+  const allReady = subjects.length > 0 && subjects.every(s => s.pet || s.file) && kitNameOk;
 
   function startCustomise() {
     setStep('photo');
@@ -327,6 +338,7 @@ export default function CustomisePage() {
     const qs = new URLSearchParams(window.location.search);
     const source = qs.get('src') || (qs.get('from') ? 'collection' : '');
     if (source) fd.append('source', source);
+    if (hasKit) { fd.append('kitName', kitName.trim().toUpperCase()); fd.append('kitNumber', kitNumber); }
     subjects.forEach((s, i) => {
       const n = subjectCount > 1 ? String(i + 1) : '';
       if (s.pet) fd.append(`petId${n}`, s.pet.pet_id);
@@ -613,6 +625,26 @@ export default function CustomisePage() {
                 </div>
               ))}
             </div>
+            {hasKit && (
+              <div className="mt-5 rounded-2xl border border-purple-200 bg-purple-50/50 p-4">
+                <p className="font-semibold text-gray-900">Their name and number on the shirt</p>
+                <p className="mt-0.5 text-sm text-gray-600">Painted on the back, just like a real match shirt.</p>
+                <div className="mt-3 flex gap-3">
+                  <label className="min-w-0 flex-1 text-sm font-medium text-gray-800">Name
+                    <input value={kitName} onChange={e => setKitName(e.target.value.toUpperCase().replace(/[^A-Z '‘’\-]/g, '').slice(0, 12))}
+                      placeholder={catalogImage.kit?.name || 'BISCUIT'} autoCapitalize="characters" autoComplete="off" maxLength={12}
+                      className="mt-1 block h-12 w-full rounded-xl border border-gray-300 bg-white px-3 text-lg font-semibold uppercase tracking-wide placeholder:font-normal placeholder:text-gray-400" />
+                  </label>
+                  <label className="w-24 text-sm font-medium text-gray-800">Number
+                    <input value={kitNumber} onChange={e => setKitNumber(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                      inputMode="numeric" placeholder="–" maxLength={2}
+                      className="mt-1 block h-12 w-full rounded-xl border border-gray-300 bg-white px-3 text-center text-lg font-semibold" />
+                  </label>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">Up to 12 letters. Leave the number empty for just the name.</p>
+                {kitName.trim() && !cleanKitName(kitName) && <p role="alert" className="mt-1 text-sm text-red-700">Letters only please (spaces, hyphens and apostrophes are fine), and nothing rude.</p>}
+              </div>
+            )}
             {preparing && <p className="mt-3 text-sm text-gray-500">Getting your photo ready…</p>}
             <p className="mt-4 text-xs text-gray-500">
               Your photo is used to make your portrait. We may show favourites on our website and Instagram with your pet’s first name only (<Link href="/terms" className="underline">terms</Link>). {!signedIn && <>No account needed — <Link href={`/auth/login?returnTo=/customise/${imageId}`} className="underline">sign in</Link> to use your saved pets.</>}
@@ -621,7 +653,7 @@ export default function CustomisePage() {
             <StickyActionBar>
               <button onClick={generate} disabled={!allReady || preparing}
                 className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 text-lg font-semibold text-white shadow-lg disabled:bg-purple-300">
-                <Sparkles className="h-5 w-5" /> {allReady ? 'Create my free preview' : subjectCount > 1 ? 'Add all photos to continue' : 'Add a photo to continue'}
+                <Sparkles className="h-5 w-5" /> {allReady ? 'Create my free preview' : !subjects.every(s => s.pet || s.file) ? (subjectCount > 1 ? 'Add all photos to continue' : 'Add a photo to continue') : 'Add their name for the shirt'}
               </button>
               <button onClick={() => setStep('choose')} className="h-10 w-full text-sm text-gray-600">Back</button>
             </StickyActionBar>

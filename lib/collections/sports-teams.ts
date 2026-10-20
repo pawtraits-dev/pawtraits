@@ -290,7 +290,14 @@ export function sceneRecolour(t: SportsTeam, pets = 1): string {
 /** Shirt lettering rules: capitals, letters/space/hyphen/apostrophe, up to 12; number 0–99 or none */
 export function cleanKitName(raw: unknown): string | null {
   const s = String(raw ?? '').toUpperCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
-  return /^[A-Z](?:[A-Z '\-]{0,10}[A-Z])?$/.test(s) ? s : null;
+  return /^[A-Z](?:[A-Z '\-]{0,10}[A-Z])?$/.test(s) && !isRudeKitName(s) ? s : null;
+}
+
+/** Words we won't paint on a shirt (substring match, so only ones that don't hide inside real names) */
+const RUDE = ['FUCK', 'SHIT', 'CUNT', 'TWAT', 'WANK', 'NAZI', 'SLUT', 'WHORE', 'BITCH', 'NIGG', 'FAGG', 'PAEDO', 'PEDO', 'BOLLOCK', 'BELLEND', 'HITLER'];
+export function isRudeKitName(name: string): boolean {
+  const n = name.toUpperCase().replace(/[^A-Z]/g, '');
+  return RUDE.some(w => n.includes(w));
 }
 export function cleanKitNumber(raw: unknown): number | null | undefined {
   if (raw === null || raw === undefined || raw === '') return null;   // no number

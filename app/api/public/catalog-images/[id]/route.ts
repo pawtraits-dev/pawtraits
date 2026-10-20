@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 import { loadSlots, subjectsOf } from '@/lib/catalog/slots-server';
+import { readKit } from '@/lib/collections/kit-lettering';
 
 // Use service role client to bypass RLS for public catalog data
 const supabaseServiceRole = createClient(
@@ -114,8 +115,14 @@ export async function GET(
     // Who goes where (multi-pet plan phase 2): one slot per pet, left to right, photo N → slot N
     const slots = isMultiSubject ? await loadSlots(supabaseServiceRole, subjectsOf(catalogImage)) : [];
 
+    // Personalised football kit: the customer chooses the name and number on the shirt (one-pet
+    // designs only). Separate read so the page still works before the 2026-10-20 migration.
+    const { data: kitRow } = await supabaseServiceRole.from('image_catalog').select('kit_personalisation').eq('id', catalogImage.id).maybeSingle();
+    const kit = !isMultiSubject ? readKit((kitRow as any)?.kit_personalisation) : null;
+
     // Format response
     const response = {
+      kit: kit ? { name: kit.name, number: kit.number } : null,
       id: catalogImage.id,
       cloudinaryPublicId: catalogImage.cloudinary_public_id,
       imageUrl,

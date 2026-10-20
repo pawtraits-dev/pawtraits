@@ -10,6 +10,8 @@ import { VariationPromptBuilder } from '@/lib/variation-prompt-builder';
 import { CloudinaryImageService } from '@/lib/cloudinary';
 import { buildSizeInstruction } from '@/lib/breed-size-mapping';
 import { detectPetBreed } from '@/lib/customise/detect-breed';
+import { letteringMatches, paintLettering, readKit, readShirt } from '@/lib/collections/kit-lettering';
+import { cleanKitName, cleanKitNumber, kitLettering } from '@/lib/collections/sports-teams';
 import { GEMINI_IMAGE_MODELS, toGeminiAspectRatio, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
 import { getRequester, setGuestCookie, clientIp } from '@/lib/guest/access';
 import { hashIp } from '@/lib/qr/attribution';
@@ -116,6 +118,7 @@ interface GenerateJob {
   aiAnalysisData?: any;
   sizeInstruction?: string;
   slotPlan?: SlotReplacement[];        // several pets: which photo replaces which pet (multi-pet plan phase 2)
+  kit?: { name: string; number: number | null } | null;  // personalised football kit: the customer's name and number
   requestStarted: number;
   timings: Timings;
 }
@@ -164,7 +167,7 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
       styleName: job.styleName,
       breedName: job.customerPetBreedName || job.catalogBreedName,
       petCharacteristics, // AI-detected pose, gaze, expression
-    });
+    }) + (job.kit ? `\n\n${kitLettering(job.kit.name, job.kit.number, { keepRest: false })}` : '');
 
     // Prompt, the design, then every pet photo; size from CUSTOMER_PREVIEW_SIZE (lib/customise/painting.ts)
     const request = paintingRequest({
@@ -178,8 +181,31 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
     const response = await generateWithUsage(geminiService.ai, { feature: 'customer-painting', customerImageId: customImageId }, request);
     timings.gemini = since(t);
 
-    const generatedImageBase64 = imageFrom(response);
+    let generatedImageBase64 = imageFrom(response);
     if (!generatedImageBase64) throw new Error('No image data in Gemini response');
+
+    // Personalised kit: read the shirt back; if the name or number came out wrong, one
+    // lettering-only fix (kept only if it reads right)
+    let kitResult: Record<string, unknown> | null = null;
+    if (job.kit) {
+      t = Date.now();
+      const first = await readShirt(generatedImageBase64, 'image/png', { customerImageId: customImageId });
+      kitResult = { ...job.kit, read: { name: first.name, number: first.number }, verified: letteringMatches(first, job.kit.name, job.kit.number), fixes: 0 };
+      if (!kitResult.verified) {
+        try {
+          const fixed = await paintLettering(generatedImageBase64, job.kit.name, job.kit.number, { customerImageId: customImageId });
+          const second = await readShirt(fixed, 'image/png', { customerImageId: customImageId });
+          kitResult.fixes = 1;
+          if (letteringMatches(second, job.kit.name, job.kit.number)) {
+            generatedImageBase64 = fixed;
+            kitResult = { ...kitResult, read: { name: second.name, number: second.number }, verified: true };
+          }
+        } catch (e) {
+          console.warn('kit lettering fix failed', customImageId, e);
+        }
+      }
+      timings.kit = since(t);
+    }
 
     // Upload the painting as binary (a base64 data URI is a third bigger)
     t = Date.now();
@@ -211,6 +237,7 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
           model: request.model,
           image_size: request.config.imageConfig.imageSize,
           full_size_url: generatedImageUrl,  // full-size URL
+          ...(kitResult ? { kit: kitResult } : {}),
           timings,
         },
       })
@@ -259,6 +286,13 @@ export async function POST(request: NextRequest) {
     // Where the visitor came from (?src= on the customise page), for Admin > Customisations
     const sourceRaw = String(formData.get('source') || '').toLowerCase();
     const source = /^[a-z0-9_-]{1,32}$/.test(sourceRaw) ? sourceRaw : 'direct';
+    // Personalised football kit (only used when the design has one)
+    const kitNameRaw = formData.get('kitName');
+    const kitName = kitNameRaw ? cleanKitName(kitNameRaw) : null;
+    const kitNumber = cleanKitNumber(formData.get('kitNumber') ?? '');
+    if (kitNameRaw && (!kitName || kitNumber === undefined)) {
+      return NextResponse.json({ error: 'Please check the name and number for the shirt: letters only for the name (up to 12), and a number from 0 to 99.' }, { status: 400 });
+    }
 
     // Check for multi-subject support (petId1, petId2, etc. OR petPhoto1, petPhoto2, etc.)
     const petIds: (string | null)[] = [];
@@ -386,6 +420,8 @@ export async function POST(request: NextRequest) {
     const { data: catalogImage, error: catalogError } = await catalogLookup;
 
     step('checks');
+    const { data: kitRow } = await supabase.from('image_catalog').select('kit_personalisation').eq('id', catalogImageId).maybeSingle();
+    const designKit = readKit((kitRow as any)?.kit_personalisation);
 
     if (catalogError) {
       console.error('❌ Catalog image fetch error:', catalogError);
@@ -567,6 +603,10 @@ export async function POST(request: NextRequest) {
 
     // Create custom image record in database (use first pet for backward compatibility)
     const firstPet = petsData[0];
+    // Personalised kit: the customer's name and number replace the design's (one pet only)
+    const kit = designKit && kitName && petImageUrls.length === 1 ? { name: kitName, number: kitNumber ?? null } : null;
+    // An uploaded photo has no name: the name on the shirt is the pet's name ("Biscuit")
+    const kitPetName = kit ? kit.name.toLowerCase().replace(/(^|[\s'-])([a-z])/g, (_m, a, b) => a + b.toUpperCase()) : null;
     const firstPetId = petIds[0];
 
     const { data: customImage, error: insertError } = await supabase
@@ -579,7 +619,7 @@ export async function POST(request: NextRequest) {
         catalog_image_id: catalogImageId,
         pet_id: firstPetId || null,
         // Every pet's name ("Biscuit & Luna"); the first pet's details stay in pet_id / breed / coat
-        pet_name: joinPetNames(petsData.map(p => p?.name)),
+        pet_name: joinPetNames(petsData.map(p => p?.name), kitPetName ?? undefined),
         pet_breed_id: firstPet?.breed_id || null,
         pet_coat_id: firstPet?.coat_id || null,
         pet_image_url: petImageUrls[0],
@@ -595,6 +635,7 @@ export async function POST(request: NextRequest) {
           all_pet_names: petsData.map(p => p?.name || 'Uploaded Pet'),
           source,
           ...(firstPet?.breed_id ? { breed_source: 'profile' } : {}),
+          ...(kit ? { kit } : {}),
         }
       })
       .select(`
@@ -654,6 +695,7 @@ export async function POST(request: NextRequest) {
         aiAnalysisData: firstPet?.ai_analysis_data,
         sizeInstruction, // relative sizes for several pets
         slotPlan,
+        kit,
         requestStarted,
         timings,
       }).then(() => capturePreviews({ ids: [customImage.id] })) // social loop: only if "Include free previews" is on

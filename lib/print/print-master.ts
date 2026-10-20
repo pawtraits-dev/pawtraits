@@ -21,7 +21,8 @@ export const PRINT_MASTER_PROMPT = [
   'Recreate this exact image at a higher resolution for a large fine-art print.',
   'Keep everything identical: the composition and framing, the animal\'s face, eyes, markings and fur colours,',
   'its expression, the clothing and accessories, the background, the lighting and the painting style.',
-  'Do not add, remove, move or restyle anything, and do not add any text, border or watermark.',
+  'Do not add, remove, move or restyle anything, and do not add any new text, border or watermark.',
+  'Keep any lettering already in the picture (such as a name and number on a shirt) exactly as it is, letter for letter and digit for digit.',
   'Only increase fine detail and sharpness so it holds up when printed at 30 × 40 cm.',
 ].join(' ');
 

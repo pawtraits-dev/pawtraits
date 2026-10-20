@@ -14,6 +14,7 @@ import { GoogleGenAI } from '@google/genai';
 import { serviceClient } from '@/lib/qr/server';
 import { uploadImageBufferToCloudinary } from '@/lib/cloudinary-server';
 import { GEMINI_IMAGE_MODELS, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
+import { after } from 'next/server';
 import { LEAGUES, sceneRecolour, teamByPath, type League } from './sports-teams';
 import { letteringMatches, readKit, readShirt } from './kit-lettering';
 import { generateWithUsage } from '@/lib/ai/usage';
@@ -173,6 +174,9 @@ export async function ensureTeamVariant(input: {
   try {
     const { imageId, check } = await paintTeamVersion(input.sourceId, input.team, input.recolour ?? geminiRecolour, input.upload ?? uploadImageBufferToCloudinary, input.fetchImage ?? fetchAsBase64);
     await supabase.from('design_team_variants').update({ status: 'done', image_id: imageId, error: null, ...(check ? { kit_check: check } : {}), updated_at: new Date().toISOString() }).eq('id', jobId);
+    // Its own title and description, written for the team's fans (after the response when we can)
+    const describe = () => describeTeamVersion(imageId, input.team).catch(e => console.warn('team version description failed', imageId, e));
+    try { after(describe); } catch { await describe(); }
     return { status: 'done', imageId };
   } catch (err) {
     const message = err instanceof Error ? err.message.slice(0, 500) : 'Unknown error';
@@ -258,4 +262,44 @@ export function recolourFor(instruction: string, pets: number): string {
   if (pets <= 1) return instruction;
   return instruction.replace(/^Recolour the pet's sports outfit( \(and its scarf, if it has one\))?/, `There are ${pets} pets. Recolour every pet's sports outfit (and scarf, if they have one), all in the same team kit,`)
     .replace(/Keep the same type of garment/, 'Keep each pet’s type of garment');
+}
+
+/**
+ * A fresh title and description for a team version, written by Claude from the picture itself and
+ * aimed at that team's fans (club name and nicknames, never generic). The shirt's sample name is
+ * left out: customers put their own pet's name on it. Saved on the version's image_catalog row.
+ */
+export async function describeTeamVersion(imageId: string, team: Pick<OfferedTeam, 'name' | 'short' | 'path' | 'nicknames'>): Promise<string | null> {
+  const supabase = serviceClient();
+  const { data: row } = await supabase.from('image_catalog').select('id, cloudinary_public_id, public_url, breeds:breed_id (name)').eq('id', imageId).maybeSingle();
+  if (!row) return null;
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  const url = row.cloudinary_public_id && cloud ? `https://res.cloudinary.com/${cloud}/image/upload/c_limit,w_1024,h_1024/f_jpg,q_85/${row.cloudinary_public_id}` : row.public_url;
+  const sportsTeam = teamByPath(team.path);
+  const { data: kitRow } = await supabase.from('image_catalog').select('kit_personalisation').eq('id', imageId).maybeSingle();
+  const kit = readKit((kitRow as any)?.kit_personalisation);
+  const nick = (sportsTeam?.nicknames ?? team.nicknames ?? []).filter(n => n.length > 3 && !/fc$/i.test(n)).slice(0, 4);
+  const context = [
+    `This pet is a devoted ${team.name} supporter: the shirt, the players and the crowd are all in ${team.short} colours${sportsTeam ? ` (${sportsTeam.colours.map(c => c.name).join(' and ')})` : ''}.`,
+    `Write the title and description for ${team.short} fans: name the club in the title, and work in the club, its colours and fan culture naturally${nick.length ? ` (nicknames fans use: ${nick.join(', ')})` : ''}, so it reads as made for ${team.short} supporters and not as a generic football picture.`,
+    kit ? `The name and number on the shirt are a placeholder that each customer replaces with their own pet's, so never use the name "${kit.name}" or the number ${kit.number ?? ''}; call the pet "this ${(row as any).breeds?.name || 'pup'}" or similar.` : '',
+    'Do not mention crests, sponsors, logos or official merchandise, and do not name real players.',
+  ].filter(Boolean).join(' ');
+  const { ImageDescriptionGenerator } = await import('@/lib/image-description-generator');
+  const text = (await new ImageDescriptionGenerator().generateDescription(url, (row as any).breeds?.name ?? undefined, undefined, context))?.trim();
+  if (!text || text === 'Unable to generate description') return null;
+  await supabase.from('image_catalog').update({ description: text }).eq('id', imageId);
+  return text;
+}
+
+/** Show (or hide) a team version on its team's collection page */
+export async function setTeamVersionPublished(imageId: string, teamCollectionId: string, publish: boolean): Promise<void> {
+  const supabase = serviceClient();
+  if (publish) {
+    const { error } = await supabase.from('design_collections')
+      .upsert({ image_id: imageId, collection_id: teamCollectionId, source: 'team', excluded: false }, { onConflict: 'image_id,collection_id' });
+    if (error) throw new Error(error.message.includes('source_check') ? 'Run the 2026-10-21-team-version-pages migration first' : error.message);
+  } else {
+    await supabase.from('design_collections').delete().eq('image_id', imageId).eq('collection_id', teamCollectionId).eq('source', 'team');
+  }
 }
