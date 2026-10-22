@@ -11,7 +11,7 @@ const nextConfig = {
     output: 'standalone',
     // Email templates are read from disk at runtime (lib/messaging/message-service.ts)
     outputFileTracingIncludes: {
-      '/api/**/*': ['./lib/messaging/templates/**/*.html'],
+      '/api/**/*': ['./lib/messaging/templates/**/*.html', './lib/fonts/**/*.ttf'],   // + label fonts (lib/stock/print-labels.ts)
     },
     transpilePackages: [],
     images: {

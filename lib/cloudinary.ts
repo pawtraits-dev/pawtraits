@@ -545,6 +545,31 @@ export class CloudinaryImageService {
   }
 
   /**
+   * Trade printer file (Admin → Trade print orders): the same crop and size as the print file
+   * (exact finished size, 300 dpi, no bleed) as a high-quality sRGB JPG, which the admin's
+   * browser fetches and wraps in a PDF of the exact page size.
+   */
+  getTradePrintUrl(
+    publicId: string,
+    plan: { crop: { x: number; y: number; width: number; height: number }; outputPx: { width: number; height: number } },
+    upscale?: { pre: { width: number; height: number } } | null,
+  ): string {
+    ensureCloudinaryConfig();
+    return cloudinary.url(publicId, {
+      secure: true,
+      sign_url: false,
+      type: 'upload',
+      resource_type: 'image',
+      format: 'jpg',
+      transformation: [
+        { crop: 'crop', x: plan.crop.x, y: plan.crop.y, width: plan.crop.width, height: plan.crop.height },
+        ...(upscale ? [{ crop: 'scale', width: upscale.pre.width, height: upscale.pre.height }, { effect: 'upscale' }] : []),
+        { crop: 'scale', width: plan.outputPx.width, height: plan.outputPx.height, quality: 95 },
+      ],
+    });
+  }
+
+  /**
    * Make sure a derived image exists before someone (Gelato, the admin) fetches it.
    * Cloudinary answers 423 while an AI upscale is still being generated.
    */

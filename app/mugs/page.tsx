@@ -2,7 +2,7 @@
 
 /**
  * Mugs: wraparound catalogue designs (2:1 format, e.g. football, with any team, the pet's name on
- * the shirt and a team motto) → /customise/[id]; and the designed zodiac (and other) mugs from
+ * the shirt and a team motto) → /mugs/design/[id]; and the designed zodiac (and other) mugs from
  * Admin → Mugs → Catalog → /mugs/[slug].
  */
 import { useEffect, useMemo, useState } from 'react';
@@ -50,7 +50,7 @@ export default function MugsPage() {
               <ul className="mt-4 grid gap-4 sm:grid-cols-2">
                 {wraps.map((w) => (
                   <li key={w.id}>
-                    <Link href={`/customise/${w.id}?src=mugs`} className="group block overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 hover:ring-purple-300">
+                    <Link href={`/mugs/design/${w.id}`} className="group block overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 hover:ring-purple-300">
                       {w.mockups?.pet ? (
                         // Both sides of the mug: the pet, and the motto round the back
                         <div className="grid grid-cols-2 bg-white">

@@ -26,7 +26,8 @@ function Swatches({ colours, size = 'md' }: { colours: Team['colours']; size?: '
   );
 }
 
-export default function TeamPicker({ imageId }: { imageId: string }) {
+/** hrefFor: where a team's version opens (default its design page; the mug page uses /mugs/design/<id>) */
+export default function TeamPicker({ imageId, hrefFor }: { imageId: string; hrefFor?: (imageId: string) => string }) {
   const router = useRouter();
   const [data, setData] = useState<Data | null>(null);
   const [open, setOpen] = useState(false);
@@ -67,7 +68,7 @@ export default function TeamPicker({ imageId }: { imageId: string }) {
 
   const go = (target: string) => {
     const from = new URLSearchParams(window.location.search).get('from');
-    router.push(`/customise/${target}${from ? `?from=${encodeURIComponent(from)}` : ''}`);
+    router.push(hrefFor ? hrefFor(target) : `/customise/${target}${from ? `?from=${encodeURIComponent(from)}` : ''}`);
   };
 
   const pick = async (team: Team) => {
