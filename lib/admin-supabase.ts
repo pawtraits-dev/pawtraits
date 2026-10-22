@@ -719,6 +719,11 @@ export class AdminSupabaseService {
     return adminRequest<{ ok: true }>(`/api/admin/collections/team-versions/${id}`, jsonInit('PATCH', { kit_personalisation: kit }));
   }
 
+  /** Make a lettering test (painted on the original) the design's picture and lettering */
+  async useKitLetteringTest(id: string, testId: string): Promise<AdminResult<{ ok: true; name: string; number: number | null }>> {
+    return adminRequest<{ ok: true; name: string; number: number | null }>(`/api/admin/collections/team-versions/${id}`, jsonInit('POST', { action: 'use-test', testId }));
+  }
+
   /** Paint a name and number onto the design (or a team's version) and read it back */
   async testKitLettering(id: string, name: string, number: number | null, team?: string | null): Promise<AdminResult<{ test: any }>> {
     return adminRequest<{ test: any }>(`/api/admin/collections/team-versions/${id}/lettering`, jsonInit('POST', { name, number, team: team || undefined }));

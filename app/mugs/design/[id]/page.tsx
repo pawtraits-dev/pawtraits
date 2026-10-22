@@ -226,7 +226,7 @@ export default function WrapMugPage() {
                     <p className="text-sm font-semibold text-gray-900">{n('kit')} Their name and number on the shirt</p>
                     <div className="mt-2 flex gap-3">
                       <input value={kitName} onChange={e => setKitName(e.target.value.toUpperCase().replace(/[^A-Z '‘’\-]/g, '').slice(0, 12))}
-                        placeholder={design.kit?.name || 'BISCUIT'} aria-label="Name on the shirt" autoCapitalize="characters" autoComplete="off" maxLength={12} disabled={!!painting}
+                        placeholder="BISCUIT" aria-label="Name on the shirt" autoCapitalize="characters" autoComplete="off" maxLength={12} disabled={!!painting}
                         className="h-12 min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-4 text-lg font-semibold uppercase tracking-wide placeholder:font-normal placeholder:text-gray-400" />
                       <input value={kitNumber} onChange={e => setKitNumber(e.target.value.replace(/\D/g, '').slice(0, 2))}
                         placeholder="–" aria-label="Number on the shirt" inputMode="numeric" maxLength={2} disabled={!!painting}

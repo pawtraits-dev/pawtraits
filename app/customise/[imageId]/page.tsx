@@ -660,7 +660,7 @@ export default function CustomisePage() {
                 <div className="mt-3 flex gap-3">
                   <label className="min-w-0 flex-1 text-sm font-medium text-gray-800">Name
                     <input value={kitName} onChange={e => setKitName(e.target.value.toUpperCase().replace(/[^A-Z '‘’\-]/g, '').slice(0, 12))}
-                      placeholder={catalogImage.kit?.name || 'BISCUIT'} autoCapitalize="characters" autoComplete="off" maxLength={12}
+                      placeholder="BISCUIT" autoCapitalize="characters" autoComplete="off" maxLength={12}
                       className="mt-1 block h-12 w-full rounded-xl border border-gray-300 bg-white px-3 text-lg font-semibold uppercase tracking-wide placeholder:font-normal placeholder:text-gray-400" />
                   </label>
                   <label className="w-24 text-sm font-medium text-gray-800">Number

@@ -8,6 +8,10 @@
  *       { team, action: 'publish' | 'unpublish' } — show it on its team's collection page or not
  *       { team, action: 'describe' } — write a fresh title and description from the picture
  *       { team, action: 'save-description', description } — save an edited description
+ *       { action: 'use-test', testId } — make a lettering test (painted on the original) the
+ *       design's picture, e.g. a generic "GOOD DOG 1" for stall stock instead of the sample pet's
+ *       name. The kit settings take the test's name and number; the old picture is kept in
+ *       kit_personalisation.previous. Then repaint the team versions so they match.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
@@ -86,6 +90,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (denied) return denied;
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
+  if (UUID.test(id) && body.action === 'use-test') return useLetteringTest(id, String(body.testId || ''));
   if (!UUID.test(id) || typeof body.team !== 'string') return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   try {
     const supabase = serviceClient();
@@ -124,5 +129,39 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch (e) {
     console.error('team version POST failed', e);
     return NextResponse.json({ status: 'failed', error: 'Something went wrong' }, { status: 500 });
+  }
+}
+
+/** Swap the design's picture for a lettering test painted on it (the new stall / reference lettering) */
+async function useLetteringTest(id: string, testId: string) {
+  if (!UUID.test(testId)) return NextResponse.json({ error: 'Choose a test' }, { status: 400 });
+  const supabase = serviceClient();
+  try {
+    const ctx = await teamContext(supabase, id);
+    if (!ctx) return NextResponse.json({ error: 'Not a sports design' }, { status: 404 });
+    const { data: test } = await supabase.from('kit_lettering_tests').select('*').eq('id', testId).maybeSingle();
+    if (!test || test.design_id !== ctx.sourceId) return NextResponse.json({ error: 'Use a test painted on the original design' }, { status: 400 });
+    if (!test.cloudinary_public_id || test.error) return NextResponse.json({ error: 'That test has no picture' }, { status: 400 });
+    if (!test.matches) return NextResponse.json({ error: 'That test didn’t read back correctly: paint it again' }, { status: 400 });
+
+    const { data: src } = await supabase.from('image_catalog').select('cloudinary_public_id, public_url, storage_path, kit_personalisation').eq('id', ctx.sourceId).maybeSingle();
+    if (!src) return NextResponse.json({ error: 'Design not found' }, { status: 404 });
+    const kit = readKit((src as any).kit_personalisation);
+    if (!kit) return NextResponse.json({ error: 'Set up the personalised kit first' }, { status: 400 });
+    const old = (src as any).kit_personalisation ?? {};
+    const previous = [
+      { cloudinary_public_id: src.cloudinary_public_id, public_url: src.public_url, storage_path: src.storage_path, name: kit.name, number: kit.number, replaced_at: new Date().toISOString() },
+      ...(Array.isArray(old.previous) ? old.previous : []),
+    ].slice(0, 5);
+    const { error } = await supabase.from('image_catalog').update({
+      cloudinary_public_id: test.cloudinary_public_id, public_url: test.image_url, storage_path: `cloudinary:${test.cloudinary_public_id}`,
+      cloudinary_version: null, cloudinary_signature: null,
+      kit_personalisation: { ...old, name: test.kit_name, number: test.kit_number, previous },
+    }).eq('id', ctx.sourceId);
+    if (error) throw error;
+    return NextResponse.json({ ok: true, name: test.kit_name, number: test.kit_number });
+  } catch (e: any) {
+    console.error('use lettering test failed', e);
+    return NextResponse.json({ error: 'Could not update the design' }, { status: 500 });
   }
 }

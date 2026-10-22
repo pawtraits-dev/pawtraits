@@ -174,6 +174,16 @@ export async function ensureTeamVariant(input: {
   try {
     const { imageId, check } = await paintTeamVersion(input.sourceId, input.team, input.recolour ?? geminiRecolour, input.upload ?? uploadImageBufferToCloudinary, input.fetchImage ?? fetchAsBase64);
     await supabase.from('design_team_variants').update({ status: 'done', image_id: imageId, error: null, ...(check ? { kit_check: check } : {}), updated_at: new Date().toISOString() }).eq('id', jobId);
+    // A repaint (Redo) takes over the old version's place on its team page
+    const previousId = existing?.image_id && existing.image_id !== imageId ? existing.image_id : null;
+    if (previousId) {
+      const { data: wasPublished } = await supabase.from('design_collections').select('image_id')
+        .eq('image_id', previousId).eq('collection_id', input.team.id).eq('source', 'team').maybeSingle();
+      if (wasPublished) {
+        await setTeamVersionPublished(imageId, input.team.id, true).catch(e => console.warn('republish after redo failed', e));
+        await setTeamVersionPublished(previousId, input.team.id, false).catch(() => {});
+      }
+    }
     // Its own title and description, written for the team's fans (after the response when we can)
     const describe = () => describeTeamVersion(imageId, input.team).catch(e => console.warn('team version description failed', imageId, e));
     try { after(describe); } catch { await describe(); }

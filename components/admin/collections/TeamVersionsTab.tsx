@@ -68,6 +68,25 @@ function DesignRow({ row, onChanged }: { row: Row; onChanged: () => void }) {
     onChanged();
   };
 
+  /** Repaint every ready version (after the original's lettering changed); published ones stay published */
+  const repaintAll = async () => {
+    if (!detail) return;
+    if (!confirm('Repaint every ready team version from the current original? About a minute and ~13p each.')) return;
+    stop.current = false; setError(null);
+    const todo = detail.groups.flatMap(g => g.teams).filter(t => t.status === 'ready' && t.path !== detail.home);
+    let done = 0, failed = 0;
+    for (const t of todo) {
+      if (stop.current) break;
+      setBusy(t.path); setProgress(`Repainting ${t.short} (${done + failed + 1} of ${todo.length})…`);
+      const r = await svc().makeTeamVersion(row.id, t.path, true);
+      if (r.ok && r.data.status === 'done') done++; else { failed++; if (!r.ok) setError(`${t.short}: ${r.error}`); }
+      await load();
+    }
+    setBusy(null);
+    setProgress(`${done} repainted${failed ? `, ${failed} failed` : ''}${stop.current ? ' (stopped)' : ''}.`);
+    onChanged();
+  };
+
   const act = async (t: Team, action: 'publish' | 'unpublish' | 'describe' | 'save-description', description?: string) => {
     setBusy(t.path); setError(null);
     const r = await svc().teamVersionAction(row.id, t.path, action, description);
@@ -145,6 +164,11 @@ function DesignRow({ row, onChanged }: { row: Row; onChanged: () => void }) {
                     </button>
                   ) : null;
                 })()}
+                {!busy && detail.groups.some(g => g.teams.some(t => t.status === 'ready' && t.path !== detail.home)) && (
+                  <button onClick={repaintAll} className="flex items-center gap-1 rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50">
+                    <RefreshCw className="h-4 w-4" /> Repaint all ready versions
+                  </button>
+                )}
                 {busy && progress && <button onClick={() => { stop.current = true; }} className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800">Stop after this one</button>}
                 {progress && <p role="status" className="text-sm text-gray-800">{progress}</p>}
               </div>
@@ -254,6 +278,17 @@ function KitPanel({ rowId, detail, reload }: { rowId: string; detail: Detail; re
     setRunning(null);
   };
 
+  const useTest = async (t: KitTest) => {
+    if (!t.id) return;
+    if (!confirm(`Make this the design's picture, with ${t.kit_name}${t.kit_number === null ? '' : ` ${t.kit_number}`} on the shirt? The old picture is kept, and you can then repaint the team versions to match.`)) return;
+    setMsg(null); setRunning('Updating the design…');
+    const r = await svc().useKitLetteringTest(rowId, t.id);
+    setRunning(null);
+    if (!r.ok) { setMsg(r.error); return; }
+    setMsg(null);
+    await reload();
+  };
+
   return (
     <div className="mb-4 rounded-lg border border-purple-100 bg-purple-50/40 p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -296,7 +331,7 @@ function KitPanel({ rowId, detail, reload }: { rowId: string; detail: Detail; re
       {kit && (
         <div className="mt-3 border-t border-purple-100 pt-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Lettering tests</p>
-          <p className="text-xs text-gray-600">Paints another name and number onto the design (or a team version) and reads the shirt back to check the spelling. About a minute and ~13p each.</p>
+          <p className="text-xs text-gray-600">Paints another name and number onto the design (or a team version) and reads the shirt back to check the spelling. About a minute and ~13p each. For stall stock, paint a generic name (e.g. GOOD DOG 1) on the original, choose &ldquo;Use on the design&rdquo;, then &ldquo;Repaint all ready versions&rdquo;.</p>
           <div className="mt-2 flex flex-wrap items-end gap-2 text-sm">
             <input value={test.name} onChange={e => setTest(t => ({ ...t, name: e.target.value.toUpperCase() }))} maxLength={12} aria-label="Test name" className="w-36 rounded border border-gray-300 px-2 py-1 uppercase" />
             <input value={test.number} onChange={e => setTest(t => ({ ...t, number: e.target.value.replace(/\D/g, '').slice(0, 2) }))} aria-label="Test number" placeholder="No." className="w-16 rounded border border-gray-300 px-2 py-1" />
@@ -325,6 +360,9 @@ function KitPanel({ rowId, detail, reload }: { rowId: string; detail: Detail; re
                         {t.matches ? <Check className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
                         reads {t.read_name ?? '?'}{t.read_number === null ? '' : ` ${t.read_number}`}{t.logos ? ' · logo seen' : ''}
                       </p>}
+                  {!t.error && t.matches && t.id && t.design_id === detail.sourceId && (kit.name !== t.kit_name || kit.number !== t.kit_number) && (
+                    <button disabled={!!running} onClick={() => useTest(t)} className="mt-1 w-full rounded border border-purple-300 px-1 py-0.5 text-[11px] font-semibold text-purple-800 hover:bg-purple-50 disabled:opacity-50">Use on the design</button>
+                  )}
                 </li>
               ))}
             </ul>
