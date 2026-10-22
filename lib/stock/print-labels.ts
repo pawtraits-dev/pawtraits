@@ -75,7 +75,7 @@ export async function generatePrintLabels(labels: PrintLabel[], opts: LabelOptio
   const layout = opts.layout ?? CL2163;
   const perPage = layout.columns * layout.rows;
   const start = Math.min(Math.max(1, Math.floor(opts.startPosition ?? 1)), perPage) - 1;
-  const cta = opts.cta ?? 'Scan to buy, or put your pet in it';
+  const cta = opts.cta ?? 'Scan to purchase, or personalise with your own pet';
 
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
@@ -120,7 +120,7 @@ function drawLabel(page: PDFPage, label: PrintLabel, b: Box, f: { titleFont: PDF
   // label is the light background; quiet zone of 2 modules kept clear)
   const qrSide = 24;
   const qrX = b.x + b.w - inset - qrSide;
-  const qrTop = b.yTop + (b.h - qrSide) / 2;
+  const qrTop = b.yTop + inset;                         // top-aligned with the thumbnail and brand line
   const { size, isDark } = qrMatrix(label.qrUrl);
   const quiet = 2;
   const mod = qrSide / (size + 2 * quiet);
@@ -147,7 +147,9 @@ function drawLabel(page: PDFPage, label: PrintLabel, b: Box, f: { titleFont: PDF
   const tw = lx + lw - textX;
 
   // Brand line
-  page.drawText('PAWTRAITS', { x: mm(textX), y: Y(top + 2.4), size: 6, font: f.bold, color: LIGHT });
+  // Brand line, cap tops level with the top of the thumbnail and QR
+  const capMm = (f.bold.heightAtSize(6, { descender: false }) / MM) * 0.82;
+  page.drawText('PAWTRAITS', { x: mm(textX), y: Y(top + capMm), size: 6, font: f.bold, color: LIGHT });
 
   // Size tag: light purple pill with the size code, then the dimensions
   const tagTop = top + 4.6;
@@ -171,8 +173,15 @@ function drawLabel(page: PDFPage, label: PrintLabel, b: Box, f: { titleFont: PDF
   lines.forEach((line, i) => page.drawText(line, { x: mm(lx), y: Y(top + lead * (i + 1) - 0.6), size: titleSize, font: f.titleFont, color: DEEP }));
 
   // Call to action at the bottom of the column
-  const ctaLines = wrap(f.cta, f.semi, 6.3, mm(lw)).slice(0, 2);
-  ctaLines.reverse().forEach((line, i) => page.drawText(line, { x: mm(lx), y: Y(b.yTop + b.h - inset - 0.4 - i * 2.7), size: 6.3, font: f.semi, color: MID }));
+  // Call to action across the bottom, centred on the label (smaller type if it's long)
+  const fullW = b.w - 2 * inset;
+  let ctaSize = 6.3;
+  while (ctaSize > 5 && f.semi.widthOfTextAtSize(f.cta, ctaSize) > mm(fullW)) ctaSize -= 0.2;
+  const ctaLines = wrap(f.cta, f.semi, ctaSize, mm(fullW)).slice(0, 2);
+  ctaLines.reverse().forEach((line, i) => {
+    const w = f.semi.widthOfTextAtSize(line, ctaSize) / MM;
+    page.drawText(line, { x: mm(b.x + (b.w - w) / 2), y: Y(b.yTop + b.h - inset - 0.4 - i * 2.6), size: ctaSize, font: f.semi, color: MID });
+  });
 }
 
 function wrap(text: string, font: PDFFont, size: number, maxWidth: number): string[] {

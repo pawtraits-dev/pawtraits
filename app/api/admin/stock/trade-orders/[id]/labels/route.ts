@@ -1,7 +1,8 @@
 /**
  * POST /api/admin/stock/trade-orders/[id]/labels → PDF of print labels (A4, 21 per sheet,
  * 63.5 × 38.1 mm, template CL2163): one label per print in the order, in the same order as the
- * print files. body: { locationCode?: string, startPosition?: 1–21, showGuides?: boolean, cta?: string }
+ * print files. body: { locationCode?: string, startPosition?: 1–21, showGuides?: boolean, cta?: string,
+ *   perPrint?: 1 | 2 }  (2, the default: a front and a back label for each print, side by side)
  * The QR is the stall sticker link for the design and size (and the stall, when given).
  */
 import { NextRequest, NextResponse } from 'next/server';
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const thumbs = new Map<string, Uint8Array>();
   await Promise.all(ids.map(async i => { const b = await thumbnail(info.get(i)?.publicId ?? null); if (b) thumbs.set(i, b); }));
 
+  const perPrint = Number(body.perPrint) === 1 ? 1 : 2;   // front and back by default
   const base = getShortLinkBase();
   const labels: PrintLabel[] = [];
   for (const l of lines) {
@@ -68,7 +70,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Stall links know S / M / L; an XL links to the design without a size
     const linkSize = (STICKER_SIZES as string[]).includes(size) ? (size as StickerSize) : null;
     const qrUrl = buildStickerUrl({ stockRef: refOf.get(l.image_id)!, size: linkSize, locationCode }, base);
-    for (let n = 0; n < l.quantity; n++) labels.push({ title: d?.title ?? 'Pawtraits', sizeCode: size, sizeText, qrUrl, thumbnailKey: thumbs.has(l.image_id) ? l.image_id : null });
+    for (let n = 0; n < l.quantity * perPrint; n++) labels.push({ title: d?.title ?? 'Pawtraits', sizeCode: size, sizeText, qrUrl, thumbnailKey: thumbs.has(l.image_id) ? l.image_id : null });
   }
   if (labels.length > MAX_LABELS) return NextResponse.json({ error: `Too many labels (${labels.length}); max ${MAX_LABELS}` }, { status: 400 });
 

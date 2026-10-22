@@ -332,16 +332,21 @@ function SalesPicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Size; 
 function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Size; quantity: number; title: string; thumb: string | null }[]) => void }) {
   const [q, setQ] = useState('');
   const [page, setPage] = useState(0);
-  const [data, setData] = useState<{ total: number; pageSize: number; designs: { id: string; title: string; breed: string | null; thumb: string | null }[] } | null>(null);
+  const [filters, setFilters] = useState({ layout: '', collection: '', animal: '', breed: '' });
+  const [meta, setMeta] = useState<{ collections: { id: string; path: string; name: string; depth: number }[]; breeds: { id: string; name: string; animal_type: string }[] } | null>(null);
+  const [data, setData] = useState<{ total: number; pageSize: number; designs: { id: string; title: string; breed: string | null; ratio: string | null; thumb: string | null }[] } | null>(null);
+  const setFilter = (k: keyof typeof filters, v: string) => { setFilters(f => ({ ...f, [k]: v, ...(k === 'animal' ? { breed: '' } : {}) })); setPage(0); };
   const [picked, setPicked] = useState<{ id: string; title: string; thumb: string | null } | null>(null);
   const [qty, setQty] = useState<Record<Size, number>>({ S: 0, M: 0, L: 0, XL: 0 });
 
   useEffect(() => {
     const t = setTimeout(() => {
-      api<any>(`/api/admin/stock/trade-orders/designs?q=${encodeURIComponent(q)}&page=${page}`).then(setData).catch(() => {});
+      const qs = new URLSearchParams({ q, page: String(page), ...(meta ? {} : { meta: '1' }) });
+      for (const [k, v] of Object.entries(filters)) if (v) qs.set(k, v);
+      api<any>(`/api/admin/stock/trade-orders/designs?${qs}`).then(d => { setData(d); if (d.meta) setMeta(d.meta); }).catch(() => {});
     }, 250);
     return () => clearTimeout(t);
-  }, [q, page]);
+  }, [q, page, filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const add = () => {
     if (!picked) return;
@@ -355,6 +360,29 @@ function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Si
       <h2 className="text-sm font-semibold text-gray-900">Add from the catalogue</h2>
       <p className="text-xs text-gray-600">Pick a design, then how many of each size.</p>
       <input value={q} onChange={e => { setQ(e.target.value); setPage(0); }} placeholder="Search designs" className="mt-3 w-full rounded border border-gray-200 px-3 py-1.5 text-sm" />
+      <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+        <select value={filters.layout} onChange={e => setFilter('layout', e.target.value)} aria-label="Layout" className="rounded border border-gray-200 bg-white px-1.5 py-1">
+          <option value="">Any layout</option>
+          <option value="portrait">Portrait (2:3)</option>
+          <option value="landscape">Landscape (3:2)</option>
+          <option value="square">Square (1:1)</option>
+          <option value="wide">Wide / mug (2:1)</option>
+        </select>
+        <select value={filters.collection} onChange={e => setFilter('collection', e.target.value)} aria-label="Collection" className="rounded border border-gray-200 bg-white px-1.5 py-1">
+          <option value="">Any collection</option>
+          {(meta?.collections ?? []).map(c => <option key={c.id} value={c.id}>{`${'\u00a0\u00a0'.repeat(c.depth)}${c.name}`}</option>)}
+        </select>
+        <select value={filters.animal} onChange={e => setFilter('animal', e.target.value)} aria-label="Dog or cat" className="rounded border border-gray-200 bg-white px-1.5 py-1">
+          <option value="">Dogs and cats</option>
+          <option value="dog">Dogs</option>
+          <option value="cat">Cats</option>
+        </select>
+        <select value={filters.breed} onChange={e => setFilter('breed', e.target.value)} aria-label="Breed" className="rounded border border-gray-200 bg-white px-1.5 py-1">
+          <option value="">Any breed</option>
+          {(meta?.breeds ?? []).filter(b => !filters.animal || b.animal_type === filters.animal).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+      </div>
+      {data && <p className="mt-1 text-[11px] text-gray-500">{data.total} design{data.total === 1 ? '' : 's'}{Object.values(filters).some(Boolean) ? <> · <button onClick={() => { setFilters({ layout: '', collection: '', animal: '', breed: '' }); setPage(0); }} className="text-purple-700 underline">clear filters</button></> : null}</p>}
       {picked ? (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-purple-50 p-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -380,7 +408,7 @@ function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Si
           <ul className="mt-3 grid max-h-72 grid-cols-4 gap-2 overflow-y-auto sm:grid-cols-6">
             {(data?.designs ?? []).map(d => (
               <li key={d.id}>
-                <button onClick={() => { setPicked(d); setQty({ S: 0, M: 1, L: 0, XL: 0 }); }} className="block w-full text-left" title={d.title}>
+                <button onClick={() => { setPicked(d); setQty({ S: 1, M: 0, L: 0, XL: 0 }); }} className="block w-full text-left" title={d.title}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {d.thumb ? <img src={d.thumb} alt={d.title} className="aspect-[4/5] w-full rounded object-cover hover:ring-2 hover:ring-purple-400" loading="lazy" /> : <span className="block aspect-[4/5] rounded bg-gray-100" />}
                   <span className="mt-0.5 block truncate text-[11px] text-gray-700">{d.title}</span>
@@ -518,15 +546,17 @@ function Labels({ id, disabled, count }: { id: string; disabled: boolean; count:
   const [loc, setLoc] = useState('');
   const [start, setStart] = useState(1);
   const [guides, setGuides] = useState(false);
+  const [perPrint, setPerPrint] = useState<1 | 2>(2);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { fetch('/api/admin/stock/locations?activeOnly=true', { credentials: 'include' }).then(r => (r.ok ? r.json() : [])).then(d => setLocations(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
-  const sheets = Math.ceil((count + start - 1) / 21);
+  const total = count * perPrint;
+  const sheets = Math.ceil((total + start - 1) / 21);
 
   const download = async () => {
     setBusy(true); setError(null);
     try {
-      const r = await fetch(`/api/admin/stock/trade-orders/${id}/labels`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationCode: loc || undefined, startPosition: start, showGuides: guides }) });
+      const r = await fetch(`/api/admin/stock/trade-orders/${id}/labels`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationCode: loc || undefined, startPosition: start, showGuides: guides, perPrint }) });
       if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || `Failed (${r.status})`); }
       const blob = await r.blob();
       const name = /filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '')?.[1] || 'labels.pdf';
@@ -539,12 +569,18 @@ function Labels({ id, disabled, count }: { id: string; disabled: boolean; count:
   return (
     <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50/50 p-4">
       <h2 className="flex items-center gap-1.5 text-sm font-semibold text-gray-900"><Tag className="h-4 w-4 text-purple-600" /> Labels</h2>
-      <p className="text-xs text-gray-600">One label per print ({count}, on {sheets} sheet{sheets === 1 ? '' : 's'} of 21), in the same order as the print files: thumbnail, title, size and a QR to buy it or put your own pet in it. Frosted 63.5 × 38.1 mm labels, 21 per A4 (CL2163). Print at 100% / actual size.</p>
+      <p className="text-xs text-gray-600">{perPrint === 2 ? `A front and a back label for each print (${total} labels, side by side in pairs)` : `One label per print (${total})`}, on {sheets} sheet{sheets === 1 ? '' : 's'} of 21, in the same order as the print files: thumbnail, title, size and a QR to buy it or put your own pet in it. Frosted 63.5 × 38.1 mm labels, 21 per A4 (CL2163). Print at 100% / actual size.</p>
       <div className="mt-3 flex flex-wrap items-end gap-3 text-sm">
         <label>QR credits the stall
           <select value={loc} onChange={e => setLoc(e.target.value)} className="mt-0.5 block rounded border border-gray-200 bg-white px-2 py-1">
             <option value="">No stall</option>
             {locations.filter(l => l.location_type === 'stall').map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
+          </select>
+        </label>
+        <label>Labels per print
+          <select value={perPrint} onChange={e => setPerPrint(Number(e.target.value) === 1 ? 1 : 2)} className="mt-0.5 block rounded border border-gray-200 bg-white px-2 py-1">
+            <option value={2}>Front and back (2)</option>
+            <option value={1}>One</option>
           </select>
         </label>
         <label>Start at label
