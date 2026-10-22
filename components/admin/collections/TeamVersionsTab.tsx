@@ -15,8 +15,8 @@ interface Row { id: string; title: string; thumb: string; home: { path: string; 
 interface Team { path: string; name: string; short: string; colours: { name: string; hex: string }[]; status: 'ready' | 'running' | 'failed' | 'none'; imageId: string | null; thumb: string | null; error: string | null; check: KitCheck | null; description: string | null; published: boolean }
 interface KitCheck { name: string | null; number: number | null; logos: boolean; ok: boolean }
 interface Kit { name: string; number: number | null; scene: boolean; slogan?: boolean }
-interface KitTest { id?: string; design_id: string; kit_name: string; kit_number: number | null; image_url: string | null; thumb?: string | null; read_name: string | null; read_number: number | null; logos: boolean | null; matches: boolean | null; error: string | null; duration_ms: number | null; created_at?: string }
-interface Detail { scope: string; home: string | null; sourceId: string; kit: Kit | null; tests: KitTest[]; groups: { league: string; name: string; teams: Team[] }[] }
+interface KitTest { id?: string; design_id: string; cloudinary_public_id?: string | null; kit_name: string; kit_number: number | null; image_url: string | null; thumb?: string | null; read_name: string | null; read_number: number | null; logos: boolean | null; matches: boolean | null; error: string | null; duration_ms: number | null; created_at?: string }
+interface Detail { scope: string; home: string | null; sourceId: string; sourcePublicId?: string | null; kit: Kit | null; tests: KitTest[]; groups: { league: string; name: string; teams: Team[] }[] }
 
 const STATUS: Record<Team['status'], { label: string; cls: string }> = {
   ready: { label: 'Ready', cls: 'border-green-300 bg-green-50' },
@@ -325,6 +325,7 @@ function KitPanel({ rowId, detail, reload }: { rowId: string; detail: Detail; re
           <button onClick={() => save()} className="rounded bg-purple-600 px-3 py-1.5 font-semibold text-white hover:bg-purple-700">Save</button>
           <button onClick={() => setEditing(false)} className="rounded border border-gray-300 px-3 py-1.5">Cancel</button>
           <p className="basis-full text-xs text-gray-600">Team versions made before this was set up used the pet-only recolour: use Redo on them.</p>
+          <p className="basis-full text-xs text-gray-600">Changing the name here doesn&apos;t repaint the original picture. To change what the shirt says, paint a lettering test below and choose &ldquo;Use on the design&rdquo;. Team versions repainted after a name change get the new lettering painted on (one extra step, ~13p).</p>
         </div>
       )}
 
@@ -360,8 +361,11 @@ function KitPanel({ rowId, detail, reload }: { rowId: string; detail: Detail; re
                         {t.matches ? <Check className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
                         reads {t.read_name ?? '?'}{t.read_number === null ? '' : ` ${t.read_number}`}{t.logos ? ' · logo seen' : ''}
                       </p>}
-                  {!t.error && t.matches && t.id && t.design_id === detail.sourceId && (kit.name !== t.kit_name || kit.number !== t.kit_number) && (
+                  {!t.error && t.matches && t.id && t.design_id === detail.sourceId && t.cloudinary_public_id !== detail.sourcePublicId && (
                     <button disabled={!!running} onClick={() => useTest(t)} className="mt-1 w-full rounded border border-purple-300 px-1 py-0.5 text-[11px] font-semibold text-purple-800 hover:bg-purple-50 disabled:opacity-50">Use on the design</button>
+                  )}
+                  {t.cloudinary_public_id && t.cloudinary_public_id === detail.sourcePublicId && (
+                    <p className="mt-1 text-[11px] font-semibold text-purple-800">On the design now</p>
                   )}
                 </li>
               ))}

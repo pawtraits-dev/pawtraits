@@ -43,11 +43,12 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const errorOf = new Map((rows ?? []).filter((e: any) => e.status === 'failed').map((e: any) => [e.team_collection_id, e.error]));
     const checkOf = new Map((rows ?? []).filter((e: any) => e.status === 'done' && e.kit_check).map((e: any) => [e.team_collection_id, e.kit_check]));
     // Personalised kit settings and lettering tests (empty before the 2026-10-20 migration)
-    const { data: src } = await supabase.from('image_catalog').select('kit_personalisation').eq('id', ctx.sourceId).maybeSingle();
+    const { data: src } = await supabase.from('image_catalog').select('kit_personalisation, cloudinary_public_id').eq('id', ctx.sourceId).maybeSingle();
     const { data: tests } = await supabase.from('kit_lettering_tests').select('*').eq('source_id', ctx.sourceId).order('created_at', { ascending: false }).limit(40);
     return NextResponse.json({
       scope: ctx.scope, home: ctx.homeTeamPath, sourceId: ctx.sourceId,
       kit: readKit((src as any)?.kit_personalisation),
+      sourcePublicId: (src as any)?.cloudinary_public_id ?? null,
       tests: (tests ?? []).map((t: any) => ({ ...t, thumb: cloud && t.cloudinary_public_id ? `https://res.cloudinary.com/${cloud}/image/upload/c_fill,w_240,h_300,g_auto/f_auto,q_auto/${t.cloudinary_public_id}` : t.image_url })),
       groups: groupByLeague(ctx.teams).map(g => ({
         league: g.league, name: g.name,

@@ -16,7 +16,7 @@ import { uploadImageBufferToCloudinary } from '@/lib/cloudinary-server';
 import { GEMINI_IMAGE_MODELS, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
 import { after } from 'next/server';
 import { LEAGUES, sceneRecolour, teamByPath, type League } from './sports-teams';
-import { letteringMatches, readKit, readShirt } from './kit-lettering';
+import { letteringMatches, paintLettering, readKit, readShirt } from './kit-lettering';
 import { generateWithUsage } from '@/lib/ai/usage';
 
 export const VARIANT_TAG = 'team-variant';
@@ -230,7 +230,7 @@ async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: R
   const kit = readKit(kitSettings);
   const sportsTeam = kit?.scene ? teamByPath(team.path) : null;
   const instruction = sportsTeam ? sceneRecolour(sportsTeam, pets) : recolourFor(team.recolour, pets);
-  const painted = await recolour(base64, instruction, { scene: !!sportsTeam });
+  let painted = await recolour(base64, instruction, { scene: !!sportsTeam });
   if (!painted) throw new Error('The picture service returned no image');
   // Format from the picture's real shape (a 2:1 mug wrap stays a mug even if the original design
   // was saved with the wrong format); the original's format when the shape isn't recognised
@@ -240,7 +240,16 @@ async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: R
     : { data: null };
   const formatId = shapeFormat?.id ?? source.format_id;
   // Lettering and logo check (shown in Admin → Team versions)
-  const check = kit ? await readShirt(painted, 'image/png', { imageId: sourceId }) : null;
+  let check = kit ? await readShirt(painted, 'image/png', { imageId: sourceId }) : null;
+  // The shirt doesn't read the design's lettering (the original still has an older name, or the
+  // recolour garbled it): paint the right lettering on once, then read it again
+  if (kit && check && (check.name || check.number !== null) && !letteringMatches(check, kit.name, kit.number)) {
+    try {
+      const fixed = await paintLettering(painted, kit.name, kit.number, { imageId: sourceId });
+      const again = await readShirt(fixed, 'image/png', { imageId: sourceId });
+      if (letteringMatches(again, kit.name, kit.number) || !letteringMatches(check, kit.name, kit.number)) { painted = fixed; check = again; }
+    } catch (e) { console.warn('team version lettering fix failed', e); }
+  }
 
   const slug = team.path.split('/').slice(1).join('-');
   const filename = `team-${slug}-${sourceId.slice(0, 8)}.png`;
