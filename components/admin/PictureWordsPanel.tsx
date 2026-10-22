@@ -66,14 +66,14 @@ export default function PictureWordsPanel({ imageId, onChanged }: { imageId: str
     setBusy(null);
   };
 
-  const apply = async (versions: boolean) => {
+  const apply = async (versions: boolean, adoptClean = false) => {
     if (!(await save())) return;
     setBusy(versions ? 'Drawing the words on the design and its versions…' : 'Drawing the words on the design…');
-    const r = await svc().pictureWordsAction(imageId, { action: 'apply', versions });
+    const r = await svc().pictureWordsAction(imageId, { action: 'apply', versions, adoptClean });
     setBusy(null);
     if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
     const v = r.data.versions;
-    setMsg({ ok: true, text: `Done: “${r.data.text}”.${v ? ` Versions: ${v.updated} updated${v.failed ? `, ${v.failed} failed` : ''}${v.needsRemake ? `, ${v.needsRemake} made before the text-free copy (they still have the old words: make them again)` : ''}.` : ''}` });
+    setMsg({ ok: true, text: `Done: “${r.data.text}”.${v ? ` Versions: ${v.updated} updated${v.failed ? `, ${v.failed} failed` : ''}${v.needsRemake ? `, ${v.needsRemake} without a text-free copy` : ''}.${v.errors?.length ? ` ${v.errors[0]}` : ''}` : ''}` });
     await load();
     onChanged?.();
   };
@@ -161,6 +161,12 @@ export default function PictureWordsPanel({ imageId, onChanged }: { imageId: str
             {info.versions.total > 0 && (
               <button disabled={!!busy || !clean} onClick={() => apply(true)} className="rounded border border-purple-300 px-3 py-1.5 text-sm font-semibold text-purple-800 hover:bg-purple-50 disabled:opacity-50">
                 …and its {info.versions.total} versions ({info.versions.ready} ready)
+              </button>
+            )}
+            {info.versions.total > info.versions.ready && (
+              <button disabled={!!busy || !clean} onClick={() => { if (confirm(`Draw the words on the ${info.versions.total - info.versions.ready} versions that don't have them yet? Only do this if those versions have no words painted in (made from the text-free picture); otherwise the words will be doubled.`)) apply(true, true); }}
+                className="rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50">
+                Add words to {info.versions.total - info.versions.ready} versions without them
               </button>
             )}
             {info.words && <button disabled={!!busy} onClick={remove} className="text-sm text-gray-500 hover:underline">Remove</button>}

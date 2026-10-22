@@ -5,7 +5,7 @@ import { promoteVariationPreview } from '@/lib/catalog/variation-previews';
 import { registerCloudinaryImage } from '@/lib/catalog/register-image';
 import { wordsForNewVersion } from '@/lib/picture-words-server';
 
-export const maxDuration = 60;
+export const maxDuration = 300;   // drawing words on each version adds a few seconds
 
 /**
  * Save approved variation previews to the catalogue, entirely on the server: each preview is
@@ -55,9 +55,9 @@ export async function POST(request: NextRequest) {
         variation_key: typeof v.variation_key === 'string' ? v.variation_key : null,
       });
       // Made from a design with words on it: draw them on for this version's breed
-      if (typeof v.variation_of === 'string') await wordsForNewVersion(supabase, saved.id, v.variation_of);
+      const words = typeof v.variation_of === 'string' ? await wordsForNewVersion(supabase, saved.id, v.variation_of) : null;
       after(() => autoTagNew(supabase, saved.id));
-      results.push({ ...base, success: true, database_id: saved.id, cloudinary_url: moved.secure_url, width: moved.width, height: moved.height });
+      results.push({ ...base, success: true, database_id: saved.id, cloudinary_url: moved.secure_url, width: moved.width, height: moved.height, ...(words ? { words } : {}) });
     } catch (e: any) {
       console.error('Variation save failed:', v.preview_public_id, e);
       results.push({ ...base, success: false, error: e?.message || e?.error?.message || 'Save failed' });

@@ -3,7 +3,9 @@
  * GET    settings, the design's breed phrase, its versions and the clean copy
  * PATCH  { words: {...} }  save the wording, font, colour and box (nothing redrawn yet)
  * POST   { action: 'set-clean', public_id, width, height }  the text-free copy (uploaded by the browser)
- *        { action: 'apply', versions?: true }  draw the words on the design (and its breed versions)
+ *        { action: 'apply', versions?: true, adoptClean?: true }  draw the words on the design (and its
+ *        breed versions; adoptClean: versions with no words set up were painted without words, so
+ *        their own picture is their clean copy)
  *        { action: 'remove' }  no words: back to the picture it had first
  */
 import { NextRequest, NextResponse } from 'next/server';
@@ -82,7 +84,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (body.action === 'apply') {
       const done = await applyWordsToDesign(supabase, id);
-      const versions = body.versions ? await applyWordsToVersions(supabase, id) : null;
+      const versions = body.versions ? await applyWordsToVersions(supabase, id, { adoptClean: body.adoptClean === true }) : null;
       return NextResponse.json({ ok: true, text: done.text, versions });
     }
 

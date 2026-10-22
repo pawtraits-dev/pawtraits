@@ -78,25 +78,32 @@ export async function applyWordsToDesign(supabase: SupabaseClient, imageId: stri
  * and gets the design's words for its own breed. Versions made before the clean copy existed
  * still have the old words painted in: they're counted, not changed (make them again).
  */
-export async function applyWordsToVersions(supabase: SupabaseClient, parentId: string): Promise<{ updated: number; failed: number; needsRemake: number }> {
+export async function applyWordsToVersions(supabase: SupabaseClient, parentId: string, opts: { adoptClean?: boolean } = {}): Promise<{ updated: number; failed: number; needsRemake: number; errors: string[] }> {
   const { data: parent } = await supabase.from('image_catalog').select('text_overlay').eq('id', parentId).maybeSingle();
   const words = readWords((parent as any)?.text_overlay);
   if (!words) throw new Error('This design has no words set up');
-  const { data: versions } = await supabase.from('image_catalog').select('id, text_overlay').eq('variation_of', parentId).limit(500);
+  const { data: versions } = await supabase.from('image_catalog').select('id, cloudinary_public_id, text_overlay').eq('variation_of', parentId).limit(500);
   let updated = 0, failed = 0, needsRemake = 0;
+  const errors: string[] = [];
   for (const v of versions ?? []) {
-    const own = readWords((v as any).text_overlay);
+    let own = readWords((v as any).text_overlay);
+    // adoptClean: a version with no words set up was painted from a picture without words, so
+    // its own picture is its clean copy (admin's choice: "they have no words painted in")
+    if (!own?.clean_public_id && opts.adoptClean && !(v as any).text_overlay && v.cloudinary_public_id) {
+      own = { ...words, clean_public_id: v.cloudinary_public_id, original_public_id: null, applied: null };
+    }
     if (!own?.clean_public_id) { needsRemake++; continue; }
     try {
       // The design's wording and layout, the version's own clean picture
       await applyWordsToDesign(supabase, v.id, { ...words, clean_public_id: own.clean_public_id, original_public_id: own.original_public_id, applied: own.applied });
       updated++;
     } catch (e) {
-      console.warn('words on version failed', v.id, e);
+      console.error('words on version failed', v.id, e);
+      errors.push(String((e as any)?.message || e).slice(0, 200));
       failed++;
     }
   }
-  return { updated, failed, needsRemake };
+  return { updated, failed, needsRemake, errors: errors.slice(0, 3) };
 }
 
 /** The picture a variation should be made from: the design's clean copy when it has words */
@@ -114,15 +121,19 @@ export async function variationSource(supabase: SupabaseClient, ref: { id?: stri
  * A version just saved from a design with words: it was made from the clean copy, so its picture
  * is clean too. Keep that as its clean copy and draw the words for its own breed. Never throws.
  */
-export async function wordsForNewVersion(supabase: SupabaseClient, versionId: string, parentId: string): Promise<void> {
+export async function wordsForNewVersion(supabase: SupabaseClient, versionId: string, parentId: string): Promise<{ text?: string; error?: string } | null> {
   try {
-    const { data: parent } = await supabase.from('image_catalog').select('text_overlay').eq('id', parentId).maybeSingle();
+    const { data: parent, error } = await supabase.from('image_catalog').select('text_overlay').eq('id', parentId).maybeSingle();
+    if (error) throw new Error(error.message);
     const words = readWords((parent as any)?.text_overlay);
-    if (!words?.clean_public_id) return;
+    if (!words?.clean_public_id) return null;
     const { data: v } = await supabase.from('image_catalog').select('cloudinary_public_id').eq('id', versionId).maybeSingle();
-    if (!v?.cloudinary_public_id) return;
-    await applyWordsToDesign(supabase, versionId, { ...words, clean_public_id: v.cloudinary_public_id, original_public_id: null, applied: null });
-  } catch (e) {
-    console.warn('words for new version failed', versionId, e);
+    if (!v?.cloudinary_public_id) throw new Error('The new version has no picture');
+    const done = await applyWordsToDesign(supabase, versionId, { ...words, clean_public_id: v.cloudinary_public_id, original_public_id: null, applied: null });
+    console.log(`🔤 Words drawn on new version ${versionId}: "${done.text}"`);
+    return { text: done.text };
+  } catch (e: any) {
+    console.error('words for new version failed', versionId, e);
+    return { error: String(e?.message || e).slice(0, 200) };
   }
 }

@@ -729,7 +729,7 @@ export class AdminSupabaseService {
     return adminRequest<any>(`/api/admin/catalog/${imageId}/words`, jsonInit('PATCH', { words }));
   }
 
-  async pictureWordsAction(imageId: string, body: { action: 'set-clean'; public_id: string; width: number; height: number } | { action: 'apply'; versions?: boolean } | { action: 'remove' }): Promise<AdminResult<any>> {
+  async pictureWordsAction(imageId: string, body: { action: 'set-clean'; public_id: string; width: number; height: number } | { action: 'apply'; versions?: boolean; adoptClean?: boolean } | { action: 'remove' }): Promise<AdminResult<any>> {
     return adminRequest<any>(`/api/admin/catalog/${imageId}/words`, jsonInit('POST', body));
   }
 

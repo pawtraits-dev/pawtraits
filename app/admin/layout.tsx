@@ -44,6 +44,7 @@ import {
   Layers,
   ScanSearch,
   Wand2,
+  ChevronRight,
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -58,37 +59,57 @@ interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
+// Grouped by job: making designs, the settings they're made from, what customers make, selling,
+// stalls, people, marketing, numbers. Each group folds away (the one with the current page opens).
+const overviewItem = { name: 'Overview', href: '/admin', icon: Home };
 const navigationSections = [
   {
-    title: 'Dashboard',
+    title: 'Catalogue',
     items: [
-      { name: 'Overview', href: '/admin', icon: Home },
-    ]
-  },
-  {
-    title: 'Content Management',
-    items: [
-      { name: 'Breeds', href: '/admin/breeds', icon: Tag },
-      { name: 'Coats', href: '/admin/coats', icon: Palette },
-      { name: 'Collections', href: '/admin/collections', icon: Layers },
-      { name: 'Themes', href: '/admin/themes', icon: ImageIcon },
-      { name: 'Styles', href: '/admin/styles', icon: Eye },
-      { name: 'Outfits', href: '/admin/outfits', icon: Shirt },
+      { name: 'Image Catalog', href: '/admin/catalog', icon: ImageIcon },
+      { name: 'Generate Images', href: '/admin/generate', icon: Wand2 },
       { name: 'Variation Batches', href: '/admin/variation-batches', icon: Layers },
-      { name: 'Preview Size Test', href: '/admin/size-test', icon: ImageIcon },
-      { name: 'Consistency Test', href: '/admin/consistency-test', icon: ScanSearch },
-      { name: 'Formats', href: '/admin/formats', icon: FileImage },
+      { name: 'Collections', href: '/admin/collections', icon: Layers },
       { name: 'Quizzes', href: '/admin/quizzes', icon: Sparkles },
     ]
   },
   {
-    title: 'Commerce',
+    title: 'Design Settings',
     items: [
-      { name: 'Products', href: '/admin/products', icon: Package },
-      { name: 'Countries', href: '/admin/countries', icon: Globe },
-      { name: 'Media', href: '/admin/media', icon: Database },
-      { name: 'Pricing Management', href: '/admin/pricing-management', icon: Settings },
+      { name: 'Breeds', href: '/admin/breeds', icon: Tag },
+      { name: 'Coats', href: '/admin/coats', icon: Palette },
+      { name: 'Themes', href: '/admin/themes', icon: ImageIcon },
+      { name: 'Styles', href: '/admin/styles', icon: Eye },
+      { name: 'Outfits', href: '/admin/outfits', icon: Shirt },
+      { name: 'Formats', href: '/admin/formats', icon: FileImage },
+      { name: 'Definitions', href: '/admin/definitions', icon: Database },
+    ]
+  },
+  {
+    title: 'Mugs',
+    items: [
+      { name: 'Mug Catalog', href: '/admin/mugs/catalog', icon: Coffee },
+      { name: 'Mug Colours', href: '/admin/mugs/colours', icon: Palette },
+      { name: 'Mug Generations', href: '/admin/mugs/generations', icon: BarChart3 },
+      { name: 'Mug Mockup Photos', href: '/admin/mugs/mockups', icon: Coffee },
+    ]
+  },
+  {
+    title: 'Customer Pictures',
+    items: [
+      { name: 'Customisations', href: '/admin/customisations', icon: Wand2 },
+      { name: 'Customer Paintings', href: '/admin/custom-paintings', icon: ScanSearch },
+      { name: 'Customer Customizations', href: '/admin/customer-customizations', icon: ImageIcon },
+    ]
+  },
+  {
+    title: 'Orders & Products',
+    items: [
       { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
+      { name: 'Products', href: '/admin/products', icon: Package },
+      { name: 'Pricing Management', href: '/admin/pricing-management', icon: Settings },
+      { name: 'Media', href: '/admin/media', icon: Database },
+      { name: 'Countries', href: '/admin/countries', icon: Globe },
     ]
   },
   {
@@ -102,32 +123,29 @@ const navigationSections = [
     ]
   },
   {
-    title: 'Users & Partners',
+    title: 'Customers & Partners',
     items: [
       { name: 'Customers', href: '/admin/customers', icon: Users },
-      { name: 'Partners', href: '/admin/partners', icon: Users },
-      { name: 'Influencers', href: '/admin/influencers', icon: Heart },
-      { name: 'Pre-Registration Codes', href: '/admin/partners/pre-registration', icon: QrCode },
-      { name: 'Partner Referrals', href: '/admin/referrals', icon: Target },
       { name: 'Customer Referrals', href: '/admin/customer-referrals', icon: UserPlus },
       { name: 'Credit Pack Settings', href: '/admin/settings/credit-packs', icon: CreditCard },
-      { name: 'Customer Customizations', href: '/admin/customer-customizations', icon: ImageIcon },
+      { name: 'Partners', href: '/admin/partners', icon: Users },
+      { name: 'Partner Referrals', href: '/admin/referrals', icon: Target },
+      { name: 'Pre-Registration Codes', href: '/admin/partners/pre-registration', icon: QrCode },
+      { name: 'Influencers', href: '/admin/influencers', icon: Heart },
     ]
   },
   {
-    title: 'Communications',
+    title: 'Marketing & Messages',
     items: [
+      { name: 'Social', href: '/admin/social', icon: Instagram },
       { name: 'Message Templates', href: '/admin/messaging', icon: Mail },
       { name: 'Message Queue', href: '/admin/messaging/queue', icon: Send },
       { name: 'Test Email', href: '/admin/messaging/test', icon: MessageSquare },
-      { name: 'Social', href: '/admin/social', icon: Instagram },
     ]
   },
   {
     title: 'Analytics',
     items: [
-      { name: 'Customisations', href: '/admin/customisations', icon: Wand2 },
-      { name: 'Customer Paintings', href: '/admin/custom-paintings', icon: ScanSearch },
       { name: 'Image Analytics', href: '/admin/image-analytics', icon: BarChart3 },
       { name: 'Liked Images', href: '/admin/liked-images', icon: Heart },
       { name: 'Shared Images', href: '/admin/shared-images', icon: Share2 },
@@ -135,7 +153,7 @@ const navigationSections = [
     ]
   },
   {
-    title: 'Financial',
+    title: 'Finance',
     items: [
       { name: 'Revenue', href: '/admin/financial/revenue', icon: DollarSign },
       { name: 'Sales', href: '/admin/financial/sales', icon: CreditCard },
@@ -146,23 +164,17 @@ const navigationSections = [
     ]
   },
   {
-    title: 'Mugs',
+    title: 'Testing',
     items: [
-      { name: 'Mug Catalog', href: '/admin/mugs/catalog', icon: Coffee },
-      { name: 'Mug Colours', href: '/admin/mugs/colours', icon: Palette },
-      { name: 'Mug Generations', href: '/admin/mugs/generations', icon: BarChart3 },
-      { name: 'Mug Mockup Photos', href: '/admin/mugs/mockups', icon: Coffee },
+      { name: 'Preview Size Test', href: '/admin/size-test', icon: ImageIcon },
+      { name: 'Consistency Test', href: '/admin/consistency-test', icon: ScanSearch },
     ]
   },
-  {
-    title: 'Tools',
-    items: [
-      { name: 'Image Catalog', href: '/admin/catalog', icon: ImageIcon },
-      { name: 'Generate Images', href: '/admin/generate', icon: ImageIcon },
-      { name: 'Definitions', href: '/admin/definitions', icon: Database },
-    ]
-  }
 ];
+
+/** Is this nav item the current page (or a page inside it, e.g. /admin/breeds/123)? */
+const matches = (pathname: string, href: string) => pathname === href || (href !== '/admin' && pathname.startsWith(`${href}/`));
+const OPEN_KEY = 'pt_admin_nav_open';
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
@@ -170,6 +182,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Which nav groups are open (remembered in this browser); the current page's group always opens
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
+  useEffect(() => {
+    let saved: string[] = [];
+    try { saved = JSON.parse(localStorage.getItem(OPEN_KEY) || '[]'); } catch { /* private mode */ }
+    const current = navigationSections.find(sec => sec.items.some(i => matches(pathname || '', i.href)))?.title;
+    setOpenGroups(Array.from(new Set([...(Array.isArray(saved) ? saved : []), ...(current ? [current] : [])])));
+  }, [pathname]);
+  const toggleGroup = (title: string) => setOpenGroups(prev => {
+    const next = prev.includes(title) ? prev.filter(t => t !== title) : [...prev, title];
+    try { localStorage.setItem(OPEN_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+    return next;
+  });
   
   const supabaseService = new SupabaseService();
   // Using SupabaseService for consistent authentication
@@ -262,36 +287,62 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0">
-          {navigationSections.map((section) => (
-            <div key={section.title}>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                {section.title}
-              </h3>
-              <div className="space-y-1">
-                {section.items.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = pathname === item.href;
-                  
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      onClick={() => setSidebarOpen(false)}
-                      className={`flex items-center px-3 py-2 text-sm rounded-md transition-colors duration-200 ${
-                        isActive
-                          ? 'bg-purple-100 text-purple-700 border-r-2 border-purple-600'
-                          : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 mr-3" />
-                      {item.name}
-                    </Link>
-                  );
-                })}
+        <nav className="flex-1 overflow-y-auto p-3 min-h-0" aria-label="Admin">
+          <Link
+            href={overviewItem.href}
+            onClick={() => setSidebarOpen(false)}
+            className={`mb-2 flex items-center px-3 py-2 text-sm rounded-md transition-colors duration-200 ${
+              pathname === overviewItem.href ? 'bg-purple-100 text-purple-700 font-medium' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+            }`}
+          >
+            <Home className="w-4 h-4 mr-3" />
+            {overviewItem.name}
+          </Link>
+          {navigationSections.map((section) => {
+            const open = openGroups.includes(section.title);
+            const hasCurrent = section.items.some(i => matches(pathname || '', i.href));
+            const id = `nav-${section.title.toLowerCase().replace(/[^a-z]+/g, '-')}`;
+            return (
+              <div key={section.title} className="border-t border-gray-100 py-1">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(section.title)}
+                  aria-expanded={open}
+                  aria-controls={id}
+                  className={`flex w-full items-center rounded-md px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide hover:bg-gray-50 ${hasCurrent ? 'text-purple-700' : 'text-gray-600'}`}
+                >
+                  <ChevronRight className={`mr-1.5 h-4 w-4 shrink-0 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} aria-hidden />
+                  <span className="flex-1">{section.title}</span>
+                  {!open && <span className="text-[10px] font-normal normal-case text-gray-400">{section.items.length}</span>}
+                </button>
+                {open && (
+                  <div id={id} className="mt-0.5 space-y-0.5 pb-1">
+                    {section.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = matches(pathname || '', item.href)
+                        && !section.items.some(o => o.href !== item.href && o.href.length > item.href.length && matches(pathname || '', o.href));
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setSidebarOpen(false)}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={`flex items-center py-1.5 pl-8 pr-3 text-sm rounded-md transition-colors duration-200 ${
+                            isActive
+                              ? 'bg-purple-100 text-purple-700 font-medium'
+                              : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4 mr-2.5 shrink-0" />
+                          {item.name}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
         {/* Sidebar Footer */}

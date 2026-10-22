@@ -226,8 +226,10 @@ export function CloudinaryImageDisplay({
  * from srcset and cache it, and Vercel's edge can cache it too (the old version fetched
  * every image with JavaScript before it could start loading).
  */
-export function CatalogImage({ imageId, className = '', alt = 'Pet Pawtrait', fallbackUrl, sizes = '(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw', priority = false }: {
+export function CatalogImage({ imageId, className = '', alt = 'Pet Pawtrait', fallbackUrl, sizes = '(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw', priority = false, version }: {
   imageId: string;
+  /** Changes when the design's picture changes (e.g. its cloudinary_public_id), so caches don't show the old one */
+  version?: string | number | null;
   className?: string;
   alt?: string;
   fallbackUrl?: string;
@@ -244,7 +246,8 @@ export function CatalogImage({ imageId, className = '', alt = 'Pet Pawtrait', fa
     const el = imgRef.current;
     if (el?.complete && el.naturalWidth > 0) setLoaded(true);
   }, []);
-  const src = (w: number) => `/api/secure-images/${imageId}?variant=mid_size&w=${w}`;
+  const v = version ? `&v=${encodeURIComponent(String(version).slice(-24))}` : '';
+  const src = (w: number) => `/api/secure-images/${imageId}?variant=mid_size&w=${w}${v}`;
 
   if (failed && !fallbackUrl) {
     return <div className={`rounded-lg bg-gray-100 ${className}`} role="img" aria-label={alt} />;

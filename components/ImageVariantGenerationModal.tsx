@@ -116,6 +116,8 @@ function VariationPreviewStep({
                   <div className="flex items-center">
                     <CheckCircle className="w-4 h-4 mr-1" />
                     Saved to catalog
+                    {result.words?.text && <span className="ml-1 text-gray-600">· words added</span>}
+                    {result.words?.error && <span className="ml-1 text-amber-700" title={result.words.error}>· words failed: {String(result.words.error).slice(0, 60)}</span>}
                   </div>
                 ) : (
                   <div>{result.error}</div>

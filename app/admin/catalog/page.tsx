@@ -599,6 +599,7 @@ export default function AdminCatalogPage() {
               <div className="relative overflow-hidden bg-gray-100 rounded-t-lg" style={{ aspectRatio: image.format_aspect_ratio || '1:1' }}>
                 <CatalogImage
                   imageId={image.id}
+                  version={image.cloudinary_public_id}
                   alt={image.description || 'Generated image'}
                   className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                 />
@@ -877,6 +878,7 @@ function ImageDetailModal({
   const [editedTags, setEditedTags] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [picVersion, setPicVersion] = useState(0);   // bumped when the words are redrawn
 
   useEffect(() => {
     if (image) {
@@ -945,6 +947,7 @@ function ImageDetailModal({
             <div className="overflow-hidden rounded-lg bg-gray-100" style={{ aspectRatio: image.format_aspect_ratio || '1:1' }}>
               <CatalogImage
                 imageId={image.id}
+                version={`${image.cloudinary_public_id ?? ''}${picVersion}`}
                 alt={image.description || 'Generated image'}
                 className="w-full h-full object-contain"
               />
@@ -1094,7 +1097,7 @@ function ImageDetailModal({
             )}
 
             {/* Words on the picture: pet's name or breed drawn on */}
-            <PictureWordsPanel imageId={image.id} />
+            <PictureWordsPanel imageId={image.id} onChanged={() => setPicVersion(Date.now())} />
 
             {/* Sticker QR code */}
             <ImageQrPanel imageId={image.id} />

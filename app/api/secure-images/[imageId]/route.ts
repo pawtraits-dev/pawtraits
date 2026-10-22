@@ -213,7 +213,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': isPublicCatalogue
-          ? 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400'
+          // An hour: a design's picture can change (words drawn on, lettering repainted)
+          ? 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400'
           : 'private, max-age=300',
         'Vary': 'Accept',
         'X-Content-Type-Options': 'nosniff',
