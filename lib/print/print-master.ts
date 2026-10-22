@@ -87,7 +87,9 @@ export async function ensurePrintMaster(supabase: SupabaseClient, customImageId:
     const cloudinary = (await import('cloudinary')).v2;
     // A painting with a slogan drawn on: re-render the clean painting, then draw the slogan again
     const slogan: string | null = custom.generation_metadata?.slogan && custom.generation_metadata?.clean_cloudinary_id ? custom.generation_metadata.slogan : null;
-    const sourceId: string | null = slogan ? custom.generation_metadata.clean_cloudinary_id : custom.generated_cloudinary_id;
+    // Words on the picture ("… Biscuit will see you shortly"): drawn again the same way
+    const wordsText: string | null = custom.generation_metadata?.words_text && custom.generation_metadata?.words && custom.generation_metadata?.clean_cloudinary_id ? custom.generation_metadata.words_text : null;
+    const sourceId: string | null = slogan || wordsText ? custom.generation_metadata.clean_cloudinary_id : custom.generated_cloudinary_id;
     const sourceUrl = sourceId
       ? cloudinary.url(sourceId, { secure: true, type: 'upload', format: 'png', sign_url: false })
       : custom.generation_metadata?.full_size_url;
@@ -105,6 +107,15 @@ export async function ensurePrintMaster(supabase: SupabaseClient, customImageId:
       const { bakeSlogan } = await import('@/lib/collections/slogan-server');
       const baked = await bakeSlogan(uploaded.publicId, slogan, 'print-masters');
       uploaded = { ...uploaded, publicId: baked.public_id, width: baked.width, height: baked.height };
+    }
+    if (wordsText) {
+      const { bakeWords } = await import('@/lib/picture-words-server');
+      const { readWords } = await import('@/lib/picture-words');
+      const settings = readWords(custom.generation_metadata.words);
+      if (settings) {
+        const baked = await bakeWords(uploaded.publicId, settings, wordsText, 'print-masters');
+        uploaded = { ...uploaded, publicId: baked.public_id, width: baked.width, height: baked.height };
+      }
     }
     console.log(`🖼️ 4K print master for ${customImageId}: ${uploaded.width}×${uploaded.height} in ${((Date.now() - started) / 1000).toFixed(1)}s`);
 

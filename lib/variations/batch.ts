@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { variationSource, wordsForNewVersion } from '@/lib/picture-words-server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { v2 as cloudinary } from 'cloudinary';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
@@ -254,7 +255,8 @@ async function referenceFile(supabase: SupabaseClient, run: any, refId: string, 
   if (existing?.uri && Date.now() - new Date(existing.uploadedAt).getTime() < REFERENCE_FILE_MAX_AGE_MS) return existing;
   const { data: ref } = await supabase.from('image_catalog').select('cloudinary_public_id, public_url').eq('id', refId).maybeSingle();
   if (!ref) throw new Error('Reference design no longer exists');
-  const base64 = await (deps.loadReference ?? loadCatalogImageBase64)(ref);
+  // A design with words on it: made from its text-free copy (words drawn on after, per breed)
+  const base64 = await (deps.loadReference ?? loadCatalogImageBase64)(deps.loadReference ? ref : await variationSource(supabase, { id: refId, ...ref }));
   const file = await (deps.ai ?? gemini()).files.upload({ file: new Blob([Buffer.from(base64, 'base64')], { type: 'image/png' }), config: { mimeType: 'image/png', displayName: `ref-${refId}` } });
   if (!file.uri) throw new Error('Gemini did not return a file uri');
   const entry = { uri: file.uri, mimeType: file.mimeType || 'image/png', uploadedAt: new Date().toISOString() };
@@ -487,6 +489,7 @@ export async function approveItems(supabase: SupabaseClient, runId: string, ids:
         variation_of: item.reference_image_id,
         variation_key: item.variation_key,
       });
+      await wordsForNewVersion(supabase, saved.id, item.reference_image_id);
       await supabase.from('variation_run_items').update({ status: 'approved', saved_image_id: saved.id, preview_public_id: moved.public_id, preview_url: moved.secure_url, updated_at: new Date().toISOString() }).eq('id', item.id);
       results.push({ id: item.id, ok: true, imageId: saved.id });
     } catch (e: any) {

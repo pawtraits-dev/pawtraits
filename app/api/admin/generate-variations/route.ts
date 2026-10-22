@@ -1,3 +1,4 @@
+import { variationSource } from '@/lib/picture-words-server';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
@@ -35,7 +36,9 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
       if (!source) return NextResponse.json({ error: 'Design not found' }, { status: 404 });
       try {
-        originalImageData = await loadCatalogImageBase64(source);
+        // A design with words on it: variations are made from its text-free copy (the words
+        // are drawn on afterwards for each version's breed, lib/picture-words-server.ts)
+        originalImageData = await loadCatalogImageBase64(await variationSource(supabase as any, { id: originalImageId, ...source }));
       } catch (e) {
         return NextResponse.json({ error: e instanceof Error ? e.message : 'Could not load the design image' }, { status: 502 });
       }

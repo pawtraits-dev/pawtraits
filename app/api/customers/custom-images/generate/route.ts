@@ -14,6 +14,8 @@ import { letteringMatches, paintLettering, readKit, readShirt } from '@/lib/coll
 import { cleanKitName, cleanKitNumber, kitLettering } from '@/lib/collections/sports-teams';
 import { cleanSlogan } from '@/lib/collections/slogan';
 import { bakeSlogan, designMotto } from '@/lib/collections/slogan-server';
+import { cleanPetName, fillWords, petPhrase, readWords, type PictureWords } from '@/lib/picture-words';
+import { bakeWords, breedPhrase } from '@/lib/picture-words-server';
 import { GEMINI_IMAGE_MODELS, toGeminiAspectRatio, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
 import { getRequester, setGuestCookie, clientIp } from '@/lib/guest/access';
 import { hashIp } from '@/lib/qr/attribution';
@@ -122,6 +124,7 @@ interface GenerateJob {
   slotPlan?: SlotReplacement[];        // several pets: which photo replaces which pet (multi-pet plan phase 2)
   kit?: { name: string; number: number | null } | null;  // personalised football kit: the customer's name and number
   slogan?: string | null;              // team motto or the customer's own slogan, drawn on the right
+  words?: { settings: PictureWords; phrase: string | null; animal: 'dog' | 'cat' | null } | null;  // words on the picture; phrase null = from the detected breed
   requestStarted: number;
   timings: Timings;
 }
@@ -232,6 +235,33 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
       timings.slogan = since(t);
     }
 
+    // Words on the picture ("Please be seated, Biscuit will see you shortly"): drawn on a stored
+    // copy, the clean painting kept for print masters. The breed of an uploaded photo is detected now.
+    let wordsMeta: Record<string, unknown> | null = null;
+    if (job.words) {
+      t = Date.now();
+      try {
+        let phrase = job.words.phrase;
+        if (!phrase) {
+          await detectPetBreed(customImageId, supabase);
+          const { data: row } = await supabase.from('customer_custom_images').select('pet_breed_id, metadata').eq('id', customImageId).maybeSingle();
+          const detected = (row?.metadata as any)?.detected_breed;
+          const animal = detected?.animal === 'dog' || detected?.animal === 'cat' ? detected.animal : job.words.animal;
+          phrase = row?.pet_breed_id && (detected?.confidence ?? 1) >= 0.5 ? await breedPhrase(supabase as any, row.pet_breed_id, animal) : petPhrase({ animal });
+        }
+        const text = fillWords(job.words.settings.template, phrase);
+        const cleanId = (sloganMeta?.clean_cloudinary_id as string) ?? generatedCloudinaryId;
+        const cleanUrl = (sloganMeta?.clean_url as string) ?? generatedImageUrl;
+        const baked = await bakeWords(generatedCloudinaryId, job.words.settings, text, 'customer-custom-images');
+        wordsMeta = { words_text: text, words: job.words.settings, clean_cloudinary_id: cleanId, clean_url: cleanUrl };
+        generatedCloudinaryId = baked.public_id;
+        generatedImageUrl = baked.secure_url;
+      } catch (e) {
+        console.warn('picture words failed; keeping the painting without them', customImageId, e);
+      }
+      timings.words = since(t);
+    }
+
     // Watermarked preview for the customise page: made now, so the phone just downloads it
     const watermarkedUrl = cloudinaryService.getPublicVariantUrl(generatedCloudinaryId, 'catalog_watermarked', { format: PREVIEW_FORMAT });
     timings.preview = await buildPreview(watermarkedUrl);
@@ -257,6 +287,7 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
           full_size_url: generatedImageUrl,  // full-size URL
           ...(kitResult ? { kit: kitResult } : {}),
           ...(sloganMeta ?? {}),
+          ...(wordsMeta ?? {}),
           timings,
         },
       })
@@ -313,6 +344,12 @@ export async function POST(request: NextRequest) {
     const customSlogan = sloganRaw && String(sloganRaw).trim() ? cleanSlogan(sloganRaw) : null;
     if (sloganRaw && String(sloganRaw).trim() && !customSlogan) {
       return NextResponse.json({ error: 'Please check the slogan: up to 32 letters, numbers and simple punctuation, and nothing rude.' }, { status: 400 });
+    }
+    // Words on the picture: their pet's name, or (left empty) their breed
+    const wordsNameRaw = formData.get('wordsName');
+    const wordsName = wordsNameRaw && String(wordsNameRaw).trim() ? cleanPetName(wordsNameRaw) : null;
+    if (wordsNameRaw && String(wordsNameRaw).trim() && !wordsName) {
+      return NextResponse.json({ error: 'Please check the name for the picture: letters only (spaces, hyphens and apostrophes are fine), up to 16, and nothing rude.' }, { status: 400 });
     }
     if (kitNameRaw && (!kitName || kitNumber === undefined)) {
       return NextResponse.json({ error: 'Please check the name and number for the shirt: letters only for the name (up to 12), and a number from 0 to 99.' }, { status: 400 });
@@ -381,7 +418,7 @@ export async function POST(request: NextRequest) {
         prompt_text,
         generation_parameters,
         subjects,
-        breeds (id, name),
+        breeds (id, name, animal_type),
         themes (id, name),
         styles (id, name),
         formats (id, name, aspect_ratio)
@@ -446,6 +483,9 @@ export async function POST(request: NextRequest) {
     step('checks');
     const { data: kitRow } = await supabase.from('image_catalog').select('kit_personalisation').eq('id', catalogImageId).maybeSingle();
     const designKit = readKit((kitRow as any)?.kit_personalisation);
+    // Separate read: works before the 2026-10-23 migration
+    const { data: wordsRow } = await supabase.from('image_catalog').select('text_overlay').eq('id', catalogImageId).maybeSingle();
+    const designWords = readWords((wordsRow as any)?.text_overlay);
 
     if (catalogError) {
       console.error('❌ Catalog image fetch error:', catalogError);
@@ -505,7 +545,9 @@ export async function POST(request: NextRequest) {
     // Gemini gets the design's original at 1024 px, with no watermark (the repeated paws would be
     // copied into the painting). CUSTOMER_DESIGN_IMAGE=watermarked goes back to the stored catalogue URL.
     if (process.env.CUSTOMER_DESIGN_IMAGE !== 'watermarked' && catalogImage.cloudinary_public_id) {
-      catalogImageUrl = cloudinary.url(catalogImage.cloudinary_public_id, { width: 1024, crop: 'limit', format: 'jpg', quality: 90, secure: true });
+      // A design with words on it: Gemini paints from the text-free copy (the words are drawn after)
+      const refId = designWords?.clean_public_id ?? catalogImage.cloudinary_public_id;
+      catalogImageUrl = cloudinary.url(refId, { width: 1024, crop: 'limit', format: 'jpg', quality: 90, secure: true });
     }
     if (!catalogImageUrl && catalogImage.cloudinary_public_id) {
       catalogImageUrl = cloudinaryService.getPublicVariantUrl(
@@ -632,6 +674,12 @@ export async function POST(request: NextRequest) {
     // An uploaded photo has no name: the name on the shirt is the pet's name ("Biscuit")
     // Slogan: the customer's own, else the team motto (designs with "Show the team motto" ticked)
     const slogan = designKit?.slogan ? (customSlogan ?? await designMotto(supabase as any, catalogImageId).catch(() => null)) : null;
+    // Words on the picture (one pet): their name, else their saved pet's breed, else detected later
+    const words = designWords?.clean_public_id && petImageUrls.length === 1 ? {
+      settings: designWords,
+      phrase: wordsName ?? (firstPet?.breed_id ? await breedPhrase(supabase as any, firstPet.breed_id, firstPet.animal_type ?? null) : null),
+      animal: (firstPet?.animal_type ?? (catalogImage.breeds as any)?.animal_type ?? null) as 'dog' | 'cat' | null,
+    } : null;
     const kitPetName = kit ? kit.name.toLowerCase().replace(/(^|[\s'-])([a-z])/g, (_m, a, b) => a + b.toUpperCase()) : null;
     const firstPetId = petIds[0];
 
@@ -645,7 +693,7 @@ export async function POST(request: NextRequest) {
         catalog_image_id: catalogImageId,
         pet_id: firstPetId || null,
         // Every pet's name ("Biscuit & Luna"); the first pet's details stay in pet_id / breed / coat
-        pet_name: joinPetNames(petsData.map(p => p?.name), kitPetName ?? undefined),
+        pet_name: joinPetNames(petsData.map(p => p?.name), kitPetName ?? (words && wordsName ? wordsName : undefined)),
         pet_breed_id: firstPet?.breed_id || null,
         pet_coat_id: firstPet?.coat_id || null,
         pet_image_url: petImageUrls[0],
@@ -663,6 +711,7 @@ export async function POST(request: NextRequest) {
           ...(firstPet?.breed_id ? { breed_source: 'profile' } : {}),
           ...(kit ? { kit } : {}),
           ...(slogan ? { slogan } : {}),
+          ...(words ? { words: { name: wordsName, phrase: words.phrase } } : {}),
         }
       })
       .select(`
@@ -724,6 +773,7 @@ export async function POST(request: NextRequest) {
         slotPlan,
         kit,
         slogan,
+        words,
         requestStarted,
         timings,
       }).then(() => capturePreviews({ ids: [customImage.id] })) // social loop: only if "Include free previews" is on

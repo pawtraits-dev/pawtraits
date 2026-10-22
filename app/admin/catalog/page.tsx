@@ -14,6 +14,7 @@ import { AdminSupabaseService } from '@/lib/admin-supabase';
 import type { ImageCatalogWithDetails, Breed, Theme, Style, Format, AnimalType, BreedCoatDetail, Outfit } from '@/lib/types';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ImageQrPanel from '@/components/admin/ImageQrPanel';
+import PictureWordsPanel from '@/components/admin/PictureWordsPanel';
 import { extractDescriptionTitle } from '@/lib/utils';
 import ImageVariantGenerationModal from '@/components/ImageVariantGenerationModal';
 
@@ -1091,6 +1092,9 @@ function ImageDetailModal({
                 </Button>
               </div>
             )}
+
+            {/* Words on the picture: pet's name or breed drawn on */}
+            <PictureWordsPanel imageId={image.id} />
 
             {/* Sticker QR code */}
             <ImageQrPanel imageId={image.id} />

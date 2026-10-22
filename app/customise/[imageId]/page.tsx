@@ -31,6 +31,7 @@ import DesignChips, { useDesignCollections } from '@/components/customise/Design
 import TeamPicker from '@/components/customise/TeamPicker';
 import { cleanKitName } from '@/lib/collections/sports-teams';
 import { cleanSlogan, SLOGAN_MAX } from '@/lib/collections/slogan';
+import { cleanPetName, escapeWords, fillWords, PET_NAME_MAX } from '@/lib/picture-words';
 import DesignQuizLink from '@/components/quiz/DesignQuizLink';
 import { collectionHref } from '@/lib/collections/href';
 
@@ -56,6 +57,8 @@ interface CatalogImage {
   mugMockups?: { pet?: string; text?: string };
   /** Personalised football kit: the customer chooses the name and number on the shirt */
   kit?: { name: string; number: number | null; motto?: string | null } | null;
+  /** Words on the picture: the customer's pet's name or breed in the sentence (live preview URL with a token) */
+  words?: { template: string; phrase: string; previewUrl: string; token: string } | null;
   /** One per pet in the picture, left to right: photo N replaces slot N (multi-pet plan phase 2) */
   slots?: { label: string; breedName: string | null; animalType: 'dog' | 'cat' | null; pose: string | null }[];
 }
@@ -141,6 +144,10 @@ export default function CustomisePage() {
   const [kitNumber, setKitNumber] = useState('');
   const [slogan, setSlogan] = useState('');            // big text on the right; starts as the team motto
   const [sloganTouched, setSloganTouched] = useState(false);
+  // Words on the picture: their pet's name, or their breed
+  const [wordsMode, setWordsMode] = useState<'name' | 'breed'>('name');
+  const [wordsName, setWordsName] = useState('');
+  const [wordsPreview, setWordsPreview] = useState<string | null>(null);
   const [subjects, setSubjects] = useState<Array<{ pet: Pet | null; file: File | null; preview: string | null; warning?: string | null }>>([{ pet: null, file: null, preview: null }]);
   const [preparing, setPreparing] = useState(false);
   const [customImage, setCustomImage] = useState<CustomImage | null>(null);
@@ -257,6 +264,7 @@ export default function CustomisePage() {
     setSubjects(prev => prev.map((s, i) => (i === idx ? { pet, file: null, preview: pet.primary_photo_url || null, warning: null } : s)));
     // The shirt shows the pet's name unless the customer has typed one
     if (catalogImage?.kit && !kitName.trim() && pet.name) setKitName(pet.name.toUpperCase().replace(/[^A-Z '\-]/g, '').slice(0, 12));
+    if (catalogImage?.words && !wordsName.trim() && pet.name) setWordsName(pet.name.slice(0, PET_NAME_MAX));
   }
   function clearSubject(idx: number) {
     setSubjects(prev => prev.map((s, i) => (i === idx ? { pet: null, file: null, preview: null, warning: null } : s)));
@@ -266,7 +274,19 @@ export default function CustomisePage() {
   const kitNameOk = !hasKit || !!cleanKitName(kitName);
   const showSlogan = hasKit && !!catalogImage?.kit?.motto;
   const sloganOk = !showSlogan || !sloganTouched || !slogan.trim() || !!cleanSlogan(slogan);
-  const allReady = subjects.length > 0 && subjects.every(s => s.pet || s.file) && kitNameOk && sloganOk;
+  const hasWords = !!catalogImage?.words && subjectCount === 1;
+  const wordsOk = !hasWords || wordsMode === 'breed' || !!cleanPetName(wordsName);
+  // What the sentence will say: their name, their saved pet's breed, or (photo) worked out later
+  const wordsPhrase = !hasWords ? '' : wordsMode === 'name'
+    ? (cleanPetName(wordsName) || 'Biscuit')
+    : subjects[0]?.pet?.breed_name ? `the ${subjects[0].pet.breed_name}` : (catalogImage?.words?.phrase || 'the dog');
+  useEffect(() => {
+    if (!hasWords || !catalogImage?.words) { setWordsPreview(null); return; }
+    const w = catalogImage.words;
+    const timer = setTimeout(() => setWordsPreview(w.previewUrl.replace(w.token, escapeWords(fillWords(w.template, wordsPhrase)))), 450);
+    return () => clearTimeout(timer);
+  }, [hasWords, catalogImage?.words, wordsPhrase]);
+  const allReady = subjects.length > 0 && subjects.every(s => s.pet || s.file) && kitNameOk && sloganOk && wordsOk;
 
   function startCustomise() {
     setStep('photo');
@@ -350,6 +370,7 @@ export default function CustomisePage() {
     if (hasKit) { fd.append('kitName', kitName.trim().toUpperCase()); fd.append('kitNumber', kitNumber); }
     // Their own slogan (left alone, the team motto is used, with its own line breaks)
     if (showSlogan && sloganTouched && slogan.trim()) fd.append('slogan', slogan.trim());
+    if (hasWords && wordsMode === 'name') fd.append('wordsName', wordsName.trim());
     subjects.forEach((s, i) => {
       const n = subjectCount > 1 ? String(i + 1) : '';
       if (s.pet) fd.append(`petId${n}`, s.pet.pet_id);
@@ -689,6 +710,36 @@ export default function CustomisePage() {
                 )}
               </div>
             )}
+            {hasWords && catalogImage.words && (
+              <div className="mt-5 rounded-2xl border border-purple-200 bg-purple-50/50 p-4">
+                <p className="font-semibold text-gray-900">The words on the picture</p>
+                <div className="mt-2 flex gap-2" role="radiogroup" aria-label="What the words say">
+                  {(['name', 'breed'] as const).map(m => (
+                    <button key={m} type="button" role="radio" aria-checked={wordsMode === m} onClick={() => setWordsMode(m)}
+                      className={`h-10 flex-1 rounded-xl border text-sm font-semibold ${wordsMode === m ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-300 bg-white text-gray-800'}`}>
+                      {m === 'name' ? 'Their name' : 'Their breed'}
+                    </button>
+                  ))}
+                </div>
+                {wordsMode === 'name' ? (
+                  <label className="mt-3 block text-sm font-medium text-gray-800">Their name
+                    <input value={wordsName} onChange={e => setWordsName(e.target.value.slice(0, PET_NAME_MAX))}
+                      placeholder="Biscuit" autoCapitalize="words" autoComplete="off" maxLength={PET_NAME_MAX}
+                      className="mt-1 block h-12 w-full rounded-xl border border-gray-300 bg-white px-3 text-lg font-semibold placeholder:font-normal placeholder:text-gray-400" />
+                  </label>
+                ) : (
+                  <p className="mt-3 text-sm text-gray-600">
+                    {subjects[0]?.pet?.breed_name ? `It will say “the ${subjects[0].pet.breed_name}”.` : 'We’ll work out their breed from the photo (or say “the dog” if they’re a lovely mix).'}
+                  </p>
+                )}
+                {wordsMode === 'name' && wordsName.trim() && !cleanPetName(wordsName) && <p role="alert" className="mt-1 text-sm text-red-700">Letters only please (spaces, hyphens and apostrophes are fine), and nothing rude.</p>}
+                <p className="mt-3 text-sm italic text-gray-700">“{fillWords(catalogImage.words.template, wordsPhrase)}”</p>
+                {wordsPreview && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={wordsPreview} alt="How the words will look" className="mt-2 w-40 rounded-lg border border-purple-200" />
+                )}
+              </div>
+            )}
             {preparing && <p className="mt-3 text-sm text-gray-500">Getting your photo ready…</p>}
             <p className="mt-4 text-xs text-gray-500">
               Your photo is used to make your portrait. We may show favourites on our website and Instagram with your pet’s first name only (<Link href="/terms" className="underline">terms</Link>). {!signedIn && <>No account needed — <Link href={`/auth/login?returnTo=/customise/${imageId}`} className="underline">sign in</Link> to use your saved pets.</>}
@@ -697,7 +748,7 @@ export default function CustomisePage() {
             <StickyActionBar>
               <button onClick={generate} disabled={!allReady || preparing}
                 className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 text-lg font-semibold text-white shadow-lg disabled:bg-purple-300">
-                <Sparkles className="h-5 w-5" /> {allReady ? 'Create my free preview' : !subjects.every(s => s.pet || s.file) ? (subjectCount > 1 ? 'Add all photos to continue' : 'Add a photo to continue') : 'Add their name for the shirt'}
+                <Sparkles className="h-5 w-5" /> {allReady ? 'Create my free preview' : !subjects.every(s => s.pet || s.file) ? (subjectCount > 1 ? 'Add all photos to continue' : 'Add a photo to continue') : !kitNameOk ? 'Add their name for the shirt' : !wordsOk ? 'Add their name for the picture' : 'Check the words'}
               </button>
               <button onClick={() => setStep('choose')} className="h-10 w-full text-sm text-gray-600">Back</button>
             </StickyActionBar>

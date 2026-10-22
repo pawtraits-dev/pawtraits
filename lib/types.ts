@@ -17,6 +17,7 @@ export interface Breed {
   animal_type: 'dog' | 'cat';
   hero_image_url?: string;
   hero_image_alt?: string;
+  short_name?: string | null;  // how it reads in a sentence ("Cavalier"); 2026-10-23 migration
   created_at: string;
   updated_at: string;
 }

@@ -100,7 +100,8 @@ function EditBreedPageClient({ params }: { params: Promise<{ id: string }> }) {
         is_active: data.is_active,
         metadata: data.metadata || {},
         hero_image_url: data.hero_image_url || '',
-        hero_image_alt: data.hero_image_alt || ''
+        hero_image_alt: data.hero_image_alt || '',
+        ...('short_name' in data ? { short_name: data.short_name || '' } : {})
       });
     } catch (error) {
       alert('Failed to load breed');
@@ -232,7 +233,8 @@ function EditBreedPageClient({ params }: { params: Promise<{ id: string }> }) {
       let finalData = {
         ...formData,
         personality_traits: (formData.personality_traits || []).filter(trait => trait.trim() !== ''),
-        alternative_names: (formData.alternative_names || []).filter(name => name.trim() !== '')
+        alternative_names: (formData.alternative_names || []).filter(name => name.trim() !== ''),
+        ...('short_name' in formData ? { short_name: (formData.short_name || '').trim() || null } : {})
       };
 
       // Upload hero image if a new one was selected
@@ -527,6 +529,20 @@ function EditBreedPageClient({ params }: { params: Promise<{ id: string }> }) {
                     </div>
                   </div>
                 </div>
+
+                {'short_name' in formData && (
+                  <div>
+                    <Label htmlFor="short_name">Short name in sentences (optional)</Label>
+                    <Input
+                      id="short_name"
+                      value={formData.short_name || ''}
+                      onChange={(e) => setFormData({ ...formData, short_name: e.target.value })}
+                      placeholder={`e.g. Cavalier (otherwise "${formData.name || 'the breed name'}")`}
+                      maxLength={30}
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Used for words on pictures: &ldquo;the Cavalier will see you shortly&rdquo;.</p>
+                  </div>
+                )}
 
                 <div>
                   <Label htmlFor="popularity_rank">Popularity Rank (optional)</Label>

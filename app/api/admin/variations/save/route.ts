@@ -3,6 +3,7 @@ import { requireAdmin, serviceClient } from '@/lib/qr/server';
 import { autoTagNew } from '@/lib/collections/auto-tag';
 import { promoteVariationPreview } from '@/lib/catalog/variation-previews';
 import { registerCloudinaryImage } from '@/lib/catalog/register-image';
+import { wordsForNewVersion } from '@/lib/picture-words-server';
 
 export const maxDuration = 60;
 
@@ -53,6 +54,8 @@ export async function POST(request: NextRequest) {
         variation_of: typeof v.variation_of === 'string' ? v.variation_of : null,
         variation_key: typeof v.variation_key === 'string' ? v.variation_key : null,
       });
+      // Made from a design with words on it: draw them on for this version's breed
+      if (typeof v.variation_of === 'string') await wordsForNewVersion(supabase, saved.id, v.variation_of);
       after(() => autoTagNew(supabase, saved.id));
       results.push({ ...base, success: true, database_id: saved.id, cloudinary_url: moved.secure_url, width: moved.width, height: moved.height });
     } catch (e: any) {

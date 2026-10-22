@@ -6,6 +6,8 @@ import { readKit } from '@/lib/collections/kit-lettering';
 import { designMotto } from '@/lib/collections/slogan-server';
 import { wrapMockups } from '@/lib/mugs/mockup';
 import { sloganLayer } from '@/lib/collections/slogan';
+import { readWords, wordsLayer, WORDS_TOKEN } from '@/lib/picture-words';
+import { breedPhrase } from '@/lib/picture-words-server';
 
 // Use service role client to bypass RLS for public catalog data
 const supabaseServiceRole = createClient(
@@ -128,6 +130,17 @@ export async function GET(
       ? cloudinaryService.getPublicVariantUrl(catalogImage.cloudinary_public_id, 'full_size', { overlay: sloganLayer(motto) })
       : imageUrl;
 
+    // Words on the picture ("Please be seated, {pet} will see you shortly"): the customer chooses
+    // their pet's name or breed; the page previews it live from this URL template (one-pet designs)
+    const { data: wordsRow } = await supabaseServiceRole.from('image_catalog').select('text_overlay').eq('id', catalogImage.id).maybeSingle();
+    const pictureWords = !isMultiSubject ? readWords((wordsRow as any)?.text_overlay) : null;
+    const words = pictureWords?.clean_public_id ? {
+      template: pictureWords.template,
+      phrase: await breedPhrase(supabaseServiceRole as any, catalogImage.breed_id),
+      previewUrl: cloudinaryService.getPublicVariantUrl(pictureWords.clean_public_id, 'catalog_watermarked', { overlay: wordsLayer(pictureWords, WORDS_TOKEN), format: 'jpg' }),
+      token: WORDS_TOKEN,
+    } : null;
+
     // Wraparound (2:1) designs: the design on the mug photos, both sides, motto included
     const isWrap = (catalogImage.format as any)?.aspect_ratio === '2:1' || (Array.isArray(catalogImage.format) && (catalogImage.format as any)[0]?.aspect_ratio === '2:1');
     const mugMockups = isWrap && catalogImage.cloudinary_public_id
@@ -138,6 +151,7 @@ export async function GET(
     const response = {
       mugMockups,
       kit: kit ? { name: kit.name, number: kit.number, motto } : null,
+      words,
       id: catalogImage.id,
       cloudinaryPublicId: catalogImage.cloudinary_public_id,
       imageUrl: displayUrl,

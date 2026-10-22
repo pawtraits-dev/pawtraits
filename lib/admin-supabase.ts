@@ -719,6 +719,20 @@ export class AdminSupabaseService {
     return adminRequest<{ ok: true }>(`/api/admin/collections/team-versions/${id}`, jsonInit('PATCH', { kit_personalisation: kit }));
   }
 
+  // ===== WORDS ON THE PICTURE (Admin → Catalogue → a design) =====
+
+  async getPictureWords(imageId: string): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/catalog/${imageId}/words`);
+  }
+
+  async savePictureWords(imageId: string, words: Record<string, unknown>): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/catalog/${imageId}/words`, jsonInit('PATCH', { words }));
+  }
+
+  async pictureWordsAction(imageId: string, body: { action: 'set-clean'; public_id: string; width: number; height: number } | { action: 'apply'; versions?: boolean } | { action: 'remove' }): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/catalog/${imageId}/words`, jsonInit('POST', body));
+  }
+
   /** Make a lettering test (painted on the original) the design's picture and lettering */
   async useKitLetteringTest(id: string, testId: string): Promise<AdminResult<{ ok: true; name: string; number: number | null }>> {
     return adminRequest<{ ok: true; name: string; number: number | null }>(`/api/admin/collections/team-versions/${id}`, jsonInit('POST', { action: 'use-test', testId }));
