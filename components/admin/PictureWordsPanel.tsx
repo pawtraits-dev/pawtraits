@@ -5,7 +5,7 @@
  * with {pet} where the name or breed goes, choose the font, colour and box (live preview), then
  * draw them on the design and its breed versions. Data: /api/admin/catalog/[id]/words.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Type, Upload } from 'lucide-react';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { uploadImageDirect } from '@/lib/cloudinary-client';
@@ -33,11 +33,14 @@ export default function PictureWordsPanel({ imageId, onChanged }: { imageId: str
 
   const clean = info?.words?.clean_public_id ?? null;
   const phrase = sample === 'name' ? 'Biscuit' : sample === 'long' ? 'the Cavalier King Charles Spaniel' : (info?.phrase ?? 'the dog');
+  // The preview is redrawn by Cloudinary a moment after changes stop (not on every drag step)
+  const [shown, setShown] = useState<Form>(form);
+  useEffect(() => { const t = setTimeout(() => setShown(form), 400); return () => clearTimeout(t); }, [form]);
   const preview = useMemo(() => {
     if (!clean || !info) return null;
-    const w: PictureWords = { ...form, aspect: info.words?.aspect ?? null, clean_public_id: clean, original_public_id: null, applied: null };
-    return `https://res.cloudinary.com/${info.cloudName}/image/upload/c_limit,w_700/${wordsLayer(w, fillWords(form.template, phrase))}/f_auto,q_auto/${clean}`;
-  }, [clean, info, form, phrase]);
+    const w: PictureWords = { ...shown, aspect: info.words?.aspect ?? null, clean_public_id: clean, original_public_id: null, applied: null };
+    return `https://res.cloudinary.com/${info.cloudName}/image/upload/c_limit,w_700/${wordsLayer(w, fillWords(shown.template, phrase))}/f_auto,q_auto/${clean}`;
+  }, [clean, info, shown, phrase]);
 
   const save = async () => {
     setBusy('Saving…'); setMsg(null);
@@ -147,9 +150,8 @@ export default function PictureWordsPanel({ imageId, onChanged }: { imageId: str
                   </button>
                 ))}
               </div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={preview} alt="Preview of the words" className="w-full rounded border" />
-              <p className="mt-1 text-[11px] text-gray-500">The box is invisible; words wrap inside it and get smaller if they don&apos;t fit.</p>
+              <BoxEditor src={preview} box={form.box} onChange={b => setForm(f => ({ ...f, box: b }))} />
+              <p className="mt-1 text-[11px] text-gray-500">Drag the dashed box to move it; drag a corner to resize. The words wrap inside it and get smaller if they don&apos;t fit. The box isn&apos;t printed.</p>
             </div>
           ) : <p className="text-xs text-gray-500">The preview appears once the text-free copy is uploaded.</p>}
 
@@ -168,6 +170,64 @@ export default function PictureWordsPanel({ imageId, onChanged }: { imageId: str
       )}
       {busy && <p role="status" className="text-sm text-gray-800">{busy}</p>}
       {msg && <p role={msg.ok ? 'status' : 'alert'} className={`text-sm ${msg.ok ? 'text-green-700' : 'text-red-700'}`}>{msg.text}</p>}
+    </div>
+  );
+}
+
+type Box = PictureWords['box'];
+type Mode = 'move' | 'nw' | 'ne' | 'sw' | 'se';
+
+/** The preview with the words' box drawn over it: drag to move, drag a corner to resize */
+function BoxEditor({ src, box, onChange }: { src: string; box: Box; onChange: (b: Box) => void }) {
+  const frame = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ mode: Mode; x: number; y: number; start: Box } | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setLoading(true); }, [src]);
+
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+  const round = (v: number) => Math.round(v * 1000) / 1000;
+
+  const down = (mode: Mode) => (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    drag.current = { mode, x: e.clientX, y: e.clientY, start: { ...box } };
+  };
+  const move = (e: React.PointerEvent) => {
+    const d = drag.current, el = frame.current;
+    if (!d || !el) return;
+    const r = el.getBoundingClientRect();
+    const dx = (e.clientX - d.x) / r.width, dy = (e.clientY - d.y) / r.height;
+    const s = d.start, MIN = 0.04;
+    let { x, y, w, h } = s;
+    if (d.mode === 'move') {
+      x = clamp(s.x + dx, 0, 1 - s.w); y = clamp(s.y + dy, 0, 1 - s.h);
+    } else {
+      if (d.mode.includes('w')) { x = clamp(s.x + dx, 0, s.x + s.w - MIN); w = s.x + s.w - x; }
+      if (d.mode.includes('e')) { w = clamp(s.w + dx, MIN, 1 - s.x); }
+      if (d.mode.includes('n')) { y = clamp(s.y + dy, 0, s.y + s.h - MIN); h = s.y + s.h - y; }
+      if (d.mode.includes('s')) { h = clamp(s.h + dy, MIN, 1 - s.y); }
+    }
+    onChange({ x: round(x), y: round(y), w: round(w), h: round(h) });
+  };
+  const up = () => { drag.current = null; };
+
+  const corner = (m: Mode, cls: string) => (
+    <span onPointerDown={down(m)} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+      className={`absolute h-3.5 w-3.5 rounded-sm border-2 border-purple-600 bg-white ${cls}`}
+      style={{ cursor: m === 'nw' || m === 'se' ? 'nwse-resize' : 'nesw-resize', touchAction: 'none' }} aria-hidden />
+  );
+
+  return (
+    <div ref={frame} className="relative w-full select-none overflow-hidden rounded border" style={{ touchAction: 'none' }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="Preview of the words" draggable={false} onLoad={() => setLoading(false)} onError={() => setLoading(false)} className="block w-full" />
+      <div onPointerDown={down('move')} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+        className="absolute cursor-move border-2 border-dashed border-purple-600 bg-purple-500/10"
+        style={{ left: `${box.x * 100}%`, top: `${box.y * 100}%`, width: `${box.w * 100}%`, height: `${box.h * 100}%`, touchAction: 'none' }}
+        role="slider" aria-label="Words box: drag to move" aria-valuetext={`left ${Math.round(box.x * 100)}%, top ${Math.round(box.y * 100)}%`}>
+        {corner('nw', '-left-2 -top-2')}{corner('ne', '-right-2 -top-2')}{corner('sw', '-bottom-2 -left-2')}{corner('se', '-bottom-2 -right-2')}
+      </div>
+      {loading && <span className="absolute right-1 top-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] text-gray-700">Redrawing…</span>}
     </div>
   );
 }
