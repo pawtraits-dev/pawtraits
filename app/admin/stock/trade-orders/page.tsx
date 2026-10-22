@@ -334,7 +334,8 @@ function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Si
   const [page, setPage] = useState(0);
   const [filters, setFilters] = useState({ layout: '', collection: '', animal: '', breed: '' });
   const [meta, setMeta] = useState<{ collections: { id: string; path: string; name: string; depth: number }[]; breeds: { id: string; name: string; animal_type: string }[] } | null>(null);
-  const [data, setData] = useState<{ total: number; pageSize: number; designs: { id: string; title: string; breed: string | null; ratio: string | null; thumb: string | null }[] } | null>(null);
+  const [data, setData] = useState<{ total: number; pageSize: number; designs: { id: string; title: string; breed: string | null; ratio: string | null; thumb: string | null; versions: number; variationOf: string | null }[] } | null>(null);
+  const [versionsOf, setVersionsOf] = useState<{ id: string; title: string } | null>(null);
   const setFilter = (k: keyof typeof filters, v: string) => { setFilters(f => ({ ...f, [k]: v, ...(k === 'animal' ? { breed: '' } : {}) })); setPage(0); };
   // Several designs at once: the selection survives paging, searching and filtering
   const [picked, setPicked] = useState<Map<string, { id: string; title: string; thumb: string | null }>>(new Map());
@@ -402,10 +403,17 @@ function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Si
                 <span className={`absolute left-1 top-1 flex h-5 w-5 items-center justify-center rounded border text-[11px] font-bold ${on ? 'border-purple-600 bg-purple-600 text-white' : 'border-white/80 bg-white/70 text-transparent'}`} aria-hidden>✓</span>
                 <span className="mt-0.5 block truncate text-[11px] text-gray-700">{d.title}</span>
               </button>
+              {d.versions > 0 && (
+                <button onClick={() => setVersionsOf(versionsOf?.id === d.id ? null : d)} className={`mt-0.5 w-full rounded px-1 py-0.5 text-[11px] font-medium ${versionsOf?.id === d.id ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-800 hover:bg-purple-100'}`}>
+                  +{d.versions} version{d.versions === 1 ? '' : 's'}
+                </button>
+              )}
+              {d.variationOf && <span className="block text-[10px] text-gray-500">a version</span>}
             </li>
           );
         })}
       </ul>
+      {versionsOf && <Versions design={versionsOf} picked={picked} onToggle={toggle} onSetMany={(list, on) => setPicked(m => { const n = new Map(m); for (const d of list) { if (on) n.set(d.id, d); else n.delete(d.id); } return n; })} onClose={() => setVersionsOf(null)} />}
       {data && data.total > data.pageSize && (
         <div className="mt-2 flex items-center gap-2 text-xs">
           <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="rounded border px-2 py-1 disabled:opacity-40">Previous</button>
@@ -436,6 +444,51 @@ function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Si
             </button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Every version of one design (breed / coat variations and team versions), tickable */
+function Versions({ design, picked, onToggle, onSetMany, onClose }: {
+  design: { id: string; title: string };
+  picked: Map<string, { id: string; title: string; thumb: string | null }>;
+  onToggle: (d: { id: string; title: string; thumb: string | null }) => void;
+  onSetMany: (list: { id: string; title: string; thumb: string | null }[], on: boolean) => void;
+  onClose: () => void;
+}) {
+  const [data, setData] = useState<{ design: { id: string; title: string; thumb: string | null; label: string | null }; versions: { id: string; title: string; label: string; kind: string; thumb: string | null; hidden: boolean }[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { setData(null); api<any>(`/api/admin/stock/trade-orders/designs/${design.id}/versions`).then(setData).catch(e => setError(e.message)); }, [design.id]);
+  const all = data ? [{ ...data.design, label: data.design.label || 'Original', kind: 'original', hidden: false }, ...data.versions] : [];
+  const items = all.map(v => ({ id: v.id, title: v.kind === 'original' ? v.title : `${v.title} · ${v.label}`, thumb: v.thumb }));
+  const allOn = items.length > 0 && items.every(i => picked.has(i.id));
+  return (
+    <div className="mt-3 rounded-lg border border-purple-200 bg-white p-3">
+      <div className="flex items-center gap-3">
+        <p className="text-sm font-semibold text-gray-900">Versions of {design.title}</p>
+        {items.length > 0 && <button onClick={() => onSetMany(items, !allOn)} className="text-xs text-purple-700 underline">{allOn ? 'Untick all' : 'Tick all'}</button>}
+        <button onClick={onClose} className="ml-auto text-xs text-gray-600 hover:underline">Close</button>
+      </div>
+      {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+      {!data && !error && <p className="mt-2 text-xs text-gray-500">Loading…</p>}
+      {data && (
+        <ul className="mt-2 grid max-h-72 grid-cols-4 gap-2 overflow-y-auto sm:grid-cols-6">
+          {all.map((v, i) => {
+            const on = picked.has(v.id);
+            return (
+              <li key={v.id}>
+                <button onClick={() => onToggle(items[i])} aria-pressed={on} className="relative block w-full text-left" title={items[i].title}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {v.thumb ? <img src={v.thumb} alt={items[i].title} className={`aspect-[4/5] w-full rounded object-cover ${on ? 'ring-[3px] ring-purple-600' : 'hover:ring-2 hover:ring-purple-300'}`} loading="lazy" /> : <span className="block aspect-[4/5] rounded bg-gray-100" />}
+                  <span className={`absolute left-1 top-1 flex h-5 w-5 items-center justify-center rounded border text-[11px] font-bold ${on ? 'border-purple-600 bg-purple-600 text-white' : 'border-white/80 bg-white/70 text-transparent'}`} aria-hidden>✓</span>
+                  <span className="mt-0.5 block truncate text-[11px] font-medium text-gray-800">{v.label}</span>
+                  <span className="block text-[10px] text-gray-500">{v.kind === 'team' ? 'Team version' : v.kind === 'original' ? 'Original' : 'Breed / coat'}{v.hidden ? ' · hidden online' : ''}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );

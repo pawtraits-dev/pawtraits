@@ -6,6 +6,10 @@
  *   breed       a breed id (main pet or any pet in a multi-pet design)
  *   animal      dog | cat
  *   meta=1      also return the filter options (collections, breeds)
+ * Breed / coat variations (image_catalog.variation_of) are shown under their reference design
+ * (each design has a `versions` count; GET ./designs/[id]/versions lists them, with its team
+ * versions). With a breed or dog/cat filter they're listed in the grid too, so a Labrador
+ * filter finds the Labrador versions.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
@@ -25,7 +29,7 @@ export async function GET(request: NextRequest) {
   const page = Math.max(0, Number(p.get('page')) || 0);
   const supabase = serviceClient();
 
-  let query = supabase.from('image_catalog').select('id, description, cloudinary_public_id, public_url, breeds:breed_id (name), formats:format_id (aspect_ratio)', { count: 'exact' })
+  let query = supabase.from('image_catalog').select('id, description, cloudinary_public_id, public_url, variation_of, breeds:breed_id (name), formats:format_id (aspect_ratio)', { count: 'exact' })
     .eq('is_public', true).or(LISTED_ONLY).not('is_customer_generated', 'is', true)
     .order('created_at', { ascending: false }).range(page * PAGE, page * PAGE + PAGE - 1);
   if (q) query = query.ilike('description', `%${q}%`);
@@ -67,8 +71,22 @@ export async function GET(request: NextRequest) {
       : query.in('breed_id', ids);
   }
 
+  if (!breedIds) query = query.is('variation_of', null);
+
   const { data, count, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // How many versions each design has: breed / coat variations and finished team versions
+  const ids = (data ?? []).map((d: any) => d.id);
+  const versions = new Map<string, number>();
+  if (ids.length) {
+    const [{ data: vars }, { data: teams }] = await Promise.all([
+      supabase.from('image_catalog').select('variation_of').in('variation_of', ids).not('is_customer_generated', 'is', true),
+      supabase.from('design_team_variants').select('source_image_id').in('source_image_id', ids).eq('status', 'done').not('image_id', 'is', null),
+    ]);
+    for (const v of vars ?? []) versions.set(v.variation_of, (versions.get(v.variation_of) ?? 0) + 1);
+    for (const t of teams ?? []) versions.set(t.source_image_id, (versions.get(t.source_image_id) ?? 0) + 1);
+  }
 
   let meta: any = undefined;
   if (p.get('meta') === '1') {
@@ -85,6 +103,8 @@ export async function GET(request: NextRequest) {
     total: count ?? 0, page, pageSize: PAGE, meta,
     designs: (data ?? []).map((d: any) => ({
       id: d.id,
+      versions: versions.get(d.id) ?? 0,
+      variationOf: d.variation_of ?? null,
       title: (d.description || '').match(/\*\*(.+?)\*\*/)?.[1]?.trim() || 'Untitled design',
       breed: one(d.breeds)?.name ?? null,
       ratio: one(d.formats)?.aspect_ratio ?? null,
