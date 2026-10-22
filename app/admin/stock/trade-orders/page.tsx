@@ -336,8 +336,13 @@ function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Si
   const [meta, setMeta] = useState<{ collections: { id: string; path: string; name: string; depth: number }[]; breeds: { id: string; name: string; animal_type: string }[] } | null>(null);
   const [data, setData] = useState<{ total: number; pageSize: number; designs: { id: string; title: string; breed: string | null; ratio: string | null; thumb: string | null }[] } | null>(null);
   const setFilter = (k: keyof typeof filters, v: string) => { setFilters(f => ({ ...f, [k]: v, ...(k === 'animal' ? { breed: '' } : {}) })); setPage(0); };
-  const [picked, setPicked] = useState<{ id: string; title: string; thumb: string | null } | null>(null);
-  const [qty, setQty] = useState<Record<Size, number>>({ S: 0, M: 0, L: 0, XL: 0 });
+  // Several designs at once: the selection survives paging, searching and filtering
+  const [picked, setPicked] = useState<Map<string, { id: string; title: string; thumb: string | null }>>(new Map());
+  const [qty, setQty] = useState<Record<Size, number>>({ S: 1, M: 0, L: 0, XL: 0 });
+  const toggle = (d: { id: string; title: string; thumb: string | null }) => setPicked(m => { const n = new Map(m); if (n.has(d.id)) n.delete(d.id); else n.set(d.id, d); return n; });
+  const pageDesigns = data?.designs ?? [];
+  const allOnPage = pageDesigns.length > 0 && pageDesigns.every(d => picked.has(d.id));
+  const togglePage = () => setPicked(m => { const n = new Map(m); for (const d of pageDesigns) { if (allOnPage) n.delete(d.id); else n.set(d.id, d); } return n; });
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -349,16 +354,15 @@ function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Si
   }, [q, page, filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const add = () => {
-    if (!picked) return;
-    const rows = SIZES.filter(s => qty[s] > 0).map(s => ({ image_id: picked.id, size: s, quantity: qty[s], title: picked.title, thumb: picked.thumb }));
+    const rows = Array.from(picked.values()).flatMap(d => SIZES.filter(s => qty[s] > 0).map(s => ({ image_id: d.id, size: s, quantity: qty[s], title: d.title, thumb: d.thumb })));
     if (rows.length) onAdd(rows);
-    setPicked(null); setQty({ S: 0, M: 0, L: 0, XL: 0 });
+    setPicked(new Map()); setQty({ S: 1, M: 0, L: 0, XL: 0 });
   };
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <h2 className="text-sm font-semibold text-gray-900">Add from the catalogue</h2>
-      <p className="text-xs text-gray-600">Pick a design, then how many of each size.</p>
+      <p className="text-xs text-gray-600">Tick one or more designs (across pages and filters), then how many of each size for each.</p>
       <input value={q} onChange={e => { setQ(e.target.value); setPage(0); }} placeholder="Search designs" className="mt-3 w-full rounded border border-gray-200 px-3 py-1.5 text-sm" />
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
         <select value={filters.layout} onChange={e => setFilter('layout', e.target.value)} aria-label="Layout" className="rounded border border-gray-200 bg-white px-1.5 py-1">
@@ -383,47 +387,55 @@ function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Si
         </select>
       </div>
       {data && <p className="mt-1 text-[11px] text-gray-500">{data.total} design{data.total === 1 ? '' : 's'}{Object.values(filters).some(Boolean) ? <> · <button onClick={() => { setFilters({ layout: '', collection: '', animal: '', breed: '' }); setPage(0); }} className="text-purple-700 underline">clear filters</button></> : null}</p>}
-      {picked ? (
-        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-purple-50 p-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {picked.thumb && <img src={picked.thumb} alt="" className="h-16 w-12 rounded object-cover" />}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-gray-900">{picked.title}</p>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {SIZES.map(s => (
-                <label key={s} className="text-xs text-gray-700">{s} <span className="text-gray-500">{SIZE_CM[s]}</span>
-                  <input type="number" min={0} max={999} value={qty[s]} onChange={e => setQty(v => ({ ...v, [s]: Math.max(0, Number(e.target.value) || 0) }))}
-                    className="ml-1 w-14 rounded border border-gray-200 px-1.5 py-0.5 tabular-nums" />
-                </label>
-              ))}
-            </div>
+      <div className="mt-2 flex items-center gap-3 text-xs">
+        {pageDesigns.length > 0 && <button onClick={togglePage} className="text-purple-700 underline">{allOnPage ? 'Untick this page' : 'Tick all on this page'}</button>}
+        {picked.size > 0 && <button onClick={() => setPicked(new Map())} className="text-gray-600 underline">Clear selection</button>}
+      </div>
+      <ul className="mt-2 grid max-h-72 grid-cols-4 gap-2 overflow-y-auto sm:grid-cols-6">
+        {pageDesigns.map(d => {
+          const on = picked.has(d.id);
+          return (
+            <li key={d.id}>
+              <button onClick={() => toggle(d)} aria-pressed={on} className="relative block w-full text-left" title={d.title}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {d.thumb ? <img src={d.thumb} alt={d.title} className={`aspect-[4/5] w-full rounded object-cover ${on ? 'ring-[3px] ring-purple-600' : 'hover:ring-2 hover:ring-purple-300'}`} loading="lazy" /> : <span className="block aspect-[4/5] rounded bg-gray-100" />}
+                <span className={`absolute left-1 top-1 flex h-5 w-5 items-center justify-center rounded border text-[11px] font-bold ${on ? 'border-purple-600 bg-purple-600 text-white' : 'border-white/80 bg-white/70 text-transparent'}`} aria-hidden>✓</span>
+                <span className="mt-0.5 block truncate text-[11px] text-gray-700">{d.title}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {data && data.total > data.pageSize && (
+        <div className="mt-2 flex items-center gap-2 text-xs">
+          <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="rounded border px-2 py-1 disabled:opacity-40">Previous</button>
+          <span>Page {page + 1} of {Math.ceil(data.total / data.pageSize)}</span>
+          <button disabled={(page + 1) * data.pageSize >= data.total} onClick={() => setPage(p => p + 1)} className="rounded border px-2 py-1 disabled:opacity-40">Next</button>
+        </div>
+      )}
+      {picked.size > 0 && (
+        <div className="mt-3 rounded-lg bg-purple-50 p-3">
+          <div className="flex items-center gap-1">
+            {Array.from(picked.values()).slice(0, 8).map(d => (
+              // eslint-disable-next-line @next/next/no-img-element
+              d.thumb ? <img key={d.id} src={d.thumb} alt="" className="h-10 w-8 rounded object-cover" /> : null
+            ))}
+            {picked.size > 8 && <span className="text-xs text-gray-600">+{picked.size - 8}</span>}
+            <span className="ml-2 text-sm font-semibold text-gray-900">{picked.size} design{picked.size === 1 ? '' : 's'} ticked</span>
           </div>
-          <div className="flex gap-2 text-sm">
-            <button onClick={add} disabled={!SIZES.some(s => qty[s] > 0)} className="rounded-lg bg-purple-600 px-3 py-1.5 font-semibold text-white disabled:opacity-40">Add</button>
-            <button onClick={() => setPicked(null)} className="rounded-lg border px-3 py-1.5">Cancel</button>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <span className="text-xs text-gray-700">For each:</span>
+            {SIZES.map(s => (
+              <label key={s} className="text-xs text-gray-700">{s} <span className="text-gray-500">{SIZE_CM[s]}</span>
+                <input type="number" min={0} max={999} value={qty[s]} onChange={e => setQty(v => ({ ...v, [s]: Math.max(0, Number(e.target.value) || 0) }))}
+                  className="ml-1 w-14 rounded border border-gray-200 px-1.5 py-0.5 tabular-nums" />
+              </label>
+            ))}
+            <button onClick={add} disabled={!SIZES.some(s => qty[s] > 0)} className="ml-auto rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40">
+              Add {picked.size * SIZES.reduce((n, s) => n + qty[s], 0)} prints
+            </button>
           </div>
         </div>
-      ) : (
-        <>
-          <ul className="mt-3 grid max-h-72 grid-cols-4 gap-2 overflow-y-auto sm:grid-cols-6">
-            {(data?.designs ?? []).map(d => (
-              <li key={d.id}>
-                <button onClick={() => { setPicked(d); setQty({ S: 1, M: 0, L: 0, XL: 0 }); }} className="block w-full text-left" title={d.title}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {d.thumb ? <img src={d.thumb} alt={d.title} className="aspect-[4/5] w-full rounded object-cover hover:ring-2 hover:ring-purple-400" loading="lazy" /> : <span className="block aspect-[4/5] rounded bg-gray-100" />}
-                  <span className="mt-0.5 block truncate text-[11px] text-gray-700">{d.title}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          {data && data.total > data.pageSize && (
-            <div className="mt-2 flex items-center gap-2 text-xs">
-              <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="rounded border px-2 py-1 disabled:opacity-40">Previous</button>
-              <span>Page {page + 1} of {Math.ceil(data.total / data.pageSize)}</span>
-              <button disabled={(page + 1) * data.pageSize >= data.total} onClick={() => setPage(p => p + 1)} className="rounded border px-2 py-1 disabled:opacity-40">Next</button>
-            </div>
-          )}
-        </>
       )}
     </div>
   );
