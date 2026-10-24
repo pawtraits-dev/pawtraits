@@ -25,15 +25,25 @@ async function api<T = any>(url: string, init?: RequestInit): Promise<T> {
  */
 export function ReferencePicker({ selected, onChange }: { selected: Ref[]; onChange: (r: Ref[]) => void }) {
   const [q, setQ] = useState('');
+  const [originals, setOriginals] = useState(true);   // originals only: vary the first design, not a version of it
   const [results, setResults] = useState<Ref[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
+  const fetchPage = async (p: number) => {
+    const r = await api<{ rows: Ref[]; total: number }>(`/api/admin/variation-runs/references?paged=1&q=${encodeURIComponent(q)}&originals=${originals ? 1 : 0}&page=${p}`);
+    setTotal(r.total);
+    setPage(p);
+    setResults((prev) => (p === 0 ? r.rows : [...prev, ...r.rows.filter((x) => !prev.some((y) => y.id === x.id))]));
+  };
   useEffect(() => {
     const t = setTimeout(async () => {
       setLoading(true);
-      try { setResults(await api<Ref[]>(`/api/admin/variation-runs/references?q=${encodeURIComponent(q)}`)); } catch { setResults([]); } finally { setLoading(false); }
+      try { await fetchPage(0); } catch { setResults([]); setTotal(0); } finally { setLoading(false); }
     }, 250);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [q, originals]); // eslint-disable-line react-hooks/exhaustive-deps
+  const more = async () => { setLoading(true); try { await fetchPage(page + 1); } finally { setLoading(false); } };
   const ids = new Set(selected.map((s) => s.id));
   const toggle = (r: Ref) => onChange(ids.has(r.id) ? selected.filter((s) => s.id !== r.id) : [...selected, r]);
   return (
@@ -49,11 +59,18 @@ export function ReferencePicker({ selected, onChange }: { selected: Ref[]; onCha
           ))}
         </div>
       )}
-      <div className="relative mb-3">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search designs by description or prompt…" className="pl-10 text-sm" />
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search designs by description or prompt…" className="pl-10 text-sm" />
+        </div>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" checked={originals} onChange={(e) => setOriginals(e.target.checked)} />
+          Originals only (not versions)
+        </label>
+        <span className="text-xs text-gray-500 tabular-nums">{results.length} of {total}</span>
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-72 overflow-y-auto">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-[28rem] overflow-y-auto">
         {loading && results.length === 0 && <p className="col-span-full text-sm text-gray-500 italic">Searching…</p>}
         {results.map((r) => (
           <button key={r.id} type="button" onClick={() => toggle(r)} aria-pressed={ids.has(r.id)} title={r.title}
@@ -64,6 +81,12 @@ export function ReferencePicker({ selected, onChange }: { selected: Ref[]; onCha
             {ids.has(r.id) && <span className="absolute top-1 right-1 rounded-full bg-purple-600 text-white text-[10px] px-1.5">✓</span>}
           </button>
         ))}
+        {results.length < total && (
+          <button type="button" onClick={more} disabled={loading} className="col-span-full rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            {loading ? 'Loading…' : `Load more (${total - results.length} more)`}
+          </button>
+        )}
+        {!loading && results.length === 0 && <p className="col-span-full text-sm text-gray-500">No designs found{originals ? ' (originals only: untick to include versions)' : ''}.</p>}
       </div>
     </div>
   );
