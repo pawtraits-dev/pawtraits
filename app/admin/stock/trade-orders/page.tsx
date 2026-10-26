@@ -524,10 +524,34 @@ async function toPdf(jpg: ArrayBuffer, widthMm: number, heightMm: number, title:
   return doc.save();
 }
 
-function orderSheet(ref: string, printer: string, files: FileSpec[], ext: string): string {
+/** Most files the printer takes in one folder (one upload) */
+const FILES_PER_FOLDER = 12;
+
+/**
+ * Where each file goes: a folder per size ("S_15x20cm"), split into folders of up to 12 files
+ * ("1-12_of_28", "13-24_of_28", "25-28_of_28"). Files keep the order of the labels.
+ */
+function folderPlan(files: FileSpec[]): { file: FileSpec; dir: string[] }[] {
+  const bySize = new Map<string, FileSpec[]>();
+  for (const f of files) bySize.set(f.size, [...(bySize.get(f.size) ?? []), f]);
+  const out: { file: FileSpec; dir: string[] }[] = [];
+  for (const [size, list] of Array.from(bySize.entries())) {
+    const a = Math.min(list[0].widthMm, list[0].heightMm) / 10, b = Math.max(list[0].widthMm, list[0].heightMm) / 10;
+    const sizeDir = `${size}_${a}x${b}cm`;
+    list.forEach((file, i) => {
+      const first = Math.floor(i / FILES_PER_FOLDER) * FILES_PER_FOLDER + 1;
+      const last = Math.min(first + FILES_PER_FOLDER - 1, list.length);
+      out.push({ file, dir: [sizeDir, `${first}-${last}_of_${list.length}`] });
+    });
+  }
+  return out;
+}
+
+function orderSheet(ref: string, printer: string, plan: { file: FileSpec; dir: string[] }[], ext: string): string {
   const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
-  const rows = [['File', 'Size', 'Width (cm)', 'Height (cm)', 'Quantity', 'Material', 'Design', 'Resolution (dpi)'].map(esc).join(',')];
-  for (const f of files) rows.push([`${f.name}.${ext}`, f.size, f.widthMm / 10, f.heightMm / 10, f.quantity, 'Foamex', f.title, f.finalDpi].map(esc).join(','));
+  const files = plan.map(p => p.file);
+  const rows = [['Folder', 'File', 'Size', 'Width (cm)', 'Height (cm)', 'Quantity', 'Material', 'Design', 'Resolution (dpi)'].map(esc).join(',')];
+  for (const { file: f, dir } of plan) rows.push([dir.join('/'), `${f.name}.${ext}`, f.size, f.widthMm / 10, f.heightMm / 10, f.quantity, 'Foamex', f.title, f.finalDpi].map(esc).join(','));
   const total = files.reduce((n, f) => n + f.quantity, 0);
   rows.push('', [esc(`${ref} for ${printer}: ${files.length} files, ${total} prints`)].join(','));
   return rows.join('\n');
@@ -551,19 +575,23 @@ function Downloader({ id, disabled, onDone }: { id: string; disabled: boolean; o
       const d = await api<{ ref: string; printer: string; files: FileSpec[]; problems: string[] }>(`/api/admin/stock/trade-orders/${id}/files`, { method: 'POST', body: '{}' });
       const outDir = dir ? await dir.getDirectoryHandle(d.ref, { create: true }) : null;
       const zip = dir ? null : new (await import('jszip')).default();
-      const write = async (name: string, data: Uint8Array | ArrayBuffer | string) => {
+      // A folder per size, each split into folders of up to 12 files
+      const write = async (path: string[], name: string, data: Uint8Array | ArrayBuffer | string) => {
         if (outDir) {
-          const fh = await outDir.getFileHandle(name, { create: true });
+          let at = outDir;
+          for (const part of path) at = await at.getDirectoryHandle(part, { create: true });
+          const fh = await at.getFileHandle(name, { create: true });
           const w = await fh.createWritable(); await w.write(data); await w.close();
-        } else zip!.file(name, data);
+        } else zip!.file([...path, name].join('/'), data);
       };
-      for (let i = 0; i < d.files.length; i++) {
-        const f = d.files[i];
+      const plan = folderPlan(d.files);
+      for (let i = 0; i < plan.length; i++) {
+        const { file: f, dir: fileDir } = plan[i];
         setProgress(`${i + 1} of ${d.files.length}: ${f.title} (${f.size})…`);
         const jpg = await fetchPrint(f.url, () => setProgress(`${i + 1} of ${d.files.length}: ${f.title} (${f.size}), upscaling for print, about a minute…`));
-        await write(`${f.name}.${format}`, format === 'pdf' ? await toPdf(jpg, f.widthMm, f.heightMm, `${d.ref} ${f.title} ${f.size}`) : jpg);
+        await write(fileDir, `${f.name}.${format}`, format === 'pdf' ? await toPdf(jpg, f.widthMm, f.heightMm, `${d.ref} ${f.title} ${f.size}`) : jpg);
       }
-      await write('order-sheet.csv', orderSheet(d.ref, d.printer, d.files, format));
+      await write([], 'order-sheet.csv', orderSheet(d.ref, d.printer, plan, format));
       if (zip) {
         setProgress('Making the ZIP…');
         const blob = await zip.generateAsync({ type: 'blob' });
@@ -572,7 +600,8 @@ function Downloader({ id, disabled, onDone }: { id: string; disabled: boolean; o
         setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
       }
       const total = d.files.reduce((n, f) => n + f.quantity, 0);
-      setProgress(`Done: ${d.files.length} files (${total} prints) ${dir ? `in the “${d.ref}” folder` : `in ${d.ref}.zip`}, with order-sheet.csv.${d.problems.length ? ` Skipped: ${d.problems.join('; ')}` : ''}`);
+      const folders = new Set(plan.map(p => p.dir.join('/'))).size;
+      setProgress(`Done: ${d.files.length} files (${total} prints) in ${folders} folder${folders === 1 ? '' : 's'} of up to ${FILES_PER_FOLDER}, by size, ${dir ? `in the “${d.ref}” folder` : `in ${d.ref}.zip`}, with order-sheet.csv.${d.problems.length ? ` Skipped: ${d.problems.join('; ')}` : ''}`);
       onDone();
     } catch (e: any) {
       setError(e.message || 'Download failed'); setProgress(null);
@@ -583,7 +612,7 @@ function Downloader({ id, disabled, onDone }: { id: string; disabled: boolean; o
   return (
     <div className="mt-6 rounded-xl border border-purple-200 bg-purple-50/50 p-4">
       <h2 className="text-sm font-semibold text-gray-900">Print files for the printer</h2>
-      <p className="text-xs text-gray-600">One file per line at the exact finished size, 300 dpi, no bleed or crop marks, named with the size and quantity, plus order-sheet.csv. Colours are RGB: the printer converts to CMYK.</p>
+      <p className="text-xs text-gray-600">One file per line at the exact finished size, 300 dpi, no bleed or crop marks, named with the size and quantity, in a folder per size split into folders of up to 12 files (e.g. S_15x20cm/1-12_of_28), plus order-sheet.csv. Colours are RGB: the printer converts to CMYK.</p>
       <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
         <label className="flex items-center gap-1"><input type="radio" checked={format === 'pdf'} onChange={() => setFormat('pdf')} /> PDF (exact page size)</label>
         <label className="flex items-center gap-1"><input type="radio" checked={format === 'jpg'} onChange={() => setFormat('jpg')} /> JPG</label>
