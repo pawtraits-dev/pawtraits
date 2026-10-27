@@ -254,7 +254,7 @@ export function CatalogImage({ imageId, className = '', alt = 'Pet Pawtrait', fa
   }
 
   return (
-    <div className="relative">
+    <div className="relative h-full w-full">
       <img
         ref={imgRef}
         src={failed && fallbackUrl ? fallbackUrl : src(400)}

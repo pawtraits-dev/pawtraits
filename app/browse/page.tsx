@@ -58,6 +58,20 @@ function idsWithDesigns(imgs: any[]) {
 
 type BrowseTab = 'all' | 'dogs' | 'cats' | 'themes';
 
+// Coming back from a design (browser Back) returns to the same place in the gallery: where the
+// page was scrolled is saved when a design is opened, and restored once the gallery has loaded
+const SCROLL_KEY = 'pt_browse_scroll';
+function saveBrowseScroll() {
+  try { sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ url: window.location.pathname + window.location.search, y: window.scrollY, at: Date.now() })); } catch { /* private mode */ }
+}
+function savedBrowseScroll(): number | null {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(SCROLL_KEY) || 'null');
+    if (!v || Date.now() - v.at > 30 * 60_000 || v.url !== window.location.pathname + window.location.search) return null;
+    return Number(v.y) || 0;
+  } catch { return null; }
+}
+
 // Simple in-memory cache to prevent rate limiting
 const dataCache = {
   breeds: null as Breed[] | null,
@@ -72,6 +86,7 @@ const dataCache = {
 function BrowsePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const openDesign = (href: string) => { saveBrowseScroll(); router.push(href); };
 
   // Get initial tab from URL params
   const getInitialTab = (): BrowseTab => {
@@ -121,6 +136,21 @@ function BrowsePageContent() {
     loadData();
     loadUserInteractions();
   }, []);
+
+  // Back from a design: scroll to where the visitor was (cards have a fixed shape, so the page
+  // is the right height as soon as the gallery renders; tried again briefly while it settles)
+  useEffect(() => {
+    if (loading) return;
+    const y = savedBrowseScroll();
+    if (y === null) return;
+    try { sessionStorage.removeItem(SCROLL_KEY); } catch { /* private mode */ }
+    let tries = 0;
+    const go = () => {
+      window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior });
+      if (Math.abs(window.scrollY - y) > 4 && ++tries < 20) setTimeout(go, 50);
+    };
+    requestAnimationFrame(go);
+  }, [loading]);
 
   // Load partner info when user is authenticated and is a partner
   useEffect(() => {
@@ -181,8 +211,10 @@ function BrowsePageContent() {
 
       // Check if cache is valid
       const now = Date.now();
+      // Coming back from a design: reuse the gallery from the last 10 minutes (instant, same order)
+      const returning = savedBrowseScroll() !== null;
       const cacheIsValid = dataCache.lastCacheTime > 0 &&
-        (now - dataCache.lastCacheTime) < dataCache.cacheTimeout &&
+        (now - dataCache.lastCacheTime) < (returning ? 10 * 60_000 : dataCache.cacheTimeout) &&
         dataCache.breeds && dataCache.themes && dataCache.images &&
         dataCache.products && dataCache.pricing;
 
@@ -320,7 +352,7 @@ function BrowsePageContent() {
   const handleCustomize = (image: ImageCatalogWithDetails) => {
     // Guests can customise too (free previews, no sign-up) — account is created at checkout
     // Navigate to customise page instead of opening modal
-    router.push(`/customise/${image.id}`);
+    openDesign(`/customise/${image.id}`);
   };
 
   const getCarouselPageType = (): PageType => {
@@ -809,8 +841,8 @@ function BrowsePageContent() {
                     return (
                       <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
                         <div
-                          className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
-                          onClick={() => router.push(`/customise/${image.id}`)}
+                          className="relative aspect-[2/3] overflow-hidden bg-gray-100 cursor-pointer"
+                          onClick={() => openDesign(`/customise/${image.id}`)}
                         >
                           <CatalogImage
                             imageId={image.id}
@@ -934,7 +966,7 @@ function BrowsePageContent() {
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/customise/${image.id}?start=photo`);
+                              openDesign(`/customise/${image.id}?start=photo`);
                             }}
                           >
                             <Camera className="w-4 h-4 mr-2" />
@@ -946,7 +978,7 @@ function BrowsePageContent() {
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/customise/${image.id}`);
+                              openDesign(`/customise/${image.id}`);
                             }}
                           >
                             <ShoppingCart className="w-4 h-4 mr-2" />
@@ -1094,8 +1126,8 @@ function BrowsePageContent() {
                 return (
                   <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
                     <div
-                      className="relative aspect-square overflow-hidden bg-gray-100 cursor-pointer"
-                      onClick={() => router.push(`/customise/${image.id}`)}
+                      className="relative aspect-[2/3] overflow-hidden bg-gray-100 cursor-pointer"
+                      onClick={() => openDesign(`/customise/${image.id}`)}
                     >
                       <CatalogImage
                         imageId={image.id}
@@ -1207,7 +1239,7 @@ function BrowsePageContent() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            router.push(`/customise/${image.id}`);
+                            openDesign(`/customise/${image.id}`);
                           }}
                         >
                           <Camera className="w-4 h-4 mr-2" />
@@ -1219,7 +1251,7 @@ function BrowsePageContent() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            router.push(`/customise/${image.id}`);
+                            openDesign(`/customise/${image.id}`);
                           }}
                         >
                           <ShoppingCart className="w-4 h-4 mr-2" />
