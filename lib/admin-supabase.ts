@@ -719,6 +719,12 @@ export class AdminSupabaseService {
     return adminRequest<{ ok: true }>(`/api/admin/collections/team-versions/${id}`, jsonInit('PATCH', { kit_personalisation: kit }));
   }
 
+  // ===== DASHBOARD (Admin home) =====
+
+  async getDashboard(period: 'today' | '7d' | '30d'): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/dashboard?period=${period}`);
+  }
+
   // ===== WORDS ON THE PICTURE (Admin → Catalogue → a design) =====
 
   async getPictureWords(imageId: string): Promise<AdminResult<any>> {
