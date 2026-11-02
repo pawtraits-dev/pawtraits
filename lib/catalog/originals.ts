@@ -11,7 +11,7 @@ const VERSION_FOLDERS = ['pawtraits/variations/', 'pawtraits/team-versions/', 'p
 /** Only original designs (uploads and pictures generated from a prompt, not from another design) */
 export function onlyOriginals<Q extends { is: any; or: any }>(query: Q): Q {
   return query.is('variation_of', null)
-    .or(`tags.is.null,not.tags.ov.${VERSION_TAGS}`)
+    .or(`tags.is.null,tags.not.ov.${VERSION_TAGS}`)
     .or(`cloudinary_public_id.is.null,and(${VERSION_FOLDERS.map(f => `cloudinary_public_id.not.like.${f}*`).join(',')})`);
 }
 
