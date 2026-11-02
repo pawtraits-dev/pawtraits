@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
 import { plainTitle } from '@/lib/variations/combos';
+import { onlyOriginals } from '@/lib/catalog/originals';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,6 @@ export const dynamic = 'force-dynamic';
  * outfit / format variations, team versions, quiz pictures), so batches vary the original.
  */
 const PAGE = 60;
-const VERSION_TAGS = '{variation,team-variant,batch-generated,quiz-generated}';
 export async function GET(request: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
@@ -28,10 +28,7 @@ export async function GET(request: NextRequest) {
     query = query.range(page * PAGE, page * PAGE + PAGE - 1);
     if (q) query = query.or(`description.ilike.%${q}%,prompt_text.ilike.%${q}%`);
     if (originals) {
-      // Linked versions (variation_of, since 17 Oct), and older ones by their tags and folders
-      query = query.is('variation_of', null)
-        .or(`tags.is.null,not.tags.ov.${VERSION_TAGS}`)
-        .or('cloudinary_public_id.is.null,and(cloudinary_public_id.not.like.pawtraits/variations/*,cloudinary_public_id.not.like.pawtraits/team-versions/*,cloudinary_public_id.not.like.pawtraits/variation-previews/*)');
+      query = onlyOriginals(query);
     }
   }
   const { data, error, count } = await query;

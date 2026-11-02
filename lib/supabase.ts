@@ -1,3 +1,4 @@
+import { onlyOriginals, onlyVersions } from '@/lib/catalog/originals';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from './supabase-client';
@@ -819,6 +820,8 @@ export class SupabaseService {
     search?: string;
     /** Admin → Catalogue: designs in any of these collections; 'none' = in no collection */
     collectionIds?: string[] | 'none';
+    /** Admin → Catalogue: 'uploads' = original designs only, 'versions' = generated variations only */
+    origin?: 'all' | 'uploads' | 'versions';
   }): Promise<ImageCatalogWithDetails[]> {
     const page = filters?.page || 1;
     const limit = filters?.limit || 20;
@@ -890,6 +893,9 @@ export class SupabaseService {
     if (filters?.coatId) {
       query = query.eq('coat_id', filters.coatId);
     }
+
+    if (filters?.origin === 'uploads') query = onlyOriginals(query);
+    else if (filters?.origin === 'versions') query = onlyVersions(query);
 
     if (filters?.featured === true) {
       query = query.eq('is_featured', true);

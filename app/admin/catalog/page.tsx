@@ -39,6 +39,15 @@ export default function AdminCatalogPage() {
   const [visibleOnly, setVisibleOnly] = useState(false);
   const [visibilityFilter, setVisibilityFilter] = useState(''); // 'all', 'public', 'hidden'
   const [ratingFilter, setRatingFilter] = useState('');
+  // Uploads (original designs) and/or the variations generated from them; remembered in this browser
+  const [origin, setOriginState] = useState<'all' | 'uploads' | 'versions'>('all');
+  useEffect(() => {
+    try { const v = localStorage.getItem('pt_admin_catalog_origin'); if (v === 'uploads' || v === 'versions') setOriginState(v); } catch { /* private mode */ }
+  }, []);
+  const setOrigin = (v: 'all' | 'uploads' | 'versions') => {
+    setOriginState(v);
+    try { localStorage.setItem('pt_admin_catalog_origin', v); } catch { /* private mode */ }
+  };
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [totalImages, setTotalImages] = useState(0);
@@ -69,11 +78,11 @@ export default function AdminCatalogPage() {
   // Reset page when filters change (but not when page size changes)
   useEffect(() => {
     setPage(1);
-  }, [animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, visibleOnly, visibilityFilter, ratingFilter, debouncedSearchTerm, selectedCollection]);
+  }, [animalType, selectedBreed, selectedTheme, selectedStyle, selectedFormat, featuredOnly, visibleOnly, visibilityFilter, ratingFilter, debouncedSearchTerm, selectedCollection, origin]);
 
   useEffect(() => {
     loadImages();
-  }, [page, pageSize, animalType, selectedBreed, selectedTheme, selectedCollection, selectedStyle, selectedFormat, featuredOnly, visibleOnly, visibilityFilter, ratingFilter, debouncedSearchTerm]);
+  }, [page, pageSize, animalType, selectedBreed, selectedTheme, selectedCollection, selectedStyle, selectedFormat, featuredOnly, visibleOnly, visibilityFilter, ratingFilter, debouncedSearchTerm, origin]);
 
   const loadData = async () => {
     try {
@@ -132,6 +141,7 @@ export default function AdminCatalogPage() {
         formatId: selectedFormat || null,
         featured: featuredOnly,
         publicOnly: false, // Admin can see all images
+        origin,
         search: debouncedSearchTerm || undefined
       });
 
@@ -182,6 +192,7 @@ export default function AdminCatalogPage() {
     setVisibleOnly(false);
     setVisibilityFilter('');
     setRatingFilter('');
+    setOrigin('all');
     setPage(1);
   };
 
@@ -524,6 +535,17 @@ export default function AdminCatalogPage() {
                       {format.name}
                     </option>
                   ))}
+                </select>
+
+                <select
+                  value={origin}
+                  onChange={(e) => setOrigin(e.target.value as 'all' | 'uploads' | 'versions')}
+                  aria-label="Uploads or variations"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                >
+                  <option value="all">Uploads and variations</option>
+                  <option value="uploads">Uploads only</option>
+                  <option value="versions">Variations only</option>
                 </select>
 
                 <select
