@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Reference designs to run a batch on: ?q= (description/prompt) or ?ids=, newest first, 60 a page
- * (?page=). ?originals=1 (the default) leaves out versions made from another design (breed / coat /
+ * (?page=). ?animal=dog|cat narrows to dogs or cats. ?originals=1 (the default) leaves out versions made from another design (breed / coat /
  * outfit / format variations, team versions, quiz pictures), so batches vary the original.
  */
 const PAGE = 60;
@@ -27,6 +27,17 @@ export async function GET(request: NextRequest) {
   else {
     query = query.range(page * PAGE, page * PAGE + PAGE - 1);
     if (q) query = query.or(`description.ilike.%${q}%,prompt_text.ilike.%${q}%`);
+    // ?animal=dog|cat: designs with a pet of that kind (main pet or any pet of a multi-pet design)
+    const animal = sp.get('animal');
+    if (animal === 'dog' || animal === 'cat') {
+      const db = serviceClient();
+      const { data: bs } = await db.from('breeds').select('id').eq('animal_type', animal);
+      const breedIds = (bs ?? []).map((b: any) => b.id);
+      const ids = breedIds.length ? breedIds : ['00000000-0000-0000-0000-000000000000'];
+      const { data: subs } = await db.from('image_catalog_subjects').select('image_catalog_id').in('breed_id', ids).limit(5000);
+      const viaSubjects = Array.from(new Set((subs ?? []).map((r: any) => r.image_catalog_id))).slice(0, 800);
+      query = viaSubjects.length ? query.or(`breed_id.in.(${ids.join(',')}),id.in.(${viaSubjects.join(',')})`) : query.in('breed_id', ids);
+    }
     if (originals) {
       query = onlyOriginals(query);
     }

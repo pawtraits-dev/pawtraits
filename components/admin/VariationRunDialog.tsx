@@ -26,12 +26,13 @@ async function api<T = any>(url: string, init?: RequestInit): Promise<T> {
 export function ReferencePicker({ selected, onChange }: { selected: Ref[]; onChange: (r: Ref[]) => void }) {
   const [q, setQ] = useState('');
   const [originals, setOriginals] = useState(true);   // originals only: vary the first design, not a version of it
+  const [animal, setAnimal] = useState<'' | 'dog' | 'cat'>('');
   const [results, setResults] = useState<Ref[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const fetchPage = async (p: number) => {
-    const r = await api<{ rows: Ref[]; total: number }>(`/api/admin/variation-runs/references?paged=1&q=${encodeURIComponent(q)}&originals=${originals ? 1 : 0}&page=${p}`);
+    const r = await api<{ rows: Ref[]; total: number }>(`/api/admin/variation-runs/references?paged=1&q=${encodeURIComponent(q)}&originals=${originals ? 1 : 0}&animal=${animal}&page=${p}`);
     setTotal(r.total);
     setPage(p);
     setResults((prev) => (p === 0 ? r.rows : [...prev, ...r.rows.filter((x) => !prev.some((y) => y.id === x.id))]));
@@ -42,7 +43,7 @@ export function ReferencePicker({ selected, onChange }: { selected: Ref[]; onCha
       try { await fetchPage(0); } catch { setResults([]); setTotal(0); } finally { setLoading(false); }
     }, 250);
     return () => clearTimeout(t);
-  }, [q, originals]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [q, originals, animal]); // eslint-disable-line react-hooks/exhaustive-deps
   const more = async () => { setLoading(true); try { await fetchPage(page + 1); } finally { setLoading(false); } };
   const ids = new Set(selected.map((s) => s.id));
   const toggle = (r: Ref) => onChange(ids.has(r.id) ? selected.filter((s) => s.id !== r.id) : [...selected, r]);
@@ -64,6 +65,12 @@ export function ReferencePicker({ selected, onChange }: { selected: Ref[]; onCha
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search designs by description or prompt…" className="pl-10 text-sm" />
         </div>
+        <select value={animal} onChange={(e) => setAnimal(e.target.value as '' | 'dog' | 'cat')} aria-label="Dogs or cats"
+          className="rounded-md border border-gray-300 px-2 py-2 text-sm">
+          <option value="">Dogs and cats</option>
+          <option value="dog">Dogs only</option>
+          <option value="cat">Cats only</option>
+        </select>
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input type="checkbox" checked={originals} onChange={(e) => setOriginals(e.target.checked)} />
           Originals only (not versions)

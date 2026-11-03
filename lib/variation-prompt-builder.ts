@@ -251,12 +251,22 @@ ${sizeInstruction ? `\n${sizeInstruction}\n` : ''}
 PRESERVATION REQUIREMENTS (MUST REMAIN IDENTICAL):
 ${preservation}
 
-STYLE:
-- Render every new pet in the reference's artistic medium and lighting (oil, watercolour, digital or photographic), not the photos' style.
-- Anthropomorphic outfits and accessories stay exactly as in the reference, fitted naturally to each new pet.
+POSE (for every pet):
+- Each new pet takes the EXACT pose of the pet it replaces in the reference: sitting or lying the same way, the same head tilt, ear position, paw and leg placement and body angle.
+- DO NOT use the pose, angle or crop from the pet photos. The photos are ONLY for each pet's colouring, markings and facial features.
+
+STYLE TRANSFORMATION (MOST IMPORTANT: THIS IS A PAINTING, NOT A COLLAGE):
+- REPAINT every new pet from scratch in the reference's artistic medium. Never paste, cut out or overlay a photo.
+- If the reference is an oil painting, paint each pet in oils with the same visible brushstrokes, soft painted fur and painterly edges; if watercolour, soft edges and colour bleeds; if digital art, the same digital rendering; only if the reference is a photograph, photographic.
+- No photographic texture, sharp camera detail, phone-camera lighting or cut-out edges may remain on any pet. Each pet must look painted by the same artist, in the same session, as the rest of the picture.
+- Light each pet exactly like the reference scene: the same light direction, warmth, shadows, highlights and colour grade, with the pets casting shadows into the scene and sitting naturally in it, not floating on top.
+- The two (or more) pets must match each other in style, finish and lighting: neither may look more photographic than the other.
+- Anthropomorphic outfits and accessories stay exactly as in the reference, fitted naturally to each new pet and painted in the same style.
 
 FINAL CHECK:
 ✓ Exactly ${n} pets, each matching its own photo, each in its own place (${slots.map(s => s.label).join(', ')})
+✓ Every pet repainted in the reference's style and lighting, with no trace of the photos' look, background or framing
+✓ Each pet in the reference pet's pose, not the photo's pose
 ✓ Background, composition, outfits, props, lighting and style identical to the reference
 ${aspectRatio ? `✓ Output aspect ratio is ${aspectRatio}\n` : ''}
 Reference metadata: theme ${metadata?.themeName || 'original'}, style ${metadata?.styleName || 'original'}, format ${metadata?.formatName || 'original'}.`;

@@ -24,9 +24,17 @@ export interface PaintingPromptInput {
 const promptBuilder = new VariationPromptBuilder();
 
 export function buildPaintingPrompt(p: PaintingPromptInput): string {
-  if (p.slotPlan && p.slotPlan.length > 1 && p.slotPlan.length === p.petCount) {
+  // Several pets always get the multi-pet prompt. Without the design's per-pet details (older
+  // designs) the places are simply left to right; the single-pet prompt ("you are given TWO
+  // images") must never be used with three or more images: Gemini then pastes the photos in.
+  if (p.petCount > 1) {
+    const slots = p.slotPlan && p.slotPlan.length === p.petCount ? p.slotPlan
+      : Array.from({ length: p.petCount }, (_, i) => ({
+          label: p.petCount === 2 ? (i === 0 ? 'Left' : 'Right') : `Pet ${i + 1}`,
+          now: p.petCount === 2 ? `the pet on the ${i === 0 ? 'left' : 'right'}` : 'a pet',
+        }));
     return buildMultiSubjectReplacementPrompt({
-      compositionTemplate: p.variationPromptTemplate, aspectRatio: p.aspectRatio, sizeInstruction: p.sizeInstruction, slots: p.slotPlan,
+      compositionTemplate: p.variationPromptTemplate, aspectRatio: p.aspectRatio, sizeInstruction: p.sizeInstruction, slots,
       metadata: { themeName: p.themeName, styleName: p.styleName, formatName: 'portrait' },
     });
   }
