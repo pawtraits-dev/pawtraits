@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   const page = Math.max(0, Number(sp.get('page')) || 0);
   const originals = sp.get('originals') !== '0';
   let query = serviceClient().from('image_catalog')
-    .select('id, description, prompt_text, public_url, image_variants, subject_count, is_public, breeds(name), themes(name)', { count: 'exact' })
+    .select('id, description, prompt_text, public_url, image_variants, cloudinary_public_id, subject_count, is_public, breeds(name), themes(name)', { count: 'exact' })
     .not('is_customer_generated', 'is', true)
     .order('created_at', { ascending: false });
   if (ids.length) query = query.in('id', ids);
@@ -33,10 +33,12 @@ export async function GET(request: NextRequest) {
   }
   const { data, error, count } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   const rows = (data ?? []).map((r: any) => ({
     id: r.id,
     title: plainTitle(r.description || r.prompt_text),
-    thumb: r.image_variants?.thumbnail?.url || r.public_url,
+    // Straight from Cloudinary: uploads' stored thumbnail links don't always load (variations' do)
+    thumb: r.cloudinary_public_id && cloud ? `https://res.cloudinary.com/${cloud}/image/upload/c_fill,w_240,h_240,g_auto/f_auto,q_auto/${r.cloudinary_public_id}` : r.image_variants?.thumbnail?.url || r.public_url,
     breed: r.breeds?.name ?? null,
     theme: r.themes?.name ?? null,
     pets: r.subject_count ?? 1,

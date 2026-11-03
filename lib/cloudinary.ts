@@ -312,7 +312,7 @@ export class CloudinaryImageService {
         height: 150,
         crop: 'fill',
         quality: 80,
-        format: 'auto'
+        fetch_format: 'auto'   // f_auto (format: 'auto' made broken ".auto" file names)
       });
 
       // 5. MID SIZE - medium, no overlay for catalog cards (secured access)
@@ -322,7 +322,7 @@ export class CloudinaryImageService {
         width: 400,
         crop: 'limit', // Maintain aspect ratio, don't crop
         quality: 85,
-        format: 'auto'
+        fetch_format: 'auto'   // f_auto (format: 'auto' made broken ".auto" file names)
       });
 
       // 6. SOCIAL MEDIA - brand overlay, various formats
