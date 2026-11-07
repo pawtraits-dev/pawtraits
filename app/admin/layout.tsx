@@ -116,6 +116,7 @@ const navigationSections = [
     title: 'Stock & Stalls',
     items: [
       { name: 'Trade Print Orders', href: '/admin/stock/trade-orders', icon: Printer },
+      { name: 'Divider Cards', href: '/admin/stock/dividers', icon: Tag },
       { name: 'Locations', href: '/admin/stock/locations', icon: MapPin },
       { name: 'Sticker Sheets', href: '/admin/stock/stickers', icon: Printer },
       { name: 'Sticker QR Report', href: '/admin/stock/qr-report', icon: QrCode },
