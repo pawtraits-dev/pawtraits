@@ -41,6 +41,25 @@ export default function AdminCatalogPage() {
   const [ratingFilter, setRatingFilter] = useState('');
   // Variations and team versions made from each design on the page
   const [variantCounts, setVariantCounts] = useState<Record<string, { variations: number; teams: number }>>({});
+  // The versions of one design, opened from its variant count
+  const [variantsOf, setVariantsOf] = useState<ImageCatalogWithDetails | null>(null);
+  const [variants, setVariants] = useState<{ id: string; title: string; label: string; kind: 'variation' | 'team'; thumb: string | null; hidden: boolean }[] | null>(null);
+  const [variantsError, setVariantsError] = useState<string | null>(null);
+  const openVariants = async (image: ImageCatalogWithDetails) => {
+    setVariantsOf(image); setVariants(null); setVariantsError(null);
+    try {
+      const r = await fetch(`/api/admin/stock/trade-orders/designs/${image.id}/versions`, { credentials: 'include' });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Could not load the variants');
+      setVariants(d.versions);
+    } catch (e: any) { setVariantsError(e.message); }
+  };
+  const openVariant = async (id: string) => {
+    const img = await supabaseService.getImage(id).catch(() => null);
+    if (!img) { setVariantsError('Could not open that variant'); return; }
+    setVariantsOf(null);
+    handleCardClick(img);
+  };
   // Uploads (original designs) and/or the variations generated from them; remembered in this browser
   const [origin, setOriginState] = useState<'all' | 'uploads' | 'versions'>('all');
   useEffect(() => {
@@ -641,7 +660,12 @@ export default function AdminCatalogPage() {
                   const total = (c?.variations ?? 0) + (c?.teams ?? 0);
                   if (total > 0) {
                     const parts = [c!.variations ? `${c!.variations} variation${c!.variations === 1 ? '' : 's'}` : null, c!.teams ? `${c!.teams} team version${c!.teams === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ');
-                    return <span className="absolute bottom-2 left-2 rounded-full bg-purple-600 px-2 py-0.5 text-xs font-semibold text-white shadow" title={parts}>{total} variant{total === 1 ? '' : 's'}</span>;
+                    return (
+                      <button type="button" onClick={(e) => { e.stopPropagation(); openVariants(image); }} title={`${parts}: click to see them`}
+                        className="absolute bottom-2 left-2 rounded-full bg-purple-600 px-2 py-0.5 text-xs font-semibold text-white shadow hover:bg-purple-700">
+                        {total} variant{total === 1 ? '' : 's'}
+                      </button>
+                    );
                   }
                   if ((image as any).variation_of) return <span className="absolute bottom-2 left-2 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium text-purple-800 shadow" title="Made from another design">Variation</span>;
                   return null;
@@ -841,6 +865,40 @@ export default function AdminCatalogPage() {
             </div>
           </div>
         )}
+
+        {/* Variants of a design (from its variant count) */}
+        <Dialog open={!!variantsOf} onOpenChange={(o) => { if (!o) setVariantsOf(null); }}>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Variants of {variantsOf ? extractDescriptionTitle(variantsOf.description || '') || 'this design' : ''}</DialogTitle>
+            </DialogHeader>
+            {variantsError && <p role="alert" className="text-sm text-red-700">{variantsError}</p>}
+            {!variants && !variantsError && <p className="text-sm text-gray-500">Loading…</p>}
+            {variants && variants.length === 0 && <p className="text-sm text-gray-500">No variants yet.</p>}
+            {variants && variants.length > 0 && (
+              <>
+                <p className="text-sm text-gray-600">
+                  {variants.filter(v => v.kind === 'variation').length} variations{variants.some(v => v.kind === 'team') ? ` · ${variants.filter(v => v.kind === 'team').length} team versions` : ''}. Click one to open it.
+                </p>
+                <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
+                  {variants.map(v => (
+                    <li key={v.id}>
+                      <button type="button" onClick={() => openVariant(v.id)} className="group block w-full text-left" title={v.title}>
+                        <div className="relative overflow-hidden rounded bg-gray-100" style={{ aspectRatio: '4 / 5' }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          {v.thumb && <img src={v.thumb} alt={v.label} className="h-full w-full object-cover transition-transform group-hover:scale-105" loading="lazy" />}
+                          {v.hidden && <span className="absolute left-1 top-1 rounded bg-gray-700/80 px-1 text-[10px] text-white">Hidden</span>}
+                          {v.kind === 'team' && <span className="absolute right-1 top-1 rounded bg-purple-600 px-1 text-[10px] text-white">Team</span>}
+                        </div>
+                        <p className="mt-1 truncate text-xs text-gray-800">{v.label}</p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Detailed View Modal */}
         <ImageDetailModal 
