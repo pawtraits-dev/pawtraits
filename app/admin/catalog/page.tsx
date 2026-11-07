@@ -39,6 +39,8 @@ export default function AdminCatalogPage() {
   const [visibleOnly, setVisibleOnly] = useState(false);
   const [visibilityFilter, setVisibilityFilter] = useState(''); // 'all', 'public', 'hidden'
   const [ratingFilter, setRatingFilter] = useState('');
+  // Variations and team versions made from each design on the page
+  const [variantCounts, setVariantCounts] = useState<Record<string, { variations: number; teams: number }>>({});
   // Uploads (original designs) and/or the variations generated from them; remembered in this browser
   const [origin, setOriginState] = useState<'all' | 'uploads' | 'versions'>('all');
   useEffect(() => {
@@ -173,6 +175,9 @@ export default function AdminCatalogPage() {
       }
 
       setImages(filteredImages);
+      // Version counts for the cards (doesn't hold up the page)
+      const ids = filteredImages.map(img => img.id);
+      if (ids.length) adminSupabaseService.getVariantCounts(ids).then(r => { if (r.ok) setVariantCounts(r.data.counts); });
     } catch (error) {
       console.error('Error loading images:', error);
     } finally {
@@ -630,6 +635,17 @@ export default function AdminCatalogPage() {
                     {renderStars(image.rating)}
                   </div>
                 )}
+                {/* Versions: how many were made from this design, or that this is one */}
+                {(() => {
+                  const c = variantCounts[image.id];
+                  const total = (c?.variations ?? 0) + (c?.teams ?? 0);
+                  if (total > 0) {
+                    const parts = [c!.variations ? `${c!.variations} variation${c!.variations === 1 ? '' : 's'}` : null, c!.teams ? `${c!.teams} team version${c!.teams === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ');
+                    return <span className="absolute bottom-2 left-2 rounded-full bg-purple-600 px-2 py-0.5 text-xs font-semibold text-white shadow" title={parts}>{total} variant{total === 1 ? '' : 's'}</span>;
+                  }
+                  if ((image as any).variation_of) return <span className="absolute bottom-2 left-2 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium text-purple-800 shadow" title="Made from another design">Variation</span>;
+                  return null;
+                })()}
                 
                 {/* Admin control icons */}
                 <div className="absolute top-2 right-2 flex flex-col space-y-1">

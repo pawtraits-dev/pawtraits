@@ -725,6 +725,11 @@ export class AdminSupabaseService {
     return adminRequest<any>(`/api/admin/dashboard?period=${period}`);
   }
 
+  /** How many variations and team versions each design has (Admin → Catalogue cards) */
+  async getVariantCounts(ids: string[]): Promise<AdminResult<{ counts: Record<string, { variations: number; teams: number }> }>> {
+    return adminRequest<{ counts: Record<string, { variations: number; teams: number }> }>(`/api/admin/catalog/variant-counts?ids=${ids.join(',')}`);
+  }
+
   // ===== WORDS ON THE PICTURE (Admin → Catalogue → a design) =====
 
   async getPictureWords(imageId: string): Promise<AdminResult<any>> {
