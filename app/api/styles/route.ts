@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/qr/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -25,6 +26,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  // Changes need an admin
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await request.json();
     

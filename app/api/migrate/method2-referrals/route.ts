@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/qr/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -12,6 +13,9 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 });
 
 export async function POST(request: NextRequest) {
+  // Admin only: maintenance / debug route
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     console.log('Starting Method 2 referral functions migration...');
 

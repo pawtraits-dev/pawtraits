@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/qr/server';
 import { SupabaseService } from '@/lib/supabase';
 import { CloudinaryImageService, cloudinaryService } from '@/lib/cloudinary';
 import type { ImageCatalogUpdate } from '@/lib/types';
@@ -326,6 +327,9 @@ async function handleVariantRequest(
 }
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
+  // Changes need an admin
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { id } = await params;
     const body = await request.json();
@@ -373,6 +377,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 }
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  // Changes need an admin
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { id } = await params;
     

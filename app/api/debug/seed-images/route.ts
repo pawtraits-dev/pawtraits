@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/qr/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Use service role client to bypass RLS issues
@@ -192,6 +193,9 @@ const sampleImages = [
 ];
 
 export async function POST(request: NextRequest) {
+  // Admin only: maintenance / debug route
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabase = getServiceRoleClient();
     
