@@ -45,6 +45,8 @@ interface VariationPreviewStepProps {
   isSaving: boolean;
   isGeneratingDescriptions: boolean;
   saveResults: any[];
+  /** Pawsonality / Zodiac designs: draw the name plate on the saved versions */
+  caption?: { label: string; on: boolean; set: (on: boolean) => void } | null;
 }
 
 function VariationPreviewStep({
@@ -61,7 +63,8 @@ function VariationPreviewStep({
   onClose,
   isSaving,
   isGeneratingDescriptions,
-  saveResults
+  saveResults,
+  caption
 }: VariationPreviewStepProps) {
   const [selectedVariations, setSelectedVariations] = useState<string[]>([]);
 
@@ -246,6 +249,12 @@ function VariationPreviewStep({
         ))}
       </div>
 
+      {caption && (
+        <label className="flex items-start gap-2 border-t pt-3 text-sm">
+          <input type="checkbox" checked={caption.on} onChange={(e) => caption.set(e.target.checked)} className="mt-0.5" />
+          <span>Add the name plate to the saved versions <span className="text-gray-500">({caption.label}, worded for each version&apos;s dog or cat)</span></span>
+        </label>
+      )}
       <div className="border-t pt-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button
@@ -366,12 +375,19 @@ export default function ImageVariantGenerationModal({
   const [isSavingToCategory, setIsSavingToCategory] = useState(false);
   const [isGeneratingDescriptions, setIsGeneratingDescriptions] = useState(false);
   const [saveResults, setSaveResults] = useState<any[]>([]);
+  // Pawsonality / Zodiac designs: name plate on the saved versions (starts as the design shows it)
+  const [captionInfo, setCaptionInfo] = useState<{ label: string } | null>(null);
+  const [captionOn, setCaptionOn] = useState(false);
 
   const supabaseService = new SupabaseService();
 
   useEffect(() => {
     if (isOpen && image) {
       loadData();
+      setCaptionInfo(null);
+      fetch(`/api/admin/catalog/${image.id}/caption`, { credentials: 'include' }).then(r => r.json()).then(d => {
+        if (d?.caption) { setCaptionInfo({ label: d.caption.title }); setCaptionOn(!!d.applied); }
+      }).catch(() => {});
     }
   }, [isOpen, image]);
 
@@ -909,7 +925,7 @@ export default function ImageVariantGenerationModal({
         const res = await fetch('/api/admin/variations/save', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ variations: onCloudinary.map(({ imageData, aiDescription, ...v }) => v) }),
+          body: JSON.stringify({ variations: onCloudinary.map(({ imageData, aiDescription, ...v }) => v), caption: !!captionInfo && captionOn }),
         });
         const saved = await res.json().catch(() => null);
         if (!res.ok || !Array.isArray(saved)) throw new Error(saved?.error || res.statusText);
@@ -992,6 +1008,7 @@ export default function ImageVariantGenerationModal({
             isSaving={isSavingToCategory}
             isGeneratingDescriptions={isGeneratingDescriptions}
             saveResults={saveResults}
+            caption={captionInfo ? { label: captionInfo.label, on: captionOn, set: setCaptionOn } : null}
           />
         ) : (
           <div className="space-y-6">

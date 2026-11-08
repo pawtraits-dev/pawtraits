@@ -107,7 +107,8 @@ export default function RunDialog({ open, onClose, recipes, initialRecipeId, ini
   const [planned, setPlanned] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { if (open) { setRecipeId(initialRecipeId ?? recipes[0]?.id ?? ''); setRefs(initialRefs ?? []); setPlanned(null); setError(null); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [caption, setCaption] = useState(false);
+  useEffect(() => { if (open) { setRecipeId(initialRecipeId ?? recipes[0]?.id ?? ''); setRefs(initialRefs ?? []); setPlanned(null); setError(null); setCaption(false); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setPlanned(null);
@@ -122,7 +123,7 @@ export default function RunDialog({ open, onClose, recipes, initialRecipeId, ini
   const start = async () => {
     setBusy(true); setError(null);
     try {
-      const r = await api('/api/admin/variation-runs', { method: 'POST', body: JSON.stringify({ recipeId, referenceIds: refs.map((x) => x.id) }) });
+      const r = await api('/api/admin/variation-runs', { method: 'POST', body: JSON.stringify({ recipeId, referenceIds: refs.map((x) => x.id), caption }) });
       onStarted(r.run.id);
     } catch (e: any) { setError(e.message); } finally { setBusy(false); }
   };
@@ -159,6 +160,10 @@ export default function RunDialog({ open, onClose, recipes, initialRecipeId, ini
               <p className="text-xs text-gray-500">Results usually arrive within a few hours (at most 24). They come back as previews to approve or reject.</p>
             </div>
           )}
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" checked={caption} onChange={(e) => setCaption(e.target.checked)} className="mt-0.5" />
+            <span>Add the name plate to approved versions <span className="text-gray-500">(Pawsonality type or Zodiac sign and its tagline, worded for each version&apos;s dog or cat; other designs are left alone)</span></span>
+          </label>
           {error && <p className="text-sm text-red-700">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>

@@ -89,7 +89,9 @@ export async function ensurePrintMaster(supabase: SupabaseClient, customImageId:
     const slogan: string | null = custom.generation_metadata?.slogan && custom.generation_metadata?.clean_cloudinary_id ? custom.generation_metadata.slogan : null;
     // Words on the picture ("… Biscuit will see you shortly"): drawn again the same way
     const wordsText: string | null = custom.generation_metadata?.words_text && custom.generation_metadata?.words && custom.generation_metadata?.clean_cloudinary_id ? custom.generation_metadata.words_text : null;
-    const sourceId: string | null = slogan || wordsText ? custom.generation_metadata.clean_cloudinary_id : custom.generated_cloudinary_id;
+    // Caption plate (type/sign + tagline): drawn again last
+    const caption = custom.generation_metadata?.caption?.title && custom.generation_metadata?.clean_cloudinary_id ? custom.generation_metadata.caption : null;
+    const sourceId: string | null = slogan || wordsText || caption ? custom.generation_metadata.clean_cloudinary_id : custom.generated_cloudinary_id;
     const sourceUrl = sourceId
       ? cloudinary.url(sourceId, { secure: true, type: 'upload', format: 'png', sign_url: false })
       : custom.generation_metadata?.full_size_url;
@@ -116,6 +118,11 @@ export async function ensurePrintMaster(supabase: SupabaseClient, customImageId:
         const baked = await bakeWords(uploaded.publicId, settings, wordsText, 'print-masters');
         uploaded = { ...uploaded, publicId: baked.public_id, width: baked.width, height: baked.height };
       }
+    }
+    if (caption) {
+      const { bakeCaption } = await import('@/lib/captions/server');
+      const baked = await bakeCaption(uploaded.publicId, { title: caption.title, tagline: caption.tagline ?? null, symbol: caption.symbol ?? null }, 'print-masters');
+      uploaded = { ...uploaded, publicId: baked.public_id, width: baked.width, height: baked.height };
     }
     console.log(`🖼️ 4K print master for ${customImageId}: ${uploaded.width}×${uploaded.height} in ${((Date.now() - started) / 1000).toFixed(1)}s`);
 

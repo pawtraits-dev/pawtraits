@@ -32,6 +32,7 @@ import TeamPicker from '@/components/customise/TeamPicker';
 import { cleanKitName } from '@/lib/collections/sports-teams';
 import { cleanSlogan, SLOGAN_MAX } from '@/lib/collections/slogan';
 import { cleanPetName, escapeWords, fillWords, PET_NAME_MAX } from '@/lib/picture-words';
+import type { Caption as CaptionText } from '@/lib/captions/caption';
 import DesignQuizLink from '@/components/quiz/DesignQuizLink';
 import { collectionHref } from '@/lib/collections/href';
 
@@ -59,6 +60,8 @@ interface CatalogImage {
   kit?: { name: string; number: number | null; motto?: string | null } | null;
   /** Words on the picture: the customer's pet's name or breed in the sentence (live preview URL with a token) */
   words?: { template: string; phrase: string; previewUrl: string; token: string } | null;
+  /** Caption plate (Pawsonality type or Zodiac sign + tagline): optional; dog and cat wording */
+  caption?: { dog: CaptionText | null; cat: CaptionText | null; designAnimal: 'dog' | 'cat'; on: boolean; previews: { dog: string | null; cat: string | null } } | null;
   /** One per pet in the picture, left to right: photo N replaces slot N (multi-pet plan phase 2) */
   slots?: { label: string; breedName: string | null; animalType: 'dog' | 'cat' | null; pose: string | null }[];
 }
@@ -144,6 +147,8 @@ export default function CustomisePage() {
   const [kitNumber, setKitNumber] = useState('');
   const [slogan, setSlogan] = useState('');            // big text on the right; starts as the team motto
   const [sloganTouched, setSloganTouched] = useState(false);
+  // Caption plate: on or off (starts as the design shows it)
+  const [captionOn, setCaptionOn] = useState(false);
   // Words on the picture: their pet's name, or their breed
   const [wordsMode, setWordsMode] = useState<'name' | 'breed'>('name');
   const [wordsName, setWordsName] = useState('');
@@ -191,6 +196,7 @@ export default function CustomisePage() {
         setCatalogImage(data);
         if (data.kit) setKitNumber(data.kit.number === null || data.kit.number === undefined ? '' : String(data.kit.number));
         if (data.kit?.motto) setSlogan(String(data.kit.motto).replace(/\n/g, ' '));
+        if (data.caption) setCaptionOn(!!data.caption.on);
         const n = data.subjectCount || 1;
         setSubjects(Array.from({ length: n }, () => ({ pet: null, file: null, preview: null })));
         track.viewCustomise({ id: data.id, name: data.description?.slice(0, 80), category: data.theme?.name }, qs.get('src') || undefined);
@@ -371,6 +377,7 @@ export default function CustomisePage() {
     // Their own slogan (left alone, the team motto is used, with its own line breaks)
     if (showSlogan && sloganTouched && slogan.trim()) fd.append('slogan', slogan.trim());
     if (hasWords && wordsMode === 'name') fd.append('wordsName', wordsName.trim());
+    if (catalogImage.caption) fd.append('caption', captionOn ? '1' : '0');
     subjects.forEach((s, i) => {
       const n = subjectCount > 1 ? String(i + 1) : '';
       if (s.pet) fd.append(`petId${n}`, s.pet.pet_id);
@@ -710,6 +717,29 @@ export default function CustomisePage() {
                 )}
               </div>
             )}
+            {catalogImage.caption && (() => {
+              // Worded for their pet: a saved pet's animal, else the design's (an uploaded photo is checked after)
+              const animal = subjects[0]?.pet?.animal_type ?? catalogImage.caption.designAnimal;
+              const c = catalogImage.caption[animal] ?? catalogImage.caption.dog ?? catalogImage.caption.cat;
+              const preview = catalogImage.caption.previews[animal] ?? catalogImage.caption.previews.dog;
+              if (!c) return null;
+              return (
+                <div className="mt-5 rounded-2xl border border-purple-200 bg-purple-50/50 p-4">
+                  <label className="flex items-start gap-3">
+                    <input type="checkbox" checked={captionOn} onChange={e => setCaptionOn(e.target.checked)} className="mt-1 h-5 w-5 accent-purple-600" />
+                    <span>
+                      <span className="block font-semibold text-gray-900">Add the name plate</span>
+                      <span className="block text-sm text-gray-700">“{c.title}”{c.tagline ? <> · <em>{c.tagline}</em></> : null}</span>
+                      {!subjects[0]?.pet && <span className="block text-xs text-gray-500">Worded for a {animal}; we match it to your pet&apos;s photo.</span>}
+                    </span>
+                  </label>
+                  {captionOn && preview && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={preview} alt="How the name plate will look" className="mt-3 w-40 rounded-lg border border-purple-200" />
+                  )}
+                </div>
+              );
+            })()}
             {hasWords && catalogImage.words && (
               <div className="mt-5 rounded-2xl border border-purple-200 bg-purple-50/50 p-4">
                 <p className="font-semibold text-gray-900">The words on the picture</p>

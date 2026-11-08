@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 
   try {
     if (body?.dryRun) return NextResponse.json(await planRun(supabase, recipe, referenceIds, imageSize));
-    const { run, planned } = await createRun(supabase, { recipe, recipeId, name, refIds: referenceIds, imageSize, targetAge: body?.targetAge });
+    const { run, planned } = await createRun(supabase, { recipe, recipeId, name, refIds: referenceIds, imageSize, targetAge: body?.targetAge, caption: body?.caption === true });
     if (!run) return NextResponse.json({ error: 'Nothing to make: every combination already exists for these designs', planned }, { status: 409 });
     // Submit straight away rather than waiting for the next cron tick
     after(() => tick(serviceClient(), 200_000).catch((e) => console.error('Batch tick after create failed:', e)));

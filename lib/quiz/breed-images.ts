@@ -107,8 +107,11 @@ async function generateBreedVersion(sourceImageId: string, breedId: string, code
 
   // Source picture as PNG, capped in size for the model
   const cloud = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-  const sourceUrl = source.cloudinary_public_id && cloud
-    ? `https://res.cloudinary.com/${cloud}/image/upload/c_limit,w_1536,h_1536/f_png/${source.cloudinary_public_id}`
+  // The picture without the caption plate (or words), so the breed version doesn't copy it
+  const { cleanPictureId } = await import('@/lib/captions/server');
+  const sourceId = await cleanPictureId(supabase as any, source.id, source.cloudinary_public_id);
+  const sourceUrl = sourceId && cloud
+    ? `https://res.cloudinary.com/${cloud}/image/upload/c_limit,w_1536,h_1536/f_png/${sourceId}`
     : source.public_url;
   const res = await fetch(sourceUrl, { signal: AbortSignal.timeout(20_000) });
   if (!res.ok) throw new Error(`Could not fetch the type design (${res.status})`);

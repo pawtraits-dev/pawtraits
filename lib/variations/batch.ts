@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { variationSource, wordsForNewVersion } from '@/lib/picture-words-server';
+import { captionForNewVersion } from '@/lib/captions/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { v2 as cloudinary } from 'cloudinary';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
@@ -97,7 +98,7 @@ export async function planRun(supabase: SupabaseClient, recipe: Recipe, refIds: 
 // ---------------------------------------------------------------------------------------------
 // Creating a run
 
-export async function createRun(supabase: SupabaseClient, opts: { recipe: Recipe; recipeId?: string | null; name: string; refIds: string[]; imageSize: string; targetAge?: string }) {
+export async function createRun(supabase: SupabaseClient, opts: { recipe: Recipe; recipeId?: string | null; name: string; refIds: string[]; imageSize: string; targetAge?: string; caption?: boolean }) {
   const { recipe, refIds, imageSize } = opts;
   const planned = await planRun(supabase, recipe, refIds, imageSize);
   if (planned.total === 0) return { run: null, planned };
@@ -132,7 +133,7 @@ export async function createRun(supabase: SupabaseClient, opts: { recipe: Recipe
   const { data: run, error: runError } = await supabase.from('variation_runs').insert({
     recipe_id: opts.recipeId ?? null,
     name: opts.name,
-    recipe_snapshot: recipe,
+    recipe_snapshot: opts.caption ? { ...recipe, caption: true } : recipe,   // caption: plate on approved versions
     reference_ids: refs.map((r) => r.id),
     image_size: imageSize,
     model,
@@ -466,6 +467,8 @@ export async function tick(supabase: SupabaseClient, budgetMs = 240_000, deps: D
 
 export async function approveItems(supabase: SupabaseClient, runId: string, ids: string[], visibility: 'public' | 'hidden', deps: Deps = {}) {
   const { data: items } = await supabase.from('variation_run_items').select('*').eq('run_id', runId).in('id', ids).eq('status', 'generated');
+  const { data: run } = await supabase.from('variation_runs').select('recipe_snapshot').eq('id', runId).maybeSingle();
+  const withCaption = (run as any)?.recipe_snapshot?.caption === true;
   const results: { id: string; ok: boolean; imageId?: string; error?: string }[] = [];
   for (const item of items ?? []) {
     try {
@@ -490,6 +493,7 @@ export async function approveItems(supabase: SupabaseClient, runId: string, ids:
         variation_key: item.variation_key,
       });
       await wordsForNewVersion(supabase, saved.id, item.reference_image_id);
+      if (withCaption) await captionForNewVersion(supabase, saved.id);
       await supabase.from('variation_run_items').update({ status: 'approved', saved_image_id: saved.id, preview_public_id: moved.public_id, preview_url: moved.secure_url, updated_at: new Date().toISOString() }).eq('id', item.id);
       results.push({ id: item.id, ok: true, imageId: saved.id });
     } catch (e: any) {

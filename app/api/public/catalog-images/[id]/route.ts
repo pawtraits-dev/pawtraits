@@ -8,6 +8,8 @@ import { wrapMockups } from '@/lib/mugs/mockup';
 import { sloganLayer } from '@/lib/collections/slogan';
 import { readWords, wordsLayer, WORDS_TOKEN } from '@/lib/picture-words';
 import { breedPhrase } from '@/lib/picture-words-server';
+import { captionLayer, readCaptionOverlay } from '@/lib/captions/caption';
+import { designCaption, ensureSymbols } from '@/lib/captions/server';
 
 // Use service role client to bypass RLS for public catalog data
 const supabaseServiceRole = createClient(
@@ -141,6 +143,25 @@ export async function GET(
       token: WORDS_TOKEN,
     } : null;
 
+    // Caption plate (Pawsonality type or Zodiac sign + tagline): the customer can have it on their
+    // picture or not; on by default when the design shows it. Previews on the clean picture.
+    let caption: any = null;
+    try {
+      const cap = await designCaption(supabaseServiceRole as any, catalogImage.id);
+      if (cap && (cap.dog || cap.cat)) {
+        const { data: capRow } = await supabaseServiceRole.from('image_catalog').select('caption_overlay').eq('id', catalogImage.id).maybeSingle();
+        const overlay = readCaptionOverlay((capRow as any)?.caption_overlay);
+        const clean = overlay?.applied ? overlay.clean_public_id : catalogImage.cloudinary_public_id;
+        const ratio = String((catalogImage.format as any)?.aspect_ratio || '2:3').split(':').map(Number);
+        const aspect = ratio[0] > 0 && ratio[1] > 0 ? ratio[0] / ratio[1] : 2 / 3;
+        if ((cap.dog?.symbol || cap.cat?.symbol)) await ensureSymbols().catch(() => null);
+        const preview = (c: typeof cap.dog) => (c && clean ? cloudinaryService.getPublicVariantUrl(clean, 'catalog_watermarked', { overlay: captionLayer(c, aspect), format: 'jpg' }) : null);
+        caption = { dog: cap.dog, cat: cap.cat, designAnimal: cap.designAnimal, on: !!overlay?.applied, previews: { dog: preview(cap.dog), cat: preview(cap.cat) } };
+      }
+    } catch (e) {
+      console.warn('caption info failed', catalogImage.id, e);
+    }
+
     // Wraparound (2:1) designs: the design on the mug photos, both sides, motto included
     const isWrap = (catalogImage.format as any)?.aspect_ratio === '2:1' || (Array.isArray(catalogImage.format) && (catalogImage.format as any)[0]?.aspect_ratio === '2:1');
     const mugMockups = isWrap && catalogImage.cloudinary_public_id
@@ -152,6 +173,7 @@ export async function GET(
       mugMockups,
       kit: kit ? { name: kit.name, number: kit.number, motto } : null,
       words,
+      caption,
       id: catalogImage.id,
       cloudinaryPublicId: catalogImage.cloudinary_public_id,
       imageUrl: displayUrl,

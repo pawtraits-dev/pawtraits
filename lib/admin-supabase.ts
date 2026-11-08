@@ -744,6 +744,28 @@ export class AdminSupabaseService {
     return adminRequest<any>(`/api/admin/catalog/${imageId}/words`, jsonInit('POST', body));
   }
 
+  /** Caption plate on a design (lib/captions/): its type/sign wording and whether it's on */
+  async getDesignCaption(imageId: string): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/catalog/${imageId}/caption`);
+  }
+
+  async designCaptionAction(imageId: string, body: { action: 'apply' | 'remove'; versions?: boolean }): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/catalog/${imageId}/caption`, jsonInit('POST', body));
+  }
+
+  /** Admin → Collections → Captions */
+  async getCaptions(): Promise<AdminResult<any>> {
+    return adminRequest<any>('/api/admin/captions');
+  }
+
+  async saveCaptionWording(collectionId: string, wording: Record<string, string | null>): Promise<AdminResult<any>> {
+    return adminRequest<any>('/api/admin/captions', jsonInit('PATCH', { collectionId, wording }));
+  }
+
+  async captionCollection(collectionId: string, on: boolean): Promise<AdminResult<any>> {
+    return adminRequest<any>('/api/admin/captions', jsonInit('POST', { collectionId, on }));
+  }
+
   /** Make a lettering test (painted on the original) the design's picture and lettering */
   async useKitLetteringTest(id: string, testId: string): Promise<AdminResult<{ ok: true; name: string; number: number | null }>> {
     return adminRequest<{ ok: true; name: string; number: number | null }>(`/api/admin/collections/team-versions/${id}`, jsonInit('POST', { action: 'use-test', testId }));

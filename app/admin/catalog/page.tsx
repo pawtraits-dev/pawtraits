@@ -15,6 +15,7 @@ import type { ImageCatalogWithDetails, Breed, Theme, Style, Format, AnimalType, 
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ImageQrPanel from '@/components/admin/ImageQrPanel';
 import PictureWordsPanel from '@/components/admin/PictureWordsPanel';
+import CaptionPanel from '@/components/admin/CaptionPanel';
 import { extractDescriptionTitle } from '@/lib/utils';
 import ImageVariantGenerationModal from '@/components/ImageVariantGenerationModal';
 
@@ -1194,6 +1195,9 @@ function ImageDetailModal({
 
             {/* Words on the picture: pet's name or breed drawn on */}
             <PictureWordsPanel imageId={image.id} onChanged={() => setPicVersion(Date.now())} />
+
+            {/* Caption plate: Pawsonality type / Zodiac sign and tagline */}
+            <CaptionPanel imageId={image.id} onChanged={() => setPicVersion(Date.now())} />
 
             {/* Sticker QR code */}
             <ImageQrPanel imageId={image.id} />

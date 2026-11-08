@@ -70,6 +70,9 @@ export async function applyWordsToDesign(supabase: SupabaseClient, imageId: stri
     text_overlay: { ...shaped, original_public_id: original, applied: { text, at: new Date().toISOString() } },
   }).eq('id', imageId);
   if (error) throw new Error(error.message);
+  // A design with the caption plate on: draw it again over the new words
+  const { reapplyCaptionAfterWords } = await import('@/lib/captions/server');
+  await reapplyCaptionAfterWords(supabase, imageId, baked.public_id).catch(e => console.error('caption after words failed', imageId, e));
   return { text, public_id: baked.public_id };
 }
 
@@ -114,7 +117,14 @@ export async function variationSource(supabase: SupabaseClient, ref: { id?: stri
     overlay = (data as any)?.text_overlay;
   }
   const words = readWords(overlay);
-  return words?.clean_public_id ? { cloudinary_public_id: words.clean_public_id, public_url: null } : ref;
+  if (words?.clean_public_id) return { cloudinary_public_id: words.clean_public_id, public_url: null };
+  // A design with the caption plate on: paint from the picture without it
+  if (ref.id) {
+    const { data, error } = await supabase.from('image_catalog').select('caption_overlay').eq('id', ref.id).maybeSingle();
+    const clean = !error ? (data as any)?.caption_overlay : null;
+    if (clean?.applied && typeof clean.clean_public_id === 'string') return { cloudinary_public_id: clean.clean_public_id, public_url: null };
+  }
+  return ref;
 }
 
 /**

@@ -45,6 +45,7 @@ import {
   ScanSearch,
   Wand2,
   ChevronRight,
+  Award,
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -70,6 +71,7 @@ const navigationSections = [
       { name: 'Generate Images', href: '/admin/generate', icon: Wand2 },
       { name: 'Variation Batches', href: '/admin/variation-batches', icon: Layers },
       { name: 'Collections', href: '/admin/collections', icon: Layers },
+      { name: 'Captions', href: '/admin/collections/captions', icon: Award },
       { name: 'Quizzes', href: '/admin/quizzes', icon: Sparkles },
     ]
   },

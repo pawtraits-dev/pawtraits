@@ -61,7 +61,9 @@ export async function sourcesFor(supabase: SupabaseClient, quizId: string, kind:
     .eq('quiz_id', quizId).not('design_image_id', 'is', null).order('code');
   const ids = (types ?? []).map((t: any) => t.design_image_id);
   const { data: imgs } = ids.length ? await supabase.from('image_catalog').select('id, cloudinary_public_id').in('id', ids) : { data: [] as any[] };
-  const pid = new Map((imgs ?? []).map((i: any) => [i.id, i.cloudinary_public_id]));
+  // The picture without the caption plate (or words), so the breed versions don't copy it
+  const { cleanPictureId } = await import('@/lib/captions/server');
+  const pid = new Map(await Promise.all((imgs ?? []).map(async (i: any) => [i.id, await cleanPictureId(supabase, i.id, i.cloudinary_public_id)] as [string, string | null])));
   return (types ?? []).filter((t: any) => pid.get(t.design_image_id))
     .map((t: any) => ({ key: t.code, label: `${t.code} · ${t.name}`, publicId: pid.get(t.design_image_id)!, typeCode: t.code, sourceImageId: t.design_image_id }));
 }

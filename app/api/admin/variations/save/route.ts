@@ -4,6 +4,7 @@ import { autoTagNew } from '@/lib/collections/auto-tag';
 import { promoteVariationPreview } from '@/lib/catalog/variation-previews';
 import { registerCloudinaryImage } from '@/lib/catalog/register-image';
 import { wordsForNewVersion } from '@/lib/picture-words-server';
+import { captionForNewVersion } from '@/lib/captions/server';
 
 export const maxDuration = 300;   // drawing words on each version adds a few seconds
 
@@ -11,7 +12,8 @@ export const maxDuration = 300;   // drawing words on each version adds a few se
  * Save approved variation previews to the catalogue, entirely on the server: each preview is
  * moved on Cloudinary from variation-previews to the catalogue folder (no download or
  * re-upload, whatever the size), then registered like any other design and auto-tagged.
- * Body: { variations: [{ preview_public_id, filename, prompt, description, metadata, theme_id, style_id, ... }] }
+ * Body: { variations: [{ preview_public_id, filename, prompt, description, metadata, theme_id, style_id, ... }],
+ *        caption?: true }  (caption: draw the Pawsonality/Zodiac plate on each new version)
  */
 export async function POST(request: NextRequest) {
   const denied = await requireAdmin();
@@ -56,8 +58,10 @@ export async function POST(request: NextRequest) {
       });
       // Made from a design with words on it: draw them on for this version's breed
       const words = typeof v.variation_of === 'string' ? await wordsForNewVersion(supabase, saved.id, v.variation_of) : null;
+      // Caption plate (type/sign + tagline) when asked
+      const caption = body?.caption === true ? await captionForNewVersion(supabase, saved.id) : null;
       after(() => autoTagNew(supabase, saved.id));
-      results.push({ ...base, success: true, database_id: saved.id, cloudinary_url: moved.secure_url, width: moved.width, height: moved.height, ...(words ? { words } : {}) });
+      results.push({ ...base, success: true, database_id: saved.id, cloudinary_url: moved.secure_url, width: moved.width, height: moved.height, ...(words ? { words } : {}), ...(caption ? { caption } : {}) });
     } catch (e: any) {
       console.error('Variation save failed:', v.preview_public_id, e);
       results.push({ ...base, success: false, error: e?.message || e?.error?.message || 'Save failed' });
