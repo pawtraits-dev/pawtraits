@@ -1,6 +1,8 @@
 /**
  * Print labels for trade-printed stall stock (server only): one small frosted label per print,
- * used on the front corner or the back, A4 sheets of 21 (63.5 × 38.1 mm, 3 × 7, template CL2163).
+ * used on the front corner or the back, A4 sheets of 21: a 15 mm strip top and bottom, then 7 rows
+ * of 3 labels edge to edge (70 × 38.14 mm, no gaps). Everything is drawn at least 2.4 mm (aim 3 mm) inside
+ * each label (2 mm minimum plus printer drift).
  *
  *   ┌───────────────────────────────────┐
  *   │ [thumb] PAWTRAITS        ┌──────┐ │   thumbnail, brand, size tag
@@ -28,7 +30,17 @@ export interface LabelSheetLayout {
   cornerRadiusMm: number;
 }
 
-/** CL2163: A4, 21 labels 63.5 × 38.1 mm, 3 across × 7 down, margins 15.15 top / 7.75 left, 2 mm gap across */
+/** A4, 21 labels, 3 across × 7 down, 15 mm strip top and bottom, no gaps: 70 × 38.14 mm each */
+export const A4_21: LabelSheetLayout = {
+  pageWidthMm: 210, pageHeightMm: 297,
+  columns: 3, rows: 7,
+  labelWidthMm: 210 / 3, labelHeightMm: (297 - 2 * 15) / 7,
+  marginLeftMm: 0, marginTopMm: 15,
+  gapXMm: 0, gapYMm: 0,
+  cornerRadiusMm: 0,
+};
+
+/** CL2163 (the earlier sheet): 63.5 × 38.1 mm, margins 15.15 top / 7.75 left, 2 mm gap across */
 export const CL2163: LabelSheetLayout = {
   pageWidthMm: 210, pageHeightMm: 297,
   columns: 3, rows: 7,
@@ -72,7 +84,7 @@ function fonts() {
 }
 
 export async function generatePrintLabels(labels: PrintLabel[], opts: LabelOptions = {}): Promise<Uint8Array> {
-  const layout = opts.layout ?? CL2163;
+  const layout = opts.layout ?? A4_21;
   const perPage = layout.columns * layout.rows;
   const start = Math.min(Math.max(1, Math.floor(opts.startPosition ?? 1)), perPage) - 1;
   const cta = opts.cta ?? 'Scan to purchase, or personalise with your own pet';
@@ -110,7 +122,7 @@ interface Box { x: number; yTop: number; w: number; h: number; pageH: number; r:
 
 function drawLabel(page: PDFPage, label: PrintLabel, b: Box, f: { titleFont: PDFFont; bold: PDFFont; semi: PDFFont; cta: string; guides: boolean; thumb: PDFImage | null }) {
   const Y = (topMm: number) => mm(b.pageH - topMm);   // pdf-lib origin is bottom-left
-  const inset = 2.5;                                     // safe area: allows ~1 mm of printer drift
+  const inset = 3;                                       // safe area: 2 mm minimum + ~1 mm printer drift
 
   if (f.guides) {
     page.drawRectangle({ x: mm(b.x), y: Y(b.yTop + b.h), width: mm(b.w), height: mm(b.h), borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 0.4 });
@@ -162,26 +174,41 @@ function drawLabel(page: PDFPage, label: PrintLabel, b: Box, f: { titleFont: PDF
   const dimSize = f.bold.widthOfTextAtSize(label.sizeText, 8.5) <= mm(dimW) ? 8.5 : 7.3;   // 40×60 cm next to XL
   page.drawText(fit(label.sizeText, f.bold, dimSize, mm(dimW)), { x: mm(textX + codeW + 1.2), y: Y(tagTop + 3.35), size: dimSize, font: f.bold, color: DEEP });
 
-  // Title under the thumbnail row, full column width, up to 2 lines (smaller if it's long)
-  top = b.yTop + inset + (f.thumb ? 16.3 : 10.5);
-  let titleSize = 12;
-  let lines = wrap(label.title, f.titleFont, titleSize, mm(lw));
-  if (lines.length > 2) { titleSize = 10; lines = wrap(label.title, f.titleFont, titleSize, mm(lw)); }
-  lines = lines.slice(0, 2);
-  if (wrap(label.title, f.titleFont, titleSize, mm(lw)).length > 2) lines[1] = fit(`${lines[1]}…`, f.titleFont, titleSize, mm(lw));
-  const lead = titleSize * 0.42;
-  lines.forEach((line, i) => page.drawText(line, { x: mm(lx), y: Y(top + lead * (i + 1) - 0.6), size: titleSize, font: f.titleFont, color: DEEP }));
-
-  // Call to action at the bottom of the column
-  // Call to action across the bottom, centred on the label (smaller type if it's long)
+  // Call to action across the bottom, centred; its lowest descender sits on the safe area
   const fullW = b.w - 2 * inset;
   let ctaSize = 6.3;
   while (ctaSize > 5 && f.semi.widthOfTextAtSize(f.cta, ctaSize) > mm(fullW)) ctaSize -= 0.2;
   const ctaLines = wrap(f.cta, f.semi, ctaSize, mm(fullW)).slice(0, 2);
-  ctaLines.reverse().forEach((line, i) => {
+  const ctaDescent = Math.abs(f.semi.heightAtSize(ctaSize, { descender: true }) - f.semi.heightAtSize(ctaSize, { descender: false })) / MM;
+  const ctaCap = (f.semi.heightAtSize(ctaSize, { descender: false }) / MM) * 0.82;
+  const ctaLead = 2.6;
+  const ctaBase = b.yTop + b.h - inset - ctaDescent;                 // baseline of the last line
+  const ctaTop = ctaBase - (ctaLines.length - 1) * ctaLead - ctaCap;  // cap top of the first line
+  ctaLines.forEach((line, i) => {
     const w = f.semi.widthOfTextAtSize(line, ctaSize) / MM;
-    page.drawText(line, { x: mm(b.x + (b.w - w) / 2), y: Y(b.yTop + b.h - inset - 0.4 - i * 2.6), size: ctaSize, font: f.semi, color: MID });
+    page.drawText(line, { x: mm(b.x + (b.w - w) / 2), y: Y(ctaBase - (ctaLines.length - 1 - i) * ctaLead), size: ctaSize, font: f.semi, color: MID });
   });
+
+  // Title under the thumbnail row, column width, up to 2 lines: as big as fits between the
+  // thumbnail row and the call to action (12 pt, else 10, else 9)
+  const titleTop = b.yTop + inset + (f.thumb ? 15.6 : 10.5);
+  const room = ctaTop - 1 - titleTop;
+  const titleDescent = (s0: number) => Math.abs(f.titleFont.heightAtSize(s0, { descender: true }) - f.titleFont.heightAtSize(s0, { descender: false })) / MM * 0.6;
+  const titleCap = (s0: number) => (f.titleFont.heightAtSize(s0, { descender: false }) / MM) * 0.78;
+  let titleSize = 12, lines: string[] = [];
+  for (const size of [12, 11, 10, 9]) {
+    titleSize = size;
+    lines = wrap(label.title, f.titleFont, size, mm(lw));
+    const n = Math.min(2, lines.length);
+    if (lines.length <= 2 && titleCap(size) + (n - 1) * size * 0.42 + titleDescent(size) <= room) break;
+  }
+  const lead = titleSize * 0.42;
+  const maxLines = titleCap(titleSize) + lead + titleDescent(titleSize) <= room ? 2 : 1;
+  if (lines.length > maxLines) {
+    lines = lines.slice(0, maxLines);
+    lines[maxLines - 1] = fit(`${lines[maxLines - 1]}…`, f.titleFont, titleSize, mm(lw));
+  }
+  lines.forEach((line, i) => page.drawText(line, { x: mm(lx), y: Y(titleTop + titleCap(titleSize) + lead * i), size: titleSize, font: f.titleFont, color: DEEP }));
 }
 
 function wrap(text: string, font: PDFFont, size: number, maxWidth: number): string[] {

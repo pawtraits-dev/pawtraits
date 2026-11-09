@@ -1,6 +1,6 @@
 /**
  * POST /api/admin/stock/trade-orders/[id]/labels → PDF of print labels (A4, 21 per sheet,
- * 63.5 × 38.1 mm, template CL2163): one label per print in the order, in the same order as the
+ * 70 × 38.14 mm, 21 per A4, 15 mm strips top and bottom, no gaps): one label per print in the order, in the same order as the
  * print files. body: { locationCode?: string, startPosition?: 1–21, showGuides?: boolean, cta?: string,
  *   perPrint?: 1 | 2 }  (2, the default: a front and a back label for each print, side by side)
  * The QR is the stall sticker link for the design and size (and the stall, when given).

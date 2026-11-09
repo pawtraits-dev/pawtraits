@@ -649,7 +649,7 @@ function Downloader({ id, disabled, onDone }: { id: string; disabled: boolean; o
 
 // ---------------------------------------------------------------------------- labels
 
-/** One label per print (63.5 × 38.1 mm, 21 per A4 sheet, template CL2163), same order as the files */
+/** One label per print (70 × 38.14 mm, 21 per A4 sheet: 15 mm strips top and bottom, no gaps), same order as the files */
 function Labels({ id, disabled, count }: { id: string; disabled: boolean; count: number }) {
   const [locations, setLocations] = useState<{ code: string; name: string; location_type: string }[]>([]);
   const [loc, setLoc] = useState('');
@@ -678,7 +678,7 @@ function Labels({ id, disabled, count }: { id: string; disabled: boolean; count:
   return (
     <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50/50 p-4">
       <h2 className="flex items-center gap-1.5 text-sm font-semibold text-gray-900"><Tag className="h-4 w-4 text-purple-600" /> Labels</h2>
-      <p className="text-xs text-gray-600">{perPrint === 2 ? `A front and a back label for each print (${total} labels, side by side in pairs)` : `One label per print (${total})`}, on {sheets} sheet{sheets === 1 ? '' : 's'} of 21, in the same order as the print files: thumbnail, title, size and a QR to buy it or put your own pet in it. Frosted 63.5 × 38.1 mm labels, 21 per A4 (CL2163). Print at 100% / actual size.</p>
+      <p className="text-xs text-gray-600">{perPrint === 2 ? `A front and a back label for each print (${total} labels, side by side in pairs)` : `One label per print (${total})`}, on {sheets} sheet{sheets === 1 ? '' : 's'} of 21, in the same order as the print files: thumbnail, title, size and a QR to buy it or put your own pet in it. Frosted 70 × 38 mm labels, 21 per A4 sheet (3 × 7, edge to edge, 15 mm strip top and bottom). Print at 100% / actual size.</p>
       <div className="mt-3 flex flex-wrap items-end gap-3 text-sm">
         <label>QR credits the stall
           <select value={loc} onChange={e => setLoc(e.target.value)} className="mt-0.5 block rounded border border-gray-200 bg-white px-2 py-1">
