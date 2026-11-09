@@ -333,6 +333,15 @@ function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Si
   const [q, setQ] = useState('');
   const [page, setPage] = useState(0);
   const [filters, setFilters] = useState({ layout: '', collection: '', animal: '', breed: '' });
+  // Uploads or variations, as in Admin → Catalogue (remembered in this browser)
+  const [origin, setOriginState] = useState<'all' | 'uploads' | 'versions'>('all');
+  useEffect(() => {
+    try { const v = localStorage.getItem('pt_admin_trade_origin'); if (v === 'uploads' || v === 'versions') setOriginState(v); } catch { /* private mode */ }
+  }, []);
+  const setOrigin = (v: 'all' | 'uploads' | 'versions') => {
+    setOriginState(v); setPage(0);
+    try { localStorage.setItem('pt_admin_trade_origin', v); } catch { /* private mode */ }
+  };
   const [meta, setMeta] = useState<{ collections: { id: string; path: string; name: string; depth: number }[]; breeds: { id: string; name: string; animal_type: string }[] } | null>(null);
   const [data, setData] = useState<{ total: number; pageSize: number; designs: { id: string; title: string; breed: string | null; ratio: string | null; thumb: string | null; versions: number; variationOf: string | null }[] } | null>(null);
   const [versionsOf, setVersionsOf] = useState<{ id: string; title: string } | null>(null);
@@ -349,10 +358,11 @@ function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Si
     const t = setTimeout(() => {
       const qs = new URLSearchParams({ q, page: String(page), ...(meta ? {} : { meta: '1' }) });
       for (const [k, v] of Object.entries(filters)) if (v) qs.set(k, v);
+      if (origin !== 'all') qs.set('origin', origin);
       api<any>(`/api/admin/stock/trade-orders/designs?${qs}`).then(d => { setData(d); if (d.meta) setMeta(d.meta); }).catch(() => {});
     }, 250);
     return () => clearTimeout(t);
-  }, [q, page, filters]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [q, page, filters, origin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const add = () => {
     const rows = Array.from(picked.values()).flatMap(d => SIZES.filter(s => qty[s] > 0).map(s => ({ image_id: d.id, size: s, quantity: qty[s], title: d.title, thumb: d.thumb })));
@@ -365,7 +375,12 @@ function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Si
       <h2 className="text-sm font-semibold text-gray-900">Add from the catalogue</h2>
       <p className="text-xs text-gray-600">Tick one or more designs (across pages and filters), then how many of each size for each.</p>
       <input value={q} onChange={e => { setQ(e.target.value); setPage(0); }} placeholder="Search designs" className="mt-3 w-full rounded border border-gray-200 px-3 py-1.5 text-sm" />
-      <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+      <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
+        <select value={origin} onChange={e => setOrigin(e.target.value as 'all' | 'uploads' | 'versions')} aria-label="Uploads or variations" className="rounded border border-gray-200 bg-white px-1.5 py-1">
+          <option value="all">Uploads and variations</option>
+          <option value="uploads">Uploads only</option>
+          <option value="versions">Variations only</option>
+        </select>
         <select value={filters.layout} onChange={e => setFilter('layout', e.target.value)} aria-label="Layout" className="rounded border border-gray-200 bg-white px-1.5 py-1">
           <option value="">Any layout</option>
           <option value="portrait">Portrait (2:3)</option>

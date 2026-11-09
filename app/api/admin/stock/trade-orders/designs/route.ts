@@ -5,15 +5,18 @@
  *   collection  a collection id (its sub-collections included)
  *   breed       a breed id (main pet or any pet in a multi-pet design)
  *   animal      dog | cat
+ *   origin      all (default) | uploads | versions   (as Admin → Catalogue: lib/catalog/originals.ts)
  *   meta=1      also return the filter options (collections, breeds)
  * Breed / coat variations (image_catalog.variation_of) are shown under their reference design
  * (each design has a `versions` count; GET ./designs/[id]/versions lists them, with its team
  * versions). With a breed or dog/cat filter they're listed in the grid too, so a Labrador
- * filter finds the Labrador versions.
+ * filter finds the Labrador versions. origin=uploads: original designs only (versions still open
+ * from each design's count); origin=versions: only versions, listed in the grid.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
 import { LISTED_ONLY } from '@/lib/catalog/listing';
+import { onlyOriginals, onlyVersions } from '@/lib/catalog/originals';
 
 export const dynamic = 'force-dynamic';
 const PAGE = 36;
@@ -71,7 +74,12 @@ export async function GET(request: NextRequest) {
       : query.in('breed_id', ids);
   }
 
-  if (!breedIds) query = query.is('variation_of', null);
+  // Uploads or variations (as Admin → Catalogue). Default: uploads with their versions grouped
+  // under them, versions listed too once filtered by breed or dog/cat
+  const origin = p.get('origin');
+  if (origin === 'uploads') query = onlyOriginals(query);
+  else if (origin === 'versions') query = onlyVersions(query);
+  else if (!breedIds) query = query.is('variation_of', null);
 
   const { data, count, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
