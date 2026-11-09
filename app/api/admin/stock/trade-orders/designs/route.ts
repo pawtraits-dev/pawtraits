@@ -6,6 +6,8 @@
  *   breed       a breed id (main pet or any pet in a multi-pet design)
  *   animal      dog | cat
  *   origin      all (default) | uploads | versions   (as Admin → Catalogue: lib/catalog/originals.ts)
+ *   ordered     no | yes   on a trade order (not cancelled, drafts included) or not; a design counts
+ *               as ordered when it or any of its versions is (range coverage)
  *   meta=1      also return the filter options (collections, breeds)
  * Breed / coat variations (image_catalog.variation_of) are shown under their reference design
  * (each design has a `versions` count; GET ./designs/[id]/versions lists them, with its team
@@ -32,9 +34,13 @@ export async function GET(request: NextRequest) {
   const page = Math.max(0, Number(p.get('page')) || 0);
   const supabase = serviceClient();
 
-  let query = supabase.from('image_catalog').select('id, description, cloudinary_public_id, public_url, variation_of, breeds:breed_id (name), formats:format_id (aspect_ratio)', { count: 'exact' })
+  // Every filter is applied to `query`; with the ordered filter, ids are matched first (below)
+  const ordered = p.get('ordered') === 'no' || p.get('ordered') === 'yes' ? p.get('ordered') : null;
+  const SELECT = 'id, description, cloudinary_public_id, public_url, variation_of, breeds:breed_id (name), formats:format_id (aspect_ratio)';
+  let query = supabase.from('image_catalog').select(ordered ? 'id, variation_of' : SELECT, ordered ? {} : { count: 'exact' })
     .eq('is_public', true).or(LISTED_ONLY).not('is_customer_generated', 'is', true)
-    .order('created_at', { ascending: false }).range(page * PAGE, page * PAGE + PAGE - 1);
+    .order('created_at', { ascending: false });
+  if (!ordered) query = query.range(page * PAGE, page * PAGE + PAGE - 1);
   if (q) query = query.ilike('description', `%${q}%`);
 
   // Layout: designs whose format has that shape
@@ -81,7 +87,45 @@ export async function GET(request: NextRequest) {
   else if (origin === 'versions') query = onlyVersions(query);
   else if (!breedIds) query = query.is('variation_of', null);
 
-  const { data, count, error } = await query;
+  let data: any[] | null, count: number | null, error: any;
+  if (!ordered) {
+    ({ data, count, error } = await query as any);
+  } else {
+    // On a trade order: every line of an order that isn't cancelled; a version on an order covers
+    // the design it was made from too
+    const onOrder = new Set<string>();
+    const { data: live } = await supabase.from('trade_print_orders').select('id').neq('status', 'cancelled').limit(1000);
+    const orderIds = (live ?? []).map((o: any) => o.id);
+    for (let i = 0; i < orderIds.length; i += 100) {
+      for (let from = 0; ; from += 1000) {
+        const { data: ls } = await supabase.from('trade_print_order_lines').select('image_id').in('order_id', orderIds.slice(i, i + 100)).range(from, from + 999);
+        for (const l of ls ?? []) onOrder.add(l.image_id);
+        if (!ls || ls.length < 1000) break;
+      }
+    }
+    const lineIds = Array.from(onOrder);
+    for (let i = 0; i < lineIds.length; i += 200) {
+      const { data: vs } = await supabase.from('image_catalog').select('variation_of').in('id', lineIds.slice(i, i + 200)).not('variation_of', 'is', null);
+      for (const v of vs ?? []) onOrder.add(v.variation_of);
+    }
+    // All matching designs (ids only), then the page of the ones on / not on an order
+    const matched: any[] = [];
+    for (let from = 0; from < 20_000; from += 1000) {
+      const { data: chunk, error: e } = await (query as any).range(from, from + 999);
+      if (e) { error = e; break; }
+      matched.push(...(chunk ?? []));
+      if (!chunk || chunk.length < 1000) break;
+    }
+    const keep = matched.filter((d: any) => (ordered === 'yes') === (onOrder.has(d.id) || (!!d.variation_of && onOrder.has(d.variation_of))));
+    count = keep.length;
+    const pageIds = keep.slice(page * PAGE, page * PAGE + PAGE).map((d: any) => d.id);
+    if (!error) {
+      const r = pageIds.length ? await supabase.from('image_catalog').select(SELECT).in('id', pageIds) : { data: [] as any[], error: null };
+      error = r.error;
+      const pos = new Map(pageIds.map((id, i) => [id, i]));
+      data = (r.data ?? []).sort((a: any, b: any) => (pos.get(a.id) ?? 0) - (pos.get(b.id) ?? 0));
+    } else data = null;
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // How many versions each design has: breed / coat variations and finished team versions

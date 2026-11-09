@@ -332,7 +332,7 @@ function SalesPicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Size; 
 function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Size; quantity: number; title: string; thumb: string | null }[]) => void }) {
   const [q, setQ] = useState('');
   const [page, setPage] = useState(0);
-  const [filters, setFilters] = useState({ layout: '', collection: '', animal: '', breed: '' });
+  const [filters, setFilters] = useState({ layout: '', collection: '', animal: '', breed: '', ordered: '' });
   // Uploads or variations, as in Admin → Catalogue (remembered in this browser)
   const [origin, setOriginState] = useState<'all' | 'uploads' | 'versions'>('all');
   useEffect(() => {
@@ -375,7 +375,7 @@ function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Si
       <h2 className="text-sm font-semibold text-gray-900">Add from the catalogue</h2>
       <p className="text-xs text-gray-600">Tick one or more designs (across pages and filters), then how many of each size for each.</p>
       <input value={q} onChange={e => { setQ(e.target.value); setPage(0); }} placeholder="Search designs" className="mt-3 w-full rounded border border-gray-200 px-3 py-1.5 text-sm" />
-      <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
+      <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3 lg:grid-cols-6">
         <select value={origin} onChange={e => setOrigin(e.target.value as 'all' | 'uploads' | 'versions')} aria-label="Uploads or variations" className="rounded border border-gray-200 bg-white px-1.5 py-1">
           <option value="all">Uploads and variations</option>
           <option value="uploads">Uploads only</option>
@@ -401,8 +401,13 @@ function CataloguePicker({ onAdd }: { onAdd: (rows: { image_id: string; size: Si
           <option value="">Any breed</option>
           {(meta?.breeds ?? []).filter(b => !filters.animal || b.animal_type === filters.animal).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
+        <select value={filters.ordered} onChange={e => setFilter('ordered', e.target.value)} aria-label="On a trade order" title="A design counts as ordered when it or any of its versions is on a trade order (drafts included, cancelled ones not)" className="rounded border border-gray-200 bg-white px-1.5 py-1">
+          <option value="">Ordered or not</option>
+          <option value="no">Not on a trade order yet</option>
+          <option value="yes">Already ordered</option>
+        </select>
       </div>
-      {data && <p className="mt-1 text-[11px] text-gray-500">{data.total} design{data.total === 1 ? '' : 's'}{Object.values(filters).some(Boolean) ? <> · <button onClick={() => { setFilters({ layout: '', collection: '', animal: '', breed: '' }); setPage(0); }} className="text-purple-700 underline">clear filters</button></> : null}</p>}
+      {data && <p className="mt-1 text-[11px] text-gray-500">{data.total} design{data.total === 1 ? '' : 's'}{Object.values(filters).some(Boolean) ? <> · <button onClick={() => { setFilters({ layout: '', collection: '', animal: '', breed: '', ordered: '' }); setPage(0); }} className="text-purple-700 underline">clear filters</button></> : null}</p>}
       <div className="mt-2 flex items-center gap-3 text-xs">
         {pageDesigns.length > 0 && <button onClick={togglePage} className="text-purple-700 underline">{allOnPage ? 'Untick this page' : 'Tick all on this page'}</button>}
         {picked.size > 0 && <button onClick={() => setPicked(new Map())} className="text-gray-600 underline">Clear selection</button>}
