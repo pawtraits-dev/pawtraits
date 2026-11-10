@@ -6,7 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, FileText, Download, Printer, Package, RefreshCw, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Loader2, FileText, Download, Printer, Package, RefreshCw, AlertTriangle, ExternalLink, Truck } from 'lucide-react';
+import RoyalMailLabelsDialog from './RoyalMailLabelsDialog';
+import { STAGE_TEXT, type TrackingStage } from '@/lib/shipping/royal-mail/status';
 import { useToast } from '@/components/ui/use-toast';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { STAGE_LABELS, describeOrderItem, itemTitle, itemRef, postedItems } from '@/lib/fulfillment/shared';
@@ -20,8 +22,8 @@ const TABS: FulfilmentStage[] = ['to_print', 'printed', 'packed', 'posted', 'on_
 const TAB_HINT: Partial<Record<FulfilmentStage, string>> = {
   to_print: 'Paid and waiting to be printed — oldest first.',
   printed: 'Printed, waiting to be packed.',
-  packed: 'Packed. Buy postage (Click & Drop CSV below), then mark each one posted.',
-  posted: 'Posted in the last 14 days.',
+  packed: 'Packed. Select them and press Royal Mail labels (or use the Click & Drop CSV and mark each one posted).',
+  posted: 'Posted in the last 14 days, with the latest Royal Mail tracking (checked automatically).',
   on_hold: 'Held because the amount paid looked wrong. Check the payment in Stripe before releasing.',
   needs_routing: 'Paid before self-print was switched on, or the automatic routing failed. Choose how to fulfil each one.',
   gelato: 'Sent to Gelato in the last 30 days — they print and post these.',
@@ -53,6 +55,19 @@ export default function FulfilmentQueue() {
   const [tab, setTab] = useState<FulfilmentStage>('to_print');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [labelsOpen, setLabelsOpen] = useState(false);
+  const [checking, setChecking] = useState<string | null>(null);
+  const checkTracking = async (id: string) => {
+    setChecking(id);
+    try {
+      const r = await fetch(`/api/admin/orders/${id}/tracking`, { method: 'POST', credentials: 'include' });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'failed');
+      setOrders(prev => prev.map(o => (o.id === id ? { ...o, ...d.order } : o)));
+      toast({ title: STAGE_TEXT[d.stage as TrackingStage]?.label ?? d.stage, description: d.notified ? 'Customer told' : undefined });
+    } catch (e: any) { fail(e.message); }
+    setChecking(null);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -188,6 +203,17 @@ export default function FulfilmentQueue() {
                     {bulkBusy ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Printer className="w-4 h-4 mr-1.5" />}Mark printed
                   </Button>
                 )}
+                {tab === 'packed' && (
+                  <Button size="sm" disabled={!selectedIds.length} onClick={() => setLabelsOpen(true)} className="bg-purple-600 hover:bg-purple-700">
+                    <Truck className="w-4 h-4 mr-1.5" />Royal Mail labels
+                  </Button>
+                )}
+                {tab === 'posted' && (
+                  <Button size="sm" variant="outline" disabled={!selectedIds.length || !visible.some(o => selected.has(o.id) && o.rm_order_identifier)}
+                    onClick={() => window.open(`/api/admin/orders/fulfilment/royal-mail/labels?ids=${selectedIds.join(',')}`, '_blank')}>
+                    <Truck className="w-4 h-4 mr-1.5" />Labels again
+                  </Button>
+                )}
                 {tab === 'printed' && (
                   <Button size="sm" disabled={!selectedIds.length || bulkBusy} onClick={() => bulkAdvance('mark_packed')} className="bg-purple-600 hover:bg-purple-700">
                     {bulkBusy ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Package className="w-4 h-4 mr-1.5" />}Mark packed
@@ -239,6 +265,14 @@ export default function FulfilmentQueue() {
                             {order.shipped_email_sent_at ? ' · customer emailed' : ' · not emailed'}
                           </p>
                         )}
+                        {(tab === 'posted' || tab === 'packed') && order.tracking_code && (
+                          <p className="flex flex-wrap items-center gap-2 text-xs">
+                            {order.tracking_status && <span className={`rounded-full px-2 py-0.5 font-medium ${order.tracking_status === 'delivered' ? 'bg-green-100 text-green-800' : ['attempted', 'awaiting_collection', 'returned', 'exception'].includes(order.tracking_status) ? 'bg-amber-100 text-amber-800' : 'bg-purple-50 text-purple-800'}`}>{STAGE_TEXT[order.tracking_status as TrackingStage]?.label ?? order.tracking_status}</span>}
+                            {order.tracking_status_text && <span className="text-gray-600">{order.tracking_status_text}</span>}
+                            {order.tracking_error && <span className="text-red-700">{order.tracking_error}</span>}
+                            <button onClick={() => checkTracking(order.id)} disabled={checking === order.id} className="text-purple-700 underline disabled:opacity-50">{checking === order.id ? 'Checking…' : 'Check now'}</button>
+                          </p>
+                        )}
                         {tab === 'gelato' && <p className="text-xs text-gray-600">Gelato {order.gelato_status || 'pending'} · {order.gelato_order_id}</p>}
                       </div>
 
@@ -254,6 +288,7 @@ export default function FulfilmentQueue() {
           </>
         )}
       </CardContent>
+      <RoyalMailLabelsDialog open={labelsOpen} orderIds={selectedIds} onOpenChange={o => { setLabelsOpen(o); if (!o) load(); }} onDone={() => setSelected(new Set())} />
     </Card>
   );
 }

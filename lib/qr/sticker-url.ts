@@ -10,9 +10,9 @@
  * Spec: docs/specs/qr-stickers.md
  */
 
-export type StickerSize = 'S' | 'M' | 'L';
+export type StickerSize = 'S' | 'M' | 'L' | 'XL';
 
-export const STICKER_SIZES: StickerSize[] = ['S', 'M', 'L'];
+export const STICKER_SIZES: StickerSize[] = ['S', 'M', 'L', 'XL'];
 export const LOCATION_CODE_PATTERN = /^[A-Z0-9]{2,8}$/;
 
 export interface StickerTarget {
@@ -72,7 +72,7 @@ export function parseStickerSegments(
 ): ParsedSticker | null {
   if (!segments.length || segments.length > 2) return null;
 
-  const m = /^(\d{1,9})([SML])?$/i.exec(segments[0].trim());
+  const m = /^(\d{1,9})(XL|[SML])?$/i.exec(segments[0].trim());
   if (!m) return null;
 
   const stockRef = parseInt(m[1], 10);

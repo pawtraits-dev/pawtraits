@@ -72,12 +72,12 @@ export default function GuestAndStallSettingsPage() {
         <CardContent className="space-y-4 text-sm">
           <div>
             <span className="font-medium">Ready-made print prices (£)</span>
-            <div className="grid grid-cols-3 gap-3 mt-2">
-              {(['S', 'M', 'L'] as const).map(s => (
+            <div className="grid grid-cols-2 gap-3 mt-2 sm:grid-cols-4">
+              {(['S', 'M', 'L', 'XL'] as const).map(s => (
                 <label key={s}>
-                  <span className="text-xs text-gray-500">{s === 'S' ? 'Small' : s === 'M' ? 'Medium' : 'Large'} ({s})</span>
+                  <span className="text-xs text-gray-500">{s === 'S' ? 'Small' : s === 'M' ? 'Medium' : s === 'L' ? 'Large' : 'Extra large'} ({s})</span>
                   <Input type="number" step="0.01" min={1}
-                    value={draft.stall_prices_pence ? pounds(draft.stall_prices_pence[s]) : ''}
+                    value={draft.stall_prices_pence?.[s] ? pounds(draft.stall_prices_pence[s]) : ''}
                     onChange={e => setDraft({ ...draft, stall_prices_pence: { ...draft.stall_prices_pence, [s]: Math.round(parseFloat(e.target.value || '0') * 100) } })} />
                 </label>
               ))}

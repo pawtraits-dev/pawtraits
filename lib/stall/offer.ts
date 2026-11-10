@@ -3,6 +3,9 @@ import { QR_ATTRIBUTION_COOKIE, decodeAttribution } from '@/lib/qr/attribution';
 import { getSetting } from '@/lib/app-settings';
 import { serviceClient } from '@/lib/qr/server';
 
+export type StallSize = 'S' | 'M' | 'L' | 'XL';
+export const STALL_SIZES: StallSize[] = ['S', 'M', 'L', 'XL'];
+
 /** A stall "take it home now" offer is only shown to someone who scanned a located sticker recently. */
 export const STALL_SCAN_FRESH_HOURS = 12;
 
@@ -13,11 +16,11 @@ export interface StallOffer {
   locationCode?: string;
   locationName?: string;
   scanId?: string;
-  size?: 'S' | 'M' | 'L';
+  size?: StallSize;
   listPricePence?: number;
   pricePence?: number;
   discountPct?: number;
-  prices?: Record<'S' | 'M' | 'L', number>;
+  prices?: Partial<Record<StallSize, number>>;
 }
 
 export async function getStallOffer(request: NextRequest, imageId: string, requestedSize?: string | null): Promise<StallOffer> {
@@ -35,10 +38,11 @@ export async function getStallOffer(request: NextRequest, imageId: string, reque
   if (!image || image.is_public === false) return { available: false, reason: 'image_unavailable' };
 
   const [prices, onlinePct] = await Promise.all([getSetting('stall_prices_pence'), getSetting('stall_online_discount_pct')]);
-  const size = (['S', 'M', 'L'].includes((requestedSize || '').toUpperCase()) ? requestedSize!.toUpperCase()
-    : attr.size && ['S', 'M', 'L'].includes(attr.size) ? attr.size : 'M') as 'S' | 'M' | 'L';
+  const sizes = STALL_SIZES.filter(s => Number((prices as any)[s]) > 0);
+  const size = (sizes.includes((requestedSize || '').toUpperCase() as StallSize) ? requestedSize!.toUpperCase()
+    : attr.size && sizes.includes(attr.size as StallSize) ? attr.size : 'M') as StallSize;
   const discountPct = Math.max(Number(onlinePct) || 0, Number(loc.at_market_discount_pct) || 0);
-  const listPricePence = prices[size];
+  const listPricePence = Number((prices as Record<string, number>)[size]) || prices.M;
   const pricePence = Math.round(listPricePence * (1 - discountPct / 100));
 
   return {

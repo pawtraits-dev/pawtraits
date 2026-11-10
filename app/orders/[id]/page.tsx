@@ -9,6 +9,8 @@ import { ArrowLeft, Package, Clock, Truck, CheckCircle, MapPin, Calendar, Credit
 import { productDescriptionService } from '@/lib/product-utils';
 import { extractDescriptionTitle } from '@/lib/utils';
 import ItemDownload from '@/components/orders/ItemDownload';
+import TrackingTimeline from '@/components/orders/TrackingTimeline';
+import type { TrackingEvent, TrackingStage } from '@/lib/shipping/royal-mail/status';
 
 // 🏗️ ORDER DETAIL PAGE — data via /api/shop/orders/[id] (signed-in owner, partner or admin)
 
@@ -51,6 +53,12 @@ interface Order {
   tracking_code?: string | null;
   tracking_number?: string | null;
   tracking_url?: string | null;
+  tracking_status?: TrackingStage | null;
+  tracking_status_text?: string | null;
+  tracking_events?: TrackingEvent[] | null;
+  tracking_checked_at?: string | null;
+  shipped_at?: string | null;
+  self_print_status?: string | null;
   order_items: OrderItem[];
   downloads?: OrderDownload[];
 }
@@ -186,6 +194,17 @@ export default function OrderDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {hasPhysical && (order.tracking_status || (tracking && /royal mail/i.test(order.carrier || ''))) && (
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Truck className="w-5 h-5 text-purple-600" />Delivery</CardTitle></CardHeader>
+            <CardContent>
+              <TrackingTimeline stage={order.tracking_status ?? null} statusText={order.tracking_status_text} events={order.tracking_events}
+                trackingNumber={tracking} trackingUrl={order.tracking_url} checkedAt={order.tracking_checked_at}
+                posted={!!order.shipped_at || order.status === 'shipped' || order.status === 'delivered'} />
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader><CardTitle>Items</CardTitle></CardHeader>

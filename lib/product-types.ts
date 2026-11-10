@@ -366,7 +366,7 @@ export interface QrScan {
   id: string;
   image_id: string | null;
   stock_ref: number;
-  size_code: 'S' | 'M' | 'L' | null;
+  size_code: 'S' | 'M' | 'L' | 'XL' | null;
   location_id: string | null;
   location_code: string | null;
   visitor_id: string;
@@ -406,7 +406,7 @@ export interface StockLocationUpdate extends Partial<Omit<StockLocation, 'id' | 
 export interface ImageQrInfo {
   imageId: string;
   stockRef: number;
-  size: 'S' | 'M' | 'L' | null;
+  size: 'S' | 'M' | 'L' | 'XL' | null;
   locationCode: string | null;
   url: string;
 }
@@ -420,7 +420,7 @@ export interface StickerImage {
 }
 
 export interface StickerSheetRequest {
-  items: Array<{ imageId: string; size?: 'S' | 'M' | 'L'; quantity: number }>;
+  items: Array<{ imageId: string; size?: 'S' | 'M' | 'L' | 'XL'; quantity: number }>;
   locationCode?: string;
   startPosition?: number;
   showGuides?: boolean;
@@ -521,6 +521,13 @@ export interface FulfilmentOrder {
   gelato_order_id?: string | null;
   gelato_status?: string | null;
   error_message?: string | null;
+  /** Royal Mail (2026-11-09 migration): Click & Drop order and tracking */
+  rm_order_identifier?: number | null;
+  tracking_status?: string | null;
+  tracking_status_text?: string | null;
+  tracking_checked_at?: string | null;
+  tracking_error?: string | null;
+  delivered_at?: string | null;
   order_items: FulfilmentOrderItem[];
   fulfilment_stage: FulfilmentStage | null;
 }

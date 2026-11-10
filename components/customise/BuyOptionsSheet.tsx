@@ -10,7 +10,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Download, Truck, ShoppingBag, X, Hand } from 'lucide-react';
+import { Check, ChevronDown, Download, Truck, ShoppingBag, X, Hand } from 'lucide-react';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { useToast } from '@/components/ui/use-toast';
 import { buildStallCartProduct, SIZE_NAMES, isStallProductId } from '@/lib/cart/items';
@@ -34,7 +34,7 @@ export interface BuyTarget {
 export interface StallOfferView {
   available: boolean;
   locationName?: string;
-  size?: 'S' | 'M' | 'L';
+  size?: 'S' | 'M' | 'L' | 'XL';
   pricePence?: number;
   listPricePence?: number;
   discountPct?: number;
@@ -52,7 +52,7 @@ const pence = (p: ProductRow['pricing']) => (p.is_on_sale && p.discount_price ? 
 const gbp = (v?: number) => (v === undefined ? '' : `£${(v / 100).toFixed(v % 100 === 0 ? 0 : 2)}`);
 
 /** Brand-voice line for each Foamex size (shown under the size name) */
-const SIZE_LINES: Record<string, string> = { S: 'Sweet and petite', M: 'Just right', L: 'Large and in charge' };
+const SIZE_LINES: Record<string, string> = { S: 'Sweet and petite', M: 'Just right', L: 'Large and in charge', XL: 'Make a statement' };
 /** The 11oz mug Gelato prints (shown instead of the wrap's print size) */
 const MUG_SIZE = 'Height 96 mm · base diameter 80 mm';
 
@@ -106,6 +106,21 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
   const printsByMedium = useMemo(() => (products ?? [])
     .filter(p => p.product_type !== 'digital_download')
     .reduce<Record<string, ProductRow[]>>((acc, p) => { (acc[p.media_name || p.medium?.name || 'Prints'] ||= []).push(p); return acc; }, {}), [products]);
+
+  // Each material folds away (a design has a dozen-plus print options); Foamex starts open, and
+  // so does any material holding something already ticked, or the only one there is
+  const [openMedia, setOpenMedia] = useState<Set<string> | null>(null);
+  const isOpen = (medium: string, rows: ProductRow[]) => {
+    if (Object.keys(printsByMedium).length <= 1) return true;
+    if (openMedia) return openMedia.has(medium);
+    return /foam/i.test(medium) || rows.some(p => selected.has(p.id));
+  };
+  const toggleMedium = (medium: string) => setOpenMedia(prev => {
+    const base = prev ?? new Set(Object.entries(printsByMedium).filter(([m, rows]) => isOpen(m, rows)).map(([m]) => m));
+    const next = new Set(base);
+    if (next.has(medium)) next.delete(medium); else next.add(medium);
+    return next;
+  });
 
   const alreadyHasStallLine = items.some(i => isStallProductId(i.productId) && i.imageId === target.imageId);
 
@@ -192,12 +207,30 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
           {!products && !loadError && <div className="space-y-2">{[0, 1, 2].map(i => <div key={i} className="h-16 animate-pulse rounded-2xl bg-gray-100" />)}</div>}
           {loadError && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{loadError}</p>}
 
-          {Object.entries(printsByMedium).map(([medium, rows]) => (
+          {Object.entries(printsByMedium).map(([medium, rows]) => {
+            const open = isOpen(medium, rows);
+            const from = Math.min(...rows.map(p => pence(p.pricing)).filter(n => n > 0));
+            const picked = rows.filter(p => selected.has(p.id)).length;
+            const single = Object.keys(printsByMedium).length <= 1;
+            return (
             <section key={medium}>
-              <p className="mb-2 flex items-center gap-1 text-sm font-semibold text-gray-800">
-                <Truck className="h-4 w-4" /> {medium} · {stallAvailable ? 'made to order, delivered' : 'printed and posted'}
-              </p>
-              <div className="space-y-2">
+              {single ? (
+                <p className="mb-2 flex items-center gap-1 text-sm font-semibold text-gray-800">
+                  <Truck className="h-4 w-4" /> {medium} · {stallAvailable ? 'made to order, delivered' : 'printed and posted'}
+                </p>
+              ) : (
+                <button type="button" onClick={() => toggleMedium(medium)} aria-expanded={open}
+                  className="mb-2 flex min-h-11 w-full items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-left">
+                  <Truck className="h-4 w-4 shrink-0 text-purple-700" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-gray-900">{medium}</span>
+                    <span className="block text-xs text-gray-500">{Number.isFinite(from) ? `from ${gbp(from)} · ` : ''}{rows.length} size{rows.length === 1 ? '' : 's'} · {stallAvailable ? 'made to order, delivered' : 'printed and posted'}</span>
+                  </span>
+                  {picked > 0 && !open && <span className="rounded-full bg-purple-600 px-2 py-0.5 text-xs font-semibold text-white">{picked} chosen</span>}
+                  <ChevronDown className={`h-5 w-5 shrink-0 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </button>
+              )}
+              {open && <div className="space-y-2">
                 {rows.map(p => {
                   const sameSize = !!scannedSize && p.size_code === scannedSize;
                   // Mugs: say what the mug is, not the print area (20×9.6 cm is the wrap, not the mug)
@@ -222,9 +255,10 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
                       price={gbp(pence(p.pricing))} />
                   );
                 })}
-              </div>
+              </div>}
             </section>
-          ))}
+            );
+          })}
 
           {digital.length > 0 && (
             <section>

@@ -10,10 +10,10 @@ import { track } from '@/lib/tracking/events';
 
 interface Receipt {
   paid: boolean; status: string; amountPence: number; paidAt: number; firstName: string;
-  takeHome: Array<{ title: string; size: 'S' | 'M' | 'L' | null; stockRef: number | null; imageUrl: string | null }>;
+  takeHome: Array<{ title: string; size: 'S' | 'M' | 'L' | 'XL' | null; stockRef: number | null; imageUrl: string | null }>;
   deliveredCount: number; stallName: string | null; orderNumber: string | null; last4: string;
 }
-const SIZE: Record<string, string> = { S: 'Small', M: 'Medium', L: 'Large' };
+const SIZE: Record<string, string> = { S: 'Small', M: 'Medium', L: 'Large', XL: 'Extra large' };
 
 export default function StallPaidPage() {
   const [pi, setPi] = useState<string | null>(null);

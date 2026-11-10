@@ -31,6 +31,9 @@
       "maxDuration": 300,
       "memory": 1769
     },
+    "app/api/cron/royal-mail-tracking/route.ts": {
+      "maxDuration": 300
+    },
     "app/api/admin/quizzes/breed-batch/tick/route.ts": {
       "maxDuration": 300,
       "memory": 1769
@@ -48,6 +51,10 @@
     {
       "path": "/api/cron/quiz-images",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/royal-mail-tracking",
+      "schedule": "*/15 * * * *"
     }
   ],
   "regions": [

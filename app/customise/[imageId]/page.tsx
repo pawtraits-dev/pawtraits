@@ -79,7 +79,7 @@ interface StallOffer {
   available: boolean;
   locationName?: string;
   locationCode?: string;
-  size?: 'S' | 'M' | 'L';
+  size?: 'S' | 'M' | 'L' | 'XL';
   pricePence?: number;
   listPricePence?: number;
   discountPct?: number;
@@ -112,7 +112,7 @@ function preloadImage(src: string, timeoutMs = PRELOAD_TIMEOUT_MS): Promise<void
   });
 }
 const POLL_TIMEOUT_MS = 4 * 60 * 1000;
-const SIZE_LABEL: Record<string, string> = { S: 'Small', M: 'Medium', L: 'Large' };
+const SIZE_LABEL: Record<string, string> = { S: 'Small', M: 'Medium', L: 'Large', XL: 'Extra large' };
 
 const gbp = (p?: number) => (p === undefined ? '' : `£${(p / 100).toFixed(p % 100 === 0 ? 0 : 2)}`);
 const ratio = (ar?: string) => ({ aspectRatio: ar ? ar.replace(':', ' / ') : '1 / 1' });
@@ -177,7 +177,7 @@ export default function CustomisePage() {
     if (from && /^[a-z0-9-]+(\/[a-z0-9-]+){0,2}$/.test(from)) setFromCollection(from);
     if (qs.get('src') === 'qr') {
       setFromQr(true);
-      if (size && ['S', 'M', 'L'].includes(size)) {
+      if (size && ['S', 'M', 'L', 'XL'].includes(size)) {
         setScannedSize(size);
         try { sessionStorage.setItem('pt_qr_size', size); } catch { /* private mode */ }
       }

@@ -6,18 +6,18 @@
  * admin settings and checks the customer scanned a stall sticker (lib/stall/offer.ts).
  */
 export const STALL_PRODUCT_PREFIX = 'stall_print_';
-export const SIZE_NAMES: Record<string, string> = { S: 'Small', M: 'Medium', L: 'Large' };
+export const SIZE_NAMES: Record<string, string> = { S: 'Small', M: 'Medium', L: 'Large', XL: 'Extra large' };
 
 export function isStallProductId(productId?: string | null): boolean {
-  return !!productId && /^stall_print_[SML]$/.test(productId);
+  return !!productId && /^stall_print_(XL|[SML])$/.test(productId);
 }
-export function stallSizeFromProductId(productId: string): 'S' | 'M' | 'L' | null {
-  const m = /^stall_print_([SML])$/.exec(productId);
-  return (m?.[1] as 'S' | 'M' | 'L') ?? null;
+export function stallSizeFromProductId(productId: string): 'S' | 'M' | 'L' | 'XL' | null {
+  const m = /^stall_print_(XL|[SML])$/.exec(productId);
+  return (m?.[1] as 'S' | 'M' | 'L' | 'XL') ?? null;
 }
 
 /** product/pricing objects shaped like real ones so the basket, cart page and checkout work unchanged */
-export function buildStallCartProduct(size: 'S' | 'M' | 'L', pricePence: number) {
+export function buildStallCartProduct(size: 'S' | 'M' | 'L' | 'XL', pricePence: number) {
   const id = `${STALL_PRODUCT_PREFIX}${size}`;
   return {
     product: {

@@ -62,7 +62,7 @@ export async function createOrderItems(
 
   const rows: any[] = [];
   for (const item of items) {
-    const stall = /^stall_print_([SML])$/.exec(item.productId);
+    const stall = /^stall_print_(XL|[SML])$/.exec(item.productId);
     const product = productById.get(item.productId) as any;
     const productData = stall
       ? { product_type: 'stall_print', fulfillment_method: 'collected', size_code: stall[1] }

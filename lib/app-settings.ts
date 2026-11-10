@@ -7,7 +7,7 @@ import { serviceClient } from '@/lib/qr/server';
 export const SETTING_DEFAULTS = {
   guest_preview_daily_limit: 20,
   guest_preview_ip_daily_limit: 200,
-  stall_prices_pence: { S: 2500, M: 3500, L: 5000 } as Record<'S' | 'M' | 'L', number>,
+  stall_prices_pence: { S: 2000, M: 3000, L: 4000, XL: 5000 } as Record<'S' | 'M' | 'L', number> & { XL?: number },
   stall_online_discount_pct: 0,
   welcome_gift_enabled: true,
   /** Where new paid orders with posted prints go */
@@ -32,7 +32,14 @@ export const SETTING_DEFAULTS = {
   team_switch_enabled: true,
   /** New team versions one visitor can have painted per hour (ready-made ones are unlimited) */
   team_switch_hourly_limit: 6,
+  /** Royal Mail labels (lib/shipping/royal-mail/): Click & Drop service codes per destination
+   *  ('' = Click & Drop's own shipping rules choose) and the parcel weight estimate */
+  royal_mail: { service_uk: '', service_europe: '', service_world: '', packaging_grams: 120, print_grams_per_100cm2: 25, large_letter_max_prints: 2 } as RoyalMailSettings,
 };
+export interface RoyalMailSettings {
+  service_uk: string; service_europe: string; service_world: string;
+  packaging_grams: number; print_grams_per_100cm2: number; large_letter_max_prints: number;
+}
 export type FulfillmentProvider = 'self_print' | 'gelato';
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 export type SettingValue<K extends SettingKey> = (typeof SETTING_DEFAULTS)[K];
@@ -97,12 +104,21 @@ export function validateSetting(key: string, value: unknown): string | null {
     case 'team_switch_enabled':
     case 'social_include_previews':
       return typeof value === 'boolean' ? null : 'Must be true or false';
+    case 'royal_mail': {
+      const v = value as Record<string, unknown>;
+      if (!v || typeof v !== 'object') return 'Must be an object';
+      for (const k of ['service_uk', 'service_europe', 'service_world']) if (typeof v[k] !== 'string' || !/^[A-Z0-9]{0,10}$/i.test(v[k] as string)) return `${k}: a Click & Drop service code (letters and numbers, up to 10) or empty`;
+      for (const k of ['packaging_grams', 'print_grams_per_100cm2', 'large_letter_max_prints']) if (typeof v[k] !== 'number' || (v[k] as number) < 0 || (v[k] as number) > 5000) return `${k}: a number 0–5000`;
+      return null;
+    }
     case 'stall_prices_pence': {
       const v = value as Record<string, unknown>;
       if (!v || typeof v !== 'object') return 'Must be an object of S/M/L prices';
       for (const s of ['S', 'M', 'L']) {
         if (!Number.isInteger(v[s]) || (v[s] as number) < 100 || (v[s] as number) > 100000) return `Price for ${s} must be 100–100000 pence`;
       }
+      // XL is optional (no XL prints at the stall when it's missing)
+      if (v.XL !== undefined && v.XL !== null && (!Number.isInteger(v.XL) || (v.XL as number) < 100 || (v.XL as number) > 100000)) return 'Price for XL must be 100–100000 pence';
       return null;
     }
     default:
