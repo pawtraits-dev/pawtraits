@@ -48,6 +48,8 @@ interface ProductRow {
 }
 
 const STALL_OPTION = '__stall__';
+/** Foamex (the stall's prints): open by default, and what a scanned size matches */
+const isFoam = (p: ProductRow) => /foam/i.test(p.media_name || p.medium?.name || '');
 const pence = (p: ProductRow['pricing']) => (p.is_on_sale && p.discount_price ? p.discount_price : p.sale_price);
 const gbp = (v?: number) => (v === undefined ? '' : `£${(v / 100).toFixed(v % 100 === 0 ? 0 : 2)}`);
 
@@ -92,7 +94,10 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
         setProducts(rows);
         // sensible default: the print in their hand, else the download for a custom portrait
         const digital = rows.find(p => p.product_type === 'digital_download');
-        const medium = rows.find(p => p.product_type !== 'digital_download' && p.size_code === (scannedSize || 'M'));
+        // The default is a Foamex print (what's on the stall), never the same size in every material
+        const prints = rows.filter(p => p.product_type !== 'digital_download');
+        const size = scannedSize || 'M';
+        const medium = prints.find(p => isFoam(p) && p.size_code === size) ?? prints.find(p => p.size_code === size);
         if (stallAvailable) setSelected(new Set([STALL_OPTION]));
         else if (target.kind === 'custom' && digital) setSelected(new Set([digital.id]));
         else if (inline && medium) setSelected(new Set([medium.id]));
@@ -232,7 +237,7 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
               )}
               {open && <div className="space-y-2">
                 {rows.map(p => {
-                  const sameSize = !!scannedSize && p.size_code === scannedSize;
+                  const sameSize = !!scannedSize && p.size_code === scannedSize && isFoam(p);
                   // Mugs: say what the mug is, not the print area (20×9.6 cm is the wrap, not the mug)
                   const mug = /mug/i.test(medium);
                   if (mug) {
@@ -248,7 +253,7 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
                     <Option key={p.id} checked={selected.has(p.id)} onClick={() => toggle(p.id)}
                       highlight={sameSize && !stallAvailable}
                       thumb={orientation && p.width_cm && p.height_cm ? <ShapeThumb src={target.imageUrl} {...printSizeFor(p.width_cm, p.height_cm, orientation)} /> : undefined}
-                      badge={p.size_code === 'M' && !stallAvailable && !sameSize ? 'Most popular' : undefined}
+                      badge={p.size_code === 'M' && isFoam(p) && !stallAvailable && !sameSize ? 'Most popular' : undefined}
                       title={`${p.size_name || p.name}${p.width_cm ? ` · ${orientedSize(p, orientation)}` : ''}`}
                       subtitle={sameSize ? (stallAvailable ? 'Same size as the one in your hand, made fresh and delivered' : 'Same size as the print you scanned') : (SIZE_LINES[p.size_code || ''] || p.media_description)}
                       perk="Includes bonus digital copy"
