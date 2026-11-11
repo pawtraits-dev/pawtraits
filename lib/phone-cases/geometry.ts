@@ -74,24 +74,46 @@ export const CASE_ART_RATIO = '9:16';
 const CANVAS_W_OVER_H = 9 / 16;
 
 export interface Box { x: number; y: number; w: number; h: number }
-export interface CaseArtLayout { cw: number; ch: number; slot: Box }
+/**
+ * Where the painting sits, per design (applies to every layout):
+ *   scale   1 = case width; 1.3 = 30% bigger (the sides run off the case)
+ *   anchorX 0 = keep the left edge on the case's left, 0.5 = centred, 1 = keep the right edge
+ *   below   how far the painting's bottom runs past the case bottom, in case widths (raises it)
+ */
+export interface Placement { scale: number; anchorX: number; below: number }
+export const DEFAULT_PLACEMENT: Placement = { scale: 1, anchorX: 0.5, below: 0 };
+/** frame = the full-width 2:3 box the cases are measured from; slot = where the painting is drawn */
+export interface CaseArtLayout { cw: number; ch: number; slot: Box; frame?: Box; placement?: Placement }
 
 type Sized = Pick<PhoneModel, 'case_w_mm' | 'case_h_mm'>;
 
-export function caseArtLayout(models: Sized[]): CaseArtLayout {
+export function cleanPlacement(p?: Partial<Placement> | null): Placement {
+  const n = (v: unknown, lo: number, hi: number, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
+  return { scale: n(p?.scale, 1, 1.8, 1), anchorX: n(p?.anchorX, 0, 1, 0.5), below: n(p?.below, 0, 0.6, 0) };
+}
+
+export function caseArtLayout(models: Sized[], placement?: Partial<Placement> | null): CaseArtLayout {
   const wrap = Math.max(...models.map(m => WRAP_MARGIN_MM / Number(m.case_w_mm)));
   const above = Math.max(0, ...models.map(m => Number(m.case_h_mm) / Number(m.case_w_mm) - 1 / PAINTING_RATIO));
   const w0 = 1 + 2 * wrap, h0 = above + 1 / PAINTING_RATIO + 2 * wrap;
   const [cw, ch] = w0 / h0 < CANVAS_W_OVER_H ? [h0 * CANVAS_W_OVER_H, h0] : [w0, w0 / CANVAS_W_OVER_H];
-  return { cw, ch, slot: { x: (cw - 1) / 2, y: ch - wrap - 1 / PAINTING_RATIO, w: 1, h: 1 / PAINTING_RATIO } };
+  const frame = { x: (cw - 1) / 2, y: ch - wrap - 1 / PAINTING_RATIO, w: 1, h: 1 / PAINTING_RATIO };
+  const p = cleanPlacement(placement);
+  const w = p.scale, h = w / PAINTING_RATIO;
+  const slot = { x: frame.x + (1 - w) * p.anchorX, y: frame.y + frame.h + p.below - h, w, h };
+  return { cw, ch, slot, frame, placement: p };
 }
+
+/** The full-width box the cases hang from (older case art has no frame: its slot is the frame) */
+export const frameOf = (L: CaseArtLayout): Box => L.frame ?? L.slot;
 
 /** A model's case on the canvas (painting-width units): the case itself, and with its wrap margin */
 export function modelOnCanvas(layout: CaseArtLayout, m: Sized): { case: Box; print: Box; scale: number } {
   const W = Number(m.case_w_mm), H = Number(m.case_h_mm);
-  const s = layout.slot.w / W;                       // units per mm
-  const bottom = layout.slot.y + layout.slot.h;
-  const c = { x: layout.slot.x, y: bottom - H * s, w: W * s, h: H * s };
+  const f = frameOf(layout);
+  const s = f.w / W;                                  // units per mm
+  const bottom = f.y + f.h;
+  const c = { x: f.x, y: bottom - H * s, w: W * s, h: H * s };
   const k = WRAP_MARGIN_MM * s;
   return { case: c, print: { x: c.x - k, y: c.y - k, w: c.w + 2 * k, h: c.h + 2 * k }, scale: s };
 }

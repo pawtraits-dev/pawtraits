@@ -1,13 +1,15 @@
 /**
  * Phone-case art for designs (admin). See lib/phone-cases/case-art.ts
  * GET                     designs that have case art (id, title, thumbnail, status per layout)
- * GET ?design=<id>        one design: title, thumbnail, aspect, and its case art per layout
- * POST  { designId, group }            generate (or redo) that layout's case art (Gemini, ~30–60 s)
+ * GET ?design=<id|ref>    one design (UUID or stock ref): title, thumbnail, aspect, and its case art per layout
+ * POST  { designId, group, placement? } generate (or redo) that layout's case art (Gemini, ~30–60 s);
+ *                                       placement { scale, anchorX, below } (else the design's current one)
  * PATCH { designId, group, status }    'approved' | 'rejected'
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
 import { generateCaseArt, setCaseArtStatus } from '@/lib/phone-cases/case-art';
+import { cleanPlacement } from '@/lib/phone-cases/geometry';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -24,8 +26,9 @@ export async function GET(req: NextRequest) {
   const db = serviceClient();
   const id = req.nextUrl.searchParams.get('design');
   if (id) {
-    if (!UUID.test(id)) return NextResponse.json({ error: 'That isn’t a design ID' }, { status: 400 });
-    const { data, error } = await db.from('image_catalog').select('id, description, cloudinary_public_id, case_art, formats(aspect_ratio)').eq('id', id).maybeSingle();
+    const byRef = /^\d{1,7}$/.test(id);
+    if (!byRef && !UUID.test(id)) return NextResponse.json({ error: 'Enter a design ID or stock ref (e.g. 1325)' }, { status: 400 });
+    const { data, error } = await db.from('image_catalog').select('id, description, cloudinary_public_id, case_art, formats(aspect_ratio)').eq(byRef ? 'stock_ref' : 'id', byRef ? Number(id) : id).maybeSingle();
     if (error) return NextResponse.json({ error: missingColumn(error.message) ? 'Run db/migrations/2026-11-11-phone-case-art.sql first.' : error.message }, { status: 500 });
     if (!data) return NextResponse.json({ error: 'Design not found' }, { status: 404 });
     const art = Object.fromEntries(Object.entries((data.case_art || {}) as Record<string, any>).map(([g, e]) => [g, { ...e, url: thumb(e.public_id, 900) }]));
@@ -44,10 +47,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
-  const { designId, group } = await req.json().catch(() => ({}));
+  const { designId, group, placement } = await req.json().catch(() => ({}));
   if (!UUID.test(designId || '') || !GROUP.test(group || '')) return NextResponse.json({ error: 'designId and group are required' }, { status: 400 });
   try {
-    const entry = await generateCaseArt(serviceClient(), designId, group);
+    const entry = await generateCaseArt(serviceClient(), designId, group, placement && typeof placement === 'object' ? cleanPlacement(placement) : null);
     return NextResponse.json({ ...entry, url: thumb(entry.public_id, 900) });
   } catch (e: any) {
     console.error('case art failed', designId, group, e);

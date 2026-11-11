@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Check, Loader2, RefreshCw, Sparkles, X } from 'lucide-react';
-import { cameraOnCanvas, modelOnCanvas, type CaseArtEntry, type PhoneLayoutGroup, type PhoneModel } from '@/lib/phone-cases/geometry';
+import { caseArtLayout, cameraOnCanvas, DEFAULT_PLACEMENT, modelOnCanvas, type CaseArtEntry, type Placement, type PhoneLayoutGroup, type PhoneModel } from '@/lib/phone-cases/geometry';
 
 type Art = CaseArtEntry & { url: string };
 interface Design { id: string; title: string; thumb: string | null; aspect: string | null; case_art: Record<string, Art> }
@@ -18,11 +18,13 @@ interface Listed { id: string; title: string; thumb: string | null; status: Reco
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 const STATUS: Record<string, string> = { pending: 'bg-amber-100 text-amber-800', approved: 'bg-green-100 text-green-800', rejected: 'bg-red-100 text-red-800' };
 
-function Overlay({ art, models, camera }: { art: Art; models: PhoneModel[]; camera: PhoneLayoutGroup['camera'] }) {
+function Overlay({ art, models, camera, proposed }: { art: Art; models: PhoneModel[]; camera: PhoneLayoutGroup['camera']; proposed?: Placement | null }) {
   const L = art.layout;
+  const next = proposed ? caseArtLayout(models, proposed).slot : null;
   return (
     <svg viewBox={`0 0 ${L.cw} ${L.ch}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
       <rect x={L.slot.x} y={L.slot.y} width={L.slot.w} height={L.slot.h} fill="none" stroke="#C9A44C" strokeWidth={0.006} strokeDasharray="0.02 0.012" />
+      {next && <rect x={next.x} y={next.y} width={next.w} height={next.h} fill="none" stroke="#7C3AED" strokeWidth={0.009} strokeDasharray="0.03 0.015" />}
       {models.map(m => {
         const { case: c } = modelOnCanvas(L, m);
         return (
@@ -46,6 +48,7 @@ export default function CaseArtPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [overlay, setOverlay] = useState(true);
+  const [placement, setPlacement] = useState<Placement>(DEFAULT_PLACEMENT);
 
   const loadList = useCallback(() => {
     fetch('/api/admin/phone-cases/case-art', { credentials: 'include' }).then(r => r.json()).then(d => (d.error ? setError(d.error) : setListed(d.designs)));
@@ -61,12 +64,14 @@ export default function CaseArtPage() {
     setBusy(null);
     if (d.error) { setError(d.error); return; }
     setDesign(d); setInput(d.id);
+    const p = Object.values(d.case_art as Record<string, Art>).find(e => e.layout?.placement)?.layout.placement;
+    setPlacement(p ?? DEFAULT_PLACEMENT);
   };
 
   const generate = async (group: string) => {
     if (!design) return;
     setError(null); setBusy(group);
-    const r = await fetch('/api/admin/phone-cases/case-art', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ designId: design.id, group }) });
+    const r = await fetch('/api/admin/phone-cases/case-art', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ designId: design.id, group, placement }) });
     const d = await r.json().catch(() => ({ error: 'Case art failed' }));
     setBusy(null);
     if (!r.ok || d.error) { setError(`Layout ${group}: ${d.error || 'failed'}`); return; }
@@ -92,6 +97,9 @@ export default function CaseArtPage() {
   }, [models]);
 
   const generateAll = async () => { for (const g of groups) if (!design?.case_art[g.id]) await generate(g.id); };
+  const current = design ? Object.values(design.case_art).find(e => e.layout?.placement)?.layout.placement ?? DEFAULT_PLACEMENT : DEFAULT_PLACEMENT;
+  const moved = Math.abs(placement.scale - current.scale) > 1e-3 || Math.abs(placement.anchorX - current.anchorX) > 1e-3 || Math.abs(placement.below - current.below) > 1e-3;
+  const redoAll = async () => { for (const g of groups) await generate(g.id); };
 
   return (
     <div className="space-y-6">
@@ -105,8 +113,8 @@ export default function CaseArtPage() {
         </p>
       </div>
 
-      <form onSubmit={e => { e.preventDefault(); const id = input.match(UUID)?.[0]; if (id) open(id); else setError('Paste a design ID or a link to the design'); }} className="flex flex-wrap gap-2">
-        <input value={input} onChange={e => setInput(e.target.value)} placeholder="Design ID or link" aria-label="Design ID or link"
+      <form onSubmit={e => { e.preventDefault(); const id = input.match(UUID)?.[0] ?? input.trim().match(/^#?(\d{1,7})$/)?.[1]; if (id) open(id); else setError('Enter a stock ref (e.g. 1325), a design ID or a link to the design'); }} className="flex flex-wrap gap-2">
+        <input value={input} onChange={e => setInput(e.target.value)} placeholder="Stock ref (e.g. 1325), design ID or link" aria-label="Stock ref, design ID or link"
           className="min-w-[18rem] flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200" />
         <button className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50" disabled={busy === 'load'}>
           {busy === 'load' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Open design'}
@@ -151,6 +159,29 @@ export default function CaseArtPage() {
             </button>
           </div>
 
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <h3 className="font-semibold text-gray-900">Position of the painting</h3>
+            <p className="text-sm text-gray-600">For every phone. Bigger pushes the sides off the case; running the bottom off the case raises the picture without inventing anything. The <span className="font-medium text-purple-700">purple</span> outline shows the new position; redo the layouts to apply it (customers’ pets then go in the same place).</p>
+            <div className="mt-3 grid gap-4 sm:grid-cols-3">
+              <label className="text-sm text-gray-700">Size: <b>{Math.round(placement.scale * 100)}%</b>
+                <input type="range" min={1} max={1.8} step={0.01} value={placement.scale} onChange={e => setPlacement(p => ({ ...p, scale: Number(e.target.value) }))} className="mt-1 w-full accent-purple-600" />
+              </label>
+              <label className="text-sm text-gray-700">Keep in view: <b>{placement.anchorX < 0.25 ? 'left side' : placement.anchorX > 0.75 ? 'right side' : 'centre'}</b>
+                <input type="range" min={0} max={1} step={0.05} value={placement.anchorX} onChange={e => setPlacement(p => ({ ...p, anchorX: Number(e.target.value) }))} className="mt-1 w-full accent-purple-600" />
+              </label>
+              <label className="text-sm text-gray-700">Bottom runs off the case: <b>{Math.round(placement.below * 100)}%</b>
+                <input type="range" min={0} max={0.6} step={0.01} value={placement.below} onChange={e => setPlacement(p => ({ ...p, below: Number(e.target.value) }))} className="mt-1 w-full accent-purple-600" />
+              </label>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button onClick={redoAll} disabled={!!busy || !moved} className="inline-flex items-center rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50">
+                <RefreshCw className="mr-2 h-4 w-4" />Redo all layouts in this position
+              </button>
+              {moved && <button onClick={() => setPlacement(current)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Reset</button>}
+              {moved && <span className="self-center text-xs text-amber-700">Redoing replaces the approved art: approve again afterwards.</span>}
+            </div>
+          </div>
+
           <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             {groups.map(g => {
               const art = design.case_art[g.id];
@@ -171,7 +202,7 @@ export default function CaseArtPage() {
                       <>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <a href={art.url} target="_blank" rel="noreferrer"><img src={art.url} alt={`Layout ${g.id} case art`} className="h-full w-full object-fill" /></a>
-                        {overlay && <Overlay art={art} models={ms} camera={g.camera} />}
+                        {overlay && <Overlay art={art} models={ms} camera={g.camera} proposed={moved ? placement : null} />}
                       </>
                     ) : <div className="flex h-full items-center justify-center text-sm text-gray-400">Not made yet</div>}
                   </div>

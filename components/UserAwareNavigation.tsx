@@ -33,6 +33,7 @@ import {
   Bell,
   Sparkles,
   Coffee,
+  Smartphone,
 } from 'lucide-react'
 import { SupabaseService } from '@/lib/supabase'
 import { useHybridCart } from '@/lib/hybrid-cart-context'
@@ -118,6 +119,7 @@ export default function UserAwareNavigation({
     const baseItems: NavigationItem[] = [
       { name: 'Browse', href: '/browse', icon: ShoppingBag },
       { name: 'Mugs', href: '/mugs', icon: Coffee },
+      { name: 'Phone cases', href: '/phone-cases', icon: Smartphone },
       { name: 'Pawsonalities', href: '/pawsonalities', icon: Sparkles }
     ]
 

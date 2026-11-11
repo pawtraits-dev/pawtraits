@@ -15,7 +15,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { GEMINI_IMAGE_MODELS, GEMINI_IMAGE_SIZES, geminiImageConfig } from '@/lib/gemini-models';
 import { generateWithUsage } from '@/lib/ai/usage';
 import { imageFrom } from '@/lib/customise/painting';
-import { CASE_ART_RATIO, caseArtLayout, type CaseArtEntry, type CaseArtLayout, type PhoneModel } from './geometry';
+import { CASE_ART_RATIO, caseArtLayout, type CaseArtEntry, type CaseArtLayout, type PhoneModel, type Placement } from './geometry';
 
 const GREY = '#808080';
 const INPUT_W = 1152;                 // Gemini input canvas width (9:16 → 2048 tall)
@@ -25,23 +25,24 @@ export const CASE_ART_PROMPT = `This image is a finished painting placed inside 
 
 Extend the painting into ALL of the grey area so the whole canvas becomes one seamless picture:
 - Continue the existing background naturally: the same scene, walls, sky, ground, lighting, perspective, colours, texture and painting style.
+- If the painting runs off an edge of the canvas, that is intended: keep it cropped there.
 - The painting itself must stay EXACTLY as it is: same pet, same face, same clothes and lettering, same size and same position. Do not redraw, move, crop, zoom or reframe it.
 - The new area above the painting is quiet background only: no animals, people, faces, text, logos, numbers or eye-catching objects, especially in the top-left corner (a phone camera covers it).
 - No borders, frames, vignettes, panels or visible seams. Keep the full canvas size.`;
 
-function configure() {
+export function configure() {
   if (!cloudinary.config().cloud_name) {
     cloudinary.config({ cloud_name: process.env.CLOUDINARY_CLOUD_NAME, api_key: process.env.CLOUDINARY_API_KEY, api_secret: process.env.CLOUDINARY_API_SECRET, secure: true });
   }
 }
 
-function sourceUrl(publicId: string, width: number) {
+export function sourceUrl(publicId: string, width: number) {
   configure();
   return cloudinary.url(publicId, { secure: true, type: 'upload', format: 'png', width: Math.round(width), crop: 'scale', sign_url: false });
 }
 
 /** The painting drawn with its outer edge feathered, so it melts into the generated surround */
-function featheredPainting(img: Image, w: number, h: number) {
+export function featheredPainting(img: Image, w: number, h: number) {
   const c = createCanvas(Math.round(w), Math.round(h));
   const g = c.getContext('2d');
   g.drawImage(img, 0, 0, c.width, c.height);
@@ -75,7 +76,7 @@ function likeness(a: Image, b: Image, box: { x: number; y: number; w: number; h:
   return Math.max(0, Math.round((1 - (sum / pa.length) * 4) * 100) / 100);
 }
 
-export async function generateCaseArt(db: SupabaseClient, designId: string, groupId: string): Promise<CaseArtEntry> {
+export async function generateCaseArt(db: SupabaseClient, designId: string, groupId: string, placement?: Partial<Placement> | null): Promise<CaseArtEntry> {
   const { data: design, error } = await db.from('image_catalog')
     .select('id, cloudinary_public_id, case_art, formats(aspect_ratio)').eq('id', designId).maybeSingle();
   if (error) throw new Error(error.message);
@@ -85,7 +86,9 @@ export async function generateCaseArt(db: SupabaseClient, designId: string, grou
 
   const { data: models } = await db.from('phone_models').select('*').eq('layout_group', groupId);
   if (!models?.length) throw new Error(`No phone models in layout ${groupId}`);
-  const layout: CaseArtLayout = caseArtLayout(models as PhoneModel[]);
+  // Placement: as asked, else as this design's existing case art (any layout), else full width
+  const existing = Object.values(((design as any).case_art || {}) as Record<string, CaseArtEntry>).find(e => e.layout?.placement)?.layout.placement;
+  const layout: CaseArtLayout = caseArtLayout(models as PhoneModel[], placement ?? existing);
 
   // 1. Input canvas
   const inPx = INPUT_W / layout.cw;
@@ -115,7 +118,8 @@ export async function generateCaseArt(db: SupabaseClient, designId: string, grou
   const final = createCanvas(generated.width, H);
   const gf = final.getContext('2d');
   gf.drawImage(generated, 0, 0, final.width, H);
-  const match = likeness(painting, generated, layout.slot, generated.width / layout.cw);
+  const inside = layout.slot.x >= 0 && layout.slot.y >= 0 && layout.slot.x + layout.slot.w <= layout.cw && layout.slot.y + layout.slot.h <= layout.ch;
+  const match = inside ? likeness(painting, generated, layout.slot, generated.width / layout.cw) : null;
   const full = await loadImage(sourceUrl(design.cloudinary_public_id, layout.slot.w * outPx));
   gf.drawImage(featheredPainting(full, layout.slot.w * outPx, layout.slot.h * outPx), Math.round(layout.slot.x * outPx), Math.round(layout.slot.y * outPx));
 

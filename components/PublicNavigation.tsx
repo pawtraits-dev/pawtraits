@@ -260,6 +260,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
             </div>
 
             <Link href="/mugs" className="text-gray-700 hover:text-purple-600 transition-colors">Mugs</Link>
+            <Link href="/phone-cases" className="text-gray-700 hover:text-purple-600 transition-colors">Phone cases</Link>
             <Link href="/pawsonalities" className="text-gray-700 hover:text-purple-600 transition-colors">Pawsonalities</Link>
 
             <Link href="/search" aria-label="Search designs" className="text-gray-700 hover:text-purple-600 transition-colors">
@@ -371,6 +372,7 @@ export default function PublicNavigation({ className = '' }: PublicNavigationPro
               </div>
 
               <Link href="/mugs" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 text-gray-700 hover:text-purple-600">Zodiac mugs</Link>
+              <Link href="/phone-cases" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 text-gray-700 hover:text-purple-600">Phone cases</Link>
               <Link href="/pawsonalities" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 text-gray-700 hover:text-purple-600">Pawsonalities</Link>
               <Link href="/search" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-purple-600">
                 <Search className="h-4 w-4" /> Search designs
