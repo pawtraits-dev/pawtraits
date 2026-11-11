@@ -15,7 +15,8 @@
  *   │                pawtraits.pics│
  *   └──────────────────────────────┘
  * Designed at 15 cm wide and scaled to the size; the tab is always 2 cm. One card per page at its
- * exact finished size, no bleed or crop marks (like the print files).
+ * exact finished size, no bleed or crop marks (like the print files). The cards are cut with
+ * 16 mm rounded corners: everything near a corner is kept 2 mm inside the curve (cornerInset).
  */
 import { readFileSync } from 'fs';
 import path from 'path';
@@ -48,6 +49,25 @@ const INK = rgb(0.16, 0.14, 0.2);
 const SOFT = rgb(0.45, 0.42, 0.5);
 const EMPTY = rgb(0.95, 0.93, 0.99);
 
+/** Rounded corners the cards are cut with, and how far inside the curve anything printed stays */
+export const CORNER_MM = 16;
+const CORNER_SAFE_MM = 2;
+/**
+ * How far in from the left or right edge something must start, if it spans y0..y1 (mm from the
+ * top) on a card H mm tall, to stay CORNER_SAFE_MM inside the rounded corners.
+ */
+export function cornerInset(y0: number, y1: number, H: number): number {
+  const R = CORNER_MM, r = R - CORNER_SAFE_MM;
+  const need = (d: number) => (d >= R ? CORNER_SAFE_MM : (R - d) >= r ? R : R - Math.sqrt(r * r - (R - d) * (R - d)));
+  return Math.max(CORNER_SAFE_MM, need(Math.max(0, y0)), need(Math.max(0, H - y1)));
+}
+
+/** Breed names as printed: single spaces, no stray spaces at either end */
+export const cleanName = (name: string) => String(name || '').replace(/\s+/g, ' ').trim();
+
+/** pdf-lib + fontkit draw ligatures (tt, ff, ll…) with a gap after them: draw letters one by one */
+const NO_LIGATURES = { features: { liga: false, dlig: false, clig: false, calt: false, rlig: false } } as any;
+
 export function breedUrl(b: Pick<DividerBreed, 'id' | 'animal'>): string {
   return `https://www.pawtraits.pics/browse?type=${b.animal === 'cat' ? 'cats' : 'dogs'}&breed=${b.id}&src=divider`;
 }
@@ -70,7 +90,9 @@ function geometry(size: DividerSize) {
   const m = 6 * k, gap = 6 * k;
   const col = (W - 2 * m - gap) / 2;                   // half width: the photo's side
   const thumbGap = 4 * k, thumbW = (W - 2 * m - 2 * thumbGap) / 3, thumbH = thumbW * 1.5;
-  return { W, H, tab, k, m, gap, col, thumbGap, thumbW, thumbH, qr: 17, top: tab + 6 * k };
+  // the QR sits in the 2 cm tab: 15 mm, centred in the tab, far enough in to clear the corner
+  const qr = 15;
+  return { W, H, tab, k, m, gap, col, thumbGap, thumbW, thumbH, qr, top: tab + 6 * k, bottom: Math.max(m, 9) };
 }
 
 /** A picture as JPEG cropped to w × h px (sharp handles PNG / WebP / anything) */
@@ -109,8 +131,8 @@ export async function generateDividerCards(breeds: DividerBreed[], size: Divider
   pdf.setTitle(`Pawtraits divider cards (${size})`);
   pdf.setCreator('Pawtraits admin');
   const f = {
-    title: await pdf.embedFont(fonts().title),                 // not subset (subsetting garbles Life Savers)
-    semi: await pdf.embedFont(fonts().semi, { subset: true }),
+    title: await pdf.embedFont(fonts().title, NO_LIGATURES),   // not subset (subsetting garbles Life Savers)
+    semi: await pdf.embedFont(fonts().semi, { subset: true, ...NO_LIGATURES }),
     body: await pdf.embedFont(StandardFonts.Helvetica),
     italic: await pdf.embedFont(StandardFonts.HelveticaOblique),
   };
@@ -126,7 +148,7 @@ export async function generateDividerCards(breeds: DividerBreed[], size: Divider
     const heroImg = hero ? await pdf.embedJpg(hero) : null;
     const designImgs: (PDFImage | null)[] = [];
     for (const d of designs) designImgs.push(d ? await pdf.embedJpg(d) : null);
-    drawCard(pdf.addPage([mm(g.W), mm(g.H)]), b, heroImg, designImgs, g, f);
+    drawCard(pdf.addPage([mm(g.W), mm(g.H)]), { ...b, name: cleanName(b.name) }, heroImg, designImgs, g, f);
   }
   return { pdf: await pdf.save(), missingHero };
 }
@@ -139,16 +161,26 @@ function drawCard(page: PDFPage, b: DividerBreed, hero: PDFImage | null, designs
 
   // ---- Tab (shows above the prints): name left, QR right on a white square
   page.drawRectangle({ x: 0, y: Y(tab), width: mm(W), height: mm(tab), color: DEEP });
-  const q = g.qr, qx = W - m - q + 2 * k, qy = (tab - q) / 2;
+  const q = g.qr, qy = (tab - q) / 2;
+  const qx = W - Math.max(m - 2 * k, cornerInset(qy, qy + q, H)) - q;
   page.drawRectangle({ x: mm(qx), y: Y(qy + q), width: mm(q), height: mm(q), color: rgb(1, 1, 1) });
   const { size: n, isDark } = qrMatrix(breedUrl(b));
   const quiet = 1.2, mod = q / (n + 2 * quiet);
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
     if (isDark(c, r)) page.drawRectangle({ x: mm(qx + (c + quiet) * mod), y: Y(qy + (r + quiet + 1) * mod), width: mm(mod) + 0.05, height: mm(mod) + 0.05, color: DEEP });
   }
+  // Name: as big as fits between the left corner and the QR (a clear 4 mm before the code),
+  // centred on its capital height in the tab
+  const CAP = 0.821;                                   // Life Savers capital height (em)
+  const nameAt = (ns: number) => {
+    const cap = (ns * CAP) / MM, base = tab / 2 + cap / 2;
+    const x = Math.max(m, cornerInset(base - cap, base + (ns * 0.2) / MM, H));
+    return { x, base, room: qx - 4 - x };
+  };
   let ns = Math.min(34 * kt, mm(tab) * 0.6);
-  while (ns > 10 && f.title.widthOfTextAtSize(b.name, ns) > mm(qx - 4 * k - m)) ns -= 0.5;
-  page.drawText(b.name, { x: mm(m), y: Y(tab / 2) - ns * 0.3, size: ns, font: f.title, color: rgb(1, 1, 1) });
+  while (ns > 8 && f.title.widthOfTextAtSize(b.name, ns) > mm(nameAt(ns).room)) ns -= 0.25;
+  const at = nameAt(ns);
+  page.drawText(b.name, { x: mm(at.x), y: Y(at.base), size: ns, font: f.title, color: rgb(1, 1, 1) });
 
   // ---- Square hero photo at half width
   const top = g.top;
@@ -167,7 +199,7 @@ function drawCard(page: PDFPage, b: DividerBreed, hero: PDFImage | null, designs
   const beside = (yy: number) => yy + lead <= top + col;
   // the words stop where the designs need their room
   const designsH = 3 * k + 9 * k + g.thumbH + 7 * k + 2 * lead + 6 * k;
-  const textEnd = H - m - designsH;
+  const textEnd = H - g.bottom - designsH;
   let line = '', truncated = false;
   const flush = (text: string) => {
     const side = beside(y);
@@ -195,7 +227,14 @@ function drawCard(page: PDFPage, b: DividerBreed, hero: PDFImage | null, designs
   }
   by += g.thumbH + 7 * k;
   const how = 'Scan the code at the top, add a photo of your pet, and Pawcasso paints them into any picture. Free preview in about a minute.';
-  for (const l of wrap(how, f.body, 8 * kt, mm(W - 2 * m))) { page.drawText(l, { x: mm(m), y: Y(by), size: 8 * kt, font: f.body, color: SOFT }); by += (8 * kt * 1.3) / MM; }
+  const hs = 8 * kt, hcap = (hs * 0.72) / MM, hdesc = (hs * 0.22) / MM;
+  for (const l of wrap(how, f.body, hs, mm(W - 2 * m))) {
+    const x = Math.max(m, cornerInset(by - hcap, by + hdesc, H));
+    page.drawText(l, { x: mm(x), y: Y(by), size: hs, font: f.body, color: SOFT });
+    by += (hs * 1.3) / MM;
+  }
   const site = 'pawtraits.pics';
-  page.drawText(site, { x: mm(W - m) - f.semi.widthOfTextAtSize(site, 8 * kt), y: Y(H - m), size: 8 * kt, font: f.semi, color: PURPLE });
+  const sy = H - g.bottom;
+  const sx = W - Math.max(m, cornerInset(sy - hcap, sy + hdesc, H));
+  page.drawText(site, { x: mm(sx) - f.semi.widthOfTextAtSize(site, hs), y: Y(sy), size: hs, font: f.semi, color: PURPLE });
 }

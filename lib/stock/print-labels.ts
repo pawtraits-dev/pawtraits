@@ -94,9 +94,11 @@ export async function generatePrintLabels(labels: PrintLabel[], opts: LabelOptio
   pdf.setTitle('Pawtraits print labels');
   pdf.setCreator('Pawtraits admin');
   const f = fonts();
-  const titleFont = await pdf.embedFont(f.title);   // not subset: subsetting garbles Life Savers' glyphs
-  const bold = await pdf.embedFont(f.bold, { subset: true });
-  const semi = await pdf.embedFont(f.semi, { subset: true });
+  // No ligatures: pdf-lib + fontkit leave a gap after tt / ff / ll ("Kitt en")
+  const noLig = { features: { liga: false, dlig: false, clig: false, calt: false, rlig: false } } as any;
+  const titleFont = await pdf.embedFont(f.title, noLig);   // not subset: subsetting garbles Life Savers' glyphs
+  const bold = await pdf.embedFont(f.bold, { subset: true, ...noLig });
+  const semi = await pdf.embedFont(f.semi, { subset: true, ...noLig });
 
   const thumbs = new Map<string, PDFImage>();
   for (const [key, bytes] of Array.from(opts.thumbnails?.entries() ?? [])) {
