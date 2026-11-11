@@ -8,6 +8,7 @@
  * approved. Data: /api/admin/phone-cases. Plan: claude/phone-cases-plan.md
  */
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Loader2, Smartphone } from 'lucide-react';
 import { cameraOverlap, defaultSlot, type CameraBox, type PhoneLayoutGroup, type PhoneModel } from '@/lib/phone-cases/geometry';
 
@@ -20,9 +21,13 @@ function CaseDrawing({ model, camera }: { model: Row; camera: CameraBox[] }) {
   const r = Math.min(W, H) * 0.14;
   return (
     <svg viewBox={`-2 -2 ${W + 4} ${H + 4}`} className="h-56 w-auto" role="img" aria-label={`${model.name}: case outline, camera cut-out and painting position`}>
-      <rect x={0} y={0} width={W} height={H} rx={r} fill="#fff" stroke="#111827" strokeWidth={0.8} />
-      <rect x={slot.x} y={slot.y} width={slot.w} height={slot.h} fill="#F3E8FF" stroke="#C9A44C" strokeWidth={0.8} strokeDasharray="2.5 1.5" />
+      <defs><clipPath id={`case-${model.id}`}><rect x={0} y={0} width={W} height={H} rx={r} /></clipPath></defs>
+      <rect x={0} y={0} width={W} height={H} rx={r} fill="#fff" />
+      <g clipPath={`url(#case-${model.id})`}>
+        <rect x={slot.x} y={slot.y} width={slot.w} height={slot.h} fill="#F3E8FF" stroke="#C9A44C" strokeWidth={0.8} strokeDasharray="2.5 1.5" />
+      </g>
       {camera.map((b, i) => <rect key={i} x={b.x} y={b.y} width={b.w} height={b.h} rx={b.r} fill="#FCA5A5" fillOpacity={0.75} stroke="#DC2626" strokeWidth={0.5} />)}
+      <rect x={0} y={0} width={W} height={H} rx={r} fill="none" stroke="#111827" strokeWidth={0.8} />
     </svg>
   );
 }
@@ -55,6 +60,7 @@ export default function PhoneCasesPage() {
           Gelato’s camera cut-out, <span className="font-medium text-amber-700">gold dashed</span> is where the painting sits. Models with
           the same layout letter share one case-art background per design.
         </p>
+        <Link href="/admin/phone-cases/case-art" className="mt-3 inline-flex items-center rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700">Case art for designs →</Link>
       </div>
       {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
       {!data && !error && <p className="flex items-center gap-2 text-gray-500"><Loader2 className="h-4 w-4 animate-spin" />Loading…</p>}

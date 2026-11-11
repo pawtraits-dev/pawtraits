@@ -22,6 +22,7 @@ export type AiFeature =
   | 'team-version'          // sports team recolour
   | 'print-master'          // 4K print file
   | 'mug'                   // mug artwork
+  | 'phone-case-art'        // phone-case background extension of a design (per layout group)
   | 'quiz-image'            // Pawsonality quiz type pictures
   | 'size-test'             // admin 1K / 2K / 4K comparison
   | 'consistency-test'      // admin model / reference / prompt comparison

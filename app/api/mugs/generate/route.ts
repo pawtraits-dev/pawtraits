@@ -6,13 +6,13 @@ import { getRequester, setGuestCookie, clientIp } from '@/lib/guest/access';
 import { hashIp } from '@/lib/qr/attribution';
 import { getSetting } from '@/lib/app-settings';
 import type { MugColour, MugCatalogEntry } from '@/lib/product-types';
-import { GEMINI_IMAGE_MODELS, geminiImageConfig } from '@/lib/gemini-models';
 import { generateWithUsage } from '@/lib/ai/usage';
 import { compositeParams, saveMugAsCustomImage, wideFormatId } from '@/lib/mugs/server';
+import { mugPaintingRequest, mugTemplate } from '@/lib/mugs/painting';
 import { mugMockups } from '@/lib/mugs/mockup';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 120; // Gemini + composite + upload
+export const maxDuration = 180; // composition analysis (first use of a design) + Gemini + composite + upload
 
 /**
  * POST /api/mugs/generate
@@ -92,19 +92,13 @@ export async function POST(request: NextRequest) {
     if (insertError || !generation) throw new Error(`Failed to create generation record: ${insertError?.message}`);
     generationId = generation.id;
 
-    // Stage 1: paint the pet into the design's scene
-    const geminiPrompt = buildGeminiPrompt(colour.hex);
+    // Stage 1: paint the pet into the design's scene, with the same prompt and model as the main
+    // customisation (lib/mugs/painting.ts), so it's painted in the design's style, not pasted in
     const [scene, pet] = await Promise.all([fetchImage(entry.catalog_image_url), fetchImage(petPhotoUrl)]);
+    const template = await mugTemplate(supabase, entry, scene);
+    const { prompt: geminiPrompt, request: paintRequest } = mugPaintingRequest({ entry, template, scene, pet, colourHex: colour.hex });
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-    const geminiResponse: any = await generateWithUsage(ai, { feature: 'mug', meta: { generationId } }, {
-      model: GEMINI_IMAGE_MODELS.flash,
-      contents: [{ role: 'user', parts: [
-        { text: geminiPrompt },
-        { inlineData: { mimeType: scene.mimeType, data: scene.data } },
-        { inlineData: { mimeType: pet.mimeType, data: pet.data } },
-      ] }],
-      config: { responseModalities: ['IMAGE', 'TEXT'], ...geminiImageConfig('1:1', '1K') },
-    });
+    const geminiResponse: any = await generateWithUsage(ai, { feature: 'mug', meta: { generationId, template: !!template } }, paintRequest);
     const painted: string | undefined = geminiResponse.candidates?.[0]?.content?.parts?.find((p: any) => p?.inlineData?.data)?.inlineData?.data;
     if (!painted) throw new Error('Gemini did not return an image');
 
@@ -153,14 +147,6 @@ export async function POST(request: NextRequest) {
     }
     return reply({ error: 'Pawcasso dropped his brush. Please try again.' }, { status: 500 });
   }
-}
-
-function buildGeminiPrompt(mugColourHex: string): string {
-  return `Replace the animal in the reference scene image (first image) with the specific pet from the uploaded photo (second image). Preserve the exact composition, pose, background, props, and artistic style of the reference scene. Match the uploaded pet's breed, build, coat colour, markings, and facial features as closely as possible.
-Recolour all decorative highlight elements (crown, collar, hat, ribbons, scarves, props) to the colour hex #${mugColourHex}.
-Maintain the original artistic style (sketch / illustration / painterly) exactly.
-Do not add any text to the image.
-Output a square image.`;
 }
 
 async function fetchImage(url: string): Promise<{ data: string; mimeType: string }> {

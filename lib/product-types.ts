@@ -296,6 +296,7 @@ export interface MugCatalogEntry {
   description_short?: string;
   catalog_image_url: string;
   catalog_image_public_id: string;
+  variation_prompt_template?: string | null;  // composition template (Claude analysis), made on first use: lib/mugs/painting.ts
   animal_type?: 'dog' | 'cat' | 'both';
   is_active: boolean;
   sort_order: number;
