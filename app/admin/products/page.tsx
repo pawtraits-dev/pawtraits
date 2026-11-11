@@ -123,7 +123,9 @@ export default function AdminProductsPage() {
                         <Switch checked={p.is_active} disabled={busy === p.id} onCheckedChange={() => toggle(p)} aria-label={`${p.name} in shop`} />
                       </td>
                       <td className="px-6 py-3 text-right">
-                        <Link href={`/admin/products/${p.id}/edit`} className="inline-flex items-center text-purple-700 hover:underline"><Pencil className="w-3.5 h-3.5 mr-1" />Edit</Link>
+                        {p.shape_family === 'phone'
+                          ? <Link href="/admin/phone-cases" className="inline-flex items-center text-purple-700 hover:underline"><Pencil className="w-3.5 h-3.5 mr-1" />Phone cases</Link>
+                          : <Link href={`/admin/products/${p.id}/edit`} className="inline-flex items-center text-purple-700 hover:underline"><Pencil className="w-3.5 h-3.5 mr-1" />Edit</Link>}
                       </td>
                     </tr>
                   ))}

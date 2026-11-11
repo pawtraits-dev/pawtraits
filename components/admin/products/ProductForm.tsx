@@ -187,7 +187,7 @@ export default function ProductForm({ product, initialType }: { product?: Catalo
             <div className="space-y-2">
               <Label>Offered on</Label>
               <div className="grid gap-2 sm:grid-cols-3">
-                {SHAPE_FAMILIES.filter(f => f.id !== 'any').map(f => (
+                {SHAPE_FAMILIES.filter(f => f.id !== 'any' && f.id !== 'phone').map(f => (
                   <button key={f.id} type="button" onClick={() => set('shape_family', f.id)}
                     className={`rounded-lg border-2 p-3 text-left ${form.shape_family === f.id ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:border-purple-300'}`}>
                     <div className="font-medium text-gray-900 text-sm">{f.label}</div>

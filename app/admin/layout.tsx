@@ -46,6 +46,7 @@ import {
   Wand2,
   ChevronRight,
   Award,
+  Smartphone,
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -109,6 +110,7 @@ const navigationSections = [
     items: [
       { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
       { name: 'Products', href: '/admin/products', icon: Package },
+      { name: 'Phone Cases', href: '/admin/phone-cases', icon: Smartphone },
       { name: 'Pricing Management', href: '/admin/pricing-management', icon: Settings },
       { name: 'Media', href: '/admin/media', icon: Database },
       { name: 'Countries', href: '/admin/countries', icon: Globe },

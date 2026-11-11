@@ -547,7 +547,7 @@ export type FulfilmentActionRequest =
 
 // ===== PRODUCT CATALOGUE (self-print, shape families, UK price) =====
 
-export type ShapeFamilyId = 'rect_2x3' | 'square' | 'wide' | 'any';
+export type ShapeFamilyId = 'rect_2x3' | 'square' | 'wide' | 'any' | 'phone';
 
 export interface CatalogueProductInput {
   product_type: 'physical_print' | 'digital_download';

@@ -6,16 +6,18 @@
  *   square   → 1:1 designs
  *   wide     → 2:1 designs (mugs)
  *   any      → every design (digital downloads)
+ *   phone    → phone cases: never matched to a format, offered through the phone-case flow
  * Legacy products without a family still match their single `format_id`.
  */
 
-export type ShapeFamily = 'rect_2x3' | 'square' | 'wide' | 'any';
+export type ShapeFamily = 'rect_2x3' | 'square' | 'wide' | 'any' | 'phone';
 
 export const SHAPE_FAMILIES: Array<{ id: ShapeFamily; label: string; ratios: string[]; hint: string }> = [
   { id: 'rect_2x3', label: 'Portrait & landscape', ratios: ['2:3', '3:2'], hint: 'Offered on 2:3 portrait and 3:2 landscape designs. Enter the portrait size; landscape designs print turned.' },
   { id: 'square', label: 'Square', ratios: ['1:1'], hint: 'Offered on 1:1 designs.' },
   { id: 'wide', label: 'Wide (mugs)', ratios: ['2:1'], hint: 'Offered on 2:1 designs.' },
   { id: 'any', label: 'All designs', ratios: [], hint: 'Offered on every design — for digital downloads.' },
+  { id: 'phone', label: 'Phone cases', ratios: [], hint: 'One product per phone model, sold through the phone-case option. Manage them in Phone Cases.' },
 ];
 
 export function familyForRatio(ratio?: string | null): ShapeFamily | null {
