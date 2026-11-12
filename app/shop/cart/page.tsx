@@ -306,7 +306,6 @@ function ShoppingCartPageContent() {
 
                 <div className="text-center text-sm text-gray-500 mt-4">
                   <p>🔒 Secure checkout powered by Stripe</p>
-                  <p>30-day money-back guarantee</p>
                 </div>
               </CardContent>
             </Card>

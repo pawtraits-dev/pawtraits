@@ -33,7 +33,7 @@ export function shippingQuoteFor(country?: string | null) {
   return {
     id: `rm_tracked_${zone.toLowerCase()}`,
     name: 'Tracked delivery',
-    description: `${z.service} — usually ${z.days} working days after dispatch`,
+    description: z.service,
     price: z.pricePence,
     currency: 'GBP',
     estimatedDeliveryDays: z.days,

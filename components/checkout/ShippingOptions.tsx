@@ -73,11 +73,6 @@ export default function ShippingOptions({
                     <div>
                       <h3 className="font-medium text-gray-900">{option.name}</h3>
                       <p className="text-sm text-gray-600">{option.description}</p>
-                      {option.estimatedDeliveryDays && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Estimated delivery: {option.estimatedDeliveryDays} business days
-                        </p>
-                      )}
                     </div>
                     <div className="text-right">
                       <p className="font-medium text-lg">

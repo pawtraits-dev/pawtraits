@@ -1,124 +1,83 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Mail, MessageCircle, Phone, HelpCircle } from 'lucide-react'
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { shippingSummary } from '@/lib/shipping/rates'
 
 export const metadata: Metadata = { title: 'Help & delivery | Pawtraits' }
 
+const SUPPORT_EMAIL = 'support@pawtraits.pics'
+
+const FAQS: { q: string; a: React.ReactNode }[] = [
+  {
+    q: 'How do I put my pet in a picture?',
+    a: 'Pick a design, tap “Add my pet’s photo” and upload a clear, well-lit photo. Pawcasso paints your pet into the design and shows you a free preview in about a minute. No sign-up needed.',
+  },
+  {
+    q: 'What kind of photo works best?',
+    a: 'One pet, facing the camera, in good light, with their whole face in shot. JPG, PNG and WEBP files work.',
+  },
+  {
+    q: 'Does it work for cats as well as dogs?',
+    a: 'Yes. Cats and dogs, any breed, including mixes.',
+  },
+  {
+    q: 'What can I buy?',
+    a: 'Prints, mugs, phone cases and digital downloads. The sizes, materials and prices for each design are on its page.',
+  },
+  {
+    q: 'Do I get a digital copy with a print?',
+    a: 'Yes. Every print bought on the website comes with a free digital download of the same Pawtrait.',
+  },
+  {
+    q: 'How much is delivery?',
+    a: `Tracked delivery is charged once per order: ${shippingSummary()}. Digital downloads have no delivery charge.`,
+  },
+  {
+    q: 'Where is my order?',
+    a: (
+      <>
+        Your order confirmation email has the details, and we email again when your order is posted. If you have an account, your orders are under{' '}
+        <Link href="/orders" className="text-purple-700 underline">My orders</Link>.
+      </>
+    ),
+  },
+  {
+    q: 'Something is wrong with my order',
+    a: (
+      <>
+        Email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-purple-700 underline">{SUPPORT_EMAIL}</a> with your order number and a photo of the problem, and we will put it right.
+      </>
+    ),
+  },
+]
+
 export default function HelpPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12">
-      <div className="max-w-4xl mx-auto px-4">
-        <Card className="shadow-xl mb-8">
-          <CardHeader>
-            <CardTitle className="text-3xl text-center">Help & Support</CardTitle>
-            <p className="text-center text-gray-600">We're here to help you create amazing pet portraits!</p>
-          </CardHeader>
-        </Card>
+    <div className="min-h-screen bg-gray-50">
+      <div className="mx-auto max-w-2xl px-5 py-10">
+        <Link href="/" className="text-sm text-purple-700 hover:underline">← Back to Pawtraits</Link>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* FAQ Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <HelpCircle className="w-5 h-5 mr-2" />
-                Frequently Asked Questions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h4 className="font-semibold">How do I create a pet portrait?</h4>
-                <p className="text-sm text-gray-600">Upload a clear photo of your pet, select a style, and our AI will generate a beautiful portrait.</p>
-              </div>
-              <div>
-                <h4 className="font-semibold">What image formats are supported?</h4>
-                <p className="text-sm text-gray-600">We accept JPG, PNG, and WEBP files up to 10MB in size.</p>
-              </div>
-              <div>
-                <h4 className="font-semibold">How long does generation take?</h4>
-                <p className="text-sm text-gray-600">Most portraits are ready within 2-5 minutes depending on complexity.</p>
-              </div>
-              <div>
-                <h4 className="font-semibold">Can I print my portraits?</h4>
-                <p className="text-sm text-gray-600">Yes! We offer high-resolution downloads and printing services.</p>
-              </div>
-            </CardContent>
-          </Card>
+        <h1 className="mt-4 text-3xl font-semibold text-gray-900">Help &amp; delivery</h1>
+        <p className="mt-2 text-gray-600">
+          Answers to the questions we hear most. Still stuck? Email{' '}
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="text-purple-700 underline">{SUPPORT_EMAIL}</a>.
+        </p>
 
-          {/* Contact Options */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Contact Support</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button className="w-full justify-start" variant="outline">
-                <Mail className="w-4 h-4 mr-2" />
-                support@pawtraits.com
-              </Button>
-              
-              <Button className="w-full justify-start" variant="outline">
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Live Chat (9 AM - 5 PM EST)
-              </Button>
-              
-              <Button className="w-full justify-start" variant="outline">
-                <Phone className="w-4 h-4 mr-2" />
-                1-800-PAWTRAITS
-              </Button>
-              
-              <div className="pt-4">
-                <h4 className="font-semibold mb-2">Quick Links</h4>
-                <div className="space-y-2 text-sm">
-                  <Link href="/browse" className="block text-blue-600 hover:underline">
-                    Customer Dashboard
-                  </Link>
-                  <Link href="/partners" className="block text-blue-600 hover:underline">
-                    Partner Portal
-                  </Link>
-                  <Link href="/privacy" className="block text-blue-600 hover:underline">
-                    Privacy Policy
-                  </Link>
-                  <Link href="/terms" className="block text-blue-600 hover:underline">
-                    Terms of Service
-                  </Link>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="mt-8 divide-y divide-gray-200 rounded-2xl border border-gray-200 bg-white">
+          {FAQS.map(({ q, a }) => (
+            <div key={q} className="px-5 py-4">
+              <h2 className="font-medium text-gray-900">{q}</h2>
+              <p className="mt-1 text-gray-600">{a}</p>
+            </div>
+          ))}
         </div>
 
-        {/* Getting Started Guide */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Getting Started Guide</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-blue-600 font-bold">1</span>
-                </div>
-                <h4 className="font-semibold mb-2">Upload Photo</h4>
-                <p className="text-sm text-gray-600">Choose a clear, well-lit photo of your pet</p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-purple-600 font-bold">2</span>
-                </div>
-                <h4 className="font-semibold mb-2">Select Style</h4>
-                <p className="text-sm text-gray-600">Choose from various artistic styles and themes</p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-green-600 font-bold">3</span>
-                </div>
-                <h4 className="font-semibold mb-2">Download & Share</h4>
-                <p className="text-sm text-gray-600">Get your portrait and share with friends</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <nav className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm text-gray-600">
+          <Link href="/browse" className="hover:text-purple-700">Browse designs</Link>
+          <Link href="/quiz/pawsonality" className="hover:text-purple-700">Pawsonality quiz</Link>
+          <Link href="/partners" className="hover:text-purple-700">Become a partner</Link>
+          <Link href="/terms" className="hover:text-purple-700">Terms</Link>
+          <Link href="/privacy" className="hover:text-purple-700">Privacy</Link>
+        </nav>
       </div>
     </div>
   )

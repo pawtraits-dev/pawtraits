@@ -352,7 +352,7 @@ function SharedImagePageClient({ id }: { id: string }) {
               </Button>
 
               <p className="text-xs text-gray-500 mt-2 text-center">
-                High-quality prints • Fast shipping • 30-day guarantee
+                High-quality prints • Tracked delivery
               </p>
             </div>
           </div>
