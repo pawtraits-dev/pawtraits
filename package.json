@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test:price-check": "npx tsx scripts/test-price-check.ts",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "validate:schema": "npx tsx scripts/validate-schema.ts",

@@ -6,8 +6,8 @@ import { QR_ATTRIBUTION_COOKIE, VISITOR_COOKIE, decodeAttribution, validVisitorI
 import { CONSENT_COOKIE, parseConsent } from '@/lib/tracking/consent';
 import { serviceClient } from '@/lib/qr/server';
 import { isStallProductId, stallSizeFromProductId } from '@/lib/cart/items';
-import { shippingQuoteFor } from '@/lib/shipping/rates';
 import { getStallOffer } from '@/lib/stall/offer';
+import { runPriceCheck, invalidCartLine } from '@/lib/checkout/price-check';
 
 interface CreatePaymentIntentRequest {
   amount: number; // in pence
@@ -114,6 +114,12 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    // Basket lines must be whole, positive quantities at non-negative prices
+    const badLine = invalidCartLine(body.cartItems);
+    if (badLine) {
+      return NextResponse.json({ error: 'There is a problem with your basket. Please go back to your basket and try again.', code: 'INVALID_BASKET', details: badLine }, { status: 400 });
     }
 
     // Determine order type using the validation service
@@ -258,17 +264,44 @@ export async function POST(request: NextRequest) {
       }
     }
     if (stallItems.length) metadata.salesChannel = 'stall_online_payment';
+    // Verified above: each stall line is quantity 1 at the stall offer price
+    const stallTotal = stallItems.reduce((sum, i) => sum + i.unitPrice, 0);
 
     if (body.customerPhone) metadata.customerPhone = String(body.customerPhone).slice(0, 30);
     if (body.marketingOptIn) metadata.marketingOptIn = 'true';
 
-    // Server-side price floor: the browser sends prices, so check them against the catalogue.
-    // Blatant underpayment is HELD (not sent to Gelato) for manual review rather than blocked,
-    // so legitimate bundle/referral discounts can never stop a sale.
-    const priceCheck = await checkPriceFloor(body);
+    // Server-side price check: the browser sends the amount, so compare it with catalogue
+    // prices, delivery and only the discounts the server can confirm (lib/checkout/price-check.ts).
+    //   suspicious (under half) → refused; low → order held for review, not printed.
+    // PRICE_CHECK_MODE=log restores the old behaviour (nothing refused, only "suspicious" held).
+    const priceCheck = await runPriceCheck({
+      amount: body.amount,
+      currency: body.currency,
+      customerEmail: body.customerEmail,
+      cartItems: body.cartItems,
+      shippingCountry: body.shippingAddress?.country,
+      clientShippingPrice: body.shippingOption?.price,
+      referralCode: orderType === 'customer' ? body.referralCode : undefined,
+      rewardRedemption: body.rewardRedemption,
+      orderType,
+      stallTotal,
+    });
+    const enforcePriceCheck = process.env.PRICE_CHECK_MODE !== 'log';
     metadata.priceCheck = priceCheck.status;
     if (priceCheck.status !== 'ok') {
-      console.warn('💷 Price check', priceCheck.status, { amount: body.amount, floor: priceCheck.floor, email: body.customerEmail });
+      console.warn('💷 Price check', priceCheck.status, {
+        amount: body.amount, required: priceCheck.required, floor: priceCheck.floor, shipping: priceCheck.shipping,
+        discountRate: priceCheck.discountRate, rewardsAllowed: priceCheck.rewardsAllowed, reason: priceCheck.reason, enforce: enforcePriceCheck,
+      });
+    }
+    if (enforcePriceCheck && priceCheck.status === 'suspicious') {
+      return NextResponse.json(
+        { error: 'The price of something in your basket has changed. Please go back to your basket, check it, and try again.', code: 'PRICE_CHECK_FAILED' },
+        { status: 409 }
+      );
+    }
+    if (priceCheck.status === 'suspicious' || (enforcePriceCheck && priceCheck.status === 'low')) {
+      metadata.priceHold = 'true';
     }
 
     // Create PaymentIntent
@@ -411,47 +444,5 @@ export async function GET(request: NextRequest) {
       { error: 'Failed to retrieve payment intent' },
       { status: 500 }
     );
-  }
-}
-
-/**
- * Compare what the browser says the goods cost with the lowest current catalogue price.
- *  ok         → at or above the floor (after declared discounts)
- *  low        → below, but within 50% (could be a bundle deal) — logged only
- *  suspicious → under half the catalogue price — order is held for review
- */
-async function checkPriceFloor(body: CreatePaymentIntentRequest): Promise<{ status: 'ok' | 'low' | 'suspicious' | 'unchecked'; floor: number }> {
-  try {
-    const items = (body.cartItems || []).filter(i => /^[0-9a-f-]{36}$/i.test(i.productId));
-    if (!items.length) return { status: 'unchecked', floor: 0 };
-    const currency = (body.currency || 'gbp').toUpperCase();
-    const { data: prices } = await serviceClient()
-      .from('product_pricing')
-      .select('product_id, sale_price, discount_price, is_on_sale, currency_code')
-      .in('product_id', Array.from(new Set(items.map(i => i.productId))))
-      .eq('is_current', true);
-    const min = new Map<string, number>();
-    for (const p of prices ?? []) {
-      if ((p.currency_code || '').toUpperCase() !== currency) continue;
-      const v = p.is_on_sale && p.discount_price ? p.discount_price : p.sale_price;
-      if (!min.has(p.product_id) || v < min.get(p.product_id)!) min.set(p.product_id, v);
-    }
-    let floor = 0;
-    for (const i of items) {
-      const m = min.get(i.productId);
-      if (m === undefined) return { status: 'unchecked', floor: 0 };
-      floor += m * i.quantity;
-    }
-    const declaredDiscounts = (body.referralDiscount || 0) + (body.rewardRedemption || 0) + (body.partnerDiscount || 0);
-    // Delivery is a flat charge by country; don't trust the browser's figure for it
-    const serverShipping = body.shippingOption ? shippingQuoteFor(body.shippingAddress?.country)?.price : undefined;
-    const shipping = serverShipping ?? body.shippingOption?.price ?? 0;
-    const paidForGoods = body.amount - shipping + declaredDiscounts;
-    if (paidForGoods >= floor) return { status: 'ok', floor };
-    if (paidForGoods >= floor * 0.5) return { status: 'low', floor };
-    return { status: 'suspicious', floor };
-  } catch (e) {
-    console.warn('Price check failed', e);
-    return { status: 'unchecked', floor: 0 };
   }
 }

@@ -399,12 +399,12 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       }
     }
 
-    if (metadata.priceCheck === 'suspicious') {
-      // Paid far below catalogue price — possible tampering. Don't print; flag for review.
+    if (metadata.priceCheck === 'suspicious' || metadata.priceHold === 'true') {
+      // Paid below catalogue price — possible tampering. Don't print; flag for review.
       console.error('🚨 Order HELD for review (price below catalogue):', order.id, order.order_number);
       await supabase.from('orders').update({
         status: 'on_hold', fulfillment_status: 'pending',
-        error_message: 'HELD: amount paid is far below catalogue price — check before fulfilling',
+        error_message: 'HELD: amount paid is below catalogue price — check before fulfilling',
         updated_at: new Date().toISOString(),
       }).eq('id', order.id);
     } else if (isStallCollect) {
@@ -428,7 +428,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
 
     // Social loop: customised portraits in a genuine paid order become before/after items
     // (website feed, Instagram batches) after the photo check. Held orders are left out.
-    if (metadata.priceCheck !== 'suspicious' && orderItems.length) {
+    if (metadata.priceCheck !== 'suspicious' && metadata.priceHold !== 'true' && orderItems.length) {
       const socialItems = orderItems;
       after(async () => {
         await captureSocialItems(supabase, order, socialItems, { chargeId: typeof paymentIntent.latest_charge === 'string' ? paymentIntent.latest_charge : null });
