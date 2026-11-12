@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/qr/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 
@@ -21,6 +22,8 @@ function ensureCloudinaryConfig() {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     // Ensure Cloudinary is configured
     ensureCloudinaryConfig();

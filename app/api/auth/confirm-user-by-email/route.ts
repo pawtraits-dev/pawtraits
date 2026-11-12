@@ -59,6 +59,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Only accounts created in the last 10 minutes may be confirmed this way (signup flow)
+    const createdAtMs = new Date(user.created_at).getTime();
+    if (!(Date.now() - createdAtMs <= 10 * 60 * 1000)) {
+      console.warn('Refusing to confirm user outside signup window:', user.id);
+      return NextResponse.json(
+        { error: 'Confirmation not allowed' },
+        { status: 403 }
+      );
+    }
+
     // Confirm the user's email using the real user ID
     const { data, error } = await supabase.auth.admin.updateUserById(
       user.id,

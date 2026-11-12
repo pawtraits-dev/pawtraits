@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/qr/server';
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import type { Review, ReviewStatistics } from '@/lib/types';
@@ -21,6 +22,8 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
  * Authentication: Admin only (service role key)
  */
 export async function GET(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
@@ -137,6 +140,8 @@ export async function GET(request: NextRequest) {
  * Authentication: Admin only (service role key)
  */
 export async function PATCH(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
@@ -231,6 +236,8 @@ export async function PATCH(request: NextRequest) {
  * Authentication: Admin only (service role key)
  */
 export async function DELETE(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }

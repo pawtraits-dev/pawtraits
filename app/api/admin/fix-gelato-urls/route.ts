@@ -10,6 +10,7 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from '@/lib/qr/server';
 
 interface FixResult {
   imageId: string;
@@ -63,6 +64,9 @@ function extractPublicIdFromUrl(url: string): string | null {
 }
 
 export async function POST() {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

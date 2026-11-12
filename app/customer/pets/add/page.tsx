@@ -96,7 +96,7 @@ export default function AddPetPage() {
         
         // Try the debug API approach that works in other parts of the app
         try {
-          const response = await fetch(`/api/debug/check-user-no-auth?email=${encodeURIComponent(user.email!)}`);
+          const response = await fetch('/api/auth/profile');
           
           if (response.ok) {
             const result = await response.json();
@@ -493,7 +493,7 @@ export default function AddPetPage() {
         
         if (error || !profile) {
           // Fallback to debug API
-          const response = await fetch(`/api/debug/check-user-no-auth?email=${encodeURIComponent(user.email!)}`);
+          const response = await fetch('/api/auth/profile');
           if (response.ok) {
             const result = await response.json();
             if (result.userProfile && result.userProfile.user_type === 'customer') {

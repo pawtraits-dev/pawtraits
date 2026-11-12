@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/qr/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { CloudinaryImageService } from '@/lib/cloudinary';
@@ -22,6 +23,8 @@ export const dynamic = 'force-dynamic';
  * NO rate limiting, NO database dependency - uses unsaved reference data directly
  */
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     console.log('🎨 [ADMIN PREVIEW API] Request received');
 

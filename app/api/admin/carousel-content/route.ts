@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/qr/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -10,6 +11,8 @@ function getSupabaseAdmin() {
 }
 
 export async function GET(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);
     const carouselId = searchParams.get('carousel_id');
@@ -60,6 +63,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabaseAdmin = getSupabaseAdmin();
     const body = await request.json();
@@ -156,6 +161,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const supabaseAdmin = getSupabaseAdmin();
     const body = await request.json();

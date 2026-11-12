@@ -49,6 +49,25 @@ export async function POST(request: NextRequest) {
       confirmed: !!userData.user.email_confirmed_at
     });
 
+    // Already confirmed: same success response as before, nothing to change
+    if (userData.user.email_confirmed_at) {
+      console.log('User email is already confirmed');
+      return NextResponse.json({ 
+        success: true,
+        message: 'User email confirmed successfully'
+      });
+    }
+
+    // Only accounts created in the last 10 minutes may be confirmed this way (signup flow)
+    const createdAtMs = new Date(userData.user.created_at).getTime();
+    if (!(Date.now() - createdAtMs <= 10 * 60 * 1000)) {
+      console.warn('Refusing to confirm user outside signup window:', userData.user.id);
+      return NextResponse.json(
+        { error: 'Confirmation not allowed' },
+        { status: 403 }
+      );
+    }
+
     // Confirm the user's email
     const { data, error } = await supabase.auth.admin.updateUserById(
       userId,

@@ -20,7 +20,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 interface PartnerInfo {
-  id: string;
+  id?: string;
   business_name?: string;
   first_name: string;
   last_name: string;

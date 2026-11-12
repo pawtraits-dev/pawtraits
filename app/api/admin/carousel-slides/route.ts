@@ -1,8 +1,11 @@
+import { requireAdmin } from '@/lib/qr/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { CarouselSlideFormData } from '@/lib/carousel-types';
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     // Initialize Supabase client inside handler to avoid build-time errors
     const supabase = createClient(
