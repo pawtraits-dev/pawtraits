@@ -70,14 +70,6 @@ export default function HelpPage() {
             </div>
           ))}
         </div>
-
-        <nav className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm text-gray-600">
-          <Link href="/browse" className="hover:text-purple-700">Browse designs</Link>
-          <Link href="/quiz/pawsonality" className="hover:text-purple-700">Pawsonality quiz</Link>
-          <Link href="/partners" className="hover:text-purple-700">Become a partner</Link>
-          <Link href="/terms" className="hover:text-purple-700">Terms</Link>
-          <Link href="/privacy" className="hover:text-purple-700">Privacy</Link>
-        </nav>
       </div>
     </div>
   )

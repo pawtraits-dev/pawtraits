@@ -7,6 +7,7 @@ import { Analytics } from '@vercel/analytics/react';
 import TrackingScripts from '@/components/tracking/TrackingScripts';
 import ConsentBanner from '@/components/tracking/ConsentBanner';
 import { Toaster } from '@/components/ui/toaster';
+import SiteFooter from '@/components/SiteFooter';
 
 const inter = Inter({ subsets: ['latin'] });
 const margarine = Margarine({ 
@@ -64,6 +65,7 @@ export default function RootLayout({
         <div id="root">
           <HybridCartProvider>
             {children}
+            <SiteFooter />
           </HybridCartProvider>
         </div>
         <ConsentBanner />
