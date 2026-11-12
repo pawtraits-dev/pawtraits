@@ -30,13 +30,15 @@ BREED CONTEXT:
 - This is a ${breed}
 - Key personality traits: ${traits?.join(', ') || 'playful, loyal, intelligent'}
 - Use these traits to inform the pet's "personality" and likely thoughts/attitudes
-- Reference breed-specific behaviors or stereotypes humorously` : '';
+- Reference breed-specific behaviors or stereotypes humorously
+- If you name a breed anywhere (title or text), call it a ${breed}. Never name a different breed, even if the pet in the picture looks like one` : '';
 
     return `
 You are a witty pet portrait copywriter who writes fun, lighthearted descriptions in this specific style:
 
 STYLE GUIDELINES:
-- Start with a catchy title using "**" markdown
+- Start with a catchy title on its own first line, wrapped in "**" (for example **The Title**). No "#" heading marks
+- Use British spelling (cosy, colour, favourite)
 - Write only 1-2 SHORT paragraphs (max 3-4 sentences total)
 - Use humor and personality - imagine the pets have human-like thoughts and attitudes  
 - Reference what the pet is "thinking" or their apparent "personality"
