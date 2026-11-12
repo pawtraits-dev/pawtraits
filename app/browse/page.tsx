@@ -1,6 +1,7 @@
 'use client';
 
 import { productMatchesFormat } from '@/lib/products/shape-family';
+import type { BrowseFacets } from '@/lib/catalog/browse-query';
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
@@ -44,16 +45,13 @@ import { PageType } from '@/lib/carousel-types';
 import ReactMarkdown from 'react-markdown';
 import { DigitalDownloadButton } from '@/components/DigitalDownloadButton';
 
-// Only show breeds and themes that have at least one public design (customer UX round 2)
-function idsWithDesigns(imgs: any[]) {
-  const breeds = new Set<string>();
-  const themes = new Set<string>();
-  for (const img of imgs || []) {
-    if (img.breed_id) breeds.add(img.breed_id);
-    for (const s of img.generation_parameters?.subjects || []) if (s?.breedId) breeds.add(s.breedId);
-    if (img.theme_id) themes.add(img.theme_id);
-  }
-  return { breeds, themes };
+// Only show breeds and themes that have at least one public design (customer UX round 2).
+// Comes from the server-side facets (counts per breed / theme), not from a full image list.
+function idsWithDesigns(f: BrowseFacets | null) {
+  return {
+    breeds: new Set<string>(Object.keys(f?.byBreed || {})),
+    themes: new Set<string>(Object.keys(f?.byTheme || {})),
+  };
 }
 
 type BrowseTab = 'all' | 'dogs' | 'cats' | 'themes';
@@ -72,22 +70,21 @@ function savedBrowseScroll(): number | null {
   } catch { return null; }
 }
 
-// Incremental rendering: cards shown per batch; remembered so Back from a design can restore the scroll
+// Paged loading: designs are fetched PAGE_SIZE at a time from /api/public/browse; the number loaded is
+// remembered so Back from a design can restore the scroll
 const PAGE_SIZE = 24;
 let browseVisibleCount = PAGE_SIZE;
 
-// Same animal-type test the gallery filter uses, so tab counts match what the grid shows
-function matchesAnimalType(img: any, animalType: 'dog' | 'cat') {
-  return img.breed?.animal_type === animalType ||
-    img.tags?.includes(animalType) ||
-    (!img.breed?.animal_type && !img.tags?.includes('cat') && animalType === 'dog');
-}
+// Grid rows loaded for one filter set, kept so Back from a design restores the same cards without refetching
+let browseGridCache: { key: string; rows: any[]; total: number; page: number; hasMore: boolean; at: number } | null = null;
+
+type BrowseCounts = { all: number; dogs: number; cats: number };
 
 // Simple in-memory cache to prevent rate limiting
 const dataCache = {
   breeds: null as Breed[] | null,
   themes: null as Theme[] | null,
-  images: null as any | null,
+  facets: null as (BrowseFacets & { counts?: BrowseCounts }) | null,
   products: null as Product[] | null,
   pricing: null as ProductPricing[] | null,
   lastCacheTime: 0,
@@ -149,7 +146,20 @@ function BrowsePageContent() {
   const [sharedImages, setSharedImages] = useState<Set<string>>(new Set());
   const [purchasedImages, setPurchasedImages] = useState<Set<string>>(new Set());
 
-  const [visibleCount, setVisibleCount] = useState<number>(() => (savedBrowseScroll() !== null ? Math.max(PAGE_SIZE, browseVisibleCount) : PAGE_SIZE));
+  // Paged gallery: `images` holds the rows loaded so far for the current filter set
+  const [facets, setFacets] = useState<BrowseFacets | null>(null);
+  const [counts, setCounts] = useState<BrowseCounts>({ all: 0, dogs: 0, cats: 0 });
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [gridLoading, setGridLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [gridPage, setGridPage] = useState(1);
+  const [loadedKey, setLoadedKey] = useState('');
+  // How many cards to bring back when returning from a design (the count remembered at that time)
+  const [restoreTarget] = useState<number>(() => (savedBrowseScroll() !== null ? Math.max(PAGE_SIZE, browseVisibleCount) : PAGE_SIZE));
+  const gridReqId = useRef(0);
+  const loadingMoreRef = useRef(false);
+  const firstGridLoad = useRef(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const { addToCart } = useHybridCart();
@@ -163,7 +173,7 @@ function BrowsePageContent() {
   // Back from a design: scroll to where the visitor was (cards have a fixed shape, so the page
   // is the right height as soon as the gallery renders; tried again briefly while it settles)
   useEffect(() => {
-    if (loading) return;
+    if (loading || gridLoading) return;
     const y = savedBrowseScroll();
     if (y === null) return;
     try { sessionStorage.removeItem(SCROLL_KEY); } catch { /* private mode */ }
@@ -173,7 +183,7 @@ function BrowsePageContent() {
       if (Math.abs(window.scrollY - y) > 4 && ++tries < 20) setTimeout(go, 50);
     };
     requestAnimationFrame(go);
-  }, [loading]);
+  }, [loading, gridLoading]);
 
   // Load partner info when user is authenticated and is a partner
   useEffect(() => {
@@ -238,19 +248,20 @@ function BrowsePageContent() {
       const returning = savedBrowseScroll() !== null;
       const cacheIsValid = dataCache.lastCacheTime > 0 &&
         (now - dataCache.lastCacheTime) < (returning ? 10 * 60_000 : dataCache.cacheTimeout) &&
-        dataCache.breeds && dataCache.themes && dataCache.images &&
+        dataCache.breeds && dataCache.themes && dataCache.facets &&
         dataCache.products && dataCache.pricing;
 
       if (cacheIsValid) {
         // Use cached data
-        const has = idsWithDesigns(dataCache.images!.images || []);
+        const has = idsWithDesigns(dataCache.facets!);
         const dogs = dataCache.breeds!.filter(breed => breed.animal_type === 'dog' && has.breeds.has(breed.id)).sort((a, b) => a.name.localeCompare(b.name));
         const cats = dataCache.breeds!.filter(breed => breed.animal_type === 'cat' && has.breeds.has(breed.id)).sort((a, b) => a.name.localeCompare(b.name));
 
         setDogBreeds(dogs);
         setCatBreeds(cats);
         setThemes(dataCache.themes!.filter(theme => theme.is_active && has.themes.has(theme.id)).sort((a, b) => a.name.localeCompare(b.name)));
-        setImages(dataCache.images!.images || []);
+        setFacets(dataCache.facets!);
+        setCounts(dataCache.facets!.counts || { all: 0, dogs: 0, cats: 0 });
         setProducts(dataCache.products! || []);
         setPricing(dataCache.pricing! || []);
       } else {
@@ -284,40 +295,31 @@ function BrowsePageContent() {
         }
 
         // Fetch other data that usually works
-        const [imagesData, productsData, pricingData] = await Promise.all([
-          fetch('/api/images?public=true&limit=1000').then(res => res.json()),
+        const [facetsData, productsData, pricingData] = await Promise.all([
+          // Per-breed / per-theme design counts and tab counts (no image rows)
+          fetch('/api/public/browse?facets=1&counts=1').then(res => res.json()),
           fetch('/api/public/products').then(res => res.json()),
           fetch('/api/public/pricing').then(res => res.json())
         ]);
 
-        console.log('[BROWSE] Images loaded:', {
-          totalImages: imagesData?.images?.length || 0,
-          publicImages: imagesData?.images?.filter((img: any) => img.is_public !== false).length || 0,
-          recentImages: imagesData?.images?.slice(0, 5).map((img: any) => ({
-            id: img.id.substring(0, 8),
-            description: img.description?.substring(0, 30),
-            is_public: img.is_public,
-            created_at: img.created_at
-          }))
-        });
-
         // Cache the data
         dataCache.breeds = breedsData;
         dataCache.themes = themesData;
-        dataCache.images = imagesData;
+        dataCache.facets = facetsData;
         dataCache.products = productsData;
         dataCache.pricing = pricingData;
         dataCache.lastCacheTime = now;
 
         // Separate dog and cat breeds and sort alphabetically; only those with designs
-        const has = idsWithDesigns(imagesData?.images || []);
+        const has = idsWithDesigns(facetsData);
         const dogs = (breedsData || []).filter(breed => breed.animal_type === 'dog' && has.breeds.has(breed.id)).sort((a, b) => a.name.localeCompare(b.name));
         const cats = (breedsData || []).filter(breed => breed.animal_type === 'cat' && has.breeds.has(breed.id)).sort((a, b) => a.name.localeCompare(b.name));
 
         setDogBreeds(dogs);
         setCatBreeds(cats);
         setThemes((themesData || []).filter(theme => theme.is_active && has.themes.has(theme.id)).sort((a, b) => a.name.localeCompare(b.name)));
-        setImages(imagesData.images || []);
+        setFacets(facetsData);
+        setCounts(facetsData?.counts || { all: 0, dogs: 0, cats: 0 });
         setProducts(productsData || []);
         setPricing(pricingData || []);
       }
@@ -404,79 +406,36 @@ function BrowsePageContent() {
     );
   };
 
-  const getBreedImageCount = (breedId: string) => {
-    return images.filter(img => {
-      // Check primary breed_id
-      if (img.breed_id === breedId) return true;
+  // Per-breed / per-theme counts come from the server-side facets (a design counts for its primary breed
+  // and for every pet in generation_parameters.subjects)
+  const getBreedImageCount = (breedId: string) => facets?.byBreed?.[breedId] || 0;
 
-      // Check subjects in generation_parameters
-      const subjects = img.generation_parameters?.subjects || [];
-      return subjects.some((subject: any) => subject.breedId === breedId);
-    }).length;
-  };
+  const getThemeImageCount = (themeId: string) => facets?.byTheme?.[themeId] || 0;
 
-  const getThemeImageCount = (themeId: string) => {
-    return images.filter(img => img.theme_id === themeId).length;
-  };
+  const getThemeDogImageCount = (themeId: string) => facets?.themeAnimal?.[themeId]?.dogs || 0;
 
-  const getThemeDogImageCount = (themeId: string) => {
-    return images.filter(img => {
-      if (img.theme_id !== themeId) return false;
-
-      // Check primary breed
-      if (dogBreeds.some(breed => breed.id === img.breed_id)) return true;
-
-      // Check subjects in generation_parameters
-      const subjects = img.generation_parameters?.subjects || [];
-      return subjects.some((subject: any) =>
-        dogBreeds.some(breed => breed.id === subject.breedId)
-      );
-    }).length;
-  };
-
-  const getThemeCatImageCount = (themeId: string) => {
-    return images.filter(img => {
-      if (img.theme_id !== themeId) return false;
-
-      // Check primary breed
-      if (catBreeds.some(breed => breed.id === img.breed_id)) return true;
-
-      // Check subjects in generation_parameters
-      const subjects = img.generation_parameters?.subjects || [];
-      return subjects.some((subject: any) =>
-        catBreeds.some(breed => breed.id === subject.breedId)
-      );
-    }).length;
-  };
+  const getThemeCatImageCount = (themeId: string) => facets?.themeAnimal?.[themeId]?.cats || 0;
 
   const getLowestPriceForBreed = (breedId: string) => {
-    const breedImages = images.filter(img => {
-      // Check primary breed_id
-      if (img.breed_id === breedId) return true;
-
-      // Check subjects in generation_parameters
-      const subjects = img.generation_parameters?.subjects || [];
-      return subjects.some((subject: any) => subject.breedId === breedId);
-    });
-    if (breedImages.length === 0) return null;
+    // Distinct formats of this breed's designs (server-side), instead of walking every design
+    const formatIds = facets?.breedFormats?.[breedId] || [];
+    if (formatIds.length === 0) return null;
 
     const countryPricing = getCountryPricing(pricing);
-    let lowestPrice = null;
-    let currency = null;
-    let currencySymbol = null;
+    let lowestPrice: any = null;
+    let currency: any = null;
+    let currencySymbol: any = null;
 
-    breedImages.forEach(image => {
-      if (image.format_id) {
-        const availableProducts = products.filter(p => p.is_active && productMatchesFormat(p, image.format_id));
-        availableProducts.forEach(product => {
-          const productPricing = countryPricing.find(p => p.product_id === product.id);
-          if (productPricing && (lowestPrice === null || productPricing.sale_price < lowestPrice)) {
-            lowestPrice = productPricing.sale_price;
-            currency = productPricing.currency_code;
-            currencySymbol = productPricing.currency_symbol;
-          }
-        });
-      }
+    formatIds.forEach(formatId => {
+      const availableProducts = products.filter(p => p.is_active && productMatchesFormat(p, formatId));
+      availableProducts.forEach(product => {
+        const productPricing = countryPricing.find(p => p.product_id === product.id);
+        if (productPricing && (lowestPrice === null || productPricing.sale_price < lowestPrice)) {
+          lowestPrice = productPricing.sale_price;
+          currency = productPricing.currency_code;
+          currencySymbol = productPricing.currency_symbol;
+        }
+      });
     });
 
     return lowestPrice ? { lowestPrice, currency, currencySymbol } : null;
@@ -491,77 +450,6 @@ function BrowsePageContent() {
   const getSelectedTheme = () => {
     if (!selectedThemeId) return null;
     return themes.find(theme => theme.id === selectedThemeId) || null;
-  };
-
-  const getFilteredImages = () => {
-    let filteredImages = [...images];
-
-    // Filter by breed - check both primary breed_id AND subjects array
-    if (selectedBreedId) {
-      filteredImages = filteredImages.filter(img => {
-        // Check primary breed_id
-        if (img.breed_id === selectedBreedId) return true;
-
-        // Check subjects in generation_parameters
-        const subjects = img.generation_parameters?.subjects || [];
-        return subjects.some((subject: any) => subject.breedId === selectedBreedId);
-      });
-    }
-
-    // Filter by theme
-    if (selectedThemeId) {
-      filteredImages = filteredImages.filter(img => img.theme_id === selectedThemeId);
-
-      // Additional theme-specific filtering
-      if (themeAnimalFilter !== 'all') {
-        const animalType = themeAnimalFilter === 'dogs' ? 'dog' : 'cat';
-        filteredImages = filteredImages.filter(img =>
-          img.breed?.animal_type === animalType ||
-          img.tags?.includes(animalType) ||
-          (!img.breed?.animal_type && !img.tags?.includes('cat') && animalType === 'dog')
-        );
-      }
-
-      // Theme breed search
-      if (themeBreedSearch) {
-        filteredImages = filteredImages.filter(img =>
-          img.breed_name?.toLowerCase().includes(themeBreedSearch.toLowerCase())
-        );
-      }
-    }
-
-    // Filter by animal type based on active tab (if no specific breed/theme selected)
-    if (!selectedBreedId && !selectedThemeId && (activeTab === 'dogs' || activeTab === 'cats')) {
-      const animalType = activeTab === 'dogs' ? 'dog' : 'cat';
-      filteredImages = filteredImages.filter(img =>
-        img.breed?.animal_type === animalType ||
-        img.tags?.includes(animalType) ||
-        (!img.breed?.animal_type && !img.tags?.includes('cat') && animalType === 'dog') // Default to dog if unclear
-      );
-    }
-
-    // Filter by color/coat search when in breed view
-    if (selectedBreedId && searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      filteredImages = filteredImages.filter(img => {
-        // Search in description (which often contains color information)
-        const descriptionMatch = img.description?.toLowerCase().includes(searchLower);
-
-        // Search in coat color/name if available
-        const coatMatch = img.coat?.coat_name?.toLowerCase().includes(searchLower) ||
-                         img.coat?.color?.toLowerCase().includes(searchLower);
-
-        // Search in image tags if available
-        const tagsMatch = img.tags?.some(tag => tag.toLowerCase().includes(searchLower));
-
-        // Search in breed name as well
-        const breedMatch = img.breed_name?.toLowerCase().includes(searchLower);
-
-        return descriptionMatch || coatMatch || tagsMatch || breedMatch;
-      });
-    }
-
-    return filteredImages;
   };
 
   const handleTabChange = (tab: BrowseTab) => {
@@ -650,40 +538,137 @@ function BrowsePageContent() {
     };
   };
 
-  // Incremental rendering: only the first PAGE_SIZE cards are in the page; more are added when the
-  // sentinel under the grid nears the viewport (or the "Show more designs" button is pressed)
-  const filteredAll = getFilteredImages();
-  const totalFiltered = filteredAll.length;
-  const hasMore = visibleCount < totalFiltered;
-  const filterKey = [activeTab, searchTerm, selectedBreedId, selectedThemeId, themeAnimalFilter, themeBreedSearch].join('|');
-  const prevFilterKey = useRef(filterKey);
+  // Paged rendering: the gallery shows the rows loaded so far for the current filters; more are fetched
+  // from /api/public/browse when the sentinel under the grid nears the viewport (or "Show more designs" is pressed)
+  const gridVisible = !!selectedBreedId || !!selectedThemeId || activeTab === 'all';
+  const gridParams = new URLSearchParams();
+  if (selectedBreedId) gridParams.set('breed', selectedBreedId);
+  if (selectedThemeId) {
+    gridParams.set('theme', selectedThemeId);
+    if (themeAnimalFilter !== 'all') gridParams.set('animal', themeAnimalFilter === 'dogs' ? 'dog' : 'cat');
+    if (themeBreedSearch.trim()) gridParams.set('breedName', themeBreedSearch.trim());
+  } else if (!selectedBreedId && (activeTab === 'dogs' || activeTab === 'cats')) {
+    gridParams.set('animal', activeTab === 'dogs' ? 'dog' : 'cat');
+  }
+  // Same as the old client rule: the search box narrows designs only inside a breed
+  if (selectedBreedId && searchTerm.trim()) gridParams.set('search', searchTerm.trim());
+  const gridKeyNow = gridVisible ? gridParams.toString() : '';
+
+  // Filters are applied after a short pause when only the text changed (typing), at once otherwise
+  const [gridKey, setGridKey] = useState(gridKeyNow);
+  const gridKeyRef = useRef(gridKey);
   useEffect(() => {
-    if (prevFilterKey.current === filterKey) return;
-    prevFilterKey.current = filterKey;
-    setVisibleCount(PAGE_SIZE);
-  }, [filterKey]);
-  useEffect(() => { browseVisibleCount = visibleCount; }, [visibleCount]);
+    if (gridKeyNow === gridKeyRef.current) return;
+    const strip = (k: string) => { const p = new URLSearchParams(k); p.delete('search'); p.delete('breedName'); return p.toString(); };
+    const typing = strip(gridKeyNow) === strip(gridKeyRef.current);
+    const t = setTimeout(() => { gridKeyRef.current = gridKeyNow; setGridKey(gridKeyNow); }, typing ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [gridKeyNow]);
+
+  const fetchGridPage = async (key: string, pageNo: number, signal?: AbortSignal) => {
+    const qs = new URLSearchParams(key);
+    qs.set('page', String(pageNo));
+    qs.set('limit', String(PAGE_SIZE));
+    const res = await fetch(`/api/public/browse?${qs.toString()}`, { signal });
+    if (!res.ok) throw new Error(`browse ${res.status}`);
+    return res.json() as Promise<{ images: ImageCatalogWithDetails[]; total: number; hasMore: boolean }>;
+  };
+  const mergeById = (a: ImageCatalogWithDetails[], b: ImageCatalogWithDetails[]) => {
+    const seen = new Set(a.map(i => i.id));
+    return [...a, ...b.filter(i => !seen.has(i.id))];
+  };
+
+  // Filter set changed: start again from page 1 (or, coming Back from a design, bring back the same cards)
+  useEffect(() => {
+    const myReq = ++gridReqId.current;
+    const ctrl = new AbortController();
+    loadingMoreRef.current = false;
+    setLoadingMore(false);
+    if (!gridVisible) { setGridLoading(false); return () => ctrl.abort(); }
+
+    const c = browseGridCache;
+    if (savedBrowseScroll() !== null && c && c.key === gridKey && Date.now() - c.at < 10 * 60_000) {
+      setImages(c.rows); setTotal(c.total); setGridPage(c.page); setHasMore(c.hasMore); setLoadedKey(gridKey); setGridLoading(false);
+      firstGridLoad.current = false;
+      return () => ctrl.abort();
+    }
+
+    // Filters are about to change (debounce pending): wait for the new key instead of fetching the old one
+    if (gridKey !== gridKeyNow) { setImages([]); setTotal(0); setHasMore(false); setGridLoading(true); return; }
+
+    const target = firstGridLoad.current ? restoreTarget : PAGE_SIZE;
+    setImages([]); setTotal(0); setHasMore(false); setGridPage(1); setGridLoading(true);
+    (async () => {
+      try {
+        let rows: ImageCatalogWithDetails[] = [];
+        let pageNo = 1;
+        let data = await fetchGridPage(gridKey, pageNo, ctrl.signal);
+        rows = mergeById(rows, data.images || []);
+        while (rows.length < target && data.hasMore && pageNo < 10) {
+          pageNo += 1;
+          data = await fetchGridPage(gridKey, pageNo, ctrl.signal);
+          rows = mergeById(rows, data.images || []);
+        }
+        if (myReq !== gridReqId.current) return;
+        firstGridLoad.current = false;
+        setImages(rows); setTotal(data.total || 0); setHasMore(!!data.hasMore); setGridPage(pageNo); setLoadedKey(gridKey);
+      } catch (err: any) {
+        if (err?.name === 'AbortError' || myReq !== gridReqId.current) return;
+        console.error('Error loading designs:', err);
+        setHasMore(false);
+      } finally {
+        if (myReq === gridReqId.current) setGridLoading(false);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [gridKey, gridVisible]);
+
+  const loadMore = async () => {
+    if (loadingMoreRef.current || !hasMore || gridLoading) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    const myReq = gridReqId.current;
+    try {
+      const data = await fetchGridPage(gridKey, gridPage + 1);
+      if (myReq !== gridReqId.current) return; // filters changed while loading
+      setImages(prev => mergeById(prev, data.images || []));
+      setTotal(data.total || 0);
+      setHasMore(!!data.hasMore);
+      setGridPage(p => p + 1);
+    } catch (err) {
+      console.error('Error loading more designs:', err);
+    } finally {
+      if (myReq === gridReqId.current) { loadingMoreRef.current = false; setLoadingMore(false); }
+    }
+  };
+
+  // Remember what is loaded so Back from a design restores it
+  useEffect(() => {
+    if (images.length > 0) browseVisibleCount = images.length;
+    if (!gridLoading && loadedKey === gridKey && images.length > 0) {
+      browseGridCache = { key: gridKey, rows: images, total, page: gridPage, hasMore, at: Date.now() };
+    }
+  }, [images, total, hasMore, gridPage, gridLoading, loadedKey, gridKey]);
+
   useEffect(() => {
     const el = sentinelRef.current;
     if (loading || !el || !hasMore || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver((entries) => {
-      if (entries.some(e => e.isIntersecting)) {
-        setVisibleCount(c => Math.min(c + PAGE_SIZE, totalFiltered));
-      }
+      if (entries.some(e => e.isIntersecting)) loadMore();
     }, { rootMargin: '600px 0px' });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [loading, hasMore, visibleCount, totalFiltered]);
-  const showMoreControls = hasMore && (
+  }, [loading, hasMore, images.length, gridLoading, loadingMore]);
+  const showMoreControls = (hasMore || loadingMore) && (
     <div className="mt-8 flex flex-col items-center gap-3">
       <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
-      <Button variant="outline" onClick={() => setVisibleCount(c => Math.min(c + PAGE_SIZE, totalFiltered))}>
-        Show more designs
+      <Button variant="outline" disabled={loadingMore} onClick={() => loadMore()}>
+        {loadingMore ? (
+          <><span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-b-2 border-purple-600" aria-hidden="true" />Loading…</>
+        ) : 'Show more designs'}
       </Button>
     </div>
   );
-  const animalCount = (type: 'dog' | 'cat') => images.filter(img => matchesAnimalType(img, type)).length;
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
@@ -805,7 +790,7 @@ function BrowsePageContent() {
           <section className="py-8 bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                Available Portraits ({getFilteredImages().length})
+                Available Portraits ({total})
               </h2>
 
               {/* Breed and Theme-specific filtering controls */}
@@ -889,7 +874,11 @@ function BrowsePageContent() {
                 </div>
               )}
 
-              {getFilteredImages().length === 0 ? (
+              {images.length === 0 && gridLoading ? (
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                </div>
+              ) : images.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 text-gray-300 mx-auto mb-4">🖼️</div>
                   <p className="text-gray-600">
@@ -899,7 +888,7 @@ function BrowsePageContent() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                  {filteredAll.slice(0, visibleCount).map((image) => {
+                  {images.map((image) => {
                     const isLiked = likedImages.has(image.id);
                     const isShared = sharedImages.has(image.id);
                     const isPurchased = purchasedImages.has(image.id);
@@ -1104,7 +1093,7 @@ function BrowsePageContent() {
                     }`}
                   >
                     <Sparkles className="w-5 h-5 mr-2" />
-                    All ({images.length})
+                    All ({counts.all})
                   </Button>
                   <Button
                     variant={activeTab === 'dogs' ? 'default' : 'ghost'}
@@ -1116,7 +1105,7 @@ function BrowsePageContent() {
                     }`}
                   >
                     <Dog className="w-5 h-5 mr-2" />
-                    Dogs ({animalCount('dog')})
+                    Dogs ({counts.dogs})
                   </Button>
                   <Button
                     variant={activeTab === 'cats' ? 'default' : 'ghost'}
@@ -1128,7 +1117,7 @@ function BrowsePageContent() {
                     }`}
                   >
                     <Cat className="w-5 h-5 mr-2" />
-                    Cats ({animalCount('cat')})
+                    Cats ({counts.cats})
                   </Button>
                   <Button
                     variant="ghost"
@@ -1191,7 +1180,7 @@ function BrowsePageContent() {
           {/* Image Cards (All Tab) */}
           {activeTab === 'all' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-              {filteredAll.slice(0, visibleCount).map((image) => {
+              {images.map((image) => {
                 const isLiked = likedImages.has(image.id);
                 const isShared = sharedImages.has(image.id);
                 const isPurchased = purchasedImages.has(image.id);
@@ -1342,6 +1331,11 @@ function BrowsePageContent() {
               })}
             </div>
           )}
+          {activeTab === 'all' && gridLoading && images.length === 0 && (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+            </div>
+          )}
           {activeTab === 'all' && showMoreControls}
 
           {/* Breed Cards (Dogs/Cats) */}
@@ -1486,7 +1480,7 @@ function BrowsePageContent() {
           )}
 
           {/* Empty states */}
-          {activeTab === 'all' && getFilteredImages().length === 0 && (
+          {activeTab === 'all' && images.length === 0 && !gridLoading && (
             <div className="text-center py-12">
               <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-600">
