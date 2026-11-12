@@ -15,7 +15,7 @@ export function useDesignCollections(imageId: string) {
   const [data, setData] = useState<Data | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/public/designs/${imageId}/collections`).then(r => (r.ok ? r.json() : null)).then(d => !cancelled && setData(d)).catch(() => {});
+    fetch(`/api/public/designs/${imageId}/collections`).then(r => (r.ok ? r.json() : null)).then(d => !cancelled && setData(d && Array.isArray(d.tags) ? { ...d, tags: d.tags.filter((t: string, i: number, a: string[]) => a.findIndex(x => x.toLowerCase() === t.toLowerCase()) === i) } : d)).catch(() => {});
     return () => { cancelled = true; };
   }, [imageId]);
   return data;

@@ -219,7 +219,7 @@ function ShoppingCartPageContent() {
                       {/* Quantity Controls (a take-home print is the one physical print in their hand) */}
                       {isStallProductId(item.productId) ? (
                         <span className="text-xs text-gray-500">1 · in your hand</span>
-                      ) : (
+                      ) : (item.product as any)?.product_type === 'digital_download' ? null : (
                       <div className="flex items-center space-x-2">
                         <Button
                           variant="outline"
@@ -300,7 +300,7 @@ function ShoppingCartPageContent() {
 
                 <Link href="/shop/checkout" className="block">
                   <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 text-lg font-semibold">
-                    Complete Your Order
+                    Go to checkout
                   </Button>
                 </Link>
 

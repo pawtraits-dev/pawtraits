@@ -704,7 +704,7 @@ function CheckoutPageContent() {
         <div className="mb-4 sm:mb-8">
           <Link href="/shop/cart" className="flex items-center text-gray-600 hover:text-purple-600 mb-2 sm:mb-4">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Cart
+            Back to basket
           </Link>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Checkout</h1>
           {/* Compact progress on phones — the full stepper doesn't fit */}
@@ -1245,6 +1245,14 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                       <span>{discountType}</span>
                       <span className="font-medium">-£{discount.toFixed(2)}</span>
                     </div>
+                  </div>
+                )}
+
+                {/* Any other discount that reduces the total (guests with an eligible referral code, admins) */}
+                {discount > 0 && userProfile?.user_type !== 'partner' && !(userProfile?.user_type === 'customer' && referralCode && referralValidation?.valid && referralValidation?.discount?.eligible) && (
+                  <div className="flex justify-between text-green-600">
+                    <span>{discountType || 'Discount'}</span>
+                    <span className="font-medium">-£{discount.toFixed(2)}</span>
                   </div>
                 )}
 

@@ -140,6 +140,9 @@ export default function CustomisePage() {
   const [scannedSize, setScannedSize] = useState<string | null>(null);
   const [fromCollection, setFromCollection] = useState<string | null>(null);
   const chips = useDesignCollections(imageId);
+  // Mug preview images that have finished loading (until then a grey pulse shows)
+  const [mugLoaded, setMugLoaded] = useState<Set<string>>(new Set());
+  const markMugLoaded = (src: string) => setMugLoaded(prev => (prev.has(src) ? prev : new Set(prev).add(src)));
 
   const [step, setStep] = useState<Step>('choose');
   // Personalised kit: name and number on the shirt
@@ -533,8 +536,12 @@ export default function CustomisePage() {
               <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-gray-500">{step === 'result' ? 'Your mug' : 'On the mug'}</p>
               <div className="grid grid-cols-2 gap-2">
                 {[m.pet, m.text].filter(Boolean).map((src, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={i} src={src} alt={i === 0 ? 'The mug, pet side' : 'The mug, back'} className="aspect-square w-full rounded-xl bg-white object-cover ring-1 ring-gray-200" loading="lazy" draggable={false} onContextMenu={e => e.preventDefault()} />
+                  <div key={src} className={`aspect-square w-full overflow-hidden rounded-xl ring-1 ring-gray-200 ${mugLoaded.has(src as string) ? 'bg-white' : 'animate-pulse bg-gray-100'}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt={i === 0 ? 'The mug, pet side' : 'The mug, back'} className={`h-full w-full object-cover transition-opacity ${mugLoaded.has(src as string) ? 'opacity-100' : 'opacity-0'}`} loading="lazy" draggable={false} onContextMenu={e => e.preventDefault()}
+                      ref={el => { if (el?.complete && el.naturalWidth) markMugLoaded(src as string); }}
+                      onLoad={() => markMugLoaded(src as string)} onError={() => markMugLoaded(src as string)} />
+                  </div>
                 ))}
               </div>
             </div>

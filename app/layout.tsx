@@ -22,19 +22,19 @@ const lifeSavers = Life_Savers({
 
 export const metadata: Metadata = {
   title: 'Pawtraits - Perfect Pet Portraits',
-  description: 'Fantastic Fun Picture of your Furry Friends.',
+  description: 'Your pet, painted into a masterpiece. Pick a design, add a photo, and Pawcasso paints your pet in. Prints, mugs and digital downloads.',
   keywords: 'pet portraits, AI art, custom pet art, dog portraits, cat portraits, pet memorial, pet gifts',
   authors: [{ name: 'Pawtraits Team' }],
   openGraph: {
     title: 'Pawtraits',
-    description: 'Fantastic Fun Picture of your Furry Friends',
+    description: 'Your pet, painted into a masterpiece. Pick a design, add a photo, and Pawcasso paints your pet in. Prints, mugs and digital downloads.',
     type: 'website',
-    locale: 'en_US',
+    locale: 'en_GB',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Pawtraits - AI Pet Portraits',
-    description: 'Fantastic Fun Picture of your Furry Friends ',
+    description: 'Your pet, painted into a masterpiece. Pick a design, add a photo, and Pawcasso paints your pet in. Prints, mugs and digital downloads.',
   },
   robots: 'index, follow',
 };
@@ -51,7 +51,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en-GB">
       <head>
         <link rel="icon" href="/assets/logos/paw-svgrepo-200x200-purple.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/assets/logos/paw-svgrepo-200x200-purple.svg" />

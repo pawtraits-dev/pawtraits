@@ -1,7 +1,7 @@
 'use client';
 
 import { productMatchesFormat } from '@/lib/products/shape-family';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -72,6 +72,17 @@ function savedBrowseScroll(): number | null {
   } catch { return null; }
 }
 
+// Incremental rendering: cards shown per batch; remembered so Back from a design can restore the scroll
+const PAGE_SIZE = 24;
+let browseVisibleCount = PAGE_SIZE;
+
+// Same animal-type test the gallery filter uses, so tab counts match what the grid shows
+function matchesAnimalType(img: any, animalType: 'dog' | 'cat') {
+  return img.breed?.animal_type === animalType ||
+    img.tags?.includes(animalType) ||
+    (!img.breed?.animal_type && !img.tags?.includes('cat') && animalType === 'dog');
+}
+
 // Simple in-memory cache to prevent rate limiting
 const dataCache = {
   breeds: null as Breed[] | null,
@@ -84,6 +95,15 @@ const dataCache = {
 };
 
 function BrowsePageContent() {
+  // "Prints from £X · digital £Y" when both are known; otherwise plain "from £X"
+  const priceLine = (info: { lowestPrice: any; currency: any; currencySymbol: any; physicalPrice?: number | null; digitalPrice?: number | null }) => {
+    const fmt = (v: number) => formatPrice(v, info.currency || 'GBP', info.currencySymbol);
+    if (info.physicalPrice != null && info.digitalPrice != null) {
+      return `Prints from ${fmt(info.physicalPrice)} · digital ${fmt(info.digitalPrice)}`;
+    }
+    return `from ${fmt(info.lowestPrice)}`;
+  };
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const openDesign = (href: string) => { saveBrowseScroll(); router.push(href); };
@@ -128,6 +148,9 @@ function BrowsePageContent() {
   const [likedImages, setLikedImages] = useState<Set<string>>(new Set());
   const [sharedImages, setSharedImages] = useState<Set<string>>(new Set());
   const [purchasedImages, setPurchasedImages] = useState<Set<string>>(new Set());
+
+  const [visibleCount, setVisibleCount] = useState<number>(() => (savedBrowseScroll() !== null ? Math.max(PAGE_SIZE, browseVisibleCount) : PAGE_SIZE));
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const { addToCart } = useHybridCart();
   const { selectedCountry, getCountryPricing } = useCountryPricing();
@@ -609,13 +632,57 @@ function BrowsePageContent() {
       current.sale_price < lowest.sale_price ? current : lowest
     );
 
+    // Split physical prints from the digital download so the card can label each price accurately
+    const isDigital = (productId: string) =>
+      (availableProducts.find(p => p.id === productId) as any)?.product_type === 'digital_download';
+    const lowestOf = (rows: typeof countryPricing) =>
+      rows.length ? rows.reduce((l, c) => (c.sale_price < l.sale_price ? c : l)) : null;
+    const physicalLowest = lowestOf(countryPricing.filter(p => !isDigital(p.product_id)));
+    const digitalLowest = lowestOf(countryPricing.filter(p => isDigital(p.product_id)));
+
     return {
       productCount: availableProducts.length,
       lowestPrice: lowestPricing.sale_price,
       currency: lowestPricing.currency_code,
-      currencySymbol: lowestPricing.currency_symbol
+      currencySymbol: lowestPricing.currency_symbol,
+      physicalPrice: physicalLowest ? physicalLowest.sale_price : null,
+      digitalPrice: digitalLowest ? digitalLowest.sale_price : null
     };
   };
+
+  // Incremental rendering: only the first PAGE_SIZE cards are in the page; more are added when the
+  // sentinel under the grid nears the viewport (or the "Show more designs" button is pressed)
+  const filteredAll = getFilteredImages();
+  const totalFiltered = filteredAll.length;
+  const hasMore = visibleCount < totalFiltered;
+  const filterKey = [activeTab, searchTerm, selectedBreedId, selectedThemeId, themeAnimalFilter, themeBreedSearch].join('|');
+  const prevFilterKey = useRef(filterKey);
+  useEffect(() => {
+    if (prevFilterKey.current === filterKey) return;
+    prevFilterKey.current = filterKey;
+    setVisibleCount(PAGE_SIZE);
+  }, [filterKey]);
+  useEffect(() => { browseVisibleCount = visibleCount; }, [visibleCount]);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (loading || !el || !hasMore || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) {
+        setVisibleCount(c => Math.min(c + PAGE_SIZE, totalFiltered));
+      }
+    }, { rootMargin: '600px 0px' });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loading, hasMore, visibleCount, totalFiltered]);
+  const showMoreControls = hasMore && (
+    <div className="mt-8 flex flex-col items-center gap-3">
+      <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
+      <Button variant="outline" onClick={() => setVisibleCount(c => Math.min(c + PAGE_SIZE, totalFiltered))}>
+        Show more designs
+      </Button>
+    </div>
+  );
+  const animalCount = (type: 'dog' | 'cat') => images.filter(img => matchesAnimalType(img, type)).length;
 
   if (loading) {
     return (
@@ -832,7 +899,7 @@ function BrowsePageContent() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                  {getFilteredImages().map((image) => {
+                  {filteredAll.slice(0, visibleCount).map((image) => {
                     const isLiked = likedImages.has(image.id);
                     const isShared = sharedImages.has(image.id);
                     const isPurchased = purchasedImages.has(image.id);
@@ -866,6 +933,8 @@ function BrowsePageContent() {
                                     : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
                                 }`}
                                 title={isLiked ? 'Unlike' : 'Like'}
+                            aria-label={isLiked ? 'Remove from favourites' : 'Save to favourites'}
+                            aria-pressed={isLiked}
                               >
                                 <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
                               </button>
@@ -881,6 +950,7 @@ function BrowsePageContent() {
                                     : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
                                 }`}
                                 title={isShared ? 'Shared' : 'Share'}
+                            aria-label="Share this design"
                               >
                                 <Share2 className="w-4 h-4" />
                               </button>
@@ -894,6 +964,7 @@ function BrowsePageContent() {
                                   }}
                                   className="p-2 rounded-full transition-all bg-white bg-opacity-80 text-gray-700 hover:bg-green-500 hover:text-white"
                                   title="Generate QR Code for Client"
+                                  aria-label="Generate QR code for client"
                                 >
                                   <QrCode className="w-4 h-4" />
                                 </button>
@@ -914,6 +985,7 @@ function BrowsePageContent() {
                               }}
                               className="p-2 rounded-full transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-lg"
                               title="Customize this image"
+                              aria-label="Personalise this design"
                             >
                               <Wand2 className="w-4 h-4" />
                             </button>
@@ -950,11 +1022,11 @@ function BrowsePageContent() {
                         {productInfo.lowestPrice && (
                           <div className="mb-3">
                             <p className="text-sm font-medium text-green-600">
-                              from {formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol)}
+                              {priceLine(productInfo)}
                             </p>
                             {productInfo.productCount > 1 && (
                               <p className="text-xs text-gray-500">
-                                {productInfo.productCount} size{productInfo.productCount > 1 ? 's' : ''} available
+                                {productInfo.productCount} options
                               </p>
                             )}
                           </div>
@@ -998,17 +1070,19 @@ function BrowsePageContent() {
                   })}
                 </div>
               )}
+              {showMoreControls}
             </div>
           </section>
         </>
       ) : (
         // Browse view with carousel and cards
         <>
+          <h1 className="sr-only">Browse Pawtrait designs</h1>
           {/* Hero Carousel - Dynamic based on active tab */}
           <section className="relative">
             <ContentBasedCarousel
               pageType={getCarouselPageType()}
-              className="h-96 lg:h-[500px]"
+              className="h-[40vh] min-h-[220px] sm:h-96 lg:h-[500px]"
             />
           </section>
 
@@ -1030,7 +1104,7 @@ function BrowsePageContent() {
                     }`}
                   >
                     <Sparkles className="w-5 h-5 mr-2" />
-                    All ({dogBreeds.length + catBreeds.length})
+                    All ({images.length})
                   </Button>
                   <Button
                     variant={activeTab === 'dogs' ? 'default' : 'ghost'}
@@ -1042,7 +1116,7 @@ function BrowsePageContent() {
                     }`}
                   >
                     <Dog className="w-5 h-5 mr-2" />
-                    Dogs ({dogBreeds.length})
+                    Dogs ({animalCount('dog')})
                   </Button>
                   <Button
                     variant={activeTab === 'cats' ? 'default' : 'ghost'}
@@ -1054,7 +1128,7 @@ function BrowsePageContent() {
                     }`}
                   >
                     <Cat className="w-5 h-5 mr-2" />
-                    Cats ({catBreeds.length})
+                    Cats ({animalCount('cat')})
                   </Button>
                   <Button
                     variant="ghost"
@@ -1117,7 +1191,7 @@ function BrowsePageContent() {
           {/* Image Cards (All Tab) */}
           {activeTab === 'all' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-              {getFilteredImages().map((image) => {
+              {filteredAll.slice(0, visibleCount).map((image) => {
                 const isLiked = likedImages.has(image.id);
                 const isShared = sharedImages.has(image.id);
                 const isPurchased = purchasedImages.has(image.id);
@@ -1151,6 +1225,8 @@ function BrowsePageContent() {
                                 : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
                             }`}
                             title={isLiked ? 'Unlike' : 'Like'}
+                            aria-label={isLiked ? 'Remove from favourites' : 'Save to favourites'}
+                            aria-pressed={isLiked}
                           >
                             <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
                           </button>
@@ -1166,6 +1242,7 @@ function BrowsePageContent() {
                                 : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
                             }`}
                             title={isShared ? 'Shared' : 'Share'}
+                            aria-label="Share this design"
                           >
                             <Share2 className="w-4 h-4" />
                           </button>
@@ -1179,6 +1256,7 @@ function BrowsePageContent() {
                               }}
                               className="p-2 rounded-full transition-all bg-white bg-opacity-80 text-gray-700 hover:bg-green-500 hover:text-white"
                               title="Generate QR Code for Client"
+                                  aria-label="Generate QR code for client"
                             >
                               <QrCode className="w-4 h-4" />
                             </button>
@@ -1223,11 +1301,11 @@ function BrowsePageContent() {
                       {productInfo.lowestPrice && (
                         <div className="mb-3">
                           <p className="text-sm font-medium text-green-600">
-                            from {formatPrice(productInfo.lowestPrice, productInfo.currency || 'GBP', productInfo.currencySymbol)}
+                            {priceLine(productInfo)}
                           </p>
                           {productInfo.productCount > 1 && (
                             <p className="text-xs text-gray-500">
-                              {productInfo.productCount} size{productInfo.productCount > 1 ? 's' : ''} available
+                              {productInfo.productCount} options
                             </p>
                           )}
                         </div>
@@ -1264,6 +1342,7 @@ function BrowsePageContent() {
               })}
             </div>
           )}
+          {activeTab === 'all' && showMoreControls}
 
           {/* Breed Cards (Dogs/Cats) */}
           {(activeTab === 'dogs' || activeTab === 'cats') && (
