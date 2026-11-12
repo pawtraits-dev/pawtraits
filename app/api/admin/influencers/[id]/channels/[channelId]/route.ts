@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/qr/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -8,6 +9,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string; channelId: string } }
 ) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     // TODO: Add admin authentication check
     console.log('Admin influencers API: Updating social channel...', params.channelId);
@@ -66,6 +69,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string; channelId: string } }
 ) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     // TODO: Add admin authentication check
     console.log('Admin influencers API: Deleting social channel...', params.channelId);

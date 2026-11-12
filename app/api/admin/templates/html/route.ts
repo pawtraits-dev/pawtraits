@@ -1,7 +1,10 @@
+import { requireAdmin } from '@/lib/qr/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Read HTML template from database
 export async function GET(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);
     const templateKey = searchParams.get('templateKey');
@@ -65,6 +68,8 @@ export async function GET(request: NextRequest) {
 
 // PUT - Update HTML template directly in database
 export async function PUT(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await request.json();
     const { templateKey, content } = body;

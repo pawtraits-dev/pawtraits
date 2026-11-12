@@ -14,6 +14,7 @@ import { markQuizPurchase, quizEmailUrl } from '@/lib/quiz/ways-in';
 import { captureSocialItems } from '@/lib/social/capture';
 import { optOutUrl } from '@/lib/social/opt-out';
 import { countryName, deliveryFor, emailItems, heroImage, petPossessive } from '@/lib/messaging/order-email';
+import { createCustomerCredit } from '@/lib/commissions/customer-credit';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -1302,27 +1303,22 @@ async function handleCustomerCreditFromMetadata(
       referral_type: 'customer'
     };
 
-    // Build base URL for API calls (webhook runs in production)
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
-      || (process.env.VERCEL_ENV === 'production' && process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : 'http://localhost:3000');
-
-    // Use API endpoint for customer credit creation
-    const creditResponse = await fetch(`${baseUrl}/api/commissions/customer`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    // Create the customer credit directly (was an HTTP call to /api/commissions/customer)
+    let credit: any = null;
+    let creditFailure: string | null = null;
+    try {
+      credit = await createCustomerCredit({
         orderId: order.id,
         orderAmount: subtotalAmount,
         referredCustomer,
         referringCustomerId: referringCustomer.id,
         referringCustomerEmail: referringCustomer.email
-      })
-    });
+      });
+    } catch (creditError) {
+      creditFailure = creditError instanceof Error ? creditError.message : String(creditError);
+    }
 
-    if (creditResponse.ok) {
-      const credit = await creditResponse.json();
+    if (creditFailure === null) {
       console.log('✅ Customer credit created from metadata using API:', {
         creditId: credit.id,
         referringCustomerId: referringCustomer.id,
@@ -1330,7 +1326,7 @@ async function handleCustomerCreditFromMetadata(
         creditAmount: credit.commission_amount / 100
       });
     } else {
-      console.error('❌ Failed to create customer credit via API:', await creditResponse.text());
+      console.error('❌ Failed to create customer credit via API:', creditFailure);
     }
 
   } catch (error) {

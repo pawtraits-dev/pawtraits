@@ -1,7 +1,10 @@
+import { requireAdmin } from '@/lib/qr/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { createGelatoService } from '@/lib/gelato-service';
 
 export async function GET(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action') || 'products';
@@ -136,6 +139,8 @@ export async function GET(request: NextRequest) {
 
 // POST endpoint for testing order creation with custom data
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await request.json();
     

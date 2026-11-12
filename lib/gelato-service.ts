@@ -530,7 +530,7 @@ export class GelatoService {
    */
   async getActiveCountries(): Promise<string[]> {
     try {
-      const response = await fetch('/api/admin/countries?supportedOnly=true');
+      const response = await fetch('/api/countries?supportedOnly=true');
       if (!response.ok) {
         console.warn('Failed to get active countries, using defaults');
         return ['GB', 'US', 'DE', 'FR']; // Fallback

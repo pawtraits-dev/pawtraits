@@ -33,7 +33,7 @@ const dlpMiddleware = createDLPMiddleware({
 })
 
 const TEST_PAGES = new Set([
-  '/quick-debug', '/simple-login', '/css-test', '/ui-demo', '/demo', '/interactions-demo', '/customer/test-cart',
+  '/quick-debug', '/css-test', '/ui-demo', '/demo', '/interactions-demo', '/customer/test-cart',
 ])
 
 // One browse page (customer UX round 2): old listing routes → /browse, keeping any query string.

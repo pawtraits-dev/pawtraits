@@ -119,7 +119,7 @@ export default function DemoPage() {
               🧪 Component Tests
             </h2>
             <div className="space-y-2">
-              <Link href="/test" className="block text-indigo-600 hover:text-indigo-800 text-sm">
+              <Link href="/demo" className="block text-indigo-600 hover:text-indigo-800 text-sm">
                 → UI Components Test
               </Link>
             </div>

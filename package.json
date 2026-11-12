@@ -23,7 +23,8 @@
     "test:ai-usage": "npx tsx scripts/test-ai-usage.ts",
     "test:collections": "npx tsx scripts/test-collections.ts",
     "test:search": "npx tsx scripts/test-search-tags.ts",
-    "test:multipet": "npx tsx scripts/test-multi-pet.ts"
+    "test:multipet": "npx tsx scripts/test-multi-pet.ts",
+    "test:admin-guards": "npx tsx scripts/check-admin-route-guards.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",

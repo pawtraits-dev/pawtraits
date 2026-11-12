@@ -9,6 +9,7 @@ import { sendEmail } from '@/lib/messaging/providers/email-provider';
 import { sendSMS } from '@/lib/messaging/providers/sms-provider';
 import { createInboxMessage } from '@/lib/messaging/message-queue';
 import { getQueueStats } from '@/lib/messaging/message-queue';
+import { requireAdmin } from '@/lib/qr/server';
 
 /**
  * POST /api/messaging/process
@@ -19,17 +20,14 @@ import { getQueueStats } from '@/lib/messaging/message-queue';
  */
 export async function POST(request: Request) {
   try {
-    // Verify cron authentication (Vercel cron or manual trigger)
+    // Allow the cron secret; anything else must be a signed-in admin (manual trigger from admin panel)
     const authHeader = request.headers.get('authorization');
-    const isVercelCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
-    const isManualTrigger = authHeader?.startsWith('Bearer ') || !authHeader;
+    const cronSecret = process.env.CRON_SECRET;
+    const isVercelCron = !!cronSecret && authHeader === `Bearer ${cronSecret}`;
 
-    // In production, only allow Vercel cron or authenticated requests
-    if (process.env.NODE_ENV === 'production' && !isVercelCron && !isManualTrigger) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    if (!isVercelCron) {
+      const denied = await requireAdmin();
+      if (denied) return denied;
     }
 
     const { limit = 100 } = await request.json().catch(() => ({}));
@@ -202,10 +200,21 @@ export async function GET(request: Request) {
   try {
     // Check if this is a cron trigger
     const authHeader = request.headers.get('authorization');
-    const isVercelCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+    const cronSecret = process.env.CRON_SECRET;
+    const isVercelCron = !!cronSecret && authHeader === `Bearer ${cronSecret}`;
 
-    // Allow processing if no CRON_SECRET is configured (development/testing)
-    const allowProcessing = isVercelCron || !process.env.CRON_SECRET;
+    // Vercel cron calls this handler (GET). If CRON_SECRET is not set, keep processing
+    // for any caller so email delivery does not stop - set CRON_SECRET to close this.
+    if (!cronSecret) {
+      console.warn('CRON_SECRET is not set - /api/messaging/process (GET) is processing the queue without authentication');
+    }
+    const allowProcessing = isVercelCron || !cronSecret;
+
+    // Not the cron: only admins may read queue stats
+    if (!allowProcessing) {
+      const denied = await requireAdmin();
+      if (denied) return denied;
+    }
 
     // If it's a cron call, process the queue
     if (allowProcessing) {

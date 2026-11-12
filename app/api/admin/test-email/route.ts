@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/lib/qr/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { sendEmail } from '@/lib/messaging/providers/email-provider';
 
@@ -6,6 +7,8 @@ import { sendEmail } from '@/lib/messaging/providers/email-provider';
  * Tests the Resend integration and email configuration
  */
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   try {
     const body = await request.json();
     const { to, testType } = body;

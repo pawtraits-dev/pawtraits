@@ -40,7 +40,7 @@ export function CountryProvider({
   useEffect(() => {
     const loadCountries = async () => {
       try {
-        const response = await fetch('/api/admin/countries?supportedOnly=true');
+        const response = await fetch('/api/countries?supportedOnly=true');
         if (response.ok) {
           const supportedCountries = await response.json();
           setCountries(supportedCountries);
