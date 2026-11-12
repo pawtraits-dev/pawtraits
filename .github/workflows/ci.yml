@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps --ignore-scripts
+
+      - name: Type check (must not exceed .tsc-baseline)
+        run: node scripts/check-type-errors.mjs
+
+      # Each test runs only if its script exists, so this workflow works on branches
+      # that do not have it yet.
+      - name: Admin routes are guarded
+        if: ${{ hashFiles('scripts/check-admin-route-guards.ts') != '' }}
+        run: npx tsx scripts/check-admin-route-guards.ts
+
+      - name: Price check logic
+        if: ${{ hashFiles('scripts/test-price-check.ts') != '' }}
+        run: npx tsx scripts/test-price-check.ts
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost
+          SUPABASE_SERVICE_ROLE_KEY: test
+
+      - name: Catalogue title hygiene
+        if: ${{ hashFiles('scripts/test-title-hygiene.ts') != '' }}
+        run: npx tsx scripts/test-title-hygiene.ts
