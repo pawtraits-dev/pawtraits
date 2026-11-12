@@ -74,6 +74,7 @@ const navigationSections = [
       { name: 'Collections', href: '/admin/collections', icon: Layers },
       { name: 'Captions', href: '/admin/collections/captions', icon: Award },
       { name: 'Quizzes', href: '/admin/quizzes', icon: Sparkles },
+      { name: 'Catalogue checks', href: '/admin/catalogue-checks', icon: Eye },
     ]
   },
   {

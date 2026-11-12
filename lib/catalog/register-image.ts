@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { cloudinaryService } from '@/lib/cloudinary';
 import type { ImageCatalogCreate } from '@/lib/types';
+import { cleanDescriptionTitle } from '@/lib/catalogue/title-hygiene';
 
 /**
  * Turning an image that is already on Cloudinary into a catalogue design. Shared by
@@ -73,7 +74,7 @@ export async function registerCloudinaryImage(supabase: SupabaseClient, input: R
     storage_path: `cloudinary:${input.cloudinary_public_id}`,
     public_url: variants.mid_size?.url || input.cloudinary_secure_url,
     prompt_text: input.prompt_text,
-    description: input.description || '',
+    description: cleanDescriptionTitle(input.description || ''),
     tags: Array.isArray(input.tags) ? input.tags : [],
     breed_id: input.breed_id || undefined,
     theme_id: input.theme_id || undefined,

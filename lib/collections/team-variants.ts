@@ -18,6 +18,7 @@ import { after } from 'next/server';
 import { LEAGUES, sceneRecolour, teamByPath, type League } from './sports-teams';
 import { letteringMatches, paintLettering, readKit, readShirt } from './kit-lettering';
 import { generateWithUsage } from '@/lib/ai/usage';
+import { cleanDescriptionTitle } from '@/lib/catalogue/title-hygiene';
 
 export const VARIANT_TAG = 'team-variant';
 const UNLISTED_TAG = 'quiz-generated'; // lib/catalog/listing.ts: "link-only, not in listings"
@@ -262,7 +263,7 @@ async function paintTeamVersion(sourceId: string, team: OfferedTeam, recolour: R
     storage_path: `cloudinary:${uploaded.public_id}`, public_url: uploaded.secure_url,
     prompt_text: `${source.prompt_text || ''}\n\n[Team version] ${instruction}`.trim(),
     ...(kitSettings ? { kit_personalisation: kitSettings } : {}),
-    description: source.description, marketing_description: source.marketing_description,
+    description: cleanDescriptionTitle(source.description), marketing_description: source.marketing_description,
     tags: [VARIANT_TAG, `team:${team.path}`, UNLISTED_TAG],
     display_tags: source.display_tags ?? [],
     breed_id: source.breed_id, coat_id: source.coat_id, theme_id: source.theme_id, style_id: source.style_id, format_id: formatId,
@@ -314,7 +315,7 @@ export async function describeTeamVersion(imageId: string, team: Pick<OfferedTea
   const { ImageDescriptionGenerator } = await import('@/lib/image-description-generator');
   const text = (await new ImageDescriptionGenerator().generateDescription(url, (row as any).breeds?.name ?? undefined, undefined, context))?.trim();
   if (!text || text === 'Unable to generate description') return null;
-  await supabase.from('image_catalog').update({ description: text }).eq('id', imageId);
+  await supabase.from('image_catalog').update({ description: cleanDescriptionTitle(text) }).eq('id', imageId);
   return text;
 }
 

@@ -3,6 +3,7 @@ import { GeminiVariationService } from './gemini-variation-service';
 import { uploadImageBufferToCloudinary } from './cloudinary-server';
 import { ImageDescriptionGenerator } from './image-description-generator';
 import { AdaptiveBatchSpeedController } from './adaptive-batch-speed-controller';
+import { cleanDescriptionTitle } from '@/lib/catalogue/title-hygiene';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -384,7 +385,7 @@ export class BatchProcessingService {
           storage_path: `cloudinary:${cloudinaryResult.public_id}`,
           public_url: cloudinaryResult.secure_url,
           prompt_text: variation.prompt,
-          description: variation.description || `Batch generated variation: ${variation.metadata.variation_type}`,
+          description: cleanDescriptionTitle(variation.description || `Batch generated variation: ${variation.metadata.variation_type}`),
           tags: variation.metadata.tags || ['batch-generated', 'gemini-variation'],
           breed_id: variation.metadata.breed_id || null,
           theme_id: variation.metadata.theme_id || null,

@@ -8,6 +8,7 @@
 import { serviceClient } from '@/lib/qr/server';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
 import { uploadImageBufferToCloudinary } from '@/lib/cloudinary-server';
+import { cleanDescriptionTitle } from '@/lib/catalogue/title-hygiene';
 
 export type BreedImageStatus =
   | { status: 'done'; imageId: string }
@@ -158,7 +159,7 @@ export async function saveBreedDesign({ source, breed, code, buffer, prompt }: {
     storage_path: `cloudinary:${uploaded.public_id}`,
     public_url: uploaded.secure_url,
     prompt_text: prompt || source.prompt_text || '',
-    description: source.description,
+    description: cleanDescriptionTitle(source.description),
     tags: ['pawsonality', `pawsonality:${code}`, 'quiz-generated'],
     breed_id: breed.id,
     theme_id: source.theme_id,
