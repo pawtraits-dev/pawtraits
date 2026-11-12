@@ -5,6 +5,7 @@ import { promoteVariationPreview } from '@/lib/catalog/variation-previews';
 import { registerCloudinaryImage } from '@/lib/catalog/register-image';
 import { wordsForNewVersion } from '@/lib/picture-words-server';
 import { captionForNewVersion } from '@/lib/captions/server';
+import { cleanDescriptionTitle } from '@/lib/catalogue/title-hygiene';
 
 export const maxDuration = 300;   // drawing words on each version adds a few seconds
 
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
         file_size: moved.bytes,
         mime_type: `image/${moved.format === 'jpg' ? 'jpeg' : moved.format}`,
         prompt_text: v.prompt || '',
-        description: v.description || `Generated variation: ${base.variation_type ?? ''}`.trim(),
+        description: cleanDescriptionTitle(v.description || `Generated variation: ${base.variation_type ?? ''}`.trim()),
         tags: v.metadata?.tags || ['variation', 'gemini-generated'],
         breed_id: v.metadata?.breed_id,
         coat_id: v.metadata?.coat_id,

@@ -5,6 +5,7 @@ import { SupabaseService } from '@/lib/supabase';
 import { generateImageMetadata, extractColorTags } from '@/lib/metadata-generator';
 import { cloudinaryService } from '@/lib/cloudinary';
 import type { ImageCatalogCreate } from '@/lib/types';
+import { cleanDescriptionTitle } from '@/lib/catalogue/title-hygiene';
 
 const supabaseService = new SupabaseService();
 
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     // Return in the expected format for public pages
     return NextResponse.json({
-      images: images,
+      images: images.map(img => ({ ...img, description: cleanDescriptionTitle(img.description) })),
       total_count: images.length,
       current_page: page,
       total_pages: Math.ceil(images.length / limit)
@@ -221,7 +222,7 @@ export async function POST(request: NextRequest) {
       storage_path: `cloudinary:${cloudinaryResult.public_id}`, // Mark as Cloudinary storage
       public_url: cloudinaryResult.variants.mid_size.url, // Use mid_size variant for public display
       prompt_text: promptText,
-      description: finalDescription,
+      description: cleanDescriptionTitle(finalDescription),
       tags: finalTags,
       breed_id: validBreedId || undefined,
       theme_id: validThemeId || undefined,

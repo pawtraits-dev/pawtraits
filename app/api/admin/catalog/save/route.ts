@@ -3,6 +3,7 @@ import { serviceClient, requireAdmin } from '@/lib/qr/server';
 import { autoTagNew } from '@/lib/collections/auto-tag';
 import { createClient } from '@supabase/supabase-js';
 import { CloudinaryImageService } from '@/lib/cloudinary';
+import { cleanDescriptionTitle } from '@/lib/catalogue/title-hygiene';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -167,7 +168,7 @@ export async function POST(request: NextRequest) {
       storage_path: uploadResult.public_id,
       public_url: publicUrl,
       prompt_text: variationPromptTemplate || '',
-      description: marketingDescription,
+      description: cleanDescriptionTitle(marketingDescription),
       tags: tags || [],
       // Tags shown to customers; reviewed on upload, so the auto-tagger keeps them
       display_tags: Array.isArray(tags) ? tags.map((t: string) => String(t).toLowerCase().trim()).filter(Boolean).slice(0, 10) : [],

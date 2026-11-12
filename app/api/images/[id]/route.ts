@@ -4,6 +4,7 @@ import { SupabaseService } from '@/lib/supabase';
 import { CloudinaryImageService, cloudinaryService } from '@/lib/cloudinary';
 import type { ImageCatalogUpdate } from '@/lib/types';
 import { createClient } from '@supabase/supabase-js';
+import { cleanDescriptionTitle } from '@/lib/catalogue/title-hygiene';
 
 const supabaseService = new SupabaseService();
 
@@ -335,7 +336,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const body = await request.json();
     
     const updateData: ImageCatalogUpdate = {
-      description: body.description,
+      description: cleanDescriptionTitle(body.description),
       tags: body.tags,
       rating: body.rating,
       is_featured: body.is_featured,

@@ -18,6 +18,7 @@ import { requireAdmin, serviceClient } from '@/lib/qr/server';
 import { describeTeamVersion, ensureTeamVariant, groupByLeague, setTeamVersionPublished, teamContext } from '@/lib/collections/team-variants';
 import { readKit } from '@/lib/collections/kit-lettering';
 import { cleanKitName, cleanKitNumber } from '@/lib/collections/sports-teams';
+import { cleanDescriptionTitle } from '@/lib/catalogue/title-hygiene';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (body.action === 'save-description') {
         const description = String(body.description ?? '').trim().slice(0, 4000);
         if (!description) return NextResponse.json({ error: 'The description is empty' }, { status: 400 });
-        await supabase.from('image_catalog').update({ description }).eq('id', team.imageId);
+        await supabase.from('image_catalog').update({ description: cleanDescriptionTitle(description) }).eq('id', team.imageId);
         return NextResponse.json({ ok: true, description });
       }
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
