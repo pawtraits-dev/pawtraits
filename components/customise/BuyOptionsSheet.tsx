@@ -302,13 +302,16 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
   );
 
   const hasPrints = stallAvailable || Object.keys(printsByMedium).length > 0;
+  const mediaNames = Object.keys(printsByMedium);
+  const offersFoamex = stallAvailable || mediaNames.some(m => /foam/i.test(m));
+  const mugOnly = !stallAvailable && mediaNames.length > 0 && mediaNames.every(m => /mug/i.test(m));
 
   if (inline) {
     return (
       <section aria-labelledby="buy-heading" className="mt-8">
         <h2 id="buy-heading" className="text-lg font-bold text-gray-900">Or buy it as it is</h2>
         <p className="mt-0.5 mb-4 text-sm text-gray-500">
-          {hasPrints || !products ? 'UV-printed on 3 mm rigid Foamex, ready to lean or hang.' : 'This design is available as a high-resolution digital download.'}
+          {offersFoamex || !products ? 'UV-printed on rigid Foamex, ready to lean or hang.' : mugOnly ? 'Printed on an 11 oz ceramic mug and posted to you.' : hasPrints ? 'Printed to order and posted to you.' : 'This design is available as a high-resolution digital download.'}
         </p>
         <div className="space-y-5">{sections}</div>
         <div className="mt-4 space-y-2">{actions}</div>

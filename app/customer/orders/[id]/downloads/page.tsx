@@ -393,7 +393,7 @@ export default function CustomerDownloadsPage() {
           <p>• Your downloads are available for 30 days from purchase</p>
           <p>• Files are high-resolution and suitable for printing</p>
           <p>• You can download multiple times before expiry</p>
-          <p>• Need help? Contact us at support@pawtraits.com</p>
+          <p>• Need help? Contact us at support@pawtraits.pics</p>
         </CardContent>
       </Card>
     </div>
