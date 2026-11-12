@@ -17,6 +17,8 @@ import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider } from '@/lib/country-context'
 import { shippingSummary } from '@/lib/shipping/rates'
 
+const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' }
+
 function ShoppingCartPageContent() {
   const { items, totalItems, totalPrice, updateQuantity, removeFromCart, isGuest, basketNotice, clearBasketNotice } = useHybridCart();
   const { continueShoppingRoute, userProfile } = useUserRouting();
@@ -118,9 +120,9 @@ function ShoppingCartPageContent() {
           <div className="mb-8">
             <Link href={continueShoppingRoute} className="flex items-center text-gray-600 hover:text-purple-600 mb-4">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Keep Exploring
+              Keep exploring
             </Link>
-            <h1 className="text-3xl font-bold text-gray-900">Your Basket</h1>
+            <h1 className="text-[2rem] leading-tight text-gray-900" style={lifeSavers}>Your basket</h1>
           {basketNotice && (
             <div role="status" className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <span>{basketNotice}</span>
@@ -130,7 +132,7 @@ function ShoppingCartPageContent() {
           </div>
 
           {/* Empty State */}
-          <Card className="text-center py-16">
+          <Card className="text-center py-16 rounded-2xl border border-gray-200 shadow-none">
             <CardContent>
               <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <ShoppingCart className="w-12 h-12 text-gray-400" />
@@ -138,8 +140,8 @@ function ShoppingCartPageContent() {
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">Your basket is looking a bit lonely!</h2>
               <p className="text-gray-600 mb-8">Let's fill it with some pawsome portraits that your pet will love.</p>
               <Link href={continueShoppingRoute}>
-                <Button className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 text-lg">
-                  Explore the Gallery
+                <Button className="rounded-2xl bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 text-lg font-semibold disabled:bg-purple-300">
+                  Explore the gallery
                 </Button>
               </Link>
             </CardContent>
@@ -159,9 +161,9 @@ function ShoppingCartPageContent() {
         <div className="mb-8">
           <Link href={continueShoppingRoute} className="flex items-center text-gray-600 hover:text-purple-600 mb-4">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Keep Exploring
+            Keep exploring
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Your Basket</h1>
+          <h1 className="text-[2rem] leading-tight text-gray-900" style={lifeSavers}>Your basket</h1>
           {basketNotice && (
             <div role="status" className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <span>{basketNotice}</span>
@@ -183,7 +185,7 @@ function ShoppingCartPageContent() {
               </div>
             ))}
             {items.map((item) => (
-              <Card key={item.id} className="shadow-sm">
+              <Card key={item.id} className="rounded-2xl border border-gray-200 shadow-none">
                 <CardContent className="p-4 sm:p-6">
                   {/* Mobile: image + details side by side, price/controls on their own row; desktop: one row */}
                   <div className="flex flex-wrap items-start gap-4 sm:flex-nowrap">
@@ -261,9 +263,9 @@ function ShoppingCartPageContent() {
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <Card className="shadow-sm sticky top-8">
+            <Card className="sticky top-8 rounded-2xl border border-gray-200 shadow-none">
               <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
+                <CardTitle>Order summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between">
@@ -299,7 +301,7 @@ function ShoppingCartPageContent() {
                 )}
 
                 <Link href="/shop/checkout" className="block">
-                  <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 text-lg font-semibold">
+                  <Button className="w-full rounded-2xl bg-purple-600 hover:bg-purple-700 text-white py-3 text-lg font-semibold disabled:bg-purple-300">
                     Go to checkout
                   </Button>
                 </Link>

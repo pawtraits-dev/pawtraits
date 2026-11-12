@@ -276,18 +276,6 @@ function HomePageContent({ hero }: { hero: FeedItem | null }) {
           </Link>
         </div>
       </section>
-
-      <footer className="border-t border-gray-200">
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-4 gap-y-3 px-5 py-8 text-sm md:grid-cols-6">
-          <Link href="/browse" className="text-gray-800 hover:text-purple-700">Browse designs</Link>
-          <Link href="/auth/login" className="text-gray-800 hover:text-purple-700">Sign in</Link>
-          <Link href="/orders" className="text-gray-800 hover:text-purple-700">My orders</Link>
-          <Link href="/help" className="text-gray-800 hover:text-purple-700">Help &amp; delivery</Link>
-          <Link href="/signup/partner" className="text-gray-800 hover:text-purple-700">Partner with us</Link>
-          <Link href="/privacy" className="text-gray-800 hover:text-purple-700">Privacy &amp; terms</Link>
-          <p className="col-span-2 mt-2 text-gray-500 md:col-span-6">© {new Date().getFullYear()} Pawtraits</p>
-        </div>
-      </footer>
     </div>
   );
 }

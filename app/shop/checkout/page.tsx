@@ -34,6 +34,8 @@ const countryName = (code: string) => {
 }
 
 
+const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' }
+
 function CheckoutPageContent() {
   const [currentStep, setCurrentStep] = useState(1)
   // Guest checkout (no account needed — one is created after payment)
@@ -706,7 +708,7 @@ function CheckoutPageContent() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to basket
           </Link>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Checkout</h1>
+          <h1 className="text-[2rem] leading-tight text-gray-900" style={lifeSavers}>Checkout</h1>
           {/* Compact progress on phones — the full stepper doesn't fit */}
           <p className={`sm:hidden mt-1 text-sm text-gray-600 ${expressFirst ? 'hidden' : ''}`}>
             Step {steps.findIndex(st => st.number === currentStep) + 1} of {steps.length} · {steps.find(st => st.number === currentStep)?.title}
@@ -769,7 +771,7 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
               // Kept visible while Stripe checks the device (a hidden, zero-height frame may never start on some phones);
               // collapsed only once Stripe says no wallet is available
               <div className={walletAvailable === false ? 'invisible h-0 overflow-hidden' : 'mb-6'} aria-hidden={walletAvailable === false}>
-                <Card className="border-purple-200">
+                <Card className="rounded-2xl border border-purple-200 shadow-none">
                   <CardContent className="pt-6 space-y-3">
                     <div>
                       <h2 className="text-lg font-semibold text-gray-900">Express checkout</h2>
@@ -823,7 +825,7 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
 
             {/* Step 1: Shipping Information */}
             {currentStep === 1 && !expressFirst && (
-              <Card>
+              <Card className="rounded-2xl border border-gray-200 shadow-none">
                 <CardHeader>
                   <CardTitle>{isDigitalOnly ? 'Your details' : 'Delivery address'}</CardTitle>
                 </CardHeader>
@@ -974,7 +976,7 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
 
                     <Button
                       type="submit"
-                      className="w-full h-14 text-lg bg-purple-600 hover:bg-purple-700 text-white"
+                      className="w-full h-14 text-lg rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-semibold disabled:bg-purple-300"
                       disabled={loadingShipping || isProcessing}
                     >
                       {loadingShipping ? (
@@ -996,11 +998,11 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
 
             {/* Step 2: Shipping Options */}
             {currentStep === 2 && (
-              <Card>
+              <Card className="rounded-2xl border border-gray-200 shadow-none">
                 <CardHeader>
                   <CardTitle className="flex items-center">
                     <Truck className="w-5 h-5 mr-2" />
-                    Select Shipping Option
+                    Select shipping option
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -1053,11 +1055,11 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
 
             {/* Step 3: Payment */}
             {currentStep === 3 && (
-              <Card>
+              <Card className="rounded-2xl border border-gray-200 shadow-none">
                 <CardHeader>
                   <CardTitle className="flex items-center">
                     <CreditCard className="w-5 h-5 mr-2" />
-                    Payment Information
+                    Payment information
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -1160,9 +1162,9 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
 
           {/* Order Summary Sidebar */}
           <div className="lg:col-span-1">
-            <Card className="sticky top-8">
+            <Card className="sticky top-8 rounded-2xl border border-gray-200 shadow-none">
               <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
+                <CardTitle>Order summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {items.map((item) => (
@@ -1309,7 +1311,7 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                         type="button"
                         onClick={handleShippingOptionSubmit}
                         disabled={!selectedShippingOption || isProcessing}
-                        className="flex-1 bg-purple-600 hover:bg-purple-700"
+                        className="flex-1 h-14 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-semibold disabled:bg-purple-300"
                       >
                         {isProcessing ? (
                           <>
