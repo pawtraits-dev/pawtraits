@@ -3,7 +3,8 @@
  * collection's page (breadcrumb, collections inside it, designs, breeds). Only active
  * collections; designs are public, listed catalogue designs.
  */
-import { inSeason, type SeasonWindow } from './definitions';
+import { TAROT } from '@/lib/tarot';
+import { inSeason, type SeasonWindow, ZODIAC } from './definitions';
 
 export interface PublicCollection {
   id: string; kind: string; path: string; parentPath: string | null; depth: number;
@@ -57,6 +58,50 @@ export function cleanPath(raw: string | null | undefined): string | null {
   return /^[a-z0-9]+(-[a-z0-9]+)*(\/[a-z0-9]+(-[a-z0-9]+)*){0,2}$/.test(p) ? p : null;
 }
 
+/** U+FE0E keeps ♈–♓ as plain text symbols (phones otherwise draw them as coloured emoji) */
+const textSymbol = (s: string) => `${s}\uFE0E`;
+
+/** The order signs and cards are shown in: the zodiac year from Aries, the Major Arcana by number */
+export function orderSignsOrCards(kind: string, children: PublicCollection[]): PublicCollection[] {
+  const rank = (c: PublicCollection) => {
+    const slug = c.path.split('/')[1];
+    const i = kind === 'zodiac' ? ZODIAC.findIndex(z => z.slug === slug) : TAROT.findIndex(t => t.slug === slug);
+    return i < 0 ? 999 : i;
+  };
+  return [...children].sort((a, b) => rank(a) - rank(b) || a.sortOrder - b.sortOrder);
+}
+
+/**
+ * Designs of the whole zodiac / tarot collection, sign by sign (card by card). One query per sign
+ * with the page's filters, joined in order, then paged here. A design in two signs is listed once,
+ * under the first. Fills `groupOf` with each design's sign or card.
+ */
+async function groupedDesigns(
+  supabase: any, tree: PublicCollection[], node: PublicCollection,
+  f: { animal: string | null; breedId: string | null; pets: number | null },
+  groupOf: Map<string, { path: string; label: string; mark: string }>, page: number, pageSize: number,
+): Promise<{ data: { id: string; total: number }[]; error: any }> {
+  const children = orderSignsOrCards(node.kind, tree.filter(c => c.parentPath === node.path && c.designs > 0));
+  const results = await Promise.all(children.map(c => supabase.rpc('collection_designs', {
+    p_path: c.path, p_animal: f.animal, p_breed_id: f.breedId, p_limit: 100, p_offset: 0, p_pets: f.pets,
+  })));
+  const failed = results.find((r: any) => r.error);
+  if (failed) return { data: [], error: failed.error };
+  const ids: string[] = [];
+  children.forEach((c, i) => {
+    const slug = c.path.split('/')[1];
+    const mark = node.kind === 'zodiac'
+      ? textSymbol(String(c.details?.symbol ?? ZODIAC.find(z => z.slug === slug)?.symbol ?? ''))
+      : String(c.details?.numeral ?? TAROT.find(t => t.slug === slug)?.numeral ?? '');
+    for (const h of (results[i] as any).data ?? []) {
+      if (groupOf.has(h.id)) continue;
+      groupOf.set(h.id, { path: c.path, label: c.name, mark });
+      ids.push(h.id);
+    }
+  });
+  return { data: ids.slice(page * pageSize, (page + 1) * pageSize).map(id => ({ id, total: ids.length })), error: null };
+}
+
 export async function loadCollectionPage(supabase: any, path: string, opts: { animal?: string | null; breedSlug?: string | null; pets?: number | null; page?: number; pageSize?: number } = {}) {
   const tree = await loadPublicTree(supabase);
   const node = tree.find(c => c.path === path);
@@ -68,10 +113,16 @@ export async function loadCollectionPage(supabase: any, path: string, opts: { an
   const breed = opts.breedSlug ? (breeds ?? []).find((b: any) => b.slug === opts.breedSlug) ?? null : null;
   const animal = opts.animal === 'dog' || opts.animal === 'cat' ? opts.animal : null;
   const pets = opts.pets === 1 || opts.pets === 2 ? opts.pets : null;
+  // The whole zodiac or tarot collection is shown sign by sign (card by card), in their own order,
+  // and each design says which one it is. Other collections keep the popularity order.
+  const grouped = node.depth === 0 && (node.kind === 'zodiac' || node.kind === 'tarot');
+  const groupOf = new Map<string, { path: string; label: string; mark: string }>();
   const [{ data: hits, error }, { data: multi }] = await Promise.all([
-    supabase.rpc('collection_designs', {
-      p_path: path, p_animal: breed ? null : animal, p_breed_id: breed?.breed_id ?? null, p_limit: pageSize, p_offset: page * pageSize, p_pets: pets,
-    }),
+    grouped
+      ? groupedDesigns(supabase, tree, node, { animal: breed ? null : animal, breedId: breed?.breed_id ?? null, pets }, groupOf, page, pageSize)
+      : supabase.rpc('collection_designs', {
+        p_path: path, p_animal: breed ? null : animal, p_breed_id: breed?.breed_id ?? null, p_limit: pageSize, p_offset: page * pageSize, p_pets: pets,
+      }),
     // Is there anything with 2+ pets here? (shows the 1 pet / 2+ pets filter)
     supabase.rpc('collection_designs', { p_path: path, p_limit: 1, p_offset: 0, p_pets: 2 }),
   ]);
@@ -91,6 +142,7 @@ export async function loadCollectionPage(supabase: any, path: string, opts: { an
   }
   let children = tree.filter(c => c.parentPath === path && c.designs > 0);
   if (node.kind === 'occasion' && node.depth === 0) children = orderOccasions(children);
+  if (grouped) children = orderSignsOrCards(node.kind, children);
   const parent = node.parentPath ? tree.find(c => c.path === node.parentPath) : null;
   const siblings = parent ? tree.filter(c => c.parentPath === parent.path && c.designs > 0 && c.path !== path) : [];
 
@@ -105,6 +157,7 @@ export async function loadCollectionPage(supabase: any, path: string, opts: { an
     designs: ids.map((id: string) => byId.get(id)).filter(Boolean).map((r: any) => ({
       id: r.id, description: r.description, publicUrl: r.public_url, formatId: r.format_id, pets: r.subject_count ?? 1,
       breed: r.breeds ? { name: r.breeds.name, slug: r.breeds.slug, animalType: r.breeds.animal_type } : null,
+      group: groupOf.get(r.id) ?? null,
     })),
     total: Number(hits?.[0]?.total ?? 0), page, pageSize,
   };

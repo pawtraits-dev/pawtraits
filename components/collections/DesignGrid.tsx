@@ -5,9 +5,41 @@ import Link from 'next/link';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import { designTitle } from '@/lib/text/plain';
 
-export interface GridDesign { id: string; description?: string | null; publicUrl?: string | null; breed?: { name: string } | null; pets?: number | null }
+export interface GridDesign {
+  id: string; description?: string | null; publicUrl?: string | null; breed?: { name: string } | null; pets?: number | null;
+  /** The zodiac sign or tarot card a design belongs to, on the whole-collection pages */
+  group?: { path: string; label: string; mark: string } | null;
+}
 
 export default function DesignGrid({ designs, from }: { designs: GridDesign[]; from?: string }) {
+  // Sign by sign (card by card) when the designs say which one they are
+  if (designs.some(d => d.group)) {
+    const runs: { group: GridDesign['group']; items: GridDesign[] }[] = [];
+    for (const d of designs) {
+      const last = runs[runs.length - 1];
+      if (last && (last.group?.path ?? '') === (d.group?.path ?? '')) last.items.push(d);
+      else runs.push({ group: d.group ?? null, items: [d] });
+    }
+    return (
+      <div className="space-y-8">
+        {runs.map((r, i) => (
+          <section key={`${r.group?.path ?? 'other'}-${i}`} aria-label={r.group?.label}>
+            {r.group && (
+              <h2 className="mb-3 flex items-baseline gap-2 border-b border-gray-200 pb-2 text-lg font-semibold text-gray-900">
+                <span aria-hidden className="min-w-6 text-center text-purple-800">{r.group.mark}</span>
+                <Link href={`/collections/${r.group.path}`} className="hover:underline">{r.group.label}</Link>
+              </h2>
+            )}
+            <Cards designs={r.items} from={from} />
+          </section>
+        ))}
+      </div>
+    );
+  }
+  return <Cards designs={designs} from={from} />;
+}
+
+function Cards({ designs, from }: { designs: GridDesign[]; from?: string }) {
   return (
     <ul className="grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-4">
       {designs.map(d => {
@@ -21,6 +53,7 @@ export default function DesignGrid({ designs, from }: { designs: GridDesign[]; f
                 {(d.pets ?? 1) > 1 && <PetsBadge n={d.pets!} />}
               </div>
               <p className="mt-2 text-sm font-semibold leading-snug text-gray-900 line-clamp-2">{title}</p>
+              {d.group && <p className="mt-0.5 text-xs font-semibold text-purple-800"><span aria-hidden>{d.group.mark}</span> {d.group.label}</p>}
               {d.breed?.name && <p className="mt-0.5 text-xs text-gray-600 line-clamp-1">{d.breed.name}</p>}
             </Link>
           </li>
