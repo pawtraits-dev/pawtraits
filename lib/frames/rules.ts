@@ -5,7 +5,7 @@
  */
 import { readFrameOverlay } from './frame';
 
-export const FRAMED_PRINTS_ONLY = 'Framed cards are sold as prints only. Digital downloads, mugs and phone cases are not available for them.';
+export const FRAMED_PRINTS_ONLY = 'Framed cards are sold as prints, which come with a bonus digital copy. They are not available as a download on its own, a mug or a phone case.';
 
 /** A catalogue row (frame_overlay) or a customer image row (generation_metadata) that shows a frame */
 export function isFramed(image: { frame_overlay?: unknown; generation_metadata?: any } | null | undefined): boolean {

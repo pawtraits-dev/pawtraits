@@ -51,7 +51,7 @@ export function FrameSwitch({ imageId, choice, onChanged }: { imageId: string; c
   return (
     <section className="mt-4 rounded-2xl border border-purple-200 bg-purple-50/50 p-4" aria-label="Card frame">
       <p className="font-semibold text-gray-900">Your card</p>
-      <p className="mb-2 text-sm text-gray-600">{choice.state === 'on' ? 'Shown with its frame. Framed cards are sold as prints only.' : 'Shown without the frame, like any other portrait.'}</p>
+      <p className="mb-2 text-sm text-gray-600">{choice.state === 'on' ? 'Shown with its frame. Framed cards are sold as prints, with a bonus digital copy.' : 'Shown without the frame, like any other portrait.'}</p>
       <FrameToggle value={choice.state} disabled={busy} onChange={send} />
       {choice.state === 'on' && (
         <div className="mt-3">

@@ -185,8 +185,10 @@ export async function buildPrintFiles(img: ResolvedOrderImage, productData: any,
 
 /** Customer download: full quality, small brand mark, signed 7-day URL. */
 export async function getCustomerDownloadUrl(img: ResolvedOrderImage, customerRef: string, orderRef: string): Promise<string> {
-  // A customised portrait's 4K master when there is one; otherwise its preview
-  const source = img.printMasterPublicId || img.cloudinaryPublicId;
+  // A customised portrait's 4K master when there is one; otherwise its preview. A framed card's
+  // master has no frame on it (print files draw the frame per size), so its download is the framed
+  // 2:3 picture the customer saw.
+  const source = img.frame ? img.cloudinaryPublicId : (img.printMasterPublicId || img.cloudinaryPublicId);
   if (!source) throw new Error(`No download source for ${img.kind} image ${img.id}`);
   const { cloudinaryService } = await import('@/lib/cloudinary');
   return cloudinaryService.getDownloadUrl(source, customerRef, orderRef);
