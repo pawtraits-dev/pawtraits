@@ -112,7 +112,11 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
         return;
       }
 
-      const { isAuthenticated, user: userData, profile: userProfile } = await authResponse.json();
+      // /api/auth/check returns the profile merged into `user` (there is no separate `profile` key)
+      const authData = await authResponse.json();
+      const isAuthenticated = authData.isAuthenticated;
+      const userData = authData.user;
+      const userProfile = authData.profile ?? authData.user;
 
       if (!isAuthenticated || !userData) {
         // Allow marketing pages to show on root /customer route
