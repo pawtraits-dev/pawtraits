@@ -11,7 +11,7 @@ import { Package, Image as ImageIcon, Share2, User } from 'lucide-react';
 
 export const CUSTOMER_NAV = [
   { name: 'Orders', href: '/orders', icon: Package, match: ['/orders', '/customer/orders', '/customer/downloads'] },
-  { name: 'My Pawtraits', href: '/customer/gallery', icon: ImageIcon, match: ['/customer/gallery', '/customer/pets', '/customer/customize'] },
+  { name: 'My Pawtraits', href: '/gallery', icon: ImageIcon, match: ['/gallery', '/customer/gallery', '/customer/pets', '/pets', '/customer/customize'] },
   { name: 'Share & earn', href: '/referrals', icon: Share2, match: ['/referrals'] },
   { name: 'Account', href: '/account', icon: User, match: ['/account', '/customer/inbox'] },
 ];

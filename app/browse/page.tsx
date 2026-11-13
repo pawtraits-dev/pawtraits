@@ -94,7 +94,8 @@ const dataCache = {
 function BrowsePageContent() {
   // "Prints from £X · digital £Y" when both are known; otherwise plain "from £X"
   const priceLine = (info: { lowestPrice: any; currency: any; currencySymbol: any; physicalPrice?: number | null; digitalPrice?: number | null }) => {
-    const fmt = (v: number) => formatPrice(v, info.currency || 'GBP', info.currencySymbol);
+    // £15, not £15.00 (whole pounds lose the pence)
+    const fmt = (v: number) => formatPrice(v, info.currency || 'GBP', info.currencySymbol).replace(/\.00$/, '');
     if (info.physicalPrice != null && info.digitalPrice != null) {
       return `Prints from ${fmt(info.physicalPrice)} · digital ${fmt(info.digitalPrice)}`;
     }

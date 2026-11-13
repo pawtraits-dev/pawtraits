@@ -554,7 +554,7 @@ export default function CustomerCustomizePage() {
                 </div>
                 <Button
                   variant="outline"
-                  onClick={() => router.push('/customer/gallery')}
+                  onClick={() => router.push('/gallery')}
                 >
                   View All
                 </Button>

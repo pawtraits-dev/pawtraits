@@ -10,7 +10,7 @@ export function getUserHomeRoute(userType: UserType | null): string {
     case 'partner':
       return '/partners';
     case 'customer':
-      return '/customer';
+      return '/gallery'; // My Pawtraits
     default:
       return '/'; // Landing page for unauthenticated users
   }

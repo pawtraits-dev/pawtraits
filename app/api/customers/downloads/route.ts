@@ -27,11 +27,21 @@ export async function GET(request: NextRequest) {
   const customIds = (rows ?? []).map(r => r.custom_image_id).filter(Boolean);
   const catIds = (rows ?? []).map(r => r.catalog_image_id).filter(Boolean);
   const [{ data: customs }, { data: cats }] = await Promise.all([
-    customIds.length ? supabase.from('customer_custom_images').select('id, generated_image_url, pet_name').in('id', customIds) : Promise.resolve({ data: [] as any[] }),
+    customIds.length ? supabase.from('customer_custom_images').select('id, generated_image_url, pet_name, catalog_image_id').in('id', customIds) : Promise.resolve({ data: [] as any[] }),
     catIds.length ? supabase.from('image_catalog').select('id, public_url, description').in('id', catIds) : Promise.resolve({ data: [] as any[] }),
   ]);
   const cMap = new Map((customs ?? []).map((c: any) => [c.id, c]));
   const kMap = new Map((cats ?? []).map((c: any) => [c.id, c]));
+
+  // Design titles for personalised Pawtraits, so downloads can be told apart
+  const designIds = Array.from(new Set((customs ?? []).map((c: any) => c.catalog_image_id).filter(Boolean)));
+  const { data: designs } = designIds.length
+    ? await supabase.from('image_catalog').select('id, description').in('id', designIds)
+    : { data: [] as any[] };
+  const dMap = new Map((designs ?? []).map((d: any) => [d.id, d]));
+  /** First line of a catalogue description, without markdown marks */
+  const designTitle = (description?: string | null) =>
+    (String(description || '').split('\n').find(l => l.trim()) || '').trim().replace(/^[#>*_\s]+/, '').replace(/[*_\s]+$/, '').slice(0, 80);
 
   return NextResponse.json((rows ?? []).map(r => {
     const c = r.custom_image_id ? cMap.get(r.custom_image_id) : null;
@@ -42,7 +52,15 @@ export async function GET(request: NextRequest) {
       status: r.status,
       createdAt: r.created_at,
       downloadCount: r.download_count,
-      title: c ? `${c.pet_name && c.pet_name !== 'Uploaded Pet' ? c.pet_name + '’s' : 'Your'} Pawtrait` : (k?.description?.slice(0, 60) || 'Pawtrait'),
+      title: c
+        ? (() => {
+            const pet = c.pet_name && c.pet_name !== 'Uploaded Pet' ? c.pet_name : null;
+            const design = designTitle(dMap.get(c.catalog_image_id)?.description);
+            if (pet && design) return `${pet} · ${design}`;
+            if (design) return design;
+            return pet ? `${pet}’s Pawtrait` : 'Your Pawtrait';
+          })()
+        : (designTitle(k?.description) || 'Pawtrait'),
       previewUrl: c?.generated_image_url ?? k?.public_url ?? null,
     };
   }));
