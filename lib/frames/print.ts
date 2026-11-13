@@ -4,15 +4,18 @@
  * Order: centre crop to the product's shape → (AI upscale when the picture is too small for the
  * print) → scale to the exact print size → the frame and lettering drawn at that final size. The
  * frame is therefore never upscaled or cropped, and it is always fitted to the trim size. A
- * self-print file gets its bleed afterwards, by padding the finished framed image with a blurred
- * copy of its own edge (never by scaling the frame past the trim).
+ * self-print file gets its bleed afterwards, by padding the finished framed image with black
+ * (the frame's own ground colour) (never by scaling the frame past the trim).
  */
 import { frameLayers, frameShapeFor, type FrameCard, type FrameShape, type FrameStyleId } from './frame';
 
 /** How far a product's shape may be from 2:3 or 3:4 and still be framed (3%) */
 export const FRAME_SHAPE_TOLERANCE = 0.03;
-/** Bleed padding: a blurred copy of the framed print's own edge (Cloudinary background mode) */
-export const BLEED_BACKGROUND = 'b_blurred:400:0';
+/**
+ * Bleed padding: black, the frame's ground colour. (b_blurred is not available on this account:
+ * Cloudinary answers 400 "Invalid color name", which broke the first framed self-print files.)
+ */
+export const BLEED_BACKGROUND = 'b_black';
 
 export interface FramedPlan {
   size: { widthMm: number; heightMm: number; orientation: string };
