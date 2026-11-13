@@ -3,9 +3,10 @@
  * and pictures are then edited in Admin → Collections). Sports teams come from ./sports-teams.
  */
 import { ZODIAC_SIGNS } from '../zodiac';
+import { TAROT } from '../tarot';
 import { LEAGUES, SPORTS_TEAMS, teamOutfit, type League } from './sports-teams';
 
-export type CollectionKind = 'occasion' | 'sport' | 'pawsonality' | 'zodiac' | 'group';
+export type CollectionKind = 'occasion' | 'sport' | 'pawsonality' | 'zodiac' | 'group' | 'tarot';
 export interface SeasonWindow { start: string; end: string } // 'MM-DD', inclusive; may wrap the year end
 export interface CollectionDef {
   kind: CollectionKind;
@@ -26,6 +27,7 @@ export const TOP_LEVEL: CollectionDef[] = [
   { kind: 'group', path: 'double-trouble', slug: 'double-trouble', name: 'Double Trouble', description: 'Two pets (or more) in one masterpiece. Add a photo of each: they don’t all have to be yours.', searchTerms: ['duo', 'duos', 'pair', 'pairs', 'two pets', 'double', 'together', 'besties', 'siblings', 'family'] },
   { kind: 'pawsonality', path: 'pawsonalities', slug: 'pawsonalities', name: '16 Pawsonalities', description: 'The Pawtrait for every type. Not sure which yours is? Take the quiz.' },
   { kind: 'zodiac', path: 'zodiac', slug: 'zodiac', name: 'Zodiac signs', description: 'Twelve signs, twelve masterpieces. Find your pet’s sign from their birthday.' },
+  { kind: 'tarot', path: 'tarot', slug: 'tarot', name: 'Tarot cards', description: 'Your pet as a card from the Major Arcana, in an ornate frame.', searchTerms: ['tarot', 'tarot card', 'major arcana', 'oracle', 'fortune'] },
 ];
 
 export const OCCASIONS: Omit<CollectionDef, 'kind' | 'path'>[] = [
@@ -86,6 +88,9 @@ export function allCollections(pawsonalityTypes: { code: string; dogName: string
   }
   for (const z of ZODIAC) {
     out.push({ kind: 'zodiac', path: `zodiac/${z.slug}`, slug: z.slug, name: z.name, searchTerms: [z.slug, `${z.slug} season`], metadata: { symbol: z.symbol, from: z.from, to: z.to, element: z.element } });
+  }
+  for (const t of TAROT) {
+    out.push({ kind: 'tarot', path: `tarot/${t.slug}`, slug: t.slug, name: t.name, searchTerms: [t.name.toLowerCase()], metadata: { numeral: t.numeral, number: t.number } });
   }
   return out;
 }

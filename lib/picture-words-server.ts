@@ -10,6 +10,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { catalogVariants } from '@/lib/catalog/register-image';
 import { cloudinaryService } from '@/lib/cloudinary';
+import { readFrameOverlay } from '@/lib/frames/frame';
 import { fillWords, petPhrase, readWords, wordsLayer, type PictureWords } from './picture-words';
 
 function configure() {
@@ -73,6 +74,8 @@ export async function applyWordsToDesign(supabase: SupabaseClient, imageId: stri
   // A design with the caption plate on: draw it again over the new words
   const { reapplyCaptionAfterWords } = await import('@/lib/captions/server');
   await reapplyCaptionAfterWords(supabase, imageId, baked.public_id).catch(e => console.error('caption after words failed', imageId, e));
+  const { reapplyFrameAfterWords } = await import('@/lib/frames/server');
+  await reapplyFrameAfterWords(supabase, imageId, baked.public_id).catch(e => console.error('frame after words failed', imageId, e));
   return { text, public_id: baked.public_id };
 }
 
@@ -123,6 +126,12 @@ export async function variationSource(supabase: SupabaseClient, ref: { id?: stri
     const { data, error } = await supabase.from('image_catalog').select('caption_overlay').eq('id', ref.id).maybeSingle();
     const clean = !error ? (data as any)?.caption_overlay : null;
     if (clean?.applied && typeof clean.clean_public_id === 'string') return { cloudinary_public_id: clean.clean_public_id, public_url: null };
+  }
+  // A design with a frame on: the same
+  if (ref.id) {
+    const { data, error } = await supabase.from('image_catalog').select('frame_overlay').eq('id', ref.id).maybeSingle();
+    const frame = !error ? readFrameOverlay((data as any)?.frame_overlay) : null;
+    if (frame?.applied) return { cloudinary_public_id: frame.clean_public_id, public_url: null };
   }
   return ref;
 }

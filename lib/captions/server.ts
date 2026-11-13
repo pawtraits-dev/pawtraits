@@ -15,6 +15,8 @@ import { getLiveQuiz } from '@/lib/quiz/server';
 import { readWords } from '@/lib/picture-words';
 import { CAPTION_MAX, ZODIAC_TAGLINES, captionLayer, cleanCaptionText, readCaptionOverlay, symbolPublicId, type Caption, type CaptionAnimal, type CaptionWording } from './caption';
 import { zodiacSymbolSvg } from './zodiac-symbols';
+import { readFrameOverlay, type FrameOverlay } from '@/lib/frames/frame';
+import { TAROT } from '@/lib/tarot';
 
 export const CAPTION_MIGRATION = 'Run db/migrations/2026-11-08-captions.sql first';
 
@@ -28,8 +30,8 @@ function configure() {
 // Wording
 
 export interface CaptionRow {
-  id: string; path: string; kind: 'pawsonality' | 'zodiac'; slug: string; name: string;
-  code: string | null;                       // Pawsonality code (ESFB)
+  id: string; path: string; kind: 'pawsonality' | 'zodiac' | 'tarot'; slug: string; name: string;
+  code: string | null;                       // Pawsonality code (ESFB), or the tarot card's Roman numeral
   defaults: Required<CaptionWording>;
   wording: CaptionWording;                   // admin's own (collections.metadata.caption)
   designs: number;
@@ -49,7 +51,7 @@ export function captionRows(supabase: SupabaseClient, fresh = false): Promise<Ca
 
 async function loadCaptionRows(supabase: SupabaseClient): Promise<CaptionRow[]> {
   const [{ data: cols, error }, dogQuiz, catQuiz, { data: counts }] = await Promise.all([
-    supabase.from('collections').select('id, path, kind, slug, name, metadata, hero_image_id, sort_order').in('kind', ['pawsonality', 'zodiac']).eq('depth', 1).order('kind').order('sort_order'),
+    supabase.from('collections').select('id, path, kind, slug, name, metadata, hero_image_id, sort_order').in('kind', ['pawsonality', 'zodiac', 'tarot']).eq('depth', 1).order('kind').order('sort_order'),
     getLiveQuiz('pawsonality', 'dog').catch(() => null),
     getLiveQuiz('pawsonality', 'cat').catch(() => null),
     supabase.from('collection_design_counts').select('collection_id, designs'),
@@ -69,6 +71,10 @@ async function loadCaptionRows(supabase: SupabaseClient): Promise<CaptionRow[]> 
       const d = dogs.get(code), k = cats.get(code);
       const dogName = d?.name || meta.dog_name || c.name, catName = k?.name || meta.cat_name || dogName;
       defaults = { title_dog: `${code} · ${dogName}`, title_cat: `${code} · ${catName}`, tagline_dog: tagline(dogName, d?.tagline), tagline_cat: tagline(catName, k?.tagline) };
+    } else if (c.kind === 'tarot') {
+      // The card's name is the title; taglines are for the owner to type in
+      code = String(meta.numeral ?? TAROT.find(t => t.slug === c.slug)?.numeral ?? '') || null;
+      defaults = { title_dog: c.name, title_cat: c.name, tagline_dog: '', tagline_cat: '' };
     } else {
       const z = ZODIAC_TAGLINES[c.slug] ?? { dog: '', cat: '' };
       defaults = { title_dog: c.name, title_cat: c.name, tagline_dog: z.dog, tagline_cat: z.cat };
@@ -93,7 +99,7 @@ export function rowCaption(row: Pick<CaptionRow, 'kind' | 'slug' | 'defaults' | 
 export async function saveWording(supabase: SupabaseClient, collectionId: string, wording: Record<string, unknown>): Promise<void> {
   const { data: col, error } = await supabase.from('collections').select('metadata, kind').eq('id', collectionId).maybeSingle();
   if (error) throw new Error(error.message);
-  if (!col || !['pawsonality', 'zodiac'].includes((col as any).kind)) throw new Error('Not a Pawsonality type or Zodiac sign');
+  if (!col || !['pawsonality', 'zodiac', 'tarot'].includes((col as any).kind)) throw new Error('Not a Pawsonality type, Zodiac sign or tarot card');
   const meta = { ...((col as any).metadata ?? {}) };
   const next: CaptionWording = { ...(meta.caption ?? {}) };
   for (const k of ['title_dog', 'title_cat', 'tagline_dog', 'tagline_cat'] as const) {
@@ -109,12 +115,12 @@ export async function saveWording(supabase: SupabaseClient, collectionId: string
 }
 
 /** The type/sign collection a design is in (its own, else the design it was made from) */
-async function designRow(supabase: SupabaseClient, imageId: string): Promise<{ collectionId: string; animal: CaptionAnimal | null } | null> {
+export async function designRow(supabase: SupabaseClient, imageId: string, kinds: string[] = ['pawsonality', 'zodiac']): Promise<{ collectionId: string; animal: CaptionAnimal | null } | null> {
   const { data: img } = await supabase.from('image_catalog').select('id, variation_of, breed_id, breeds:breed_id (animal_type)').eq('id', imageId).maybeSingle();
   if (!img) return null;
   const animal = ((img as any).breeds?.animal_type === 'cat' ? 'cat' : (img as any).breeds?.animal_type === 'dog' ? 'dog' : null) as CaptionAnimal | null;
   for (const id of [img.id, (img as any).variation_of].filter(Boolean) as string[]) {
-    const { data } = await supabase.from('design_collections').select('collection_id, collections!inner (kind, depth)').eq('image_id', id).in('collections.kind', ['pawsonality', 'zodiac']).eq('collections.depth', 1).limit(1);
+    const { data } = await supabase.from('design_collections').select('collection_id, collections!inner (kind, depth)').eq('image_id', id).in('collections.kind', kinds).eq('collections.depth', 1).limit(1);
     if (data?.length) return { collectionId: (data[0] as any).collection_id, animal };
   }
   return null;
@@ -169,7 +175,8 @@ export async function bakeCaption(publicId: string, caption: Caption, folder = '
   return { public_id: r.public_id, secure_url: r.secure_url, width: r.width, height: r.height, bytes: r.bytes };
 }
 
-async function setPicture(supabase: SupabaseClient, imageId: string, publicId: string, secureUrl: string, overlay: unknown) {
+/** Make a stored picture the design's picture (and set other columns with it, e.g. caption_overlay or frame_overlay) */
+export async function setDesignPicture(supabase: SupabaseClient, imageId: string, publicId: string, secureUrl: string, fields: Record<string, unknown>) {
   const variants = catalogVariants(publicId, secureUrl);
   const { error } = await supabase.from('image_catalog').update({
     cloudinary_public_id: publicId,
@@ -177,9 +184,18 @@ async function setPicture(supabase: SupabaseClient, imageId: string, publicId: s
     storage_path: `cloudinary:${publicId}`,
     image_variants: variants,
     cloudinary_version: null, cloudinary_signature: null,
-    caption_overlay: overlay,
+    ...fields,
   }).eq('id', imageId);
-  if (error) throw new Error(error.message.includes('caption_overlay') ? CAPTION_MIGRATION : error.message);
+  if (error) throw new Error(/caption_overlay/.test(error.message) ? CAPTION_MIGRATION : /frame_overlay/.test(error.message) ? 'Run db/migrations/2026-11-13-framed-cards.sql first' : error.message);
+}
+
+const setPicture = (supabase: SupabaseClient, imageId: string, publicId: string, secureUrl: string, overlay: unknown) =>
+  setDesignPicture(supabase, imageId, publicId, secureUrl, { caption_overlay: overlay });
+
+/** The frame on a design, or null (also before the framed-cards migration) */
+export async function frameOverlayOf(supabase: SupabaseClient, imageId: string): Promise<FrameOverlay | null> {
+  const { data, error } = await supabase.from('image_catalog').select('frame_overlay').eq('id', imageId).maybeSingle();
+  return error ? null : readFrameOverlay((data as any)?.frame_overlay);
 }
 
 /**
@@ -190,6 +206,8 @@ export async function applyCaptionToDesign(supabase: SupabaseClient, imageId: st
   const { data: row, error } = await supabase.from('image_catalog').select('id, cloudinary_public_id, caption_overlay').eq('id', imageId).maybeSingle();
   if (error) throw new Error(error.message.includes('caption_overlay') ? CAPTION_MIGRATION : error.message);
   if (!row?.cloudinary_public_id) throw new Error('Design not found');
+  // A design has the plate or a frame, never both
+  if ((await frameOverlayOf(supabase, imageId))?.applied) throw new Error('This design has a frame on. Take the frame off first.');
   const caption = given ?? (await designCaption(supabase, imageId))?.caption ?? null;
   if (!caption) throw new Error('This design is not in a Pawsonality type or Zodiac sign collection');
   const overlay = readCaptionOverlay((row as any).caption_overlay);
@@ -260,7 +278,7 @@ export async function captionApplied(supabase: SupabaseClient, imageId: string):
 
 /**
  * The picture AI should paint from: the words' text-free copy, else the picture without the
- * plate, else the design's picture. Works before the captions migration.
+ * plate or frame, else the design's picture. Works before the captions migration.
  */
 export async function cleanPictureId(supabase: SupabaseClient, imageId: string, current: string | null | undefined): Promise<string | null> {
   const { data: w } = await supabase.from('image_catalog').select('text_overlay').eq('id', imageId).maybeSingle();
@@ -271,6 +289,8 @@ export async function cleanPictureId(supabase: SupabaseClient, imageId: string, 
     const o = readCaptionOverlay((c as any)?.caption_overlay);
     if (o?.applied) return o.clean_public_id;
   }
+  const f = await frameOverlayOf(supabase, imageId);
+  if (f?.applied) return f.clean_public_id;
   return current ?? null;
 }
 

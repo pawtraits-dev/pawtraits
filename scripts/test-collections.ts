@@ -3,6 +3,7 @@ import { allCollections, inSeason, zodiacFor, suggestCollectionForTheme, OCCASIO
 import { cleanWindows, cleanTerms, slugify } from '../lib/collections/server';
 import { SPORTS_TEAMS } from '../lib/collections/sports-teams';
 import { cleanPath, orderOccasions, type PublicCollection } from '../lib/collections/public';
+import { TAROT } from '../lib/tarot';
 import { joinPetNames } from '../lib/text/pet-names';
 import { recolourFor } from '../lib/collections/team-variants';
 
@@ -37,7 +38,8 @@ ok('every day of a leap year has a sign', allDays);
 const types = Array.from({ length: 16 }, (_, i) => ({ code: `T${String(i).padStart(3, '0')}`, dogName: `Dog ${i}`, catName: `Cat ${i}` }));
 const all = allCollections(types);
 const paths = new Set(all.map(c => c.path));
-ok('188 collections', all.length === 5 + 11 + 4 + 5 + SPORTS_TEAMS.length + 16 + 12);
+ok('collection count', all.length === 6 + 11 + 4 + 5 + SPORTS_TEAMS.length + 16 + 12 + TAROT.length);
+ok('22 tarot cards in order, numerals set', TAROT.length === 22 && all.filter(c => c.kind === 'tarot' && c.path.includes('/')).every((c, i) => (c.metadata as any).number === i && !!(c.metadata as any).numeral));
 ok('paths unique', paths.size === all.length);
 ok('parents before children', all.every((c, i) => !c.path.includes('/') || all.slice(0, i).some(p => p.path === c.path.slice(0, c.path.lastIndexOf('/')))));
 ok('slugs valid', all.every(c => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(c.slug)));
