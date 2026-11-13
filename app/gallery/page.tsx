@@ -81,7 +81,7 @@ function GalleryContent() {
   const [userPets, setUserPets] = useState<any[]>([]);
   const [loadingRecommended, setLoadingRecommended] = useState(false);
   // Breeds the recommendations are based on (pets, personalised photos, quiz), from the server
-  const [recommendedBasis, setRecommendedBasis] = useState<{ breed_id: string; breed_name: string | null }[]>([]);
+  const [recommendedBasis, setRecommendedBasis] = useState<{ breed_id: string; breed_name: string | null; coat_match?: 'exact' | 'closest' | 'any'; closest_coats?: string[] }[]>([]);
   const [loadingCustomImages, setLoadingCustomImages] = useState(false);
 
   // State for like tracking and customize modal
@@ -1089,11 +1089,18 @@ function GalleryContent() {
                 </CardContent>
               </Card>
             ) : (
+              <>
+              <p className="text-sm text-gray-600">
+                {recommendedBasis.map(b => b.coat_match === 'closest' && b.closest_coats?.length
+                  ? `${b.breed_name} Pawtraits in ${b.closest_coats.join(' and ')}, the closest we have to your pet’s coat`
+                  : b.coat_match === 'exact' ? `${b.breed_name} Pawtraits in your pet’s coat` : `${b.breed_name} Pawtraits`).join(' · ')}
+              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {recommendedImages.map((image) => (
                   <ImageCard key={image.id} image={image} />
                 ))}
               </div>
+              </>
             )}
           </TabsContent>
 

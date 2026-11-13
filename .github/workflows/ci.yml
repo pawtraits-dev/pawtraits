@@ -51,3 +51,7 @@ jobs:
       - name: Browse query helpers
         if: ${{ hashFiles('scripts/test-browse-query.ts') != '' }}
         run: npx tsx scripts/test-browse-query.ts
+
+      - name: Closest coat colour
+        if: ${{ hashFiles('scripts/test-coat-match.ts') != '' }}
+        run: npx tsx scripts/test-coat-match.ts
