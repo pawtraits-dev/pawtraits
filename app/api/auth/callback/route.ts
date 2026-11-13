@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
           redirectTo = '/partners'
           break
         case 'customer':
-          redirectTo = '/customer'
+          redirectTo = '/gallery'
           break
         default:
           redirectTo = '/dashboard'

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Download, Lock, Gift } from 'lucide-react';
 
-interface Item { id: string; source: 'purchase' | 'welcome_gift'; status: 'locked' | 'available'; title: string; previewUrl: string | null; downloadCount: number }
+interface Item { id: string; source: 'purchase' | 'welcome_gift'; status: 'locked' | 'available'; title: string; previewUrl: string | null; downloadCount: number; createdAt?: string }
 
 export default function DownloadsPage() {
   const [items, setItems] = useState<Item[] | null>(null);
@@ -43,8 +43,11 @@ export default function DownloadsPage() {
               {item.previewUrl && <img src={item.previewUrl} alt="" className="w-full h-full object-cover" />}
             </div>
             <div className="p-3">
-              <p className="text-sm font-medium text-gray-900 truncate">{item.title}</p>
-              <p className="text-xs text-gray-500">{item.source === 'welcome_gift' ? 'Free gift' : 'Purchased'}</p>
+              <p className="text-sm font-medium text-gray-900 line-clamp-2" title={item.title}>{item.title}</p>
+              <p className="text-xs text-gray-500">
+                {item.source === 'welcome_gift' ? 'Free gift' : 'Purchased'}
+                {item.createdAt ? ` · ${new Date(item.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+              </p>
               {item.status === 'available' ? (
                 <a href={`/api/downloads/${item.id}`} className="mt-2 flex h-11 items-center justify-center gap-1 rounded-lg bg-purple-600 text-white text-sm font-semibold">
                   <Download className="w-4 h-4" /> Download

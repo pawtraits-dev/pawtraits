@@ -437,7 +437,7 @@ function CustomerCustomizePageContent() {
                 </div>
                 <Button
                   variant="outline"
-                  onClick={() => router.push('/customer/gallery')}
+                  onClick={() => router.push('/gallery')}
                 >
                   View All
                 </Button>

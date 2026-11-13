@@ -37,7 +37,7 @@ export function UserAccessControl({
       if (userType && !allowedUserTypes.includes(userType)) {
         const homeRoute = userType === 'admin' ? '/admin' 
                         : userType === 'partner' ? '/partners'
-                        : userType === 'customer' ? '/customer' 
+                        : userType === 'customer' ? '/gallery' 
                         : '/';
         router.push(homeRoute);
         return;
