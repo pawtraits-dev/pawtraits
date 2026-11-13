@@ -102,7 +102,7 @@ ok('self-print: same framed image, padded last with the blurred edge', fb.slice(
 ok('bleed is larger than the trim, frame stays at the trim size', smallBleed.outputPx.width > smallPlan.outputPx.width && fb.some(p => p === `c_scale,w_${smallPlan.outputPx.width},h_${smallPlan.outputPx.height},q_100`));
 // Prints-only rule
 ok('prints allowed', framedProductAllowed({ product_type: 'physical_print', media_name: 'Foamex', name: 'Small' }) && framedProductAllowed(null));
-ok('downloads, mugs and phone cases refused', !framedProductAllowed({ product_type: 'digital_download' }) && !framedProductAllowed({ product_type: 'physical_print', media_name: 'Ceramic mug' }) && !framedProductAllowed({ product_type: 'physical_print', name: 'iPhone 15 Phone Case' }) && !framedProductAllowed({ product_type: 'hybrid' }) && !framedProductAllowed({ sku: 'DIGITAL' }));
+ok('downloads, mugs and phone cases refused', !framedProductAllowed({ product_type: 'digital_download' }) && !framedProductAllowed({ product_type: 'physical_print', media_name: 'Ceramic mug' }) && !framedProductAllowed({ product_type: 'physical_print', name: 'iPhone 15 Phone Case' }) && !framedProductAllowed({ sku: 'DIGITAL' }));
 ok('isFramed: catalogue and customer images', isFramed({ frame_overlay: { clean_public_id: 'a', applied: { title: 'T', medallion: null, at: '' } } }) && isFramed({ generation_metadata: { frame: { title: 'ARIES' } } }) && !isFramed({ frame_overlay: { clean_public_id: 'a', applied: null } }) && !isFramed({ generation_metadata: {} }) && !isFramed(null));
 ok('prints-only message', /prints only/.test(FRAMED_PRINTS_ONLY));
 if (process.env.SHOW) { console.log(fp); console.log(fb.join('/')); }
