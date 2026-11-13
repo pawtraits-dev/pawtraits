@@ -19,7 +19,7 @@ export function isFramed(image: { frame_overlay?: unknown; generation_metadata?:
 export function framedProductAllowed(product: any): boolean {
   if (!product) return true;
   const t = product.product_type;
-  if (t === 'digital_download' || t === 'hybrid') return false;
+  if (t === 'digital_download') return false;   // 'hybrid' counts as a print everywhere else (lib/fulfillment/shared.ts), so it is allowed
   if (product.shape_family === 'any' || product.sku === 'DIGITAL' || product.fulfillment_method === 'download' || product.medium?.slug === 'digital') return false;
   const text = [product.media_name, product.medium?.name, product.name, product.sku].filter(Boolean).join(' ');
   return !/\bmugs?\b|phone\s*-?\s*cases?/i.test(text);
