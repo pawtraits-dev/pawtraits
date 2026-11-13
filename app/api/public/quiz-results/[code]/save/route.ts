@@ -16,6 +16,7 @@ import { sendMessageImmediate } from '@/lib/messaging/message-service';
 import { renderEmailFile } from '@/lib/messaging/render-file';
 import { getPublicResult } from '@/lib/quiz/results';
 import { afterFrame } from '@/lib/social/feed';
+import { zodiacByKey } from '@/lib/zodiac';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,9 +77,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 }
 
 /** The pet with this name (any case) on the account, updated with the type; created if missing */
-async function savePet(userId: string, r: { id: string; pet_name: string; animal_type: string; breed_id: string | null; result_type: string; pet_id: string | null }) {
+async function savePet(userId: string, r: { id: string; pet_name: string; animal_type: string; breed_id: string | null; result_type: string; quiz_type?: string | null; pet_id: string | null }) {
   const supabase = serviceClient();
-  const fields = { pawsonality_type: r.result_type, pawsonality_result_id: r.id, updated_at: new Date().toISOString() };
+  // A zodiac quiz result is a star sign; it is saved as the pet's sign (a birthday still wins when
+  // the sign is shown). Every other quiz saves the Pawsonality type.
+  const sign = r.quiz_type !== 'pawsonality' ? zodiacByKey(r.result_type) : null;
+  const fields = sign
+    ? { zodiac_sign: sign.key, zodiac_result_id: r.id, updated_at: new Date().toISOString() }
+    : { pawsonality_type: r.result_type, pawsonality_result_id: r.id, updated_at: new Date().toISOString() };
 
   const { data: pets } = await supabase.from('pets').select('id, name, animal_type, breed_id')
     .eq('user_id', userId).eq('is_active', true);

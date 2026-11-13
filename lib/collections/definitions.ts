@@ -2,6 +2,7 @@
  * The fixed collection tree (seeded by scripts/build-collections-seed.ts; names, order, seasons
  * and pictures are then edited in Admin → Collections). Sports teams come from ./sports-teams.
  */
+import { ZODIAC_SIGNS } from '../zodiac';
 import { LEAGUES, SPORTS_TEAMS, teamOutfit, type League } from './sports-teams';
 
 export type CollectionKind = 'occasion' | 'sport' | 'pawsonality' | 'zodiac' | 'group';
@@ -41,20 +42,10 @@ export const OCCASIONS: Omit<CollectionDef, 'kind' | 'path'>[] = [
   { slug: 'gotcha-day', name: 'Gotcha Day', description: 'For the day they came home.', searchTerms: ['gotcha day', 'adoption', 'adopted', 'rescue', 'anniversary'] },
 ];
 
-export const ZODIAC: { slug: string; name: string; symbol: string; from: string; to: string; element: string }[] = [
-  { slug: 'aries', name: 'Aries', symbol: '♈', from: '03-21', to: '04-19', element: 'fire' },
-  { slug: 'taurus', name: 'Taurus', symbol: '♉', from: '04-20', to: '05-20', element: 'earth' },
-  { slug: 'gemini', name: 'Gemini', symbol: '♊', from: '05-21', to: '06-20', element: 'air' },
-  { slug: 'cancer', name: 'Cancer', symbol: '♋', from: '06-21', to: '07-22', element: 'water' },
-  { slug: 'leo', name: 'Leo', symbol: '♌', from: '07-23', to: '08-22', element: 'fire' },
-  { slug: 'virgo', name: 'Virgo', symbol: '♍', from: '08-23', to: '09-22', element: 'earth' },
-  { slug: 'libra', name: 'Libra', symbol: '♎', from: '09-23', to: '10-22', element: 'air' },
-  { slug: 'scorpio', name: 'Scorpio', symbol: '♏', from: '10-23', to: '11-21', element: 'water' },
-  { slug: 'sagittarius', name: 'Sagittarius', symbol: '♐', from: '11-22', to: '12-21', element: 'fire' },
-  { slug: 'capricorn', name: 'Capricorn', symbol: '♑', from: '12-22', to: '01-19', element: 'earth' },
-  { slug: 'aquarius', name: 'Aquarius', symbol: '♒', from: '01-20', to: '02-18', element: 'air' },
-  { slug: 'pisces', name: 'Pisces', symbol: '♓', from: '02-19', to: '03-20', element: 'water' },
-];
+const mmdd = ([m, d]: [number, number]) => `${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+/** The twelve signs, from lib/zodiac.ts (the one place their dates live) */
+export const ZODIAC: { slug: string; name: string; symbol: string; from: string; to: string; element: string }[] =
+  ZODIAC_SIGNS.map(z => ({ slug: z.key, name: z.name, symbol: z.symbol, from: mmdd(z.from), to: mmdd(z.to), element: z.element }));
 
 const LEAGUE_ORDER: League[] = ['premier-league', 'nfl', 'nba', 'nhl', 'college'];
 const LEAGUE_TERMS: Record<League, string[]> = {

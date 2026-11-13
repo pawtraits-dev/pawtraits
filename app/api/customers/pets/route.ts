@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { zodiacForBirthday } from '@/lib/zodiac';
+import { petZodiac } from '@/lib/zodiac';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
@@ -63,8 +63,19 @@ export async function GET(request: NextRequest) {
     console.log('🔧 Customer pets API: Found', pets?.length || 0, 'pets for customer');
 
     // Return in format expected by customise page: { pets: Pet[] }
-    // Star sign from the birthday (lib/zodiac.ts), so every page and quiz reads it the same way
-    const withSigns = (pets || []).map((pet: any) => ({ ...pet, zodiac_sign: zodiacForBirthday(pet.birthday)?.key ?? null }));
+    // Star sign: from the birthday, else the one saved by the zodiac quiz (lib/zodiac.ts), so every
+    // page and quiz reads it the same way. The saved sign is read separately so this keeps working
+    // if the pets.zodiac_sign column is not there yet.
+    const petIds = (pets || []).map((p: any) => p.pet_id ?? p.id).filter(Boolean);
+    const stored = new Map<string, string | null>();
+    if (petIds.length) {
+      const { data: signRows, error: signError } = await supabase.from('pets').select('id, zodiac_sign').in('id', petIds);
+      if (!signError) for (const r of signRows ?? []) stored.set((r as any).id, (r as any).zodiac_sign ?? null);
+    }
+    const withSigns = (pets || []).map((pet: any) => {
+      const z = petZodiac({ birthday: pet.birthday, zodiac_sign: stored.get(pet.pet_id ?? pet.id) });
+      return { ...pet, zodiac_sign: z?.sign.key ?? null, zodiac_source: z?.source ?? null };
+    });
     return NextResponse.json({ pets: withSigns });
 
   } catch (error) {

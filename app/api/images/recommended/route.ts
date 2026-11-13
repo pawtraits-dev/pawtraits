@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import { LISTED_ONLY } from '@/lib/catalog/listing';
 import { closestCoat } from '@/lib/catalog/coat-match';
+import { petZodiac, zodiacCollectionPath, type ZodiacSign } from '@/lib/zodiac';
 
 /**
  * POST /api/images/recommended
@@ -132,6 +133,52 @@ const RECOMMENDED_SELECT = `
 `;
 const RECOMMENDED_LIMIT = 24;
 
+const ZODIAC_LIMIT = 12;
+
+/**
+ * Designs from the zodiac collection for each of the customer's pets' star signs (birthday, else the
+ * sign saved by the zodiac quiz). The pet's own breed comes first. Best effort: any failure gives [].
+ */
+async function zodiacPicks(db: any, userId: string, breedIds: string[]) {
+  try {
+    // zodiac_sign is read if the column exists; without it, signs still come from birthdays
+    let petsRes = await db.from('pets').select('id, name, birthday, breed_id, zodiac_sign').eq('user_id', userId).eq('is_active', true);
+    if (petsRes.error) petsRes = await db.from('pets').select('id, name, birthday, breed_id').eq('user_id', userId).eq('is_active', true);
+    const bySign = new Map<string, { sign: ZodiacSign; pets: string[]; breeds: Set<string> }>();
+    for (const pet of (petsRes.data as any[] | null) ?? []) {
+      const z = petZodiac(pet);
+      if (!z) continue;
+      const entry = bySign.get(z.sign.key) ?? { sign: z.sign, pets: [], breeds: new Set<string>() };
+      if (pet.name) entry.pets.push(pet.name);
+      if (pet.breed_id) entry.breeds.add(pet.breed_id);
+      bySign.set(z.sign.key, entry);
+    }
+    if (bySign.size === 0) return [];
+
+    const entries = Array.from(bySign.values());
+    const { data: cols } = await db.from('collections').select('id, path').in('path', entries.map(e => zodiacCollectionPath(e.sign.key)));
+    const out: any[] = [];
+    for (const e of entries) {
+      const path = zodiacCollectionPath(e.sign.key);
+      const col = (cols ?? []).find((c: any) => c.path === path);
+      if (!col) continue;
+      const { data: links } = await db.from('design_collections').select('image_id').eq('collection_id', col.id).limit(300);
+      const ids = Array.from(new Set((links ?? []).map((l: any) => l.image_id)));
+      if (!ids.length) continue;
+      const { data: imgs } = await db.from('image_catalog').select(RECOMMENDED_SELECT).eq('is_public', true).or(LISTED_ONLY)
+        .in('id', ids).order('rating', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(300);
+      const own = new Set<string>([...Array.from(e.breeds), ...breedIds]);
+      const sorted = [...((imgs as any[] | null) ?? [])].sort((a, b) => Number(own.has(b.breed_id)) - Number(own.has(a.breed_id)));
+      if (!sorted.length) continue;
+      out.push({ sign: e.sign.key, name: e.sign.name, symbol: e.sign.symbol, pets: e.pets, path, images: sorted.slice(0, ZODIAC_LIMIT) });
+    }
+    return out;
+  } catch (err) {
+    console.error('Zodiac recommendations failed:', err);
+    return [];
+  }
+}
+
 type Basis = { source: 'pet' | 'customisation' | 'quiz'; breed_id: string; coat_id: string | null };
 
 /**
@@ -195,8 +242,10 @@ export async function GET() {
     for (const c of (customRes.data as any[] | null) ?? []) add('customisation', c.pet_breed_id, c.pet_coat_id);
     for (const q of (quizRes.data as any[] | null) ?? []) add('quiz', q.breed_id, null);
 
+    const zodiac = await zodiacPicks(db, user.id, Array.from(new Set(basis.map(b => b.breed_id))));
+
     if (basis.length === 0) {
-      return NextResponse.json({ success: true, images: [], basedOn: [] });
+      return NextResponse.json({ success: true, images: [], basedOn: [], zodiac });
     }
 
     const breedIds = Array.from(new Set(basis.map(b => b.breed_id)));
@@ -272,7 +321,7 @@ export async function GET() {
       closest_coats: Array.from(new Set(closest.filter(c => c.breed_id === id).map(c => c.coat_name).filter(Boolean))),
     }));
 
-    return NextResponse.json({ success: true, images, basedOn });
+    return NextResponse.json({ success: true, images, basedOn, zodiac });
   } catch (error) {
     console.error('Recommended images error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
