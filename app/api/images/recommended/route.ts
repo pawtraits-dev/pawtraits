@@ -155,22 +155,24 @@ async function zodiacPicks(db: any, userId: string, breedIds: string[]) {
     }
     if (bySign.size === 0) return [];
 
-    const entries = Array.from(bySign.values());
-    const { data: cols } = await db.from('collections').select('id, path').in('path', entries.map(e => zodiacCollectionPath(e.sign.key)));
+    // collection_designs is the same rule the collection pages use (active collection, design not
+    // excluded from it, public designs only). The pets' own breeds first, then the rest of the sign.
     const out: any[] = [];
-    for (const e of entries) {
+    for (const e of Array.from(bySign.values())) {
       const path = zodiacCollectionPath(e.sign.key);
-      const col = (cols ?? []).find((c: any) => c.path === path);
-      if (!col) continue;
-      const { data: links } = await db.from('design_collections').select('image_id').eq('collection_id', col.id).limit(300);
-      const ids = Array.from(new Set((links ?? []).map((l: any) => l.image_id)));
+      const own = Array.from(new Set<string>([...Array.from(e.breeds), ...breedIds]));
+      const ids: string[] = [];
+      for (const breedId of [...own, null]) {
+        if (ids.length >= ZODIAC_LIMIT) break;
+        const { data: hits } = await db.rpc('collection_designs', { p_path: path, p_breed_id: breedId, p_limit: ZODIAC_LIMIT, p_offset: 0 });
+        for (const h of (hits as any[] | null) ?? []) if (!ids.includes(h.id) && ids.length < ZODIAC_LIMIT) ids.push(h.id);
+      }
       if (!ids.length) continue;
-      const { data: imgs } = await db.from('image_catalog').select(RECOMMENDED_SELECT).eq('is_public', true).or(LISTED_ONLY)
-        .in('id', ids).order('rating', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(300);
-      const own = new Set<string>([...Array.from(e.breeds), ...breedIds]);
-      const sorted = [...((imgs as any[] | null) ?? [])].sort((a, b) => Number(own.has(b.breed_id)) - Number(own.has(a.breed_id)));
-      if (!sorted.length) continue;
-      out.push({ sign: e.sign.key, name: e.sign.name, symbol: e.sign.symbol, pets: e.pets, path, images: sorted.slice(0, ZODIAC_LIMIT) });
+      const { data: imgs } = await db.from('image_catalog').select(RECOMMENDED_SELECT).in('id', ids);
+      const byId = new Map(((imgs as any[] | null) ?? []).map(i => [i.id, i]));
+      const images = ids.map(id => byId.get(id)).filter(Boolean);
+      if (!images.length) continue;
+      out.push({ sign: e.sign.key, name: e.sign.name, symbol: e.sign.symbol, pets: e.pets, path, images });
     }
     return out;
   } catch (err) {
