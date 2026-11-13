@@ -89,6 +89,9 @@ export default function PawsonalityQuizPage() {
   const [quiz, setQuiz] = useState<PublicQuiz | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Signed-in customer's own pets, so the name and breed do not have to be typed again
+  const [myPets, setMyPets] = useState<{ pet_id: string; name: string; breed_id: string | null; breed_name: string | null }[]>([]);
+  const [chosenPetId, setChosenPetId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [attribution, setAttribution] = useState<{ partnerCode?: string; referralCode?: string }>({});
   const [entry, setEntry] = useState<{ source: string; petId: string | null; breedId: string | null }>({ source: 'direct', petId: null, breedId: null });
@@ -133,6 +136,41 @@ export default function PawsonalityQuizPage() {
   }, []);
 
   // Prefilled breed (from My pets) once the breed list has loaded
+  // Fill the form from one of the customer's pets (name, dog or cat, breed)
+  const choosePet = useCallback((pet: { pet_id: string; name: string; breed_id: string | null; breed_name: string | null } | null) => {
+    setChosenPetId(pet?.pet_id ?? null);
+    if (!pet) { setPetName(''); setBreedName(''); setEntry(e => ({ ...e, petId: null, breedId: null })); return; }
+    setPetName(pet.name || '');
+    setBreedName(pet.breed_name || '');
+    setEntry(e => ({ ...e, petId: pet.pet_id, breedId: pet.breed_id }));
+  }, []);
+
+  // Signed in with pets saved, and not already started from a pet or a quiz in progress: prefill
+  useEffect(() => {
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.get('pet') || qs.get('name')) return;
+    const saved = load();
+    if (saved && saved.history.length > 0) return;
+    let live = true;
+    fetch('/api/customers/pets', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        const pets = Array.isArray(d?.pets) ? d.pets.filter((p: any) => p?.pet_id && p?.name) : [];
+        if (!live || pets.length === 0) return;
+        setMyPets(pets);
+        choosePet(pets[0]);
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [choosePet]);
+
+  // The chosen pet's breed tells us whether it is a dog or a cat
+  useEffect(() => {
+    const pet = myPets.find(p => p.pet_id === chosenPetId);
+    const breed = pet?.breed_id ? breeds.find(b => b.id === pet.breed_id) : null;
+    if (breed) { setAnimal(breed.animal_type); setBreedName(breed.name); }
+  }, [chosenPetId, myPets, breeds]);
+
   useEffect(() => {
     if (!entry.breedId || breedName) return;
     const b = breeds.find(x => x.id === entry.breedId);
@@ -344,6 +382,24 @@ export default function PawsonalityQuizPage() {
         </section>
 
         <form onSubmit={begin} className="mx-auto flex max-w-md flex-col gap-4 px-5 py-6" noValidate>
+          {myPets.length > 1 && (
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="mb-1.5 text-sm font-semibold">Who is taking the quiz?</legend>
+              <div className="flex flex-wrap gap-2">
+                {myPets.map(p => (
+                  <button key={p.pet_id} type="button" aria-pressed={chosenPetId === p.pet_id} onClick={() => choosePet(p)}
+                    className={`h-10 rounded-full px-4 text-sm ${chosenPetId === p.pet_id ? 'border-2 border-purple-700 bg-purple-50 font-bold text-purple-900' : 'border-[1.5px] border-gray-300 bg-white font-medium'}`}>
+                    {p.name}
+                  </button>
+                ))}
+                <button type="button" aria-pressed={chosenPetId === null} onClick={() => choosePet(null)}
+                  className={`h-10 rounded-full px-4 text-sm ${chosenPetId === null ? 'border-2 border-purple-700 bg-purple-50 font-bold text-purple-900' : 'border-[1.5px] border-gray-300 bg-white font-medium'}`}>
+                  Another pet
+                </button>
+              </div>
+            </fieldset>
+          )}
+
           <div className="flex flex-col gap-1.5">
             <label htmlFor="pet-name" className="text-sm font-semibold">Your pet&rsquo;s name</label>
             <input id="pet-name" type="text" autoComplete="off" maxLength={30} value={petName}

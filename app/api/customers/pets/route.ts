@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { zodiacForBirthday } from '@/lib/zodiac';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
@@ -62,7 +63,9 @@ export async function GET(request: NextRequest) {
     console.log('🔧 Customer pets API: Found', pets?.length || 0, 'pets for customer');
 
     // Return in format expected by customise page: { pets: Pet[] }
-    return NextResponse.json({ pets: pets || [] });
+    // Star sign from the birthday (lib/zodiac.ts), so every page and quiz reads it the same way
+    const withSigns = (pets || []).map((pet: any) => ({ ...pet, zodiac_sign: zodiacForBirthday(pet.birthday)?.key ?? null }));
+    return NextResponse.json({ pets: withSigns });
 
   } catch (error) {
     console.error('🔧 Error fetching customer pets:', error);

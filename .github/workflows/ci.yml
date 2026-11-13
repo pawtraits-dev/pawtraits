@@ -43,3 +43,11 @@ jobs:
       - name: Catalogue title hygiene
         if: ${{ hashFiles('scripts/test-title-hygiene.ts') != '' }}
         run: npx tsx scripts/test-title-hygiene.ts
+
+      - name: Star signs
+        if: ${{ hashFiles('scripts/test-zodiac.ts') != '' }}
+        run: npx tsx scripts/test-zodiac.ts
+
+      - name: Browse query helpers
+        if: ${{ hashFiles('scripts/test-browse-query.ts') != '' }}
+        run: npx tsx scripts/test-browse-query.ts

@@ -140,7 +140,8 @@ type Basis = { source: 'pet' | 'customisation' | 'quiz'; breed_id: string; coat_
  *   1. pets they have added (breed and coat)
  *   2. photos they have used to personalise a design (detected breed and coat)
  *   3. the breed they chose when taking a Pawsonality quiz (breed only)
- * Exact breed-and-coat matches come first, then other designs of those breeds.
+ * Where the pet's coat is known, only that breed in that coat is recommended; any coat is used
+ * only for a quiz breed (no coat known) or when no design exists in the pet's coat yet.
  * Returns { images, basedOn } — basedOn lists the breeds used, for the heading.
  */
 export async function GET() {
@@ -203,20 +204,28 @@ export async function GET() {
       .order('created_at', { ascending: false })
       .limit(RECOMMENDED_LIMIT);
 
-    const [exactRes, breedRes] = await Promise.all([
-      exactPairs.length
-        ? listed().or(exactPairs.map(b => `and(breed_id.eq.${b.breed_id},coat_id.eq.${b.coat_id})`).join(','))
-        : Promise.resolve({ data: [] as any[], error: null }),
-      listed().in('breed_id', breedIds),
-    ]);
+    // Where the coat is known, recommend that breed in that coat only
+    const exactRes = exactPairs.length
+      ? await listed().or(exactPairs.map(b => `and(breed_id.eq.${b.breed_id},coat_id.eq.${b.coat_id})`).join(','))
+      : { data: [] as any[], error: null };
+    if (exactRes.error) console.error('Recommended images (breed and coat) query failed:', exactRes.error);
+    const exact: any[] = exactRes.data ?? [];
+
+    // Any coat is shown only for a breed whose coat we do not know (a quiz answer), or for a breed
+    // that has no design in the pet's coat yet, so the tab is not left empty
+    const breedsWithExact = new Set(exact.map(img => img.breed_id));
+    const breedsWithCoat = new Set(exactPairs.map(b => b.breed_id));
+    const anyCoatBreedIds = breedIds.filter(id => !breedsWithCoat.has(id) || !breedsWithExact.has(id));
+    const breedRes = anyCoatBreedIds.length
+      ? await listed().in('breed_id', anyCoatBreedIds)
+      : { data: [] as any[], error: null };
     if (exactRes.error && breedRes.error) {
-      console.error('Recommended images query failed:', exactRes.error, breedRes.error);
+      console.error('Recommended images query failed:', breedRes.error);
       return NextResponse.json({ error: 'Failed to fetch recommended images' }, { status: 500 });
     }
 
-    // Exact breed-and-coat matches first, then the rest of those breeds
     const byId = new Map<string, any>();
-    for (const img of [...(exactRes.data ?? []), ...(breedRes.data ?? [])]) if (!byId.has(img.id)) byId.set(img.id, img);
+    for (const img of [...exact, ...(breedRes.data ?? [])]) if (!byId.has(img.id)) byId.set(img.id, img);
     const images = Array.from(byId.values()).slice(0, RECOMMENDED_LIMIT);
 
     const { data: breedRows } = await db.from('breeds').select('id, name').in('id', breedIds);
@@ -225,6 +234,7 @@ export async function GET() {
       breed_id: id,
       breed_name: names.get(id) ?? null,
       sources: Array.from(new Set(basis.filter(b => b.breed_id === id).map(b => b.source))),
+      coat_matched: breedsWithExact.has(id),
     }));
 
     return NextResponse.json({ success: true, images, basedOn });
