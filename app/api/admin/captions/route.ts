@@ -7,12 +7,15 @@
  * POST   { collectionId, on: boolean, what?: 'plate' | 'frame' }  plate (default) or frame on
  *        (redrawn with the current wording) or off for every design in that type/sign/card; stops
  *        after ~4½ minutes and reports what's left
+ * POST   { kind: 'zodiac' | 'tarot' }  the frame on every design in every sign (or card) that has none
+ *        yet; press again until `left` is 0
+ * Changing the wording does not redraw anything by itself (as for the plate): press "Redraw frames".
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
 import { readCaptionOverlay } from '@/lib/captions/caption';
 import { readFrameOverlay } from '@/lib/frames/frame';
-import { cardFromRow, ensureFrameAssets, frameMany } from '@/lib/frames/server';
+import { cardFromRow, ensureFrameAssets, frameAllInCollections, frameMany } from '@/lib/frames/server';
 import { captionMany, captionRows, ensureSymbols, rowCaption, saveWording } from '@/lib/captions/server';
 
 export const dynamic = 'force-dynamic';
@@ -83,8 +86,17 @@ export async function POST(request: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
   const body = await request.json().catch(() => ({}));
-  if (!UUID.test(String(body.collectionId || ''))) return NextResponse.json({ error: 'Choose a type, sign or card' }, { status: 400 });
   const supabase = serviceClient();
+  if (body.kind === 'zodiac' || body.kind === 'tarot') {
+    try {
+      const rows = (await captionRows(supabase, true)).filter(r => r.kind === body.kind);
+      const r = await frameAllInCollections(supabase, rows.map(x => x.id), Date.now() + 270_000);
+      return NextResponse.json({ ok: true, ...r });
+    } catch (e: any) {
+      return NextResponse.json({ error: e?.message || 'Could not put the frames on' }, { status: 500 });
+    }
+  }
+  if (!UUID.test(String(body.collectionId || ''))) return NextResponse.json({ error: 'Choose a type, sign or card' }, { status: 400 });
   const { data: links, error } = await supabase.from('design_collections').select('image_id').eq('collection_id', body.collectionId).limit(1000);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   try {

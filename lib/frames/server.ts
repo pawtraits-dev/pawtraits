@@ -4,6 +4,7 @@
  *   designCard()             the card for a design: its zodiac sign or tarot card, same wording as captions
  *   bakeFrame()              a stored 2:3 copy of a picture with the frame drawn on
  *   applyFrameToDesign() / removeFrameFromDesign() / frameMany()   on catalogue designs
+ *   frameIfCard()            keep a design's frame in step with its sign or card (called wherever its collections change)
  *   reapplyFrameAfterWords() the words were redrawn: put the frame back on top
  * A design has the caption plate or a frame, never both; the frame is always drawn from the clean picture.
  */
@@ -15,8 +16,10 @@ import { cloudinaryService } from '@/lib/cloudinary';
 import { captionRows, designRow, ensureSymbols, rowCaption, setDesignPicture, type CaptionRow } from '@/lib/captions/server';
 import { readCaptionOverlay, type CaptionAnimal } from '@/lib/captions/caption';
 import { zodiacSymbolSvg } from '@/lib/captions/zodiac-symbols';
-import { DEFAULT_FRAME_STYLE, FRAME_SHAPES, frameAssetIds, frameBase, frameBaseForWidth, frameCrop, frameLayers, readFrameOverlay, sameCard, type FrameCard, type FrameShape } from './frame';
+import { DEFAULT_FRAME_STYLE, FRAME_MAX, FRAME_SHAPES, frameTitle, frameAssetIds, frameBase, frameBaseForWidth, frameCrop, frameLayers, readFrameOverlay, sameCard, type FrameCard, type FrameShape } from './frame';
 import { FRAMED_PRINTS_ONLY, framedProductAllowed, isFramed } from './rules';
+import { metaWithFrame, metaWithoutFrame, switchBlocked, unframedBaseId, type FrameChoice } from './switch';
+import { cleanPetName } from '@/lib/picture-words';
 
 export const FRAME_MIGRATION = 'Run db/migrations/2026-11-13-framed-cards.sql first';
 const missing = (m?: string) => /frame_overlay/.test(m || '');
@@ -203,6 +206,76 @@ export async function frameForNewVersion(supabase: SupabaseClient, versionId: st
   }
 }
 
+/** What frameIfCard did: 'framed' (put on), 'redrawn' (new sign, card or wording), 'unframed' (taken off), 'unchanged', 'skipped' (customer or quiz picture, or before the migration), 'failed' */
+export type FrameSync = 'framed' | 'redrawn' | 'unframed' | 'unchanged' | 'skipped' | 'failed';
+
+/** Is this row one the frame never touches? Customer portraits and quiz breed pictures are not catalogue designs */
+export function frameExempt(row: { is_customer_generated?: boolean | null; tags?: string[] | null }): boolean {
+  return !!row.is_customer_generated || (row.tags ?? []).includes('quiz-generated');
+}
+
+/**
+ * Make a catalogue design's picture match its collections: in a Zodiac sign or tarot card (its own
+ * link, else its parent design's) it shows that card's frame; in none it shows no frame. Moving it
+ * to another sign or card, or changing the wording, redraws it. Cheap when nothing needs doing (a
+ * row read and the links), best-effort, and never throws: it logs and returns 'failed'.
+ * `versions` does the same for the breed / coat versions made from the design, until `deadline`.
+ */
+export async function frameIfCard(supabase: SupabaseClient, imageId: string | null | undefined, opts: { versions?: boolean; deadline?: number } = {}): Promise<FrameSync> {
+  if (!imageId) return 'skipped';
+  try {
+    const { data, error } = await supabase.from('image_catalog').select('id, is_customer_generated, tags, frame_overlay').eq('id', imageId).maybeSingle();
+    if (error || !data || frameExempt(data as any)) return 'skipped';
+    const applied = readFrameOverlay((data as any).frame_overlay)?.applied ?? null;
+    const card = (await designCard(supabase, imageId))?.card ?? null;
+    let result: FrameSync = 'unchanged';
+    if (card) {
+      if (!applied) { await applyFrameToDesign(supabase, imageId, card); result = 'framed'; }
+      else if (!sameCard(applied, card)) { await applyFrameToDesign(supabase, imageId, card); result = 'redrawn'; }
+    } else if (applied) {
+      await removeFrameFromDesign(supabase, imageId);
+      result = 'unframed';
+    }
+    if (opts.versions) {
+      const { data: kids } = await supabase.from('image_catalog').select('id').eq('variation_of', imageId).limit(500);
+      const deadline = opts.deadline ?? Date.now() + 40_000;
+      for (const k of kids ?? []) { if (Date.now() > deadline) break; await frameIfCard(supabase, (k as any).id); }
+    }
+    return result;
+  } catch (e) {
+    console.error('frameIfCard failed', imageId, e);
+    return 'failed';
+  }
+}
+
+/**
+ * Backfill: put the frame on every catalogue design in these collections (all signs, or all cards)
+ * that has none yet, stopping politely at the deadline. Designs that already show a frame are not
+ * touched, so pressing again carries on; `left` is how many are still to do.
+ */
+export async function frameAllInCollections(supabase: SupabaseClient, collectionIds: string[], deadline = Date.now() + 270_000): Promise<{ total: number; done: number; failed: number; left: number; errors: string[] }> {
+  const { data: links, error } = await supabase.from('design_collections').select('image_id').in('collection_id', collectionIds).eq('excluded', false).limit(5000);
+  if (error) throw new Error(error.message);
+  const ids = Array.from(new Set((links ?? []).map((l: any) => l.image_id as string)));
+  const todo: string[] = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error: e2 } = await supabase.from('image_catalog').select('id, is_customer_generated, tags, frame_overlay').in('id', ids.slice(i, i + 200));
+    if (e2) throw new Error(missing(e2.message) ? FRAME_MIGRATION : e2.message);
+    for (const r of data ?? []) if (!frameExempt(r as any) && !readFrameOverlay((r as any).frame_overlay)?.applied) todo.push((r as any).id);
+  }
+  let done = 0, failed = 0, left = 0;
+  const errors: string[] = [];
+  for (const id of todo) {
+    if (Date.now() > deadline) { left++; continue; }
+    try { await applyFrameToDesign(supabase, id); done++; }
+    catch (e: any) {
+      if (/^Run db\/migrations/.test(e?.message)) throw e;
+      failed++; errors.push(String(e?.message || e).slice(0, 200));
+    }
+  }
+  return { total: ids.length, done, failed, left, errors: Array.from(new Set(errors)).slice(0, 3) };
+}
+
 /** Does the design show a frame now? (null before the migration) */
 export async function frameApplied(supabase: SupabaseClient, imageId: string): Promise<boolean | null> {
   const { data, error } = await supabase.from('image_catalog').select('frame_overlay').eq('id', imageId).maybeSingle();
@@ -264,4 +337,68 @@ export async function framedIds(supabase: SupabaseClient, ids: string[]): Promis
   if (!ids.length) return new Set();
   const { data, error } = await supabase.from('image_catalog').select('id, frame_overlay').in('id', ids);
   return new Set(error ? [] : (data ?? []).filter((r: any) => isFramed(r)).map((r: any) => r.id));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Customers: framed or not, without a new generation
+
+export type SwitchResult =
+  | { ok: true; state: FrameChoice; petName: string | null; generatedImageUrl: string; changed: boolean }
+  | { ok: false; status: number; error: string };
+
+/**
+ * Switch a customer's portrait between framed and unframed (no AI): the clean painting is stored and
+ * the frame is only layers. The caller has already checked that the requester owns it.
+ *   off → the displayed picture becomes the painting without the frame; the card is kept as metadata.frame_off
+ *   on  → the card (from the design, worded for the pet, with `petName` on the banner) is drawn on the painting
+ * Refused (with a short message) for a portrait that has been ordered, and for switching on while a
+ * download, mug or case of it is in the signed-in basket. Prints in the basket follow the state at ordering.
+ */
+export async function switchCustomFrame(supabase: SupabaseClient, imageId: string, to: FrameChoice, petNameRaw?: unknown): Promise<SwitchResult> {
+  const { data: row, error } = await supabase.from('customer_custom_images').select('id, catalog_image_id, status, generated_cloudinary_id, generation_metadata, metadata, pet_name').eq('id', imageId).maybeSingle();
+  if (error || !row) return { ok: false, status: 404, error: 'Picture not found' };
+  const meta: any = (row as any).generation_metadata ?? {};
+  if ((row as any).status !== 'complete' || !(row as any).generated_cloudinary_id) return { ok: false, status: 409, error: 'Your picture is not ready yet' };
+  const cur = isFramed({ generation_metadata: meta });
+  const petGiven = petNameRaw !== undefined && petNameRaw !== null && String(petNameRaw).trim() !== '';
+  const petName = !petGiven ? null : (cleanPetName(petNameRaw) ?? '').slice(0, FRAME_MAX.pet).trim() || null;
+  if (petGiven && !petName) return { ok: false, status: 400, error: 'Please check the name for the card: letters only (spaces, hyphens and apostrophes are fine), up to 14, and nothing rude.' };
+  const keepName: string | null = petGiven ? petName : (meta.frame?.pet_name ?? meta.frame_off?.pet_name ?? (row as any).metadata?.frame?.pet_name ?? null);
+  if (to === 'off' && !cur) return { ok: true, state: 'off', petName: keepName, generatedImageUrl: '', changed: false };
+  if (to === 'on' && cur && keepName === (meta.frame?.pet_name ?? null)) return { ok: true, state: 'on', petName: keepName, generatedImageUrl: '', changed: false };
+
+  // Order lines keep what was bought, so an ordered picture is left alone; a basket with a download, mug or case blocks "with frame"
+  const { data: ordered, error: oErr } = await supabase.from('order_items').select('id').eq('image_id', imageId).limit(1);
+  if (oErr) return { ok: false, status: 500, error: 'Could not check your orders just now. Please try again.' };
+  const { data: basket } = await supabase.from('cart_items').select('product_data').eq('image_id', imageId).limit(50);
+  const blocked = switchBlocked(to, { ordered: (ordered ?? []).length > 0, basketProducts: (basket ?? []).map((b: any) => b.product_data) }, framedProductAllowed);
+  if (blocked) return { ok: false, status: 409, error: blocked };
+
+  const baseId = unframedBaseId(meta, (row as any).generated_cloudinary_id);
+  if (!baseId) return { ok: false, status: 409, error: 'This picture cannot be changed' };
+  const watermarked = (id: string) => cloudinaryService.getPublicVariantUrl(id, 'catalog_watermarked', { format: process.env.CUSTOMER_PREVIEW_FORMAT || 'webp' });
+  let update: Record<string, unknown>;
+
+  if (to === 'off') {
+    configure();
+    update = { generated_cloudinary_id: baseId, generated_image_url: watermarked(baseId), generation_metadata: { ...metaWithoutFrame(meta)!, full_size_url: cloudinary.url(baseId, { secure: true }) } };
+  } else {
+    // The card: this design's sign or card, worded for their pet's animal (as when it was made), else the one set aside
+    const dc = (row as any).catalog_image_id ? await designCard(supabase, (row as any).catalog_image_id).catch(() => null) : null;
+    const animal = (meta.frame?.animal ?? meta.frame_off?.animal ?? (row as any).metadata?.detected_breed?.animal ?? null) as 'dog' | 'cat' | null;
+    const designBase = dc ? ((animal === 'cat' ? dc.cat : animal === 'dog' ? dc.dog : dc.card) ?? dc.dog ?? dc.cat) : null;
+    const kept = meta.frame_off ?? meta.frame;
+    const card = designBase
+      ? { ...designBase, title: frameTitle(designBase.title, keepName) }
+      : kept && !petGiven ? { title: kept.title as string, tagline: (kept.tagline ?? null) as string | null, medallion: kept.medallion ?? null } : null;
+    if (!card) return { ok: false, status: 409, error: 'This design no longer has a card frame' };
+    const baked = await bakeFrame(baseId, card, 'customer-custom-images');
+    update = {
+      generated_cloudinary_id: baked.public_id, generated_image_url: watermarked(baked.public_id),
+      generation_metadata: metaWithFrame(meta, { card, petName: keepName, animal, baseId, framedUrl: baked.secure_url }),
+    };
+  }
+  const { error: uErr } = await supabase.from('customer_custom_images').update(update).eq('id', imageId);
+  if (uErr) return { ok: false, status: 500, error: 'Could not save the change' };
+  return { ok: true, state: to, petName: keepName, generatedImageUrl: update.generated_image_url as string, changed: true };
 }

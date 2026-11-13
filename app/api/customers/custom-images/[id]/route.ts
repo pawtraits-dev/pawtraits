@@ -3,7 +3,9 @@ import { serviceClient } from '@/lib/qr/server';
 import { getRequester, canAccessCustomImage } from '@/lib/guest/access';
 import { wrapMockups } from '@/lib/mugs/mockup';
 import { watermarkTiles } from '@/lib/watermark';
-import { customFrameCard, ensureFrameAssets, frameShapeUrls } from '@/lib/frames/server';
+import { customFrameCard, designCard, ensureFrameAssets, frameShapeUrls } from '@/lib/frames/server';
+import { frameState } from '@/lib/frames/switch';
+import { FRAME_MAX } from '@/lib/frames/frame';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +43,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
     // Framed card: per-size thumbnails for the buy sheet (watermarked; the clean picture is never sent)
     let frame: { thumbs: Record<string, string> } | null = null;
+    // Whether they can choose with or without the frame, and which they have now
+    let frameChoice: { state: 'on' | 'off'; petName: string | null; nameMax: number } | null = null;
     if (customImage.status === 'complete') {
       const { data: gm } = await serviceClient().from('customer_custom_images').select('generation_metadata').eq('id', id).maybeSingle();
       const card = customFrameCard((gm as any)?.generation_metadata);
@@ -49,8 +53,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         await ensureFrameAssets().catch(() => null);
         frame = { thumbs: frameShapeUrls(base, card, 240) };
       }
+      const meta = (gm as any)?.generation_metadata;
+      const st = frameState(meta);
+      if (st) frameChoice = { state: st, petName: meta?.frame?.pet_name ?? meta?.frame_off?.pet_name ?? null, nameMax: FRAME_MAX.pet };
+      else if (customImage.catalog_image_id && (await designCard(serviceClient() as any, customImage.catalog_image_id).catch(() => null))) {
+        frameChoice = { state: 'off', petName: null, nameMax: FRAME_MAX.pet };   // made without the frame: it can still be added
+      }
     }
-    return NextResponse.json({ ...safe, mugMockups, frame }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ ...safe, mugMockups, frame, frameChoice }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('custom-image GET failed', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

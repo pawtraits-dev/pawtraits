@@ -34,6 +34,7 @@ import { cleanSlogan, SLOGAN_MAX } from '@/lib/collections/slogan';
 import { cleanPetName, escapeWords, fillWords, PET_NAME_MAX } from '@/lib/picture-words';
 import type { Caption as CaptionText } from '@/lib/captions/caption';
 import { frameTitle, type FrameCard as FrameCardText } from '@/lib/frames/frame';
+import { FrameSwitch, FrameToggle, type FrameChoiceInfo } from '@/components/customise/FrameToggle';
 import DesignQuizLink from '@/components/quiz/DesignQuizLink';
 import { collectionHref } from '@/lib/collections/href';
 
@@ -62,7 +63,7 @@ interface CatalogImage {
   /** Words on the picture: the customer's pet's name or breed in the sentence (live preview URL with a token) */
   words?: { template: string; phrase: string; previewUrl: string; token: string } | null;
   /** Caption plate (Pawsonality type or Zodiac sign + tagline): optional; dog and cat wording */
-  frame?: { dog: FrameCardText | null; cat: FrameCardText | null; designAnimal: 'dog' | 'cat'; nameMax: number; on: boolean; previews: { dog: string | null; cat: string | null }; thumbs: Partial<Record<'2:3' | '3:4', string>> | null } | null;
+  frame?: { dog: FrameCardText | null; cat: FrameCardText | null; designAnimal: 'dog' | 'cat'; nameMax: number; on: boolean; framedUrl?: string | null; cleanUrl?: string | null; previews: { dog: string | null; cat: string | null }; thumbs: Partial<Record<'2:3' | '3:4', string>> | null } | null;
   caption?: { dog: CaptionText | null; cat: CaptionText | null; designAnimal: 'dog' | 'cat'; on: boolean; previews: { dog: string | null; cat: string | null } } | null;
   /** One per pet in the picture, left to right: photo N replaces slot N (multi-pet plan phase 2) */
   slots?: { label: string; breedName: string | null; animalType: 'dog' | 'cat' | null; pose: string | null }[];
@@ -74,6 +75,7 @@ interface CustomImage {
   pet_name?: string | null;
   generated_image_url: string | null;
   frame?: { thumbs: Partial<Record<'2:3' | '3:4', string>> } | null;
+  frameChoice?: FrameChoiceInfo | null;   // with or without the frame, and which they have now
   share_token: string | null;
   status: 'pending' | 'generating' | 'complete' | 'failed';
 }
@@ -160,6 +162,7 @@ export default function CustomisePage() {
   const [wordsName, setWordsName] = useState('');
   // Framed cards (zodiac sign / tarot card): the frame is always on; the pet's name on the banner is optional
   const [frameName, setFrameName] = useState('');
+  const [withFrame, setWithFrame] = useState(true);   // "With frame" is the default; "Without frame" makes an ordinary portrait
   const [wordsPreview, setWordsPreview] = useState<string | null>(null);
   const [subjects, setSubjects] = useState<Array<{ pet: Pet | null; file: File | null; preview: string | null; warning?: string | null }>>([{ pet: null, file: null, preview: null }]);
   const [preparing, setPreparing] = useState(false);
@@ -301,7 +304,7 @@ export default function CustomisePage() {
     const timer = setTimeout(() => setWordsPreview(w.previewUrl.replace(w.token, escapeWords(fillWords(w.template, wordsPhrase)))), 450);
     return () => clearTimeout(timer);
   }, [hasWords, catalogImage?.words, wordsPhrase]);
-  const frameOk = !catalogImage?.frame || !frameName.trim() || !!cleanPetName(frameName);
+  const frameOk = !catalogImage?.frame || !withFrame || !frameName.trim() || !!cleanPetName(frameName);
   const allReady = subjects.length > 0 && subjects.every(s => s.pet || s.file) && kitNameOk && sloganOk && wordsOk && frameOk;
 
   function startCustomise() {
@@ -388,7 +391,8 @@ export default function CustomisePage() {
     if (showSlogan && sloganTouched && slogan.trim()) fd.append('slogan', slogan.trim());
     if (hasWords && wordsMode === 'name') fd.append('wordsName', wordsName.trim());
     if (catalogImage.caption) fd.append('caption', captionOn ? '1' : '0');
-    if (catalogImage.frame && frameName.trim()) fd.append('frameName', frameName.trim());
+    if (catalogImage.frame && !withFrame) fd.append('frame', 'off');
+    else if (catalogImage.frame && frameName.trim()) fd.append('frameName', frameName.trim());
     subjects.forEach((s, i) => {
       const n = subjectCount > 1 ? String(i + 1) : '';
       if (s.pet) fd.append(`petId${n}`, s.pet.pet_id);
@@ -464,7 +468,8 @@ export default function CustomisePage() {
         imageUrl: customImage.generated_image_url || catalogImage.imageUrl,
         title: customPortraitTitle(customImage.pet_name, catalogImage.theme?.displayName || catalogImage.theme?.name),
         formatId: catalogImage.format?.id, themeName: catalogImage.theme?.name,
-        frame: customImage.frame ?? (catalogImage.frame?.dog || catalogImage.frame?.cat ? { thumbs: null } : null),
+        // The portrait's own state decides (framed cards are prints only); before it is known, a framed design counts as framed
+        frame: customImage.frameChoice ? (customImage.frameChoice.state === 'on' ? { thumbs: customImage.frame?.thumbs ?? null } : null) : (customImage.frame ?? (catalogImage.frame?.dog || catalogImage.frame?.cat ? { thumbs: null } : null)),
       }
     : {
         kind: 'catalog', imageId: catalogImage.id, catalogImageId: catalogImage.id, imageUrl: catalogImage.imageUrl,
@@ -496,7 +501,15 @@ export default function CustomisePage() {
     );
   }
 
-  const heroSrc = step === 'result' && customImage?.generated_image_url ? customImage.generated_image_url : catalogImage.imageUrl;
+  // The design's picture: with or without its frame (zodiac and tarot designs); both are watermarked previews
+  const designSrc = catalogImage.frame ? (withFrame ? catalogImage.frame.framedUrl : catalogImage.frame.cleanUrl) || catalogImage.imageUrl : catalogImage.imageUrl;
+  const heroSrc = step === 'result' && customImage?.generated_image_url ? customImage.generated_image_url : designSrc;
+  // A finished portrait's choice changed: fetch it again (new picture, new buy-sheet thumbnails)
+  async function refreshCustomImage() {
+    if (!customImage) return;
+    const r = await fetch(`/api/customers/custom-images/${customImage.id}`, { credentials: 'include', cache: 'no-store' });
+    if (r.ok) { const d: CustomImage = await r.json(); if (d.generated_image_url) await preloadImage(d.generated_image_url); setCustomImage(d); }
+  }
   const themeName = catalogImage.theme?.displayName || catalogImage.theme?.name;
   const breedName = catalogImage.breed?.displayName || catalogImage.breed?.name;
   const title = designTitle(catalogImage.description, 'Pawtraits design');
@@ -569,6 +582,13 @@ export default function CustomisePage() {
               <DesignChips data={chips} />
             </div>
 
+            {catalogImage.frame && (
+              <div className="mt-3">
+                <FrameToggle value={withFrame ? 'on' : 'off'} onChange={v => setWithFrame(v === 'on')} />
+                <p className="mt-1 text-xs text-gray-500">{withFrame ? 'Framed cards are sold as prints only.' : 'Without the frame it is an ordinary picture: your own painting, as a print, download, mug or phone case.'}</p>
+              </div>
+            )}
+
             <TeamPicker imageId={catalogImage.id} />
 
             {stallOffer?.available && (
@@ -599,9 +619,12 @@ export default function CustomisePage() {
 
             <DesignQuizLink imageId={catalogImage.id} themeName={themeName} />
 
-            {buyTarget && (
+            {buyTarget && !(catalogImage.frame?.on && !withFrame) && (
               <BuyOptionsSheet inline open onClose={() => {}} target={buyTarget}
                 stallOffer={stallOffer} scannedSize={scannedSize} />
+            )}
+            {catalogImage.frame?.on && !withFrame && (
+              <p className="mt-4 rounded-2xl bg-gray-100 p-4 text-sm text-gray-800">The design as it stands is sold framed. To have it without the frame, add your pet&apos;s photo above: we paint your own picture, and then you choose a size.</p>
             )}
 
             {aboutText && (
@@ -744,7 +767,9 @@ export default function CustomisePage() {
               return (
                 <div className="mt-5 rounded-2xl border border-purple-200 bg-purple-50/50 p-4">
                   <p className="font-semibold text-gray-900">Your card</p>
-                  <p className="text-sm text-gray-700">It comes in this frame: “{frameTitle(c.title, frameName).toUpperCase()}”{c.tagline ? <> · <em>{c.tagline}</em></> : null}</p>
+                  <div className="mt-2"><FrameToggle value={withFrame ? 'on' : 'off'} onChange={v => setWithFrame(v === 'on')} /></div>
+                  {withFrame ? (<>
+                  <p className="mt-3 text-sm text-gray-700">It comes in this frame: “{frameTitle(c.title, frameName).toUpperCase()}”{c.tagline ? <> · <em>{c.tagline}</em></> : null}</p>
                   <label className="mt-3 block text-sm font-medium text-gray-900" htmlFor="frame-name">Pet&apos;s name on the card</label>
                   <input id="frame-name" value={frameName} onChange={e => setFrameName(e.target.value.slice(0, max))} maxLength={max}
                     placeholder="Optional" className="mt-1 h-12 w-full rounded-xl border border-gray-300 px-3 text-base text-gray-900" />
@@ -754,6 +779,9 @@ export default function CustomisePage() {
                   {preview && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={preview} alt="How the card will look" className="mt-3 w-40 rounded-lg border border-purple-200" />
+                  )}
+                  </>) : (
+                    <p className="mt-3 text-sm text-gray-700">Without the frame, you get an ordinary portrait with no card wording. You can add the frame again once it is ready.</p>
                   )}
                 </div>
               );
@@ -868,6 +896,8 @@ export default function CustomisePage() {
               </div>
               {rating > 0 && <p className="mt-1 text-xs text-purple-700">Thanks — he’s blushing.</p>}
             </div>
+
+            {customImage?.frameChoice && <FrameSwitch key={`${customImage.id}:${customImage.frameChoice.state}`} imageId={customImage.id} choice={customImage.frameChoice} onChanged={refreshCustomImage} />}
 
             <StickyActionBar>
               <BasketBar />

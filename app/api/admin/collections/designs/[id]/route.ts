@@ -4,10 +4,12 @@
  *   { add: collectionId }             — put the design in a collection (by hand)
  *   { remove: collectionId }          — take it out; theme filing and auto-tagging won't put it back
  *   { retag: true }                   — ask the tagger again (hand-set tags are kept)
+ * add / remove / retag keep the frame in step: a design in a sign or card shows its frame, one in none shows none.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
 import { autoTagImage, cleanTags } from '@/lib/collections/auto-tag';
+import { frameIfCard } from '@/lib/frames/server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -38,7 +40,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const { error } = await supabase.from('design_collections')
         .upsert({ image_id: id, collection_id: cid, source: 'admin', excluded: !!body.remove }, { onConflict: 'image_id,collection_id' });
       if (error) throw error;
-      return NextResponse.json({ ok: true });
+      // In (or out of) a Zodiac sign or tarot card: the design gets (or loses) its frame, and so do its versions
+      const frame = await frameIfCard(supabase, id, { versions: true });
+      return NextResponse.json({ ok: true, frame });
     }
     if (body.retag) {
       const r = await autoTagImage(supabase, id, { force: true });
