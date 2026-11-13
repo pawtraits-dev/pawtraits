@@ -269,7 +269,7 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
                       badge={p.size_code === 'M' && isFoam(p) && !stallAvailable && !sameSize ? 'Most popular' : undefined}
                       title={`${p.size_name || p.name}${p.width_cm ? ` · ${orientedSize(p, orientation)}` : ''}`}
                       subtitle={sameSize ? (stallAvailable ? 'Same size as the one in your hand, made fresh and delivered' : 'Same size as the print you scanned') : (SIZE_LINES[p.size_code || ''] || p.media_description)}
-                      perk={target.frame ? undefined : 'Includes bonus digital copy'}
+                      perk="Includes bonus digital copy"
                       price={gbp(pence(p.pricing))} />
                   );
                 })}

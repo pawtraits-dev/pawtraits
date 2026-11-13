@@ -585,7 +585,7 @@ export default function CustomisePage() {
             {catalogImage.frame && (
               <div className="mt-3">
                 <FrameToggle value={withFrame ? 'on' : 'off'} onChange={v => setWithFrame(v === 'on')} />
-                <p className="mt-1 text-xs text-gray-500">{withFrame ? 'Framed cards are sold as prints only.' : 'Without the frame it is an ordinary picture: your own painting, as a print, download, mug or phone case.'}</p>
+                <p className="mt-1 text-xs text-gray-500">{withFrame ? 'Framed cards are sold as prints, with a bonus digital copy.' : 'Without the frame it is an ordinary picture: your own painting, as a print, download, mug or phone case.'}</p>
               </div>
             )}
 
