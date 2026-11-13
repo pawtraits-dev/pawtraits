@@ -20,8 +20,8 @@ ok('pet name trimmed', frameTitle('Leo', '  Rex  ') === 'REX · LEO');
 // Sizing and shrinking (fitSize and estimateWidth are unit-free)
 const P23 = FRAME_STYLES.celestial.geometry['2:3'].plate;
 const P34 = FRAME_STYLES.celestial.geometry['3:4'].plate;
-ok('plate geometry 2:3', P23.x0 === 0.2689 && P23.x1 === 0.7402 && P23.y0 === 0.9114 && P23.y1 === 0.9561);
-ok('plate geometry 3:4', P34.x0 === 0.2689 && P34.x1 === 0.7402 && P34.y0 === 0.9002 && P34.y1 === 0.9506);
+ok('plate geometry 2:3', P23.x0 === 0.2664 && P23.x1 === 0.7377 && P23.y0 === 0.9114 && P23.y1 === 0.9561);
+ok('plate geometry 3:4', P34.x0 === 0.2664 && P34.x1 === 0.7377 && P34.y0 === 0.9002 && P34.y1 === 0.9506);
 ok('fitSize keeps a short line', fitSize('LEO', 30, 400, 0.1) === 30);
 const long = 'BARTHOLOMEW TH · SAGITTARIUS';
 const fitted = fitSize(long, 30, 400, 0.1);
