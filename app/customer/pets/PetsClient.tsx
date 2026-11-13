@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { zodiacForBirthday } from '@/lib/zodiac';
+import { petZodiac } from '@/lib/zodiac';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -437,7 +437,7 @@ export default function PetsClient() {
                       <p>Age: {getAgeDisplay(pet.age)}</p>
                     )}
                     {(() => {
-                      const sign = zodiacForBirthday(pet.birthday);
+                      const sign = petZodiac(pet as any)?.sign;
                       return sign
                         ? <p title={sign.dates}>Star sign: {sign.symbol} {sign.name}</p>
                         : <p className="text-gray-400">Star sign: add a birthday to find out</p>;

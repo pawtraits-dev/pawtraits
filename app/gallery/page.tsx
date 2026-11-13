@@ -82,6 +82,8 @@ function GalleryContent() {
   const [loadingRecommended, setLoadingRecommended] = useState(false);
   // Breeds the recommendations are based on (pets, personalised photos, quiz), from the server
   const [recommendedBasis, setRecommendedBasis] = useState<{ breed_id: string; breed_name: string | null; coat_match?: 'exact' | 'closest' | 'any'; closest_coats?: string[] }[]>([]);
+  // Star-sign designs for the customer's pets, from the zodiac collection
+  const [recommendedZodiac, setRecommendedZodiac] = useState<{ sign: string; name: string; symbol: string; pets: string[]; path: string; images: GalleryImage[] }[]>([]);
   const [loadingCustomImages, setLoadingCustomImages] = useState(false);
 
   // State for like tracking and customize modal
@@ -235,11 +237,11 @@ function GalleryContent() {
       const response = await fetch('/api/images/recommended', { credentials: 'include' });
 
       if (response.ok) {
-        const { images, basedOn } = await response.json();
+        const { images, basedOn, zodiac } = await response.json();
         setRecommendedBasis(basedOn || []);
 
         // Transform to GalleryImage format
-        const recommendedGalleryImages: GalleryImage[] = (images || []).map((img: any) => ({
+        const toGalleryImage = (img: any): GalleryImage => ({
           id: img.id,
           filename: img.filename,
           public_url: img.public_url,
@@ -259,7 +261,9 @@ function GalleryContent() {
           breed: img.breeds ? { id: img.breeds.id, name: img.breeds.name, animal_type: img.breeds.animal_type } : undefined,
           theme: img.themes ? { id: img.themes.id, name: img.themes.name } : undefined,
           style: img.styles ? { id: img.styles.id, name: img.styles.name } : undefined,
-        }));
+        });
+        const recommendedGalleryImages: GalleryImage[] = (images || []).map(toGalleryImage);
+        setRecommendedZodiac((zodiac || []).map((z: any) => ({ ...z, images: (z.images || []).map(toGalleryImage) })));
 
         setRecommendedImages(recommendedGalleryImages);
       }
@@ -1102,6 +1106,21 @@ function GalleryContent() {
               </div>
               </>
             )}
+            {!loadingRecommended && recommendedZodiac.map(z => (
+              <section key={z.sign} className="space-y-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    {z.symbol} {z.pets.length ? `${z.pets.join(' and ')} ${z.pets.length > 1 ? 'are' : 'is'} ${/^[aeiou]/i.test(z.name) ? 'an' : 'a'} ${z.name}` : `${z.name} Pawtraits`}
+                  </h3>
+                  <a href={`/collections/${z.path}`} className="text-sm font-semibold text-purple-700 underline">See all {z.name} Pawtraits</a>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {z.images.map((image) => (
+                    <ImageCard key={`${z.sign}-${image.id}`} image={image} />
+                  ))}
+                </div>
+              </section>
+            ))}
           </TabsContent>
 
           <TabsContent value="custom" className="space-y-6">
