@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { shippingQuoteFor } from '@/lib/shipping/rates'
 import { Elements, ExpressCheckoutElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { getStripe } from '@/lib/stripe-client'
 
@@ -125,8 +126,9 @@ function ExpressButtons({ goodsTotalPence, needsShipping, allowedCountries, defa
           setError(null)
           if (needsShipping && !quotes.current.length) {
             // Quote not back yet — offer a placeholder; the real rates arrive once the address is chosen
-            quotes.current = [{ id: 'standard_fallback', name: 'Standard Delivery', price: 999, currency: 'GBP', estimatedDeliveryDays: '7-10' }]
-            shippingPence.current = 999
+            const placeholder = shippingQuoteFor('GB')?.price ?? 0
+            quotes.current = [{ id: 'standard_fallback', name: 'Tracked delivery', price: placeholder, currency: 'GBP' } as any]
+            shippingPence.current = placeholder
           }
           onStart?.()
           e.resolve(needsShipping ? { shippingRates: quotes.current.map(toRate) } : {})

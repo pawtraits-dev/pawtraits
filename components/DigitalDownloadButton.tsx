@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Check } from 'lucide-react';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
+import { gbp, useLowestPrices } from '@/lib/pricing/use-lowest-prices';
 import { useToast } from '@/components/ui/use-toast';
 
 interface DigitalDownloadButtonProps {
@@ -22,6 +23,7 @@ export function DigitalDownloadButton({
   variant = 'outline'
 }: DigitalDownloadButtonProps) {
   const { addToCart, getMasterBundleProductId, items } = useHybridCart();
+  const { lowestDigital } = useLowestPrices();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [added, setAdded] = useState(false);
@@ -84,7 +86,7 @@ export function DigitalDownloadButton({
       setTimeout(() => setAdded(false), 2000);
 
       toast({
-        title: 'Added to cart',
+        title: 'Added to basket',
         description: `${imageTitle} digital download added to your basket.`,
       });
 
@@ -93,7 +95,7 @@ export function DigitalDownloadButton({
       console.error('❌ [Digital Download] Failed to add to cart:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to add to cart',
+        description: error instanceof Error ? error.message : 'Could not add to your basket',
         variant: 'destructive'
       });
     } finally {
@@ -109,7 +111,7 @@ export function DigitalDownloadButton({
         disabled
       >
         <Check className="w-4 h-4 mr-2 text-green-600" />
-        In Cart
+        In basket
       </Button>
     );
   }
@@ -129,7 +131,7 @@ export function DigitalDownloadButton({
       ) : (
         <>
           <Download className="w-4 h-4 mr-2" />
-          {loading ? 'Adding...' : 'Digital Download - £9.99'}
+          {loading ? 'Adding…' : `Digital download${lowestDigital ? ` · ${gbp(lowestDigital)}` : ''}`}
         </>
       )}
     </Button>

@@ -43,8 +43,6 @@ export default function SiteFooter() {
         <Link href="/help" className={LINK_CLASS}>Help &amp; delivery</Link>
         <Link href="/orders" className={LINK_CLASS}>My orders</Link>
         <Link href="/auth/login" className={LINK_CLASS}>Sign in</Link>
-        <Link href="/partners" className={LINK_CLASS}>Become a partner</Link>
-        <Link href="/signup/partner" className={LINK_CLASS}>Partner with us</Link>
         <Link href="/terms" className={LINK_CLASS}>Terms</Link>
         <Link href="/privacy" className={LINK_CLASS}>Privacy</Link>
         <a href="mailto:support@pawtraits.pics" className={LINK_CLASS}>support@pawtraits.pics</a>

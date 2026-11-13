@@ -242,22 +242,6 @@ function CustomerSignupPageContent() {
                     </Button>
                   </Link>
                 </div>
-
-                {/* Business Account */}
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4">
-                  <div className="flex items-center justify-center space-x-2 mb-2">
-                    <User className="w-5 h-5 text-blue-600" />
-                    <h3 className="font-medium text-blue-800">Business Account?</h3>
-                  </div>
-                  <p className="text-sm text-blue-700 text-center mb-3">
-                    Groomers, vets & breeders can earn commissions by referring clients
-                  </p>
-                  <Link href="/signup/partner">
-                    <Button variant="outline" size="sm" className="w-full">
-                      Become a Partner
-                    </Button>
-                  </Link>
-                </div>
               </div>
             </CardContent>
           </Card>

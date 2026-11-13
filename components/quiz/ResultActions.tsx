@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Check, Share2 } from 'lucide-react';
 import ResultPicture from './ResultPicture';
+import { gbp, useLowestPrices } from '@/lib/pricing/use-lowest-prices';
 import { track } from '@/lib/tracking/events';
 
 export interface ResultActionsProps {
@@ -78,11 +79,12 @@ export function MakePawtrait({ petName, typeName, code, imageId, breedId, animal
   petName: string; typeName: string; code: string; imageId: string | null; breedId: string | null; animal: 'dog' | 'cat';
 }) {
   const browse = breedId ? `/browse?type=${animal === 'cat' ? 'cats' : 'dogs'}&breed=${breedId}` : `/browse?type=${animal === 'cat' ? 'cats' : 'dogs'}`;
+  const { lowestPrint } = useLowestPrices();
   return (
     <section className="border-y border-purple-100 bg-[#FBF9FE] px-5 py-6">
       <div className="mx-auto max-w-md">
         <h2 className="text-xl font-bold">Make {petName}&rsquo;s Pawtrait as {typeName}</h2>
-        <p className="mt-1 text-sm text-gray-700">Add {petName}&rsquo;s photo and Pawcasso paints them in. Prints from £25, or a digital download.</p>
+        <p className="mt-1 text-sm text-gray-700">Add {petName}&rsquo;s photo and Pawcasso paints them in. {lowestPrint ? `Prints from ${gbp(lowestPrint)}, or a digital download.` : 'Prints, mugs and digital downloads.'}</p>
         {imageId ? (
           <Link href={`/customise/${imageId}?start=photo&src=pawsonality`} onClick={() => track.quizResultDesignClick('pawsonality', code, imageId)}
             className="mt-4 flex h-[52px] items-center justify-center rounded-xl bg-purple-700 text-base font-bold text-white hover:bg-purple-800">
