@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import { LISTED_ONLY } from '@/lib/catalog/listing';
+import { closestCoat } from '@/lib/catalog/coat-match';
 
 /**
  * POST /api/images/recommended
@@ -141,7 +142,8 @@ type Basis = { source: 'pet' | 'customisation' | 'quiz'; breed_id: string; coat_
  *   2. photos they have used to personalise a design (detected breed and coat)
  *   3. the breed they chose when taking a Pawsonality quiz (breed only)
  * Where the pet's coat is known, only that breed in that coat is recommended; any coat is used
- * only for a quiz breed (no coat known) or when no design exists in the pet's coat yet.
+ * only for a quiz breed (no coat known). When no design exists in the pet's coat, the closest coat
+ * colour available for that breed is used instead (lib/catalog/coat-match.ts).
  * Returns { images, basedOn } — basedOn lists the breeds used, for the heading.
  */
 export async function GET() {
@@ -216,8 +218,39 @@ export async function GET() {
     const breedsWithExact = new Set(exact.map(img => img.breed_id));
     const breedsWithCoat = new Set(exactPairs.map(b => b.breed_id));
     const anyCoatBreedIds = breedIds.filter(id => !breedsWithCoat.has(id) || !breedsWithExact.has(id));
-    const breedRes = anyCoatBreedIds.length
-      ? await listed().in('breed_id', anyCoatBreedIds)
+    // A breed with a known coat but no design in it: use the closest coat colour we do have
+    // (an Apricot pet sees Golden, not Black) rather than every colour
+    const closest: { breed_id: string; coat_id: string; coat_name: string | null }[] = [];
+    const stillAnyCoat: string[] = [];
+    const needClosest = anyCoatBreedIds.filter(id => breedsWithCoat.has(id));
+    if (needClosest.length) {
+      const [{ data: coatRows }, { data: available }] = await Promise.all([
+        db.from('coats').select('id, name, hex_color'),
+        db.from('image_catalog').select('breed_id, coat_id').eq('is_public', true).or(LISTED_ONLY)
+          .in('breed_id', needClosest).not('coat_id', 'is', null).limit(5000),
+      ]);
+      const coatById = new Map((coatRows ?? []).map((c: any) => [c.id, c]));
+      for (const breedId of needClosest) {
+        const petCoats = exactPairs.filter(b => b.breed_id === breedId).map(b => coatById.get(b.coat_id as string)).filter(Boolean);
+        const candidateIds = Array.from(new Set((available ?? []).filter((r: any) => r.breed_id === breedId).map((r: any) => r.coat_id)));
+        const candidates = candidateIds.map(id => coatById.get(id)).filter(Boolean) as any[];
+        const picks = new Map<string, any>();
+        for (const petCoat of petCoats) {
+          const best = closestCoat(petCoat as any, candidates);
+          if (!best) continue;
+          // Coats that share that exact colour count too (e.g. "Red" and "Red and White")
+          for (const c of candidates) if (c.hex_color && c.hex_color === (best as any).hex_color) picks.set(c.id, c);
+        }
+        if (picks.size) for (const c of Array.from(picks.values())) closest.push({ breed_id: breedId, coat_id: c.id, coat_name: c.name ?? null });
+        else stillAnyCoat.push(breedId);
+      }
+    }
+    const anyCoatFinal = [...anyCoatBreedIds.filter(id => !breedsWithCoat.has(id)), ...stillAnyCoat];
+    const closestRes = closest.length
+      ? await listed().or(closest.map(c => `and(breed_id.eq.${c.breed_id},coat_id.eq.${c.coat_id})`).join(','))
+      : { data: [] as any[], error: null };
+    const breedRes = anyCoatFinal.length
+      ? await listed().in('breed_id', anyCoatFinal)
       : { data: [] as any[], error: null };
     if (exactRes.error && breedRes.error) {
       console.error('Recommended images query failed:', breedRes.error);
@@ -225,7 +258,7 @@ export async function GET() {
     }
 
     const byId = new Map<string, any>();
-    for (const img of [...exact, ...(breedRes.data ?? [])]) if (!byId.has(img.id)) byId.set(img.id, img);
+    for (const img of [...exact, ...(closestRes.data ?? []), ...(breedRes.data ?? [])]) if (!byId.has(img.id)) byId.set(img.id, img);
     const images = Array.from(byId.values()).slice(0, RECOMMENDED_LIMIT);
 
     const { data: breedRows } = await db.from('breeds').select('id, name').in('id', breedIds);
@@ -234,7 +267,9 @@ export async function GET() {
       breed_id: id,
       breed_name: names.get(id) ?? null,
       sources: Array.from(new Set(basis.filter(b => b.breed_id === id).map(b => b.source))),
-      coat_matched: breedsWithExact.has(id),
+      // 'exact' = the pet's own coat; 'closest' = nearest colour available; 'any' = coat not known or no colour data
+      coat_match: breedsWithExact.has(id) ? 'exact' : closest.some(c => c.breed_id === id) ? 'closest' : 'any',
+      closest_coats: Array.from(new Set(closest.filter(c => c.breed_id === id).map(c => c.coat_name).filter(Boolean))),
     }));
 
     return NextResponse.json({ success: true, images, basedOn });
