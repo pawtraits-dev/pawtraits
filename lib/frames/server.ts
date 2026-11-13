@@ -48,8 +48,8 @@ async function sourceOf(file: string, mime: string): Promise<string> {
     const buf = await fs.readFile(path.join(process.cwd(), 'public', 'frames', file));
     return `data:${mime};base64,${buf.toString('base64')}`;
   } catch {
-    const base = (process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '');
-    if (!base) throw new Error(`The frame file public/frames/${file} is missing`);
+    // On Vercel, files in public/ are served by the site but are not on the function's disk
+    const base = (process.env.NEXT_PUBLIC_BASE_URL || 'https://www.pawtraits.pics').replace(/\/$/, '');
     return `${base}/frames/${file}`;
   }
 }
