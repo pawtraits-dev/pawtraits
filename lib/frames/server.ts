@@ -15,7 +15,7 @@ import { cloudinaryService } from '@/lib/cloudinary';
 import { captionRows, designRow, ensureSymbols, rowCaption, setDesignPicture, type CaptionRow } from '@/lib/captions/server';
 import { readCaptionOverlay, type CaptionAnimal } from '@/lib/captions/caption';
 import { zodiacSymbolSvg } from '@/lib/captions/zodiac-symbols';
-import { DEFAULT_FRAME_STYLE, FRAME_SHAPES, frameAssetIds, frameCrop, frameLayers, readFrameOverlay, sameCard, type FrameCard, type FrameShape } from './frame';
+import { DEFAULT_FRAME_STYLE, FRAME_SHAPES, frameAssetIds, frameBase, frameBaseForWidth, frameCrop, frameLayers, readFrameOverlay, sameCard, type FrameCard, type FrameShape } from './frame';
 import { FRAMED_PRINTS_ONLY, framedProductAllowed, isFramed } from './rules';
 
 export const FRAME_MIGRATION = 'Run db/migrations/2026-11-13-framed-cards.sql first';
@@ -113,7 +113,10 @@ export async function designCard(supabase: SupabaseClient, imageId: string, anim
 export async function bakeFrame(cleanPublicId: string, card: FrameCard, folder = 'pawtraits/catalog-frames'): Promise<{ public_id: string; secure_url: string; width: number; height: number; bytes: number }> {
   configure();
   await ensureFrameAssets();
-  const url = cloudinary.url(cleanPublicId, { secure: true, raw_transformation: [frameCrop('2:3'), frameLayers(card, '2:3')].join('/'), format: 'png' });
+  // The frame's pixel layout needs a known base: the largest 2:3 inside the clean picture (2000 × 3000 when its size can't be read)
+  const dims = await cloudinaryService.getSourceDimensions(cleanPublicId).catch(() => null);
+  const base = dims ? frameBase('2:3', dims) : { width: 2000, height: 3000 };
+  const url = cloudinary.url(cleanPublicId, { secure: true, raw_transformation: [frameCrop(base), frameLayers(card, '2:3', base)].join('/'), format: 'png' });
   const r = await cloudinary.uploader.upload(url, { folder, resource_type: 'image', tags: ['frame-card'] });
   return { public_id: r.public_id, secure_url: r.secure_url, width: r.width, height: r.height, bytes: r.bytes };
 }
@@ -223,7 +226,7 @@ export async function reapplyFrameAfterWords(supabase: SupabaseClient, imageId: 
 
 /** Watermarked previews of a card on a clean picture, one per print shape (the picture is cropped to the shape first) */
 export function frameShapeUrls(cleanPublicId: string, card: FrameCard, width = 400): Record<FrameShape, string> {
-  return Object.fromEntries(FRAME_SHAPES.map(s => [s, cloudinaryService.getPublicVariantUrl(cleanPublicId, 'catalog_watermarked', { pre: frameCrop(s), overlay: frameLayers(card, s), format: 'jpg', width })])) as Record<FrameShape, string>;
+  return Object.fromEntries(FRAME_SHAPES.map(s => [s, cloudinaryService.getPublicVariantUrl(cleanPublicId, 'catalog_watermarked', { pre: frameCrop(frameBaseForWidth(s, width)), overlay: frameLayers(card, s, frameBaseForWidth(s, width)), format: 'jpg', width })])) as Record<FrameShape, string>;
 }
 
 /** What a customer's portrait shows: generation_metadata.frame → the card, or null */

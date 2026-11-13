@@ -9,8 +9,10 @@
  * clean picture (image_catalog.frame_overlay) so AI variations never copy the frame. Server code
  * (uploading the frame files, baking, applying) is in lib/frames/server.ts.
  *
- * Use frameLayers() on a picture ALREADY cropped to the shape (frameCrop()). Phase B (print files
- * per size, the customer's pet name) calls it with a shape and frameTitle(base, petName).
+ * Every layout value is a whole number of pixels of a known base size (Cloudinary only keeps two
+ * decimals of fl_relative values, which is too coarse). Crop the picture to the base with
+ * frameCrop(), then add frameLayers(card, shape, base); the base is required. Per-customer
+ * frames (the pet name in the title) call the same functions with frameTitle(base, petName).
  */
 import { escapeWords } from '@/lib/picture-words';
 import { symbolPublicId } from '@/lib/captions/caption';
@@ -53,8 +55,8 @@ export const FRAME_STYLES = {
     taglineFont: 'pawtraits/frames/fonts/playfair-display-700-italic.woff2',
     ink: '1E1708', highlight: 'ECDEAA', medallionInk: 'D9C48A',
     geometry: {
-      '2:3': { aspect: 2 / 3, medallion: { x: 0.4997, y: 0.0744, r: 0.0704 }, plate: { x0: 0.2689, x1: 0.7402, y0: 0.9114, y1: 0.9561 } },
-      '3:4': { aspect: 3 / 4, medallion: { x: 0.4997, y: 0.0838, r: 0.0704 }, plate: { x0: 0.2689, x1: 0.7402, y0: 0.9002, y1: 0.9506 } },
+      '2:3': { aspect: 2 / 3, medallion: { x: 0.4997, y: 0.0744, r: 0.0704 }, plate: { x0: 0.2664, x1: 0.7377, y0: 0.9114, y1: 0.9561 } },
+      '3:4': { aspect: 3 / 4, medallion: { x: 0.4997, y: 0.0838, r: 0.0704 }, plate: { x0: 0.2664, x1: 0.7377, y0: 0.9002, y1: 0.9506 } },
     },
   },
 } satisfies Record<string, FrameStyle>;
@@ -73,25 +75,18 @@ export const FRAME_MAX = { pet: 14 };
 export const FRAME_LAYOUT = {
   title: 0.36, titleSolo: 0.46, tagline: 0.24, gap: 0.09,        // × plate height
   spacing: 0.10,                                                 // title letter spacing × title size
-  engrave: 0.02,                                                 // highlight offset down × plate height
+  engrave: 0.02,                                                 // highlight offset down × plate height (at least 1 px)
   fit: 0.88,                                                     // text may use this share of the plate width
   symbolWidth: 1.45,                                             // zodiac symbol width × radius
-  numeralWidth: 1.5, numeralSize: 1.1,                           // numeral box width and nominal size × radius (cap height 0.78 r, under the 0.9 r limit)
-  // Where the letters sit in a Cloudinary text layer, as a share of the font size below the
-  // layer's centre (Playfair: ascent 1.082, descent 0.251, cap height 0.708, x height 0.514).
-  // Estimates: tune against a real preview if the words look high or low on the plate.
-  capsDrop: 0.06, mixedDrop: 0.11,
+  numeralWidth: 1.5, numeralSize: 1.1,                           // numeral box width and size × radius
+  capHeight: 0.708,                                              // Playfair capital height × font size (both fonts)
+  // Measured on real Cloudinary renders: the capitals' band sits this far below the text layer's
+  // centre, as a share of the font size.
+  titleDrop: 0.02, taglineDrop: 0.03, numeralDrop: 0.02,
 };
 
-/** Text is drawn this many pixels wide per 1.0 of the picture's width, then scaled down: crisp up to a ~3,500 px print file */
-export const RENDER_PX = 7000;
-
-/** A relative Cloudinary number: 4 places; whole numbers keep ".0" (a bare 1 would mean one pixel) */
-export function rel(v: number): string {
-  const n = Math.round(v * 10000) / 10000;
-  if (n === 0) return '0';
-  return Number.isInteger(n) ? n.toFixed(1) : String(n);
-}
+/** A relative Cloudinary number is only exact to 2 places, so everything is emitted in whole pixels of a known base size */
+export interface FrameBase { width: number; height: number }
 
 /** Cloudinary refers to a font or image in a layer by its public id with "/" as ":" */
 export const layerId = (publicId: string) => publicId.replace(/\//g, ':');
@@ -102,8 +97,24 @@ export function frameShapeFor(aspect: number): FrameShape {
   return Math.abs(aspect - 2 / 3) <= Math.abs(aspect - 3 / 4) ? '2:3' : '3:4';
 }
 
-/** Cloudinary crop to a shape (centred): put it before frameLayers() unless the picture is already that shape */
-export const frameCrop = (shape: FrameShape) => `c_fill,ar_${shape},g_center`;
+const SHAPE_PARTS: Record<FrameShape, [number, number]> = { '2:3': [2, 3], '3:4': [3, 4] };
+
+/** The largest exactly-shaped base inside a picture of this size (k × the shape's parts) */
+export function frameBase(shape: FrameShape, within: { width: number; height: number }): FrameBase {
+  const [a, b] = SHAPE_PARTS[shape];
+  const k = Math.max(1, Math.floor(Math.min(within.width / a, within.height / b)));
+  return { width: a * k, height: b * k };
+}
+
+/** The base for a display size: this width, in the shape's proportions */
+export function frameBaseForWidth(shape: FrameShape, width: number): FrameBase {
+  const [a, b] = SHAPE_PARTS[shape];
+  const w = Math.max(1, Math.round(width));
+  return { width: w, height: Math.round((w * b) / a) };
+}
+
+/** Cloudinary crop (centred) to exactly the base: put it before frameLayers(), which needs this size */
+export const frameCrop = (base: FrameBase) => `c_fill,w_${base.width},h_${base.height},g_center`;
 
 /** "DAISY · TAURUS" with a pet name (trimmed, 14 characters at most), else "TAURUS" */
 export function frameTitle(base: string, petName?: string | null): string {
@@ -127,107 +138,119 @@ export function charWidth(ch: string): number {
   return 0.4;                                                    // "·", dashes, other punctuation, accents (close enough)
 }
 
-/** Estimated width of a line as a share of the picture's width, letter spacing included */
+/** Estimated width of a line in the same unit as `size`, letter spacing (a share of the size, after every letter) included */
 export function estimateWidth(text: string, size: number, spacing = 0): number {
   return Array.from(text).reduce((w, ch) => w + (charWidth(ch) + spacing) * size, 0);
 }
 
-/** The size to use: the wanted size, or smaller so the line's estimated width fits `maxWidth` */
+/** The size to use: the wanted size, or smaller so the line's estimated width fits `maxWidth` (same unit) */
 export function fitSize(text: string, size: number, maxWidth: number, spacing = 0): number {
   const w = estimateWidth(text, size, spacing);
   return w > maxWidth ? size * (maxWidth / w) : size;
 }
 
-export interface FrameLine { text: string; size: number; x: number; y: number; maxWidth: number }
+/** One line of text, in whole pixels: font size, letter spacing, max width, and where its layer's centre goes (offset from the base centre) */
+export interface FrameLine { text: string; size: number; spacing: number; maxWidth: number; dx: number; dy: number; font: 'title' | 'tagline' }
 export interface FrameLayout {
   shape: FrameShape;
+  base: FrameBase;
   title: FrameLine;
   tagline: FrameLine | null;
-  medallion: { x: number; y: number; r: number; symbolWidth: number; numeral: FrameLine | null };
-  engrave: number;                                               // highlight offset, share of height
-}
-
-/**
- * Where everything goes, as shares of the picture: x and sizes of its width, y of its height.
- * Title and tagline are centred on the plate together (the title alone when there is no tagline).
- * `y` of a line is where its letters are centred (the text layer is nudged for its own padding).
- */
-export function frameLayout(card: FrameCard, shape: FrameShape, style: FrameStyleId = DEFAULT_FRAME_STYLE): FrameLayout {
-  const g = FRAME_STYLES[style].geometry[shape];
-  const L = FRAME_LAYOUT;
-  const plateHW = (g.plate.y1 - g.plate.y0) / g.aspect;          // plate height in width units
-  const maxWidth = (g.plate.x1 - g.plate.x0) * L.fit;
-  const x = (g.plate.x0 + g.plate.x1) / 2;
-  const cyW = ((g.plate.y0 + g.plate.y1) / 2) / g.aspect;        // plate centre, width units
-  const title = frameCaps(card.title);
-  const tagline = (card.tagline ?? '').trim();
-  const titleSize = fitSize(title, (tagline ? L.title : L.titleSolo) * plateHW, maxWidth, L.spacing);
-  let titleY = cyW, tagY = 0, tagSize = 0;
-  if (tagline) {
-    tagSize = fitSize(tagline, L.tagline * plateHW, maxWidth);
-    const block = L.title * plateHW + L.gap * plateHW + L.tagline * plateHW;   // laid out at the nominal sizes so a shrunk line doesn't move the other
-    const top = cyW - block / 2;
-    titleY = top + (L.title * plateHW) / 2;
-    tagY = top + (L.title + L.gap) * plateHW + (L.tagline * plateHW) / 2;
-  }
-  const toH = (yW: number, size: number, drop: number) => (yW - drop * size) * g.aspect;
-  const m = g.medallion;
-  const numeral = card.medallion && 'numeral' in card.medallion && card.medallion.numeral.trim() ? card.medallion.numeral.trim() : null;
-  const numMax = L.numeralWidth * m.r;
-  const numSize = numeral ? fitSize(numeral, L.numeralSize * m.r, numMax) : 0;
-  return {
-    shape,
-    title: { text: title, size: titleSize, x, y: toH(titleY, titleSize, L.capsDrop), maxWidth },
-    tagline: tagline ? { text: tagline, size: tagSize, x, y: toH(tagY, tagSize, L.mixedDrop), maxWidth } : null,
-    medallion: {
-      x: m.x, y: m.y, r: m.r, symbolWidth: L.symbolWidth * m.r,
-      numeral: numeral ? { text: numeral, size: numSize, x: m.x, y: toH(m.y / g.aspect, numSize, L.capsDrop), maxWidth: numMax } : null,
-    },
-    engrave: L.engrave * (g.plate.y1 - g.plate.y0),
-  };
+  medallion: { dx: number; dy: number; symbolWidth: number; numeral: FrameLine | null };
+  engrave: number;                                               // highlight offset down, px
 }
 
 const frameCaps = (t: string) => String(t ?? '').replace(/\s+/g, ' ').trim().toUpperCase();
+const int = (v: number) => { const n = Math.round(v); return n === 0 ? 0 : n; };   // never -0
+
+function checkBase(base: FrameBase): FrameBase {
+  if (!base || !Number.isInteger(base.width) || !Number.isInteger(base.height) || base.width < 1 || base.height < 1) {
+    throw new Error('frameLayers needs the base picture size in whole pixels (crop the picture to it first)');
+  }
+  return base;
+}
 
 /**
- * One line of words as layers. The text is set big (RENDER_PX per picture width), shrunk by
- * c_limit if it is wider than its box, padded to a fixed box so its centre is the box's centre,
- * then the box is scaled to `maxWidth` of the picture's width. Every number is a share of the
- * picture, so the same string suits a 600 px thumbnail and a 3,500 px print file.
+ * Where everything goes, in whole pixels of `base` (a picture already cropped to `shape` and exactly
+ * that size). Offsets are from the base centre (g_center). The title and tagline INK (capital
+ * bands) plus the gap are centred together on the plate; the title alone when there is no tagline.
  */
-export function textLayer(line: FrameLine, font: string, colour: string, opts: { spacing?: number; dy?: number } = {}): string {
-  const px = Math.max(8, Math.round(line.size * RENDER_PX));
-  const boxW = Math.max(40, Math.round(line.maxWidth * RENDER_PX));
-  const boxH = Math.round(px * 1.7);
-  const ls = opts.spacing ? `_letter_spacing_${Math.round(px * opts.spacing)}` : '';
+export function frameLayout(card: FrameCard, shape: FrameShape, base: FrameBase, style: FrameStyleId = DEFAULT_FRAME_STYLE): FrameLayout {
+  checkBase(base);
+  const g = FRAME_STYLES[style].geometry[shape];
+  const L = FRAME_LAYOUT;
+  const W = base.width, H = base.height;
+  const plateH = (g.plate.y1 - g.plate.y0) * H;
+  const maxWidth = int((g.plate.x1 - g.plate.x0) * W * L.fit);
+  const cx = ((g.plate.x0 + g.plate.x1) / 2) * W, cy = ((g.plate.y0 + g.plate.y1) / 2) * H;
+  const title = frameCaps(card.title);
+  const tagline = (card.tagline ?? '').trim();
+  const px = (v: number) => Math.max(1, Math.round(v));
+  const titleNominal = (tagline ? L.title : L.titleSolo) * plateH;
+  const titleSize = px(fitSize(title, titleNominal, maxWidth, L.spacing));
+  const spacing = Math.round(L.spacing * titleSize);
+  // Capital band centres: the whole block (title band, gap, tagline band) is centred on the plate
+  let titleBand = cy, tagBand = 0, tagSize = 0;
+  if (tagline) {
+    const tagNominal = L.tagline * plateH;
+    tagSize = px(fitSize(tagline, tagNominal, maxWidth));
+    const block = L.capHeight * titleNominal + L.gap * plateH + L.capHeight * tagNominal;
+    const top = cy - block / 2;
+    titleBand = top + (L.capHeight * titleNominal) / 2;
+    tagBand = top + L.capHeight * titleNominal + L.gap * plateH + (L.capHeight * tagNominal) / 2;
+  }
+  // Text layers are centred on their box, the capitals sit a little below it: move the layer up by the drop.
+  // Letter spacing also follows the last letter, which pushes the word left by half a space: shift right.
+  const titleLine: FrameLine = { text: title, size: titleSize, spacing, maxWidth, dx: int(cx - W / 2 + spacing / 2), dy: int(titleBand - L.titleDrop * titleSize - H / 2), font: 'title' };
+  const m = g.medallion;
+  const mx = m.x * W, my = m.y * H, r = m.r * W;
+  const numeral = card.medallion && 'numeral' in card.medallion && card.medallion.numeral.trim() ? card.medallion.numeral.trim() : null;
+  const numSize = numeral ? px(fitSize(numeral, L.numeralSize * r, L.numeralWidth * r)) : 0;
+  return {
+    shape, base,
+    title: titleLine,
+    tagline: tagline ? { text: tagline, size: tagSize, spacing: 0, maxWidth, dx: int(cx - W / 2), dy: int(tagBand - L.taglineDrop * tagSize - H / 2), font: 'tagline' } : null,
+    medallion: {
+      dx: int(mx - W / 2), dy: int(my - H / 2), symbolWidth: px(L.symbolWidth * r),
+      numeral: numeral ? { text: numeral, size: numSize, spacing: 0, maxWidth: int(L.numeralWidth * r), dx: int(mx - W / 2), dy: int(my - L.numeralDrop * numSize - H / 2), font: 'title' } : null,
+    },
+    engrave: Math.max(1, Math.round(L.engrave * plateH)),
+  };
+}
+
+/**
+ * One line of text as a layer, drawn directly at its pixel size (no scaling: Cloudinary's relative
+ * values are only exact to 2 places). c_limit is the safety net if the font is wider than expected.
+ */
+export function textLayer(line: FrameLine, fontId: string, colour: string, opts: { dy?: number } = {}): string {
+  const ls = line.spacing > 0 ? `_letter_spacing_${line.spacing}` : '';
   return [
-    `l_text:${layerId(font)}_${px}${ls}:${escapeWords(line.text)},co_rgb:${colour}`,
-    `c_limit,w_${boxW},h_${boxH}`,
-    `c_mpad,w_${boxW},h_${boxH}`,
-    `c_scale,w_${rel(line.maxWidth)},fl_relative`,
-    `fl_layer_apply,g_center,x_${rel(line.x - 0.5)},y_${rel(line.y + (opts.dy ?? 0) - 0.5)},fl_relative`,
+    `l_text:${layerId(fontId)}_${line.size}${ls}:${escapeWords(line.text)},co_rgb:${colour}`,
+    `c_limit,w_${line.maxWidth}`,
+    `fl_layer_apply,g_center,x_${line.dx},y_${line.dy + (opts.dy ?? 0)}`,
   ].join('/');
 }
 
 /**
  * Raw Cloudinary transformation drawing the frame, medallion content, title and tagline on a
- * picture already cropped to `shape`, in this order: the frame image (stretched to cover the
- * whole picture), the medallion content, then each line twice (highlight colour a hair lower,
- * then ink) for an engraved look.
+ * picture already cropped to `shape` and exactly `base` pixels (see frameCrop / frameBase), in this
+ * order: the frame image (stretched to cover the whole picture), the medallion content, then each
+ * line twice (highlight colour a hair lower, then ink) for an engraved look. Every size and offset is
+ * a whole number of pixels, so the same card at another size needs another call with that size.
  */
-export function frameLayers(card: FrameCard, shape: FrameShape, style: FrameStyleId = DEFAULT_FRAME_STYLE): string {
+export function frameLayers(card: FrameCard, shape: FrameShape, base: FrameBase, style: FrameStyleId = DEFAULT_FRAME_STYLE): string {
   const S = FRAME_STYLES[style];
-  const lay = frameLayout(card, shape, style);
+  const lay = frameLayout(card, shape, base, style);
   const layers = [`l_${layerId(S.frames[shape])}/c_scale,w_1.0,h_1.0,fl_relative/fl_layer_apply`];
   const med = card.medallion;
   if (med && 'symbol' in med && /^[a-z-]+$/.test(med.symbol)) {
-    layers.push(`l_${layerId(symbolPublicId(med.symbol))}/e_colorize:100,co_rgb:${S.medallionInk}/c_scale,w_${rel(lay.medallion.symbolWidth)},fl_relative/fl_layer_apply,g_center,x_${rel(lay.medallion.x - 0.5)},y_${rel(lay.medallion.y - 0.5)},fl_relative`);
+    layers.push(`l_${layerId(symbolPublicId(med.symbol))}/e_colorize:100,co_rgb:${S.medallionInk}/c_scale,w_${lay.medallion.symbolWidth}/fl_layer_apply,g_center,x_${lay.medallion.dx},y_${lay.medallion.dy}`);
   } else if (lay.medallion.numeral) {
     layers.push(textLayer(lay.medallion.numeral, S.titleFont, S.medallionInk));
   }
   if (lay.title.text) {
-    layers.push(textLayer(lay.title, S.titleFont, S.highlight, { spacing: FRAME_LAYOUT.spacing, dy: lay.engrave }));
-    layers.push(textLayer(lay.title, S.titleFont, S.ink, { spacing: FRAME_LAYOUT.spacing }));
+    layers.push(textLayer(lay.title, S.titleFont, S.highlight, { dy: lay.engrave }));
+    layers.push(textLayer(lay.title, S.titleFont, S.ink));
   }
   if (lay.tagline) {
     layers.push(textLayer(lay.tagline, S.taglineFont, S.highlight, { dy: lay.engrave }));
