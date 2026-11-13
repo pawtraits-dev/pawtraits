@@ -59,7 +59,7 @@ function RowEditor({ row, cloudName, onSaved }: { row: Row; cloudName: string; o
     setBusy(null);
     if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
     const shownOn = row.captioned + row.framed;
-    setMsg({ ok: true, text: shownOn ? `Saved. ${shownOn} picture${shownOn === 1 ? ' shows' : 's show'} the older wording: press "Put on all" to redraw.` : 'Saved.' });
+    setMsg({ ok: true, text: shownOn ? `Saved. ${shownOn} picture${shownOn === 1 ? ' shows' : 's show'} the older wording: press "${row.kind === 'pawsonality' ? 'Put on all' : 'Redraw frames'}" to redraw.` : 'Saved.' });
     onSaved();
   };
   const all = async (on: boolean, what: 'plate' | 'frame' = 'plate') => {
@@ -110,6 +110,7 @@ function RowEditor({ row, cloudName, onSaved }: { row: Row; cloudName: string; o
           {row.kind === 'pawsonality' && <button disabled={!!busy || dirty || !row.designs} onClick={() => all(true)} title={dirty ? 'Save the wording first' : undefined} className="rounded bg-amber-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">Put on all {row.designs}</button>}
           {row.kind === 'pawsonality' && row.captioned > 0 && <button disabled={!!busy} onClick={() => all(false)} className="rounded border border-gray-300 px-3 py-1 text-xs disabled:opacity-40">Take off all</button>}
           {row.hasFrame && <button disabled={!!busy || dirty || !row.designs} onClick={() => all(true, 'frame')} title={dirty ? 'Save the wording first' : undefined} className="rounded bg-indigo-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">Put the frame on all</button>}
+          {row.hasFrame && row.framed > 0 && <button disabled={!!busy || dirty} onClick={() => all(true, 'frame')} title={dirty ? 'Save the wording first' : 'Draw the frames again with the wording above'} className="rounded border border-indigo-300 px-3 py-1 text-xs text-indigo-700 disabled:opacity-40">Redraw frames</button>}
           {row.hasFrame && row.framed > 0 && <button disabled={!!busy} onClick={() => all(false, 'frame')} className="rounded border border-gray-300 px-3 py-1 text-xs disabled:opacity-40">Take the frame off all</button>}
           {busy && <span role="status" className="flex items-center gap-1 text-xs text-gray-700"><Loader2 className="h-3 w-3 animate-spin" /> {busy}</span>}
           {msg && <span role={msg.ok ? 'status' : 'alert'} className={`text-xs ${msg.ok ? 'text-green-700' : 'text-red-700'}`}>{msg.text}</span>}
@@ -129,6 +130,15 @@ export default function CaptionsPage() {
   };
   useEffect(() => { load(); }, []);
   const rows = (data?.rows ?? []).filter(r => r.kind === kind);
+  const [bulk, setBulk] = useState<{ busy: boolean; ok?: boolean; text?: string }>({ busy: false });
+  const frameEvery = async (k: 'zodiac' | 'tarot') => {
+    setBulk({ busy: true });
+    const r = await new AdminSupabaseService().frameEveryDesign(k);
+    if (!r.ok) { setBulk({ busy: false, ok: false, text: r.error }); return; }
+    const d = r.data;
+    setBulk({ busy: false, ok: !d.failed, text: `${d.done} framed${d.failed ? `, ${d.failed} failed (${d.errors.join('; ')})` : ''}${d.left ? `, ${d.left} still to do: press again to carry on` : d.total ? ', none left' : ', no designs yet'}.` });
+    load();
+  };
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -143,6 +153,14 @@ export default function CaptionsPage() {
           </button>
         ))}
       </div>
+      {kind !== 'pawsonality' && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button disabled={bulk.busy} onClick={() => frameEvery(kind)} className="rounded bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40">Put the frame on every design</button>
+          <span className="text-xs text-gray-500">Designs in {kind === 'zodiac' ? 'a sign' : 'a card'} are framed automatically when they are filed there; this catches up the earlier ones.</span>
+          {bulk.busy && <span role="status" className="flex items-center gap-1 text-xs text-gray-700"><Loader2 className="h-3 w-3 animate-spin" /> Drawing frames… (a few seconds each)</span>}
+          {bulk.text && <span role={bulk.ok ? 'status' : 'alert'} className={`text-xs ${bulk.ok ? 'text-green-700' : 'text-red-700'}`}>{bulk.text}</span>}
+        </div>
+      )}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       {!data && !error && <p className="text-sm text-gray-500">Loading…</p>}
       <ul className="space-y-3">

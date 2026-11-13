@@ -1,5 +1,5 @@
 // Run: npx tsx scripts/test-auto-tag.ts   (no network: the model is injected)
-import { autoTagImage, buildPrompt, limitSingles, parseTagReply } from '../lib/collections/auto-tag';
+import { autoTagImage, buildPrompt, limitSingles, parseTagReply, thumbUrl } from '../lib/collections/auto-tag';
 
 let pass = 0, fail = 0;
 const ok = (name: string, cond: boolean, extra?: unknown) => { if (cond) pass++; else { fail++; console.log('FAIL', name, extra ?? ''); } };
@@ -24,6 +24,10 @@ const prompt = buildPrompt({ pawsonalities: [] }, { theme: 'Aries' });
 ok('prompt: one sign, decoration, tarot list', /at most ONE zodiac sign/.test(prompt) && /decoration/.test(prompt) && /tarot\/the-fool \(The Fool\)/.test(prompt) && /tarot\/the-world \(The World\)/.test(prompt) && /Tarot only if the text says so/.test(prompt));
 ok('parse keeps tarot paths', eq(parseTagReply('{"collections":["tarot/the-fool","zodiac/leo"],"tags":[]}', new Set(['tarot/the-fool', 'zodiac/leo']))?.collections, ['tarot/the-fool', 'zodiac/leo']));
 
+// The tagger looks at the clean picture, never the framed copy
+process.env.CLOUDINARY_CLOUD_NAME = 'demo';
+ok('thumb uses the clean picture when given', /\/clean-id$/.test(thumbUrl({ cloudinary_public_id: 'framed-id' }, 'clean-id') ?? '') && /\/framed-id$/.test(thumbUrl({ cloudinary_public_id: 'framed-id' }) ?? ''));
+
 // End to end with a fake database and model: the Aries design with a starry background
 function fakeDb(adminZodiac: boolean) {
   const cols = [
@@ -31,23 +35,25 @@ function fakeDb(adminZodiac: boolean) {
   ];
   const links: any[] = adminZodiac ? [{ source: 'admin', excluded: false, collections: { kind: 'zodiac', depth: 1 } }] : [];
   let upserted: any[] = [];
+  const log: string[] = [];
   const row = { id: 'img', prompt_text: 'Aries pup, ram horns', description: null, marketing_description: null, tags: [], is_customer_generated: false, cloudinary_public_id: null, public_url: null, breeds: { name: 'Beagle' }, themes: { name: 'Zodiac Aries' }, outfits: null };
   const q = (table: string) => {
     const chain: any = {
-      select: () => chain, eq: () => chain, neq: () => chain, order: () => chain, update: () => chain, delete: () => chain,
-      upsert: (r: any[]) => { upserted = r; return chain; },
+      select: (cols?: string) => { if (/frame_overlay/.test(cols ?? '')) log.push('frame check'); return chain; }, eq: () => chain, neq: () => chain, in: () => chain, limit: () => chain, order: () => chain, update: () => chain, delete: () => chain,
+      upsert: (r: any[]) => { upserted = r; log.push('links'); return chain; },
       maybeSingle: async () => ({ data: table === 'image_catalog' ? row : null }),
       then: (f: any) => f({ data: table === 'collections' ? cols : table === 'design_collections' ? links : [] }),
     };
     return chain;
   };
-  return { db: { from: q }, upserted: () => upserted };
+  return { db: { from: q }, upserted: () => upserted, log: () => log };
 }
 (async () => {
   const model = async () => '{"collections":["zodiac/aries","zodiac/leo","zodiac/gemini"],"team":null,"tags":["ram horns"],"confidence":0.9}';
   const a = fakeDb(false);
   const r1 = await autoTagImage(a.db, 'img', { model, force: true });
   ok('end to end: only Aries is linked', r1.ok && eq(r1.answer.collections, ['zodiac/aries']) && eq(a.upserted().map((x: any) => x.collection_id), ['z0']), r1);
+  ok('tag first, then frame', eq(a.log().slice(-2), ['links', 'frame check']), a.log());
   const b = fakeDb(true);
   const r2 = await autoTagImage(b.db, 'img', { model, force: true });
   ok('end to end: admin link means no automatic sign', r2.ok && eq(r2.answer.collections, []) && b.upserted().length === 0, r2);

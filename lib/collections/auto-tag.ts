@@ -13,6 +13,8 @@ import { OCCASIONS, ZODIAC } from './definitions';
 import { LEAGUES, SPORTS_TEAMS } from './sports-teams';
 import { TAROT } from '@/lib/tarot';
 import { createWithUsage } from '@/lib/ai/usage';
+import { cleanPictureId } from '@/lib/captions/server';
+import { frameIfCard } from '@/lib/frames/server';
 
 const MODEL = 'claude-haiku-4-5-20251001';
 export const MAX_TAGS = 10;
@@ -135,9 +137,11 @@ function anthropic() {
   return (client ??= new Anthropic({ apiKey }));
 }
 
-function thumbUrl(row: any): string | null {
+/** The tagger looks at the picture without a caption plate, frame or words: `cleanId` is that picture's id, else the design's own */
+export function thumbUrl(row: any, cleanId?: string | null): string | null {
   const cloud = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-  if (cloud && row.cloudinary_public_id) return `https://res.cloudinary.com/${cloud}/image/upload/c_limit,w_768,h_768/f_jpg,q_80/${row.cloudinary_public_id}`;
+  const id = cleanId || row.cloudinary_public_id;
+  if (cloud && id) return `https://res.cloudinary.com/${cloud}/image/upload/c_limit,w_768,h_768/f_jpg,q_80/${id}`;
   return /^https:\/\//.test(row.public_url || '') ? row.public_url : null;
 }
 
@@ -187,7 +191,8 @@ export async function autoTagImage(supabase: any, imageId: string, opts: { model
     const petBreeds = Array.from(new Set([row.breeds?.name, ...(pets ?? []).map((p: any) => p.breeds?.name)].filter(Boolean)));
     const breed = petBreeds.length > 1 ? `${(pets ?? []).length || petBreeds.length} pets: ${petBreeds.join(' and ')}` : petBreeds[0];
     const prompt = buildPrompt(ctx, { prompt: row.prompt_text, description: row.marketing_description || row.description, theme: row.themes?.name, breed, outfit: row.outfits?.name });
-    const reply = await (opts.model ?? askModel)(prompt, thumbUrl(row));
+    const cleanId = await cleanPictureId(supabase, imageId, row.cloudinary_public_id).catch(() => null);   // never the framed copy
+    const reply = await (opts.model ?? askModel)(prompt, thumbUrl(row, cleanId));
     const answer = parseTagReply(reply, new Set(byPath.keys()));
     if (answer) {
       // At most one sign and one card; admin links to a sign or card win over automatic ones
@@ -214,6 +219,7 @@ export async function autoTagImage(supabase: any, imageId: string, opts: { model
     await supabase.from('design_collections').delete().eq('image_id', imageId).eq('source', 'auto').eq('excluded', false);
     const rows = paths.map(p => byPath.get(p)).filter(Boolean).map((c: any) => ({ image_id: imageId, collection_id: c.id, source: 'auto' }));
     if (rows.length) await supabase.from('design_collections').upsert(rows, { onConflict: 'image_id,collection_id', ignoreDuplicates: true });
+    await frameIfCard(supabase, imageId);   // tag first, then frame: a design in a sign or card gets its frame (best-effort)
     return { ok: true, answer };
   } catch (err: any) {
     console.error('autoTagImage failed', imageId, err);
@@ -225,7 +231,7 @@ export async function autoTagImage(supabase: any, imageId: string, opts: { model
 /** For save routes: tag a new design if auto-tagging is on (call inside next/server `after`) */
 export async function autoTagNew(supabase: any, imageId: string | null | undefined): Promise<void> {
   if (!imageId) return;
-  if (!(await getSetting('auto_tag_enabled'))) return;
+  if (!(await getSetting('auto_tag_enabled'))) { await frameIfCard(supabase, imageId); return; }   // e.g. a version of a design that is already in a sign
   await autoTagImage(supabase, imageId);
 }
 

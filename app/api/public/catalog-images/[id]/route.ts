@@ -179,6 +179,9 @@ export async function GET(
         frame = {
           dog: fc.dog, cat: fc.cat, designAnimal: fc.designAnimal, nameMax: FRAME_MAX.pet,
           on: !!a, previews: { dog: previewOf(fc.dog), cat: previewOf(fc.cat) },
+          // "With frame" / "Without frame" on the design's picture: both watermarked like every preview
+          framedUrl: a ? displayUrl : (clean && fc.card ? frameShapeUrls(clean, fc.card, 1200)['2:3'] : displayUrl),
+          cleanUrl: clean ? cloudinaryService.getPublicVariantUrl(clean, 'full_size') : null,
           // Buy-sheet thumbnails, one per print shape, only when the design itself shows the frame
           thumbs: a && clean ? frameShapeUrls(clean, { title: a.title, tagline: a.tagline, medallion: a.medallion }, 240) : null,
         };

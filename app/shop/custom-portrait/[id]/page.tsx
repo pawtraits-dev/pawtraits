@@ -12,6 +12,7 @@ import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
 import BuyOptionsSheet, { type BuyTarget } from '@/components/customise/BuyOptionsSheet';
 import { customPortraitTitle } from '@/lib/cart/items';
+import { FrameSwitch, type FrameChoiceInfo } from '@/components/customise/FrameToggle';
 
 export default function CustomPortraitPurchasePage() {
   const { id } = useParams() as { id: string };
@@ -19,6 +20,8 @@ export default function CustomPortraitPurchasePage() {
   const [target, setTarget] = useState<BuyTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scannedSize, setScannedSize] = useState<string | null>(null);
+  const [choice, setChoice] = useState<FrameChoiceInfo | null>(null);
+  const [version, setVersion] = useState(0);   // bumped when the frame is switched: load the portrait again
 
   useEffect(() => {
     try { setScannedSize(sessionStorage.getItem('pt_qr_size')); } catch { /* ignore */ }
@@ -37,13 +40,14 @@ export default function CustomPortraitPurchasePage() {
           title: customPortraitTitle(c.pet_name, cat?.theme?.displayName || cat?.theme?.name),
           formatId: cat?.format?.id,
           themeName: cat?.theme?.name,
-          frame: c.frame ?? null,
+          frame: c.frameChoice ? (c.frameChoice.state === 'on' ? (c.frame ?? { thumbs: null }) : null) : (c.frame ?? null),
         });
+        setChoice(c.frameChoice ?? null);
       } catch (e: any) {
         setError(e.message);
       }
     })();
-  }, [id]);
+  }, [id, version]);
 
   return (
     <CountryProvider>
@@ -62,6 +66,7 @@ export default function CustomPortraitPurchasePage() {
             <div className="aspect-square animate-pulse rounded-2xl bg-gray-200" />
           )}
         </div>
+        {target && choice && <div className="mx-auto max-w-xl px-4"><FrameSwitch key={`${id}:${choice.state}`} imageId={id} choice={choice} onChanged={() => setVersion(v => v + 1)} /></div>}
         {target && <BuyOptionsSheet open onClose={() => router.back()} target={target} scannedSize={scannedSize} />}
       </div>
     </CountryProvider>

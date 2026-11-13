@@ -766,6 +766,11 @@ export class AdminSupabaseService {
     return adminRequest<any>('/api/admin/captions', jsonInit('POST', { collectionId, on, what }));
   }
 
+  /** The frame on every design in every sign (or card) that has none yet; press again while `left` > 0 */
+  async frameEveryDesign(kind: 'zodiac' | 'tarot'): Promise<AdminResult<any>> {
+    return adminRequest<any>('/api/admin/captions', jsonInit('POST', { kind }));
+  }
+
   /** Framed card on a design (lib/frames/) */
   async getDesignFrame(imageId: string): Promise<AdminResult<any>> {
     return adminRequest<any>(`/api/admin/catalog/${imageId}/frame`);

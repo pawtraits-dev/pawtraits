@@ -317,7 +317,7 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
           const cleanUrl = ((wordsMeta ?? sloganMeta)?.clean_url as string) ?? generatedImageUrl;
           const baked = await bakeFrame(generatedCloudinaryId, card, 'customer-custom-images');
           frameMeta = {
-            frame: { style: DEFAULT_FRAME_STYLE, title: card.title, tagline: card.tagline, medallion: card.medallion, pet_name: job.frame.petName, base_cloudinary_id: generatedCloudinaryId },
+            frame: { style: DEFAULT_FRAME_STYLE, title: card.title, tagline: card.tagline, medallion: card.medallion, pet_name: job.frame.petName, base_cloudinary_id: generatedCloudinaryId, animal },
             clean_cloudinary_id: cleanId, clean_url: cleanUrl,
           };
           generatedCloudinaryId = baked.public_id;
@@ -423,7 +423,9 @@ export async function POST(request: NextRequest) {
     // Caption plate (type/sign + tagline): '1' on, '0' off; not sent = as the design shows it
     const captionRaw = String(formData.get('caption') ?? '');
     // Framed cards (zodiac sign / tarot card): always framed; the pet's name on the banner is optional
-    const frameNameRaw = formData.get('frameName');
+    // frame=off: "Without frame": an ordinary portrait from the clean picture (no frame, no pet name on a card)
+    const frameOff = String(formData.get('frame') ?? '') === 'off';
+    const frameNameRaw = frameOff ? null : formData.get('frameName');
     const frameName = frameNameRaw && String(frameNameRaw).trim() ? (cleanPetName(frameNameRaw) ?? '').slice(0, FRAME_MAX.pet).trim() || null : null;
     if (frameNameRaw && String(frameNameRaw).trim() && !frameName) {
       return NextResponse.json({ error: 'Please check the name for the card: letters only (spaces, hyphens and apostrophes are fine), up to 14, and nothing rude.' }, { status: 400 });
@@ -764,7 +766,7 @@ export async function POST(request: NextRequest) {
       dog: designCap.dog, cat: designCap.cat, designAnimal: designCap.designAnimal,
       animal: (firstPet?.animal_type === 'cat' || firstPet?.animal_type === 'dog' ? firstPet.animal_type : null) as 'dog' | 'cat' | null,
     } : null;
-    const designFrame = await designCard(supabase as any, catalogImageId).catch(() => null);
+    const designFrame = frameOff ? null : await designCard(supabase as any, catalogImageId).catch(() => null);
     const frame = designFrame && (designFrame.dog || designFrame.cat) ? {
       dog: designFrame.dog, cat: designFrame.cat, designAnimal: designFrame.designAnimal, petName: frameName,
       animal: (firstPet?.animal_type === 'cat' || firstPet?.animal_type === 'dog' ? firstPet.animal_type : null) as 'dog' | 'cat' | null,
