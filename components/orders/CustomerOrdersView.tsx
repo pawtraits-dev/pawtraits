@@ -30,6 +30,15 @@ interface OrderItem {
   total_price: number;
 }
 
+/** A download-only order has nothing to post: no address, delivery charge or delivery date to show. */
+function isDigitalOnly(order: any): boolean {
+  if (order.fulfillment_type === 'digital') return true;
+  const items: any[] = order.order_items || [];
+  const types = items.map(i => i.product_data?.product_type).filter(Boolean);
+  if (types.length && types.length === items.length) return types.every(t => t === 'digital_download');
+  return !order.shipping_city && !order.shipping_address_line_1 && !order.shipping_address && !order.shipping_postcode;
+}
+
 interface Order {
   id: string;
   order_number: string;
@@ -300,9 +309,11 @@ export default function CustomerOrdersView({ userProfile }: CustomerOrdersViewPr
                       <p className="text-sm text-gray-600">
                         Placed on {new Date(order.created_at).toLocaleDateString()}
                       </p>
-                      <p className="text-sm text-gray-600">
-                        Shipping to: {order.shipping_first_name} {order.shipping_last_name}
-                      </p>
+                      {!isDigitalOnly(order) && (
+                        <p className="text-sm text-gray-600">
+                          Delivering to: {order.shipping_first_name} {order.shipping_last_name}
+                        </p>
+                      )}
                       {order.order_type === 'partner_for_client' && (
                         <p className="text-sm text-purple-600 bg-purple-50 px-2 py-1 rounded-md inline-block mt-1">
                           📋 Order placed by partner on your behalf
@@ -405,10 +416,12 @@ export default function CustomerOrdersView({ userProfile }: CustomerOrdersViewPr
                         <span className="text-gray-600">Subtotal:</span>
                         <span>£{(order.subtotal_amount / 100).toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Shipping:</span>
-                        <span>£{(order.shipping_amount / 100).toFixed(2)}</span>
-                      </div>
+                      {!isDigitalOnly(order) && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Delivery:</span>
+                          <span>£{(order.shipping_amount / 100).toFixed(2)}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between font-semibold text-base border-t border-gray-200 pt-2">
                         <span>Total:</span>
                         <span>£{(order.total_amount / 100).toFixed(2)}</span>
@@ -430,7 +443,7 @@ export default function CustomerOrdersView({ userProfile }: CustomerOrdersViewPr
                             <span className="font-medium">Carrier:</span> {order.carrier_name}
                           </div>
                         )}
-                        {order.estimated_delivery && (
+                        {order.estimated_delivery && !isDigitalOnly(order) && (
                           <div className="text-sm text-gray-600">
                             <span className="font-medium">Estimated Delivery:</span> {new Date(order.estimated_delivery).toLocaleDateString()}
                           </div>

@@ -19,6 +19,7 @@
  * /api/public/breeds-with-designs. Admins and partners are sent to their own areas.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { shippingQuoteFor } from '@/lib/shipping/rates';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Camera, Paintbrush, ArrowRight } from 'lucide-react';
@@ -110,6 +111,8 @@ function HomePageContent({ hero }: { hero: FeedItem | null }) {
     return null;
   };
 
+  const ukDelivery = shippingQuoteFor('GB')?.price ?? null;
+
   const lowestPrint = useMemo(() => {
     const v = products.filter(p => p.is_active !== false && p.product_type !== 'digital_download').map(p => prices.get(p.id)).filter((x): x is number => !!x);
     return v.length ? Math.min(...v) : null;
@@ -154,7 +157,7 @@ function HomePageContent({ hero }: { hero: FeedItem | null }) {
               </Link>
             </div>
             <p className="mt-3 text-center text-sm text-gray-500 sm:text-left">
-              {lowestPrint ? `Prints from ${gbp(lowestPrint)} · ` : ''}Tracked UK delivery £5 · Instant downloads
+              {lowestPrint ? `Prints from ${gbp(lowestPrint)} · ` : ''}{ukDelivery ? `Tracked UK delivery ${gbp(ukDelivery)} · ` : ''}Instant downloads
             </p>
           </div>
           <HeroPicture creation={hero} image={heroImage} className="hidden md:block" />
