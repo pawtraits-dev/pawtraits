@@ -33,6 +33,7 @@ import { cleanKitName } from '@/lib/collections/sports-teams';
 import { cleanSlogan, SLOGAN_MAX } from '@/lib/collections/slogan';
 import { cleanPetName, escapeWords, fillWords, PET_NAME_MAX } from '@/lib/picture-words';
 import type { Caption as CaptionText } from '@/lib/captions/caption';
+import { frameTitle, type FrameCard as FrameCardText } from '@/lib/frames/frame';
 import DesignQuizLink from '@/components/quiz/DesignQuizLink';
 import { collectionHref } from '@/lib/collections/href';
 
@@ -61,6 +62,7 @@ interface CatalogImage {
   /** Words on the picture: the customer's pet's name or breed in the sentence (live preview URL with a token) */
   words?: { template: string; phrase: string; previewUrl: string; token: string } | null;
   /** Caption plate (Pawsonality type or Zodiac sign + tagline): optional; dog and cat wording */
+  frame?: { dog: FrameCardText | null; cat: FrameCardText | null; designAnimal: 'dog' | 'cat'; nameMax: number; on: boolean; previews: { dog: string | null; cat: string | null }; thumbs: Partial<Record<'2:3' | '3:4', string>> | null } | null;
   caption?: { dog: CaptionText | null; cat: CaptionText | null; designAnimal: 'dog' | 'cat'; on: boolean; previews: { dog: string | null; cat: string | null } } | null;
   /** One per pet in the picture, left to right: photo N replaces slot N (multi-pet plan phase 2) */
   slots?: { label: string; breedName: string | null; animalType: 'dog' | 'cat' | null; pose: string | null }[];
@@ -71,6 +73,7 @@ interface CustomImage {
   mugMockups?: { pet?: string; text?: string };   // wraparound designs: the finished painting on a mug
   pet_name?: string | null;
   generated_image_url: string | null;
+  frame?: { thumbs: Partial<Record<'2:3' | '3:4', string>> } | null;
   share_token: string | null;
   status: 'pending' | 'generating' | 'complete' | 'failed';
 }
@@ -155,6 +158,8 @@ export default function CustomisePage() {
   // Words on the picture: their pet's name, or their breed
   const [wordsMode, setWordsMode] = useState<'name' | 'breed'>('name');
   const [wordsName, setWordsName] = useState('');
+  // Framed cards (zodiac sign / tarot card): the frame is always on; the pet's name on the banner is optional
+  const [frameName, setFrameName] = useState('');
   const [wordsPreview, setWordsPreview] = useState<string | null>(null);
   const [subjects, setSubjects] = useState<Array<{ pet: Pet | null; file: File | null; preview: string | null; warning?: string | null }>>([{ pet: null, file: null, preview: null }]);
   const [preparing, setPreparing] = useState(false);
@@ -274,6 +279,7 @@ export default function CustomisePage() {
     // The shirt shows the pet's name unless the customer has typed one
     if (catalogImage?.kit && !kitName.trim() && pet.name) setKitName(pet.name.toUpperCase().replace(/[^A-Z '\-]/g, '').slice(0, 12));
     if (catalogImage?.words && !wordsName.trim() && pet.name) setWordsName(pet.name.slice(0, PET_NAME_MAX));
+    if (catalogImage?.frame && !frameName.trim() && pet.name) setFrameName(pet.name.slice(0, catalogImage.frame.nameMax || 14));
   }
   function clearSubject(idx: number) {
     setSubjects(prev => prev.map((s, i) => (i === idx ? { pet: null, file: null, preview: null, warning: null } : s)));
@@ -295,7 +301,8 @@ export default function CustomisePage() {
     const timer = setTimeout(() => setWordsPreview(w.previewUrl.replace(w.token, escapeWords(fillWords(w.template, wordsPhrase)))), 450);
     return () => clearTimeout(timer);
   }, [hasWords, catalogImage?.words, wordsPhrase]);
-  const allReady = subjects.length > 0 && subjects.every(s => s.pet || s.file) && kitNameOk && sloganOk && wordsOk;
+  const frameOk = !catalogImage?.frame || !frameName.trim() || !!cleanPetName(frameName);
+  const allReady = subjects.length > 0 && subjects.every(s => s.pet || s.file) && kitNameOk && sloganOk && wordsOk && frameOk;
 
   function startCustomise() {
     setStep('photo');
@@ -381,6 +388,7 @@ export default function CustomisePage() {
     if (showSlogan && sloganTouched && slogan.trim()) fd.append('slogan', slogan.trim());
     if (hasWords && wordsMode === 'name') fd.append('wordsName', wordsName.trim());
     if (catalogImage.caption) fd.append('caption', captionOn ? '1' : '0');
+    if (catalogImage.frame && frameName.trim()) fd.append('frameName', frameName.trim());
     subjects.forEach((s, i) => {
       const n = subjectCount > 1 ? String(i + 1) : '';
       if (s.pet) fd.append(`petId${n}`, s.pet.pet_id);
@@ -456,10 +464,12 @@ export default function CustomisePage() {
         imageUrl: customImage.generated_image_url || catalogImage.imageUrl,
         title: customPortraitTitle(customImage.pet_name, catalogImage.theme?.displayName || catalogImage.theme?.name),
         formatId: catalogImage.format?.id, themeName: catalogImage.theme?.name,
+        frame: customImage.frame ?? (catalogImage.frame?.dog || catalogImage.frame?.cat ? { thumbs: null } : null),
       }
     : {
         kind: 'catalog', imageId: catalogImage.id, catalogImageId: catalogImage.id, imageUrl: catalogImage.imageUrl,
         title: extractDescriptionTitle(catalogImage.description) || 'Pawtraits print', formatId: catalogImage.format?.id, themeName: catalogImage.theme?.name,
+        frame: catalogImage.frame?.on ? { thumbs: catalogImage.frame.thumbs } : null,
       };
 
   // ---- render ----
@@ -724,6 +734,30 @@ export default function CustomisePage() {
                 )}
               </div>
             )}
+            {catalogImage.frame && (() => {
+              // Worded for their pet: a saved pet's animal, else the design's (an uploaded photo is checked after)
+              const animal = subjects[0]?.pet?.animal_type ?? catalogImage.frame.designAnimal;
+              const c = catalogImage.frame[animal] ?? catalogImage.frame.dog ?? catalogImage.frame.cat;
+              const preview = catalogImage.frame.previews[animal] ?? catalogImage.frame.previews.dog;
+              if (!c) return null;
+              const max = catalogImage.frame.nameMax || 14;
+              return (
+                <div className="mt-5 rounded-2xl border border-purple-200 bg-purple-50/50 p-4">
+                  <p className="font-semibold text-gray-900">Your card</p>
+                  <p className="text-sm text-gray-700">It comes in this frame: “{frameTitle(c.title, frameName).toUpperCase()}”{c.tagline ? <> · <em>{c.tagline}</em></> : null}</p>
+                  <label className="mt-3 block text-sm font-medium text-gray-900" htmlFor="frame-name">Pet&apos;s name on the card</label>
+                  <input id="frame-name" value={frameName} onChange={e => setFrameName(e.target.value.slice(0, max))} maxLength={max}
+                    placeholder="Optional" className="mt-1 h-12 w-full rounded-xl border border-gray-300 px-3 text-base text-gray-900" />
+                  <p className="mt-1 text-xs text-gray-500">Up to {max} letters. You can leave it empty: the card then shows just its title.</p>
+                  {frameName.trim() && !cleanPetName(frameName) && <p role="alert" className="mt-1 text-sm text-red-700">Letters only please (spaces, hyphens and apostrophes are fine), and nothing rude.</p>}
+                  {!subjects[0]?.pet && <p className="mt-1 text-xs text-gray-500">Worded for a {animal}; we match it to your pet&apos;s photo.</p>}
+                  {preview && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={preview} alt="How the card will look" className="mt-3 w-40 rounded-lg border border-purple-200" />
+                  )}
+                </div>
+              );
+            })()}
             {catalogImage.caption && (() => {
               // Worded for their pet: a saved pet's animal, else the design's (an uploaded photo is checked after)
               const animal = subjects[0]?.pet?.animal_type ?? catalogImage.caption.designAnimal;
@@ -785,7 +819,7 @@ export default function CustomisePage() {
             <StickyActionBar>
               <button onClick={generate} disabled={!allReady || preparing}
                 className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 text-lg font-semibold text-white shadow-lg disabled:bg-purple-300">
-                <Sparkles className="h-5 w-5" /> {allReady ? 'Create my free preview' : !subjects.every(s => s.pet || s.file) ? (subjectCount > 1 ? 'Add all photos to continue' : 'Add a photo to continue') : !kitNameOk ? 'Add their name for the shirt' : !wordsOk ? 'Add their name for the picture' : 'Check the words'}
+                <Sparkles className="h-5 w-5" /> {allReady ? 'Create my free preview' : !subjects.every(s => s.pet || s.file) ? (subjectCount > 1 ? 'Add all photos to continue' : 'Add a photo to continue') : !kitNameOk ? 'Add their name for the shirt' : !wordsOk ? 'Add their name for the picture' : !frameOk ? 'Check the name for the card' : 'Check the words'}
               </button>
               <button onClick={() => setStep('choose')} className="h-10 w-full text-sm text-gray-600">Back</button>
             </StickyActionBar>

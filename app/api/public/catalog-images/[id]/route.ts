@@ -10,6 +10,8 @@ import { readWords, wordsLayer, WORDS_TOKEN } from '@/lib/picture-words';
 import { breedPhrase } from '@/lib/picture-words-server';
 import { captionLayer, readCaptionOverlay } from '@/lib/captions/caption';
 import { designCaption, ensureSymbols } from '@/lib/captions/server';
+import { designCard, ensureFrameAssets, frameShapeUrls } from '@/lib/frames/server';
+import { FRAME_MAX, readFrameOverlay } from '@/lib/frames/frame';
 
 // Use service role client to bypass RLS for public catalog data
 const supabaseServiceRole = createClient(
@@ -162,6 +164,29 @@ export async function GET(
       console.warn('caption info failed', catalogImage.id, e);
     }
 
+    // Framed card (zodiac sign or tarot card): always on for the customer; they may add their pet's
+    // name to the banner. Previews and per-size thumbnails are drawn from the clean picture, watermarked.
+    let frame: any = null;
+    try {
+      const fc = await designCard(supabaseServiceRole as any, catalogImage.id);
+      if (fc && (fc.dog || fc.cat)) {
+        const { data: frRow, error: frErr } = await supabaseServiceRole.from('image_catalog').select('frame_overlay').eq('id', catalogImage.id).maybeSingle();
+        const fo = frErr ? null : readFrameOverlay((frRow as any)?.frame_overlay);
+        const clean = fo?.clean_public_id ?? catalogImage.cloudinary_public_id;
+        await ensureFrameAssets().catch(() => null);
+        const previewOf = (c: typeof fc.dog) => (c && clean ? frameShapeUrls(clean, c, 400)['2:3'] : null);
+        const a = fo?.applied;
+        frame = {
+          dog: fc.dog, cat: fc.cat, designAnimal: fc.designAnimal, nameMax: FRAME_MAX.pet,
+          on: !!a, previews: { dog: previewOf(fc.dog), cat: previewOf(fc.cat) },
+          // Buy-sheet thumbnails, one per print shape, only when the design itself shows the frame
+          thumbs: a && clean ? frameShapeUrls(clean, { title: a.title, tagline: a.tagline, medallion: a.medallion }, 240) : null,
+        };
+      }
+    } catch (e) {
+      console.warn('frame info failed', catalogImage.id, e);
+    }
+
     // Wraparound (2:1) designs: the design on the mug photos, both sides, motto included
     const isWrap = (catalogImage.format as any)?.aspect_ratio === '2:1' || (Array.isArray(catalogImage.format) && (catalogImage.format as any)[0]?.aspect_ratio === '2:1');
     const mugMockups = isWrap && catalogImage.cloudinary_public_id
@@ -174,6 +199,7 @@ export async function GET(
       kit: kit ? { name: kit.name, number: kit.number, motto } : null,
       words,
       caption,
+      frame,
       id: catalogImage.id,
       cloudinaryPublicId: catalogImage.cloudinary_public_id,
       imageUrl: displayUrl,

@@ -2,6 +2,7 @@
  * What the shop shows for phone cases (server): designs with approved case art, the models on the
  * dropdowns with their product and price, and the camera layouts. Preview images are watermarked.
  */
+import { framedIds } from '@/lib/frames/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { watermarkTiles } from '@/lib/watermark';
 import { LISTED_ONLY } from '@/lib/catalog/listing';
@@ -30,7 +31,9 @@ export async function phoneCaseCatalogue(db: SupabaseClient, designId?: string) 
     db.from('phone_models').select('id, brand, name, layout_group, case_w_mm, case_h_mm, display_order, product:products(id, sku, name, is_active, gelato_sku, pricing:product_pricing(sale_price, is_current, country_code))').eq('is_active', true).order('display_order'),
     db.from('phone_layout_groups').select('id, label, camera'),
   ]);
-  const out: PublicCaseDesign[] = (designs.data ?? []).map((d: any) => ({ id: d.id, title: title(d.description), thumb: plainUrl(d.cloudinary_public_id), art: approvedArt(d.case_art) }))
+  // Framed cards are prints only: no phone cases
+  const framed = await framedIds(db, (designs.data ?? []).map((d: any) => d.id));
+  const out: PublicCaseDesign[] = (designs.data ?? []).filter((d: any) => !framed.has(d.id)).map((d: any) => ({ id: d.id, title: title(d.description), thumb: plainUrl(d.cloudinary_public_id), art: approvedArt(d.case_art) }))
     .filter(d => Object.keys(d.art).length > 0);
   const phoneModels: PublicPhoneModel[] = (models.data ?? []).map((m: any) => {
     const p = Array.isArray(m.product) ? m.product[0] : m.product;

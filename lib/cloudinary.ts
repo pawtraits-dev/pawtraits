@@ -545,6 +545,16 @@ export class CloudinaryImageService {
   }
 
   /**
+   * A framed card's print file (lib/frames/print.ts builds the transformation): crop, scale to the
+   * print size, frame drawn on at that size; the self-print version is padded for bleed.
+   * Unsigned public PNG, like getCroppedPrintUrl.
+   */
+  getFramedPrintUrl(publicId: string, transformation: string): string {
+    ensureCloudinaryConfig();
+    return cloudinary.url(publicId, { secure: true, sign_url: false, type: 'upload', resource_type: 'image', format: 'png', raw_transformation: transformation });
+  }
+
+  /**
    * Trade printer file (Admin → Trade print orders): the same crop and size as the print file
    * (exact finished size, 300 dpi, no bleed) as a high-quality sRGB JPG, which the admin's
    * browser fetches and wraps in a PDF of the exact page size.
@@ -867,7 +877,7 @@ export class CloudinaryImageService {
   /**
    * Get public variant URL by type with security (signed URLs)
    */
-  getPublicVariantUrl(publicId: string, variant: 'full_size' | 'thumbnail' | 'mid_size' | 'purchased' | 'catalog_watermarked', opts: { width?: number; format?: string; overlay?: string } = {}): string {
+  getPublicVariantUrl(publicId: string, variant: 'full_size' | 'thumbnail' | 'mid_size' | 'purchased' | 'catalog_watermarked', opts: { width?: number; format?: string; overlay?: string; pre?: string } = {}): string {
     try {
       ensureCloudinaryConfig();
       
@@ -890,7 +900,8 @@ export class CloudinaryImageService {
           generatedUrl = cloudinary.url(publicId, {
             ...baseConfig,
             transformation: [
-              { width: 800, crop: 'limit' }, // Maintain aspect ratio, don't crop
+              ...(opts.pre ? [{ raw_transformation: opts.pre }] : []), // e.g. a crop to a print shape (framed cards)
+              { width: opts.width ?? 800, crop: 'limit' }, // Maintain aspect ratio, don't crop
               ...(opts.overlay ? [{ raw_transformation: opts.overlay }] : []), // e.g. a team motto (lib/collections/slogan.ts)
               { raw_transformation: watermarkTiles() }, // small paws repeated over the picture
               // a fixed format makes one file (f_auto makes one per browser type)

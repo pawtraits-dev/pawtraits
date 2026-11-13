@@ -91,7 +91,11 @@ export async function ensurePrintMaster(supabase: SupabaseClient, customImageId:
     const wordsText: string | null = custom.generation_metadata?.words_text && custom.generation_metadata?.words && custom.generation_metadata?.clean_cloudinary_id ? custom.generation_metadata.words_text : null;
     // Caption plate (type/sign + tagline): drawn again last
     const caption = custom.generation_metadata?.caption?.title && custom.generation_metadata?.clean_cloudinary_id ? custom.generation_metadata.caption : null;
-    const sourceId: string | null = slogan || wordsText || caption ? custom.generation_metadata.clean_cloudinary_id : custom.generated_cloudinary_id;
+    // A framed card: the master is the re-rendered picture WITHOUT the frame (words and slogan
+    // drawn as usual); the frame is drawn on it per print shape when the print files are made
+    // (lib/frames/print.ts), so it is never baked at 2:3 or upscaled.
+    const framed = !!custom.generation_metadata?.frame?.title && !!custom.generation_metadata?.clean_cloudinary_id;
+    const sourceId: string | null = slogan || wordsText || caption || framed ? custom.generation_metadata.clean_cloudinary_id : custom.generated_cloudinary_id;
     const sourceUrl = sourceId
       ? cloudinary.url(sourceId, { secure: true, type: 'upload', format: 'png', sign_url: false })
       : custom.generation_metadata?.full_size_url;

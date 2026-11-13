@@ -18,6 +18,8 @@ import { cleanPetName, fillWords, petPhrase, readWords, type PictureWords } from
 import { bakeWords, breedPhrase } from '@/lib/picture-words-server';
 import { bakeCaption, captionApplied, cleanPictureId, designCaption } from '@/lib/captions/server';
 import type { Caption } from '@/lib/captions/caption';
+import { bakeFrame, designCard } from '@/lib/frames/server';
+import { frameTitle, FRAME_MAX, DEFAULT_FRAME_STYLE, type FrameCard } from '@/lib/frames/frame';
 import { GEMINI_IMAGE_MODELS, toGeminiAspectRatio, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
 import { getRequester, setGuestCookie, clientIp } from '@/lib/guest/access';
 import { hashIp } from '@/lib/qr/attribution';
@@ -128,6 +130,7 @@ interface GenerateJob {
   slogan?: string | null;              // team motto or the customer's own slogan, drawn on the right
   words?: { settings: PictureWords; phrase: string | null; animal: 'dog' | 'cat' | null } | null;  // words on the picture; phrase null = from the detected breed
   caption?: { dog: Caption | null; cat: Caption | null; animal: 'dog' | 'cat' | null; designAnimal: 'dog' | 'cat' } | null;  // type/sign plate; animal null = from the detected pet
+  frame?: { dog: FrameCard | null; cat: FrameCard | null; animal: 'dog' | 'cat' | null; designAnimal: 'dog' | 'cat'; petName: string | null } | null;  // zodiac sign / tarot card frame; animal null = from the detected pet
   requestStarted: number;
   timings: Timings;
 }
@@ -293,6 +296,39 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
       timings.caption = since(t);
     }
 
+    // Framed card (zodiac sign or tarot card), worded for their pet's animal, with their pet's name
+    // on the banner when they gave one. Drawn on a stored 2:3 copy; the picture before the frame
+    // (base) and the clean painting are kept so print files can draw the frame per print shape.
+    let frameMeta: Record<string, unknown> | null = null;
+    if (job.frame) {
+      t = Date.now();
+      try {
+        let animal = job.frame.animal;
+        if (!animal) {
+          const read = async () => ((await supabase.from('customer_custom_images').select('metadata').eq('id', customImageId).maybeSingle()).data?.metadata as any)?.detected_breed?.animal;
+          let detected = await read();
+          if (!detected) { await detectPetBreed(customImageId, supabase); detected = await read(); }
+          animal = detected === 'cat' || detected === 'dog' ? detected : job.frame.designAnimal;
+        }
+        const base = (animal === 'cat' ? job.frame.cat : job.frame.dog) ?? job.frame.dog ?? job.frame.cat;
+        if (base) {
+          const card: FrameCard = { ...base, title: frameTitle(base.title, job.frame.petName) };
+          const cleanId = ((wordsMeta ?? sloganMeta)?.clean_cloudinary_id as string) ?? generatedCloudinaryId;
+          const cleanUrl = ((wordsMeta ?? sloganMeta)?.clean_url as string) ?? generatedImageUrl;
+          const baked = await bakeFrame(generatedCloudinaryId, card, 'customer-custom-images');
+          frameMeta = {
+            frame: { style: DEFAULT_FRAME_STYLE, title: card.title, tagline: card.tagline, medallion: card.medallion, pet_name: job.frame.petName, base_cloudinary_id: generatedCloudinaryId },
+            clean_cloudinary_id: cleanId, clean_url: cleanUrl,
+          };
+          generatedCloudinaryId = baked.public_id;
+          generatedImageUrl = baked.secure_url;
+        }
+      } catch (e) {
+        console.warn('frame failed; keeping the painting without it', customImageId, e);
+      }
+      timings.frame = since(t);
+    }
+
     // Watermarked preview for the customise page: made now, so the phone just downloads it
     const watermarkedUrl = cloudinaryService.getPublicVariantUrl(generatedCloudinaryId, 'catalog_watermarked', { format: PREVIEW_FORMAT });
     timings.preview = await buildPreview(watermarkedUrl);
@@ -320,6 +356,7 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
           ...(sloganMeta ?? {}),
           ...(wordsMeta ?? {}),
           ...(captionMeta ?? {}),
+          ...(frameMeta ?? {}),
           timings,
         },
       })
@@ -385,6 +422,12 @@ export async function POST(request: NextRequest) {
     }
     // Caption plate (type/sign + tagline): '1' on, '0' off; not sent = as the design shows it
     const captionRaw = String(formData.get('caption') ?? '');
+    // Framed cards (zodiac sign / tarot card): always framed; the pet's name on the banner is optional
+    const frameNameRaw = formData.get('frameName');
+    const frameName = frameNameRaw && String(frameNameRaw).trim() ? (cleanPetName(frameNameRaw) ?? '').slice(0, FRAME_MAX.pet).trim() || null : null;
+    if (frameNameRaw && String(frameNameRaw).trim() && !frameName) {
+      return NextResponse.json({ error: 'Please check the name for the card: letters only (spaces, hyphens and apostrophes are fine), up to 14, and nothing rude.' }, { status: 400 });
+    }
     if (kitNameRaw && (!kitName || kitNumber === undefined)) {
       return NextResponse.json({ error: 'Please check the name and number for the shirt: letters only for the name (up to 12), and a number from 0 to 99.' }, { status: 400 });
     }
@@ -721,6 +764,11 @@ export async function POST(request: NextRequest) {
       dog: designCap.dog, cat: designCap.cat, designAnimal: designCap.designAnimal,
       animal: (firstPet?.animal_type === 'cat' || firstPet?.animal_type === 'dog' ? firstPet.animal_type : null) as 'dog' | 'cat' | null,
     } : null;
+    const designFrame = await designCard(supabase as any, catalogImageId).catch(() => null);
+    const frame = designFrame && (designFrame.dog || designFrame.cat) ? {
+      dog: designFrame.dog, cat: designFrame.cat, designAnimal: designFrame.designAnimal, petName: frameName,
+      animal: (firstPet?.animal_type === 'cat' || firstPet?.animal_type === 'dog' ? firstPet.animal_type : null) as 'dog' | 'cat' | null,
+    } : null;
     const kitPetName = kit ? kit.name.toLowerCase().replace(/(^|[\s'-])([a-z])/g, (_m, a, b) => a + b.toUpperCase()) : null;
     const firstPetId = petIds[0];
 
@@ -754,6 +802,7 @@ export async function POST(request: NextRequest) {
           ...(slogan ? { slogan } : {}),
           ...(words ? { words: { name: wordsName, phrase: words.phrase } } : {}),
           ...(caption ? { caption: true } : {}),
+          ...(frame ? { frame: { pet_name: frameName } } : {}),
         }
       })
       .select(`
@@ -817,6 +866,7 @@ export async function POST(request: NextRequest) {
         slogan,
         words,
         caption,
+        frame,
         requestStarted,
         timings,
       }).then(() => capturePreviews({ ids: [customImage.id] })) // social loop: only if "Include free previews" is on

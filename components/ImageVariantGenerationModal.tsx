@@ -46,7 +46,7 @@ interface VariationPreviewStepProps {
   isGeneratingDescriptions: boolean;
   saveResults: any[];
   /** Pawsonality / Zodiac designs: draw the name plate on the saved versions */
-  caption?: { label: string; on: boolean; set: (on: boolean) => void } | null;
+  caption?: { label: string; on: boolean; set: (on: boolean) => void; frame?: boolean } | null;
 }
 
 function VariationPreviewStep({
@@ -252,7 +252,7 @@ function VariationPreviewStep({
       {caption && (
         <label className="flex items-start gap-2 border-t pt-3 text-sm">
           <input type="checkbox" checked={caption.on} onChange={(e) => caption.set(e.target.checked)} className="mt-0.5" />
-          <span>Add the name plate to the saved versions <span className="text-gray-500">({caption.label}, worded for each version&apos;s dog or cat)</span></span>
+          <span>Add the {caption.frame ? 'frame' : 'name plate'} to the saved versions <span className="text-gray-500">({caption.label}, worded for each version&apos;s dog or cat)</span></span>
         </label>
       )}
       <div className="border-t pt-4 flex items-center justify-between">
@@ -376,7 +376,7 @@ export default function ImageVariantGenerationModal({
   const [isGeneratingDescriptions, setIsGeneratingDescriptions] = useState(false);
   const [saveResults, setSaveResults] = useState<any[]>([]);
   // Pawsonality / Zodiac designs: name plate on the saved versions (starts as the design shows it)
-  const [captionInfo, setCaptionInfo] = useState<{ label: string } | null>(null);
+  const [captionInfo, setCaptionInfo] = useState<{ label: string; frame?: boolean } | null>(null);
   const [captionOn, setCaptionOn] = useState(false);
 
   const supabaseService = new SupabaseService();
@@ -386,7 +386,11 @@ export default function ImageVariantGenerationModal({
       loadData();
       setCaptionInfo(null);
       fetch(`/api/admin/catalog/${image.id}/caption`, { credentials: 'include' }).then(r => r.json()).then(d => {
-        if (d?.caption) { setCaptionInfo({ label: d.caption.title }); setCaptionOn(!!d.applied); }
+        if (d?.caption) { setCaptionInfo({ label: d.caption.title }); setCaptionOn(!!d.applied); return; }
+        // Zodiac and tarot designs have the frame instead of the plate
+        return fetch(`/api/admin/catalog/${image.id}/frame`, { credentials: 'include' }).then(r => r.json()).then(f => {
+          if (f?.card) { setCaptionInfo({ label: f.card.title, frame: true }); setCaptionOn(!!f.applied); }
+        });
       }).catch(() => {});
     }
   }, [isOpen, image]);
@@ -1008,7 +1012,7 @@ export default function ImageVariantGenerationModal({
             isSaving={isSavingToCategory}
             isGeneratingDescriptions={isGeneratingDescriptions}
             saveResults={saveResults}
-            caption={captionInfo ? { label: captionInfo.label, on: captionOn, set: setCaptionOn } : null}
+            caption={captionInfo ? { label: captionInfo.label, on: captionOn, set: setCaptionOn, frame: captionInfo.frame } : null}
           />
         ) : (
           <div className="space-y-6">

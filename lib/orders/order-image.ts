@@ -5,6 +5,7 @@
  * Previously only image_catalog was checked, so custom portraits could not be fulfilled.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { readFrameOverlay, type FrameCard, type FrameStyleId } from '@/lib/frames/frame';
 
 export interface ResolvedOrderImage {
   kind: 'catalog' | 'custom';
@@ -18,6 +19,12 @@ export interface ResolvedOrderImage {
   catalogImageId: string | null;
   /** 4K re-render made for large prints (custom portraits only), if one exists */
   printMasterPublicId?: string | null;
+  /**
+   * A framed card: its print files are made from this picture (no frame on it), with the frame
+   * drawn per product shape (lib/frames/print.ts). A custom portrait's 4K master, when it has one,
+   * is also unframed and takes its place.
+   */
+  frame?: { card: FrameCard; style: FrameStyleId; sourceId: string } | null;
 }
 
 export async function resolveOrderImage(supabase: SupabaseClient, imageId: string): Promise<ResolvedOrderImage | null> {
@@ -29,7 +36,12 @@ export async function resolveOrderImage(supabase: SupabaseClient, imageId: strin
     .eq('id', imageId)
     .maybeSingle();
   if (cat) {
+    // Tolerates the framed-cards migration not being run
+    const { data: fr, error: frErr } = await supabase.from('image_catalog').select('frame_overlay').eq('id', imageId).maybeSingle();
+    const fo = frErr ? null : readFrameOverlay((fr as any)?.frame_overlay);
+    const { applied } = fo ?? { applied: null };
     return {
+      frame: fo && applied ? { card: { title: applied.title, tagline: applied.tagline, medallion: applied.medallion }, style: fo.style, sourceId: fo.clean_public_id } : null,
       kind: 'catalog',
       id: cat.id,
       cloudinaryPublicId: cat.cloudinary_public_id,
@@ -56,6 +68,12 @@ export async function resolveOrderImage(supabase: SupabaseClient, imageId: strin
       filename: `pawtraits-${petSlug}-${custom.id.slice(0, 8)}`,
       catalogImageId: custom.catalog_image_id,
       printMasterPublicId: custom.print_master_cloudinary_id ?? null,
+      frame: (() => {
+        const f = custom.generation_metadata?.frame;
+        const sourceId = f?.base_cloudinary_id || custom.generation_metadata?.clean_cloudinary_id;
+        if (!f?.title || !sourceId) return null;
+        return { card: { title: f.title, tagline: f.tagline || null, medallion: f.medallion ?? null }, style: (f.style || 'celestial') as FrameStyleId, sourceId };
+      })(),
     };
   }
   return null;
@@ -88,7 +106,8 @@ export interface PrintFiles {
  */
 export async function buildPrintFiles(img: ResolvedOrderImage, productData: any, orderId: string): Promise<PrintFiles> {
   const widthCm = Number(productData?.width_cm), heightCm = Number(productData?.height_cm);
-  const sourceId = img.printMasterPublicId || img.cloudinaryPublicId;
+  // A framed card is made from the picture without the frame (the frame is drawn per shape below)
+  const sourceId = img.frame ? (img.printMasterPublicId || img.frame.sourceId) : (img.printMasterPublicId || img.cloudinaryPublicId);
   if (sourceId && widthCm > 0 && heightCm > 0) {
     const { cloudinaryService } = await import('@/lib/cloudinary');
     const g = await import('@/lib/print/print-geometry');
@@ -103,6 +122,38 @@ export async function buildPrintFiles(img: ResolvedOrderImage, productData: any,
       const finalDpi = upscale
         ? Math.min(g.PRINT_DPI, Math.round(Math.min(upscale.upscaled.width / (plan.size.widthMm / 25.4), upscale.upscaled.height / (plan.size.heightMm / 25.4))))
         : Math.min(g.PRINT_DPI, plan.effectiveDpi);
+      // Framed: portrait 2:3 / 3:4 products only (within 3%); anything else prints the clean picture
+      const { framedPrintShape, framedPrintTransformation } = await import('@/lib/frames/print');
+      const shape = img.frame ? framedPrintShape(plan.size) : null;
+      if (img.frame && shape) {
+        const { ensureFrameAssets } = await import('@/lib/frames/server');
+        await ensureFrameAssets();
+        const card = img.frame.card;
+        const printUrl = cloudinaryService.getFramedPrintUrl(sourceId, framedPrintTransformation(plan, upscale, card, shape, { style: img.frame.style }));
+        // Bleed: the framed print at its trim size, padded outwards (the frame is never scaled past the trim)
+        const selfPrintUrl = cloudinaryService.getFramedPrintUrl(sourceId, framedPrintTransformation(plan, upscale, card, shape, { style: img.frame.style, bleedOutputPx: bleedPlan.outputPx }));
+        return {
+          printUrl, selfPrintUrl,
+          meta: {
+            version: 2,
+            source: img.printMasterPublicId ? 'print_master' : img.kind === 'custom' ? 'preview' : 'catalogue',
+            source_px: [source.width, source.height],
+            print_mm: [plan.size.widthMm, plan.size.heightMm],
+            orientation: plan.size.orientation,
+            output_px: [plan.outputPx.width, plan.outputPx.height],
+            bleed_mm: g.SELF_PRINT_BLEED_MM,
+            crop: plan.crop,
+            effective_dpi: plan.effectiveDpi,
+            ai_upscaled: !!upscale,
+            final_dpi: finalDpi,
+            quality: finalDpi >= g.DPI_OK ? 'good' : finalDpi >= g.DPI_MIN ? 'ok' : 'low',
+            mismatch: plan.mismatch,
+            frame: { style: img.frame.style, shape, title: card.title, tagline: card.tagline },
+            print_master: img.kind === 'custom' && !img.printMasterPublicId && plan.effectiveDpi < g.PRINT_MASTER_BELOW_DPI ? 'pending' : img.printMasterPublicId ? 'ready' : undefined,
+          },
+        };
+      }
+      const frameNote = img.frame ? `Framed card on a ${plan.size.widthMm / 10}×${plan.size.heightMm / 10} cm product: not framed (the frame fits portrait 2:3 and 3:4 prints only)` : null;
       const needsMaster = img.kind === 'custom' && !img.printMasterPublicId && plan.effectiveDpi < g.PRINT_MASTER_BELOW_DPI;
       return {
         printUrl: cloudinaryService.getCroppedPrintUrl(sourceId, plan, upscale),
@@ -120,7 +171,8 @@ export async function buildPrintFiles(img: ResolvedOrderImage, productData: any,
           ai_upscaled: !!upscale,
           final_dpi: finalDpi,
           quality: finalDpi >= g.DPI_OK ? 'good' : finalDpi >= g.DPI_MIN ? 'ok' : 'low',
-          mismatch: plan.mismatch,
+          mismatch: frameNote ?? plan.mismatch,
+          ...(frameNote ? { frame: 'skipped' } : {}),
           print_master: needsMaster ? 'pending' : img.printMasterPublicId ? 'ready' : undefined,
         },
       };

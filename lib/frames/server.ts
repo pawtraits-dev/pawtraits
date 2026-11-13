@@ -11,10 +11,12 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { v2 as cloudinary } from 'cloudinary';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { cloudinaryService } from '@/lib/cloudinary';
 import { captionRows, designRow, ensureSymbols, rowCaption, setDesignPicture, type CaptionRow } from '@/lib/captions/server';
 import { readCaptionOverlay, type CaptionAnimal } from '@/lib/captions/caption';
 import { zodiacSymbolSvg } from '@/lib/captions/zodiac-symbols';
-import { DEFAULT_FRAME_STYLE, frameAssetIds, frameCrop, frameLayers, readFrameOverlay, sameCard, type FrameCard } from './frame';
+import { DEFAULT_FRAME_STYLE, FRAME_SHAPES, frameAssetIds, frameCrop, frameLayers, readFrameOverlay, sameCard, type FrameCard, type FrameShape } from './frame';
+import { FRAMED_PRINTS_ONLY, framedProductAllowed, isFramed } from './rules';
 
 export const FRAME_MIGRATION = 'Run db/migrations/2026-11-13-framed-cards.sql first';
 const missing = (m?: string) => /frame_overlay/.test(m || '');
@@ -186,6 +188,18 @@ export async function frameMany(supabase: SupabaseClient, ids: string[], on: boo
   return { done, failed, skipped, errors: Array.from(new Set(errors)).slice(0, 3) };
 }
 
+/** A version just saved from a framed design is framed too (as words are drawn on versions). Never throws. */
+export async function frameForNewVersion(supabase: SupabaseClient, versionId: string, parentId: string): Promise<{ text?: string; error?: string } | null> {
+  try {
+    if (!(await frameApplied(supabase, parentId))) return null;
+    const c = await applyFrameToDesign(supabase, versionId);
+    return { text: c.tagline ? `${c.title} — ${c.tagline}` : c.title };
+  } catch (e: any) {
+    console.error('frame for new version failed', versionId, e);
+    return { error: String(e?.message || e).slice(0, 200) };
+  }
+}
+
 /** Does the design show a frame now? (null before the migration) */
 export async function frameApplied(supabase: SupabaseClient, imageId: string): Promise<boolean | null> {
   const { data, error } = await supabase.from('image_catalog').select('frame_overlay').eq('id', imageId).maybeSingle();
@@ -202,4 +216,49 @@ export async function reapplyFrameAfterWords(supabase: SupabaseClient, imageId: 
   const { at: _at, ...card } = o.applied;
   const baked = await bakeFrame(newClean, card);
   await setDesignPicture(supabase, imageId, baked.public_id, baked.secure_url, { frame_overlay: { style: o.style, clean_public_id: newClean, applied: { ...card, at: new Date().toISOString() } } });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Customers: previews, thumbnails, and the prints-only rule
+
+/** Watermarked previews of a card on a clean picture, one per print shape (the picture is cropped to the shape first) */
+export function frameShapeUrls(cleanPublicId: string, card: FrameCard, width = 400): Record<FrameShape, string> {
+  return Object.fromEntries(FRAME_SHAPES.map(s => [s, cloudinaryService.getPublicVariantUrl(cleanPublicId, 'catalog_watermarked', { pre: frameCrop(s), overlay: frameLayers(card, s), format: 'jpg', width })])) as Record<FrameShape, string>;
+}
+
+/** What a customer's portrait shows: generation_metadata.frame → the card, or null */
+export function customFrameCard(meta: any): (FrameCard & { petName: string | null }) | null {
+  const f = meta?.frame;
+  if (!f || typeof f.title !== 'string' || !f.title) return null;
+  const m = f.medallion;
+  return { title: f.title, tagline: typeof f.tagline === 'string' && f.tagline ? f.tagline : null, medallion: m && typeof m.symbol === 'string' ? { symbol: m.symbol } : m && typeof m.numeral === 'string' ? { numeral: m.numeral } : null, petName: typeof f.pet_name === 'string' ? f.pet_name : null };
+}
+
+/**
+ * The message to refuse a basket or order with, or null: framed designs are prints only. Checks
+ * each line's product and whether its image (catalogue design or customer portrait) is framed.
+ */
+export async function framedLineProblem(supabase: SupabaseClient, lines: { imageId?: string | null; productId?: string | null; product?: any }[]): Promise<string | null> {
+  // The product as the database has it, as well as the one the browser sent
+  const productIds = Array.from(new Set(lines.map(l => l.productId).filter((id): id is string => !!id && /^[0-9a-f-]{36}$/i.test(id))));
+  const { data: prods } = productIds.length ? await supabase.from('products').select('*').in('id', productIds) : { data: [] as any[] };
+  const byId = new Map((prods ?? []).map((p: any) => [p.id, p]));
+  const bad = lines.filter(l => l.imageId && (!framedProductAllowed(l.product) || !framedProductAllowed(l.productId ? byId.get(l.productId) : null)));
+  if (!bad.length) return null;
+  const ids = Array.from(new Set(bad.map(l => l.imageId as string)));
+  const [cat, cust] = await Promise.all([
+    supabase.from('image_catalog').select('id, frame_overlay').in('id', ids),
+    supabase.from('customer_custom_images').select('id, generation_metadata').in('id', ids),
+  ]);
+  const framed = new Set<string>();
+  for (const r of cat.error ? [] : cat.data ?? []) if (isFramed(r as any)) framed.add((r as any).id);
+  for (const r of cust.error ? [] : cust.data ?? []) if (isFramed(r as any)) framed.add((r as any).id);
+  return bad.some(l => framed.has(l.imageId as string)) ? FRAMED_PRINTS_ONLY : null;
+}
+
+/** The ids of these catalogue designs that show a frame (empty before the migration) */
+export async function framedIds(supabase: SupabaseClient, ids: string[]): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  const { data, error } = await supabase.from('image_catalog').select('id, frame_overlay').in('id', ids);
+  return new Set(error ? [] : (data ?? []).filter((r: any) => isFramed(r)).map((r: any) => r.id));
 }

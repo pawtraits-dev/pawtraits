@@ -8,6 +8,7 @@ import { serviceClient } from '@/lib/qr/server';
 import { isStallProductId, stallSizeFromProductId } from '@/lib/cart/items';
 import { getStallOffer } from '@/lib/stall/offer';
 import { runPriceCheck, invalidCartLine } from '@/lib/checkout/price-check';
+import { framedLineProblem } from '@/lib/frames/server';
 
 interface CreatePaymentIntentRequest {
   amount: number; // in pence
@@ -120,6 +121,12 @@ export async function POST(request: NextRequest) {
     const badLine = invalidCartLine(body.cartItems);
     if (badLine) {
       return NextResponse.json({ error: 'There is a problem with your basket. Please go back to your basket and try again.', code: 'INVALID_BASKET', details: badLine }, { status: 400 });
+    }
+
+    // Framed cards are prints only (no downloads, mugs or phone cases), whatever the browser's basket says
+    const framedProblem = await framedLineProblem(serviceClient() as any, body.cartItems.map(i => ({ imageId: i.imageId, productId: i.productId, product: (i as any).product })));
+    if (framedProblem) {
+      return NextResponse.json({ error: `${framedProblem} Please remove it from your basket to continue.`, code: 'FRAMED_PRINTS_ONLY' }, { status: 400 });
     }
 
     // Determine order type using the validation service

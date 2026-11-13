@@ -11,6 +11,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { getSetting } from '@/lib/app-settings';
 import { OCCASIONS, ZODIAC } from './definitions';
 import { LEAGUES, SPORTS_TEAMS } from './sports-teams';
+import { TAROT } from '@/lib/tarot';
 import { createWithUsage } from '@/lib/ai/usage';
 
 const MODEL = 'claude-haiku-4-5-20251001';
@@ -34,7 +35,8 @@ function collectionList(ctx: TagContext): string {
   const occ = OCCASIONS.map(o => `occasions/${o.slug} (${o.name})`).join('; ');
   const zod = ZODIAC.map(z => `zodiac/${z.slug}`).join('; ');
   const paw = ctx.pawsonalities.map(p => `${p.path} (${p.name})`).join('; ');
-  return `Occasions: ${occ}\nZodiac signs: ${zod}\nPawsonality types: ${paw}`;
+  const tarot = TAROT.map(t => `tarot/${t.slug} (${t.name})`).join('; ');
+  return `Occasions: ${occ}\nZodiac signs: ${zod}\nPawsonality types: ${paw}\nTarot cards: ${tarot}`;
 }
 
 function teamList(): string {
@@ -55,7 +57,8 @@ About this design:
 
 1. "collections": which of these the design clearly belongs in (usually 0 or 1; only if obvious from the picture or text, never a guess):
 ${collectionList(ctx)}
-A design belongs to an occasion only if it visibly shows it (Christmas jumper, Santa hat, tree, pumpkins, birthday cake, hearts…). Zodiac or Pawsonality only if the text says so.
+A design belongs to an occasion only if it visibly shows it (Christmas jumper, Santa hat, tree, pumpkins, birthday cake, hearts…). Pawsonality only if the text says so.
+A design is in at most ONE zodiac sign and at most ONE tarot card. Faint symbols of several signs in a starry background are decoration and do not count. Choose a zodiac sign only when the theme, description or prompt names it, or when exactly one sign is unmistakably the subject (for example ram's horns for Aries); otherwise choose none. Tarot only if the text says so.
 
 2. "team": the sports team ONLY if the outfit is unmistakably that team's kit by its colours and the sport (otherwise null). Use the path:
 ${teamList()}
@@ -76,6 +79,37 @@ export function cleanTags(raw: unknown): string[] {
     if (!out.includes(t)) out.push(t);
   }
   return out.slice(0, MAX_TAGS);
+}
+
+/** The collections that may hold only one design at a time: a design is in one sign and one card */
+const SINGLE_KINDS = ['zodiac', 'tarot'] as const;
+
+/** "the-high-priestess" / "The High Priestess" → whole-word matches in the text */
+function named(text: string, path: string, names: Map<string, string>): boolean {
+  const slug = path.split('/')[1] ?? '';
+  const words = [slug.replace(/-/g, ' '), names.get(path) ?? ''].map(w => w.toLowerCase().trim()).filter(Boolean);
+  const t = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+  return words.some(w => new RegExp(`(^| )${w.replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`).test(t));
+}
+
+/**
+ * The real guard against a model that tags several signs: keep at most one zodiac/ path and one
+ * tarot/ path. When more than one comes back, keep the one named in `text` (theme, description,
+ * prompt); if none is named, keep none (not a guess). A design that already has an admin link to
+ * a sign (or card) gets no automatic one of that kind. Other paths pass through in order.
+ */
+export function limitSingles(paths: string[], text: string, opts: { names?: Map<string, string>; adminKinds?: Iterable<string> } = {}): string[] {
+  const names = opts.names ?? new Map<string, string>([...ZODIAC.map(z => [`zodiac/${z.slug}`, z.name] as [string, string]), ...TAROT.map(t => [`tarot/${t.slug}`, t.name] as [string, string])]);
+  const admin = new Set(opts.adminKinds ?? []);
+  const out: string[] = [];
+  for (const p of Array.from(new Set(paths))) if (!SINGLE_KINDS.some(k => p.startsWith(`${k}/`))) out.push(p);
+  for (const k of SINGLE_KINDS) {
+    if (admin.has(k)) continue;
+    const mine = Array.from(new Set(paths)).filter(p => p.startsWith(`${k}/`));
+    const keep = mine.length <= 1 ? mine : (() => { const hit = mine.filter(p => named(text, p, names)); return hit.length === 1 ? hit : []; })();
+    out.push(...keep);
+  }
+  return paths.filter(p => out.includes(p)).filter((p, i, a) => a.indexOf(p) === i);
 }
 
 /** Parse the model's reply against the known paths; anything unknown is dropped */
@@ -155,6 +189,13 @@ export async function autoTagImage(supabase: any, imageId: string, opts: { model
     const prompt = buildPrompt(ctx, { prompt: row.prompt_text, description: row.marketing_description || row.description, theme: row.themes?.name, breed, outfit: row.outfits?.name });
     const reply = await (opts.model ?? askModel)(prompt, thumbUrl(row));
     const answer = parseTagReply(reply, new Set(byPath.keys()));
+    if (answer) {
+      // At most one sign and one card; admin links to a sign or card win over automatic ones
+      const { data: adminLinks } = await supabase.from('design_collections').select('collections!inner (kind, depth)').eq('image_id', imageId).neq('source', 'auto').eq('excluded', false);
+      const adminKinds = (adminLinks ?? []).filter((l: any) => l.collections?.depth === 1).map((l: any) => l.collections?.kind);
+      const names = new Map<string, string>((cols ?? []).map((c: any) => [c.path, c.name]));
+      answer.collections = limitSingles(answer.collections, [row.themes?.name, row.marketing_description, row.description, row.prompt_text].filter(Boolean).join(' '), { names, adminKinds });
+    }
     if (!answer) {
       await supabase.from('image_catalog').update({ auto_tag_error: 'Unreadable answer', auto_tagged_at: new Date().toISOString() }).eq('id', imageId);
       return { ok: false, error: 'unreadable answer' };
