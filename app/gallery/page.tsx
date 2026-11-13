@@ -80,6 +80,8 @@ function GalleryContent() {
   const [recommendedImages, setRecommendedImages] = useState<GalleryImage[]>([]);
   const [userPets, setUserPets] = useState<any[]>([]);
   const [loadingRecommended, setLoadingRecommended] = useState(false);
+  // Breeds the recommendations are based on (pets, personalised photos, quiz), from the server
+  const [recommendedBasis, setRecommendedBasis] = useState<{ breed_id: string; breed_name: string | null }[]>([]);
   const [loadingCustomImages, setLoadingCustomImages] = useState(false);
 
   // State for like tracking and customize modal
@@ -118,10 +120,10 @@ function GalleryContent() {
   }, [userProfile, cartItems]);
 
   useEffect(() => {
-    if (userPets.length > 0) {
+    if (userProfile) {
       loadRecommendedImages();
     }
-  }, [userPets]);
+  }, [userProfile, userPets]);
 
   useEffect(() => {
     filterImages();
@@ -220,7 +222,7 @@ function GalleryContent() {
   };
 
   const loadRecommendedImages = async () => {
-    if (!userProfile || userPets.length === 0) {
+    if (!userProfile) {
       setRecommendedImages([]);
       return;
     }
@@ -228,27 +230,13 @@ function GalleryContent() {
     try {
       setLoadingRecommended(true);
 
-      // Build pet combinations (breed_id + coat_id)
-      const petCombinations = userPets
-        .filter(pet => pet.breed_id && pet.coat_id)
-        .map(pet => ({
-          breed_id: pet.breed_id,
-          coat_id: pet.coat_id
-        }));
-
-      if (petCombinations.length === 0) {
-        setRecommendedImages([]);
-        return;
-      }
-
-      const response = await fetch('/api/images/recommended', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ petCombinations })
-      });
+      // The server works out the breeds and coats from the customer's pets, the photos they have
+      // personalised designs with, and the breed chosen in a Pawsonality quiz
+      const response = await fetch('/api/images/recommended', { credentials: 'include' });
 
       if (response.ok) {
-        const { images } = await response.json();
+        const { images, basedOn } = await response.json();
+        setRecommendedBasis(basedOn || []);
 
         // Transform to GalleryImage format
         const recommendedGalleryImages: GalleryImage[] = (images || []).map((img: any) => ({
@@ -1062,27 +1050,27 @@ function GalleryContent() {
           </TabsList>
 
           <TabsContent value="recommended" className="space-y-6">
-            {userPets.length === 0 ? (
+            {loadingRecommended ? (
+              <div className="flex justify-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+              </div>
+            ) : recommendedBasis.length === 0 ? (
               <Card className="p-8 text-center">
                 <CardContent>
                   <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Star className="w-8 h-8 text-gray-400" />
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Add Your Pets for Personalized Recommendations
+                    Tell us about your pet for personalised recommendations
                   </h3>
                   <p className="text-gray-600 mb-4">
-                    Tell us about your pets to see Pawtraits that match their breed and coat
+                    Add your pet, put their photo in a design, or take the Pawsonality quiz, and we&apos;ll show Pawtraits that match their breed and coat
                   </p>
                   <Button onClick={() => window.location.href = '/customer/pets/add'}>
                     Add Your First Pet
                   </Button>
                 </CardContent>
               </Card>
-            ) : loadingRecommended ? (
-              <div className="flex justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-              </div>
             ) : recommendedImages.length === 0 ? (
               <Card className="p-8 text-center">
                 <CardContent>
@@ -1090,10 +1078,10 @@ function GalleryContent() {
                     <Star className="w-8 h-8 text-gray-400" />
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    No Matching Recommendations Yet
+                    No matching Pawtraits yet
                   </h3>
                   <p className="text-gray-600 mb-4">
-                    We're working on creating more Pawtraits for your pets' breeds and coats
+                    We&apos;re painting more Pawtraits for {recommendedBasis.map(b => b.breed_name).filter(Boolean).join(', ') || 'your pet’s breed'}
                   </p>
                   <Button variant="outline" onClick={() => window.location.href = '/browse'}>
                     Browse All Pawtraits
