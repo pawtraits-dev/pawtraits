@@ -16,6 +16,7 @@ import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ImageQrPanel from '@/components/admin/ImageQrPanel';
 import PictureWordsPanel from '@/components/admin/PictureWordsPanel';
 import CaptionPanel from '@/components/admin/CaptionPanel';
+import FramePanel from '@/components/admin/FramePanel';
 import { extractDescriptionTitle } from '@/lib/utils';
 import ImageVariantGenerationModal from '@/components/ImageVariantGenerationModal';
 
@@ -1198,6 +1199,9 @@ function ImageDetailModal({
 
             {/* Caption plate: Pawsonality type / Zodiac sign and tagline */}
             <CaptionPanel imageId={image.id} onChanged={() => setPicVersion(Date.now())} />
+
+            {/* Framed card: Zodiac sign / tarot card */}
+            <FramePanel imageId={image.id} onChanged={() => setPicVersion(Date.now())} />
 
             {/* Sticker QR code */}
             <ImageQrPanel imageId={image.id} />

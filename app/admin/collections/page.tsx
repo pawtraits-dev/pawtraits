@@ -157,7 +157,7 @@ function Row({ c, all, open, toggle, editing, setEditing, reload }: {
           {children.length > 0 && (
             <ul>{children.map(ch => <Row key={ch.id} c={ch} all={all} open={open} toggle={toggle} editing={editing} setEditing={setEditing} reload={reload} />)}</ul>
           )}
-          {c.depth < 2 && c.kind !== 'zodiac' && c.kind !== 'pawsonality' && c.kind !== 'group' && <AddChild parent={c} onAdded={reload} />}
+          {c.depth < 2 && c.kind !== 'zodiac' && c.kind !== 'pawsonality' && c.kind !== 'group' && c.kind !== 'tarot' && <AddChild parent={c} onAdded={reload} />}
           {c.kind === 'group' && c.depth === 0 && <p className="mt-1 text-xs text-gray-600">Filled automatically: every design with more than one pet goes in the right group by number of pets and species.</p>}
         </div>
       )}
@@ -261,7 +261,7 @@ export default function AdminCollectionsPage() {
     <div className="mx-auto max-w-5xl space-y-6 p-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Collections</h1>
-        <p className="mt-1 text-gray-700">Besides breed, the places customers browse: Occasions, Sports, 16 Pawsonalities and Zodiac signs.</p>
+        <p className="mt-1 text-gray-700">Besides breed, the places customers browse: Occasions, Sports, 16 Pawsonalities, Zodiac signs and Tarot cards.</p>
         {inSeasonNow.length > 0 && <p className="mt-2 text-sm text-green-800">Promoted right now: {inSeasonNow.join(', ')}</p>}
       </div>
       <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-gray-200">

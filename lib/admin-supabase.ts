@@ -762,8 +762,21 @@ export class AdminSupabaseService {
     return adminRequest<any>('/api/admin/captions', jsonInit('PATCH', { collectionId, wording }));
   }
 
-  async captionCollection(collectionId: string, on: boolean): Promise<AdminResult<any>> {
-    return adminRequest<any>('/api/admin/captions', jsonInit('POST', { collectionId, on }));
+  async captionCollection(collectionId: string, on: boolean, what: 'plate' | 'frame' = 'plate'): Promise<AdminResult<any>> {
+    return adminRequest<any>('/api/admin/captions', jsonInit('POST', { collectionId, on, what }));
+  }
+
+  /** Framed card on a design (lib/frames/) */
+  async getDesignFrame(imageId: string): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/catalog/${imageId}/frame`);
+  }
+
+  async applyDesignFrame(imageId: string, versions: boolean): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/catalog/${imageId}/frame`, jsonInit('POST', { versions }));
+  }
+
+  async removeDesignFrame(imageId: string, versions: boolean): Promise<AdminResult<any>> {
+    return adminRequest<any>(`/api/admin/catalog/${imageId}/frame${versions ? '?versions=1' : ''}`, { method: 'DELETE' });
   }
 
   /** Make a lettering test (painted on the original) the design's picture and lettering */

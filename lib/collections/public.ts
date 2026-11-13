@@ -14,7 +14,7 @@ export interface PublicCollection {
   sortOrder: number;
 }
 
-const DETAIL_KEYS = ['colours', 'symbol', 'from', 'to', 'element', 'code', 'cat_name', 'dog_name', 'league'];
+const DETAIL_KEYS = ['colours', 'symbol', 'from', 'to', 'element', 'code', 'cat_name', 'dog_name', 'league', 'numeral', 'number'];
 
 export async function loadPublicTree(supabase: any, today = new Date()): Promise<PublicCollection[]> {
   const [{ data: cols, error }, { data: summary, error: sErr }] = await Promise.all([

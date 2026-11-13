@@ -1,6 +1,6 @@
 /**
  * Builds db/migrations/2026-10-07-collections-seed.sql from lib/collections/definitions.ts
- * (occasions, sports leagues + 135 teams with their kit outfits, 16 Pawsonalities, 12 zodiac signs).
+ * (occasions, sports leagues + 135 teams with their kit outfits, 16 Pawsonalities, 12 zodiac signs, 22 tarot cards).
  * Run: npm run build:collections-seed. Ids are deterministic (uuid v5 of the path), so re-running
  * the SQL is safe: existing rows keep admin edits (names, seasons, order, pictures); team kit
  * prompts and colours are refreshed.
