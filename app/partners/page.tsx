@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { SupabaseService } from '@/lib/supabase';
-import { useServerCart } from '@/lib/server-cart-context';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
 
 interface PartnerStats {
   totalReferrals: number;
@@ -414,7 +414,8 @@ export default function PartnerDashboard() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const { cart } = useServerCart();
+  const { items: cartItems, totalItems: cartTotalItems } = useHybridCart();
+  const cart = { items: cartItems, totalItems: cartTotalItems };
 
   const supabaseService = new SupabaseService();
 

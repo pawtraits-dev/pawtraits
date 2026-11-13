@@ -14,6 +14,15 @@ const HIDDEN_PREFIXES = [
   '/setup',
   '/shop/checkout',
   '/customer', // signed-in area with its own fixed bottom tab bar
+  // signed-in customer pages outside /customer that show the same fixed bottom tab bar
+  '/orders',
+  '/account',
+  '/referrals',
+  '/gallery',
+  '/pets',
+  '/inbox',
+  '/commissions',
+  '/dashboard',
 ];
 
 const LINK_CLASS = 'text-gray-800 hover:text-purple-700';

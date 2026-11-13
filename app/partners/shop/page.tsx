@@ -17,7 +17,7 @@ import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
 import CartIcon from '@/components/cart-icon';
-import { useServerCart } from '@/lib/server-cart-context';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
 import UserInteractionsService from '@/lib/user-interactions';
 import { useCountryPricing } from '@/lib/country-context';
 import ShareModal from '@/components/share-modal';
@@ -62,7 +62,7 @@ export default function PartnerShopPage() {
 
   const supabaseService = new SupabaseService();
   // Using SupabaseService for partner access
-  const { addToCart } = useServerCart();
+  const { addToCart } = useHybridCart();
   const { selectedCountry, selectedCountryData, getCountryPricing, getLowestPrice } = useCountryPricing();
 
   useEffect(() => {

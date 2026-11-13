@@ -11,7 +11,7 @@ import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
 import { SupabaseService } from '@/lib/supabase';
 import UserInteractionsService from '@/lib/user-interactions';
-import { useServerCart } from '@/lib/server-cart-context';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { useCountryPricing } from '@/lib/country-context';
 import ReactMarkdown from 'react-markdown';
 import ShareModal from '@/components/share-modal';
@@ -36,7 +36,7 @@ export default function CustomerImageDetailPage() {
   const [isPurchased, setIsPurchased] = useState(false);
 
   const supabaseService = new SupabaseService();
-  const { addToCart } = useServerCart();
+  const { addToCart } = useHybridCart();
   const { selectedCountry, selectedCountryData, getCountryPricing } = useCountryPricing();
 
   useEffect(() => {

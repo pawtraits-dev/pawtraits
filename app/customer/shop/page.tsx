@@ -18,7 +18,7 @@ import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
 import CartIcon from '@/components/cart-icon';
-import { useServerCart } from '@/lib/server-cart-context';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
 import UserInteractionsService from '@/lib/user-interactions';
 import ShareModal from '@/components/share-modal';
 import { useCountryPricing } from '@/lib/country-context';
@@ -59,7 +59,7 @@ export default function CustomerShopPage() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const supabaseService = new SupabaseService();
-  const { addToCart } = useServerCart();
+  const { addToCart } = useHybridCart();
   const { selectedCountry, selectedCountryData, getCountryPricing, getLowestPrice } = useCountryPricing();
   const supabase = getSupabaseClient();
 
