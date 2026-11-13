@@ -120,18 +120,22 @@ export async function designRow(supabase: SupabaseClient, imageId: string, kinds
   if (!img) return null;
   const animal = ((img as any).breeds?.animal_type === 'cat' ? 'cat' : (img as any).breeds?.animal_type === 'dog' ? 'dog' : null) as CaptionAnimal | null;
   for (const id of [img.id, (img as any).variation_of].filter(Boolean) as string[]) {
-    const { data } = await supabase.from('design_collections').select('collection_id, collections!inner (kind, depth)').eq('image_id', id).in('collections.kind', kinds).eq('collections.depth', 1).limit(1);
-    if (data?.length) return { collectionId: (data[0] as any).collection_id, animal };
+    const { data } = await supabase.from('design_collections').select('collection_id, source, created_at, collections!inner (kind, depth)').eq('image_id', id).eq('excluded', false).in('collections.kind', kinds).eq('collections.depth', 1).limit(50);
+    // Deterministic: an admin's link beats an automatic one; then the oldest link; then the id
+    const best = [...(data ?? [])].sort((a: any, b: any) =>
+      Number(a.source === 'auto') - Number(b.source === 'auto') || String(a.created_at).localeCompare(String(b.created_at)) || String(a.collection_id).localeCompare(String(b.collection_id)))[0];
+    if (best) return { collectionId: (best as any).collection_id, animal };
   }
   return null;
 }
 
 /**
- * The caption for a design: its Pawsonality type or Zodiac sign, worded for `animal` (the
- * customer's pet), else for the design's own breed's animal. Null when it's in neither.
+ * The caption plate for a design: its Pawsonality type, worded for `animal` (the customer's
+ * pet), else for the design's own breed's animal. Null otherwise: Zodiac and tarot designs use
+ * the frame (lib/frames/), never the plate.
  */
 export async function designCaption(supabase: SupabaseClient, imageId: string, animal?: CaptionAnimal | null): Promise<{ dog: Caption | null; cat: Caption | null; caption: Caption | null; designAnimal: CaptionAnimal } | null> {
-  const d = await designRow(supabase, imageId);
+  const d = await designRow(supabase, imageId, ['pawsonality']);
   if (!d) return null;
   const rows = await captionRows(supabase);
   const row = rows.find(r => r.id === d.collectionId);
@@ -206,10 +210,12 @@ export async function applyCaptionToDesign(supabase: SupabaseClient, imageId: st
   const { data: row, error } = await supabase.from('image_catalog').select('id, cloudinary_public_id, caption_overlay').eq('id', imageId).maybeSingle();
   if (error) throw new Error(error.message.includes('caption_overlay') ? CAPTION_MIGRATION : error.message);
   if (!row?.cloudinary_public_id) throw new Error('Design not found');
+  // Zodiac and tarot designs use the frame, never the plate
+  if (await designRow(supabase, imageId, ['zodiac', 'tarot'])) throw new Error('Zodiac and tarot designs use the frame, not the caption plate');
   // A design has the plate or a frame, never both
   if ((await frameOverlayOf(supabase, imageId))?.applied) throw new Error('This design has a frame on. Take the frame off first.');
   const caption = given ?? (await designCaption(supabase, imageId))?.caption ?? null;
-  if (!caption) throw new Error('This design is not in a Pawsonality type or Zodiac sign collection');
+  if (!caption) throw new Error('This design is not in a Pawsonality type collection');
   const overlay = readCaptionOverlay((row as any).caption_overlay);
   // Already showing exactly this plate: nothing to redraw
   const a = overlay?.applied;
@@ -258,9 +264,14 @@ export async function captionMany(supabase: SupabaseClient, ids: string[], on: b
   return { done, failed, skipped, errors: Array.from(new Set(errors)).slice(0, 3) };
 }
 
-/** A version just saved, when the admin asked for the plate. Never throws. */
+/** A version just saved, when the admin asked for the plate (the frame for zodiac and tarot designs). Never throws. */
 export async function captionForNewVersion(supabase: SupabaseClient, versionId: string): Promise<{ text?: string; error?: string } | null> {
   try {
+    if (await designRow(supabase, versionId, ['zodiac', 'tarot'])) {
+      const { applyFrameToDesign } = await import('@/lib/frames/server');
+      const f = await applyFrameToDesign(supabase, versionId);
+      return { text: f.tagline ? `${f.title} — ${f.tagline}` : f.title };
+    }
     const c = await applyCaptionToDesign(supabase, versionId);
     return { text: c.tagline ? `${c.title} — ${c.tagline}` : c.title };
   } catch (e: any) {

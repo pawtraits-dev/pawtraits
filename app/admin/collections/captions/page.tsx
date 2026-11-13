@@ -34,12 +34,12 @@ function RowEditor({ row, cloudName, onSaved }: { row: Row; cloudName: string; o
   const [shown, setShown] = useState(form);
   useEffect(() => { const t = setTimeout(() => setShown(form), 500); return () => clearTimeout(t); }, [form]);
   // Tarot cards have the frame only; zodiac signs can show either
-  const [look, setLook] = useState<'plate' | 'frame'>(row.kind === 'tarot' ? 'frame' : 'plate');
+  const look = row.kind === 'pawsonality' ? 'plate' : 'frame';   // the plate is for Pawsonalities only
   const preview = useMemo(() => {
     if (!row.sample || !cloudName) return null;
     const title = shown[`title_${animal}`].trim();
     if (!title) return null;
-    if (look === 'frame' || row.kind === 'tarot') {
+    if (look === 'frame') {
       const base = animal === 'cat' ? row.catCard : row.dogCard;
       if (!base?.medallion) return null;
       const card: FrameCard = { title: frameTitle(title), tagline: shown[`tagline_${animal}`].trim() || null, medallion: base.medallion };
@@ -91,11 +91,6 @@ function RowEditor({ row, cloudName, onSaved }: { row: Row; cloudName: string; o
       <div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {preview ? <img src={preview} alt={`${row.name} with the plate`} className="w-full rounded border border-gray-200" /> : <div className="flex aspect-[2/3] items-center justify-center rounded bg-gray-100 text-center text-xs text-gray-500">No designs yet</div>}
-        {row.kind === 'zodiac' && (
-          <div className="mt-1 flex justify-center gap-1 text-[11px]" role="radiogroup" aria-label="Preview style">
-            {(['plate', 'frame'] as const).map(l => <button key={l} role="radio" aria-checked={look === l} onClick={() => setLook(l)} className={`rounded px-2 py-0.5 ${look === l ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700'}`}>{l}</button>)}
-          </div>
-        )}
         <div className="mt-1 flex justify-center gap-1 text-[11px]" role="radiogroup" aria-label="Preview wording">
           {(['dog', 'cat'] as const).map(a => <button key={a} role="radio" aria-checked={animal === a} onClick={() => setAnimal(a)} className={`rounded px-2 py-0.5 ${animal === a ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700'}`}>{a}</button>)}
         </div>
@@ -103,7 +98,7 @@ function RowEditor({ row, cloudName, onSaved }: { row: Row; cloudName: string; o
       <div className="space-y-2">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="font-semibold text-gray-900">{row.code ? `${row.code} · ` : ''}{row.name}</h3>
-          <span className="text-xs text-gray-500">{row.designs} design{row.designs === 1 ? '' : 's'}{row.kind !== 'tarot' && ` · plate on ${row.captioned}`}{row.hasFrame && ` · frame on ${row.framed}`}</span>
+          <span className="text-xs text-gray-500">{row.designs} design{row.designs === 1 ? '' : 's'}{row.kind === 'pawsonality' && ` · plate on ${row.captioned}`}{row.hasFrame && ` · frame on ${row.framed}`}</span>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {field('title_dog', 'Title (dogs)')}{field('tagline_dog', 'Tagline (dogs)')}
@@ -111,8 +106,8 @@ function RowEditor({ row, cloudName, onSaved }: { row: Row; cloudName: string; o
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button disabled={!!busy || !dirty} onClick={save} className="rounded bg-purple-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">Save wording</button>
-          {row.kind !== 'tarot' && <button disabled={!!busy || dirty || !row.designs} onClick={() => all(true)} title={dirty ? 'Save the wording first' : undefined} className="rounded bg-amber-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">Put on all {row.designs}</button>}
-          {row.kind !== 'tarot' && row.captioned > 0 && <button disabled={!!busy} onClick={() => all(false)} className="rounded border border-gray-300 px-3 py-1 text-xs disabled:opacity-40">Take off all</button>}
+          {row.kind === 'pawsonality' && <button disabled={!!busy || dirty || !row.designs} onClick={() => all(true)} title={dirty ? 'Save the wording first' : undefined} className="rounded bg-amber-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">Put on all {row.designs}</button>}
+          {row.kind === 'pawsonality' && row.captioned > 0 && <button disabled={!!busy} onClick={() => all(false)} className="rounded border border-gray-300 px-3 py-1 text-xs disabled:opacity-40">Take off all</button>}
           {row.hasFrame && <button disabled={!!busy || dirty || !row.designs} onClick={() => all(true, 'frame')} title={dirty ? 'Save the wording first' : undefined} className="rounded bg-indigo-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">Put the frame on all</button>}
           {row.hasFrame && row.framed > 0 && <button disabled={!!busy} onClick={() => all(false, 'frame')} className="rounded border border-gray-300 px-3 py-1 text-xs disabled:opacity-40">Take the frame off all</button>}
           {busy && <span role="status" className="flex items-center gap-1 text-xs text-gray-700"><Loader2 className="h-3 w-3 animate-spin" /> {busy}</span>}
@@ -138,7 +133,7 @@ export default function CaptionsPage() {
     <div className="mx-auto max-w-5xl space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Captions</h1>
-        <p className="text-sm text-gray-600">The translucent gold name plate on Pawsonality and Zodiac pictures (and the title and tagline of framed cards): the type, sign or card and a tagline, worded separately for dogs and cats. Customers can switch it on or off when they make their picture, and you choose it for variations. Empty tagline = title only. Zodiac taglines are shared by the plate and the frame; tarot cards (22, in order) have the frame only.</p>
+        <p className="text-sm text-gray-600">The translucent gold name plate on Pawsonality and Zodiac pictures (and the title and tagline of framed cards): the type, sign or card and a tagline, worded separately for dogs and cats. Customers can switch it on or off when they make their picture, and you choose it for variations. Empty tagline = title only. The name plate is for Pawsonalities only: zodiac signs and tarot cards (22, in order) use the frame, and zodiac taglines are shared with it.</p>
       </div>
       <div className="flex gap-2" role="tablist">
         {(['pawsonality', 'zodiac', 'tarot'] as const).map(k => (

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Admin → Catalogue → a design → Caption plate: for designs in a Pawsonality type or Zodiac sign,
+ * Admin → Catalogue → a design → Caption plate: for designs in a Pawsonality type,
  * put the translucent gold plate (type/sign + tagline) on the picture or take it off, on the design
  * and optionally its breed versions. Wording: Admin → Collections → Captions. Data:
  * /api/admin/catalog/[id]/caption (lib/captions/).

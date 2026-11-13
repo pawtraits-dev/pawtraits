@@ -21,7 +21,7 @@ import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider, useCountryPricing } from '@/lib/country-context';
 import { useUserRouting } from '@/hooks/use-user-routing';
 import ReactMarkdown from 'react-markdown';
-import { DigitalDownloadButton } from '@/components/DigitalDownloadButton';
+import { DigitalDownloadButton, useIsFramed } from '@/components/DigitalDownloadButton';
 import { Download } from 'lucide-react';
 import { track } from '@/lib/tracking/events';
 
@@ -30,6 +30,7 @@ function QRLandingPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { addToCart } = useHybridCart();
+  const framedCard = useIsFramed(typeof (params as any)?.imageId === 'string' ? (params as any).imageId : null);
   const { getCountryPricing } = useCountryPricing();
   const { userProfile } = useUserRouting();
 
@@ -421,8 +422,8 @@ function QRLandingPageContent() {
                   </div>
                 )}
 
-                {/* Digital Download */}
-                <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
+                {/* Digital Download (framed cards are prints only) */}
+                {!framedCard && <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
                   <div className="flex items-start space-x-3 mb-3">
                     <div className="p-2 bg-purple-600 rounded-lg flex-shrink-0">
                       <Download className="w-6 h-6 text-white" />
@@ -443,9 +444,9 @@ function QRLandingPageContent() {
                     variant="default"
                     className="bg-purple-600 hover:bg-purple-700 w-full"
                   />
-                </div>
+                </div>}
 
-                <Separator />
+                {!framedCard && <Separator />}
 
                 {/* Physical Products */}
                 <div className="space-y-3">

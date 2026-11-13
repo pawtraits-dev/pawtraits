@@ -53,8 +53,8 @@ export const FRAME_STYLES = {
     taglineFont: 'pawtraits/frames/fonts/playfair-display-700-italic.woff2',
     ink: '1E1708', highlight: 'ECDEAA', medallionInk: 'D9C48A',
     geometry: {
-      '2:3': { aspect: 2 / 3, medallion: { x: 0.4997, y: 0.0744, r: 0.0704 }, plate: { x0: 0.2647, x1: 0.7360, y0: 0.9096, y1: 0.9544 } },
-      '3:4': { aspect: 3 / 4, medallion: { x: 0.4997, y: 0.0838, r: 0.0704 }, plate: { x0: 0.2647, x1: 0.7360, y0: 0.8983, y1: 0.9487 } },
+      '2:3': { aspect: 2 / 3, medallion: { x: 0.4997, y: 0.0744, r: 0.0704 }, plate: { x0: 0.2689, x1: 0.7402, y0: 0.9114, y1: 0.9561 } },
+      '3:4': { aspect: 3 / 4, medallion: { x: 0.4997, y: 0.0838, r: 0.0704 }, plate: { x0: 0.2689, x1: 0.7402, y0: 0.9002, y1: 0.9506 } },
     },
   },
 } satisfies Record<string, FrameStyle>;

@@ -162,7 +162,7 @@ export default function RunDialog({ open, onClose, recipes, initialRecipeId, ini
           )}
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" checked={caption} onChange={(e) => setCaption(e.target.checked)} className="mt-0.5" />
-            <span>Add the name plate to approved versions <span className="text-gray-500">(Pawsonality type or Zodiac sign and its tagline, worded for each version&apos;s dog or cat; other designs are left alone)</span></span>
+            <span>Add the name plate or frame to approved versions <span className="text-gray-500">(the name plate for a Pawsonality type; the frame for a Zodiac sign or tarot card; worded for each version&apos;s dog or cat; other designs are left alone. Versions of a framed design are always framed)</span></span>
           </label>
           {error && <p className="text-sm text-red-700">{error}</p>}
           <div className="flex justify-end gap-2">

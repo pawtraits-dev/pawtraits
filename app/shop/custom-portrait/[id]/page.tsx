@@ -37,6 +37,7 @@ export default function CustomPortraitPurchasePage() {
           title: customPortraitTitle(c.pet_name, cat?.theme?.displayName || cat?.theme?.name),
           formatId: cat?.format?.id,
           themeName: cat?.theme?.name,
+          frame: c.frame ?? null,
         });
       } catch (e: any) {
         setError(e.message);

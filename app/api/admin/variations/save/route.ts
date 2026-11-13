@@ -5,6 +5,7 @@ import { promoteVariationPreview } from '@/lib/catalog/variation-previews';
 import { registerCloudinaryImage } from '@/lib/catalog/register-image';
 import { wordsForNewVersion } from '@/lib/picture-words-server';
 import { captionForNewVersion } from '@/lib/captions/server';
+import { frameForNewVersion } from '@/lib/frames/server';
 import { cleanDescriptionTitle } from '@/lib/catalogue/title-hygiene';
 
 export const maxDuration = 300;   // drawing words on each version adds a few seconds
@@ -60,7 +61,9 @@ export async function POST(request: NextRequest) {
       // Made from a design with words on it: draw them on for this version's breed
       const words = typeof v.variation_of === 'string' ? await wordsForNewVersion(supabase, saved.id, v.variation_of) : null;
       // Caption plate (type/sign + tagline) when asked
-      const caption = body?.caption === true ? await captionForNewVersion(supabase, saved.id) : null;
+      // A version of a framed design is framed too
+      const framed = typeof v.variation_of === 'string' ? await frameForNewVersion(supabase, saved.id, v.variation_of) : null;
+      const caption = framed ?? (body?.caption === true ? await captionForNewVersion(supabase, saved.id) : null);
       after(() => autoTagNew(supabase, saved.id));
       results.push({ ...base, success: true, database_id: saved.id, cloudinary_url: moved.secure_url, width: moved.width, height: moved.height, ...(words ? { words } : {}), ...(caption ? { caption } : {}) });
     } catch (e: any) {

@@ -1197,7 +1197,7 @@ function ImageDetailModal({
             {/* Words on the picture: pet's name or breed drawn on */}
             <PictureWordsPanel imageId={image.id} onChanged={() => setPicVersion(Date.now())} />
 
-            {/* Caption plate: Pawsonality type / Zodiac sign and tagline */}
+            {/* Caption plate: Pawsonality type and tagline (zodiac and tarot designs use the frame) */}
             <CaptionPanel imageId={image.id} onChanged={() => setPicVersion(Date.now())} />
 
             {/* Framed card: Zodiac sign / tarot card */}

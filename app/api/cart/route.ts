@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { framedLineProblem } from '@/lib/frames/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -166,6 +167,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Framed cards are prints only
+    const framedProblem = await framedLineProblem(serviceRoleSupabase as any, [{ imageId, productId, product }]);
+    if (framedProblem) return NextResponse.json({ error: framedProblem, code: 'FRAMED_PRINTS_ONLY' }, { status: 400 });
 
     // Add item to cart using database function
     const { data: cartItem, error: cartError } = await serviceRoleSupabase

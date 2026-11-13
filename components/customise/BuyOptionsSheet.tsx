@@ -18,6 +18,8 @@ import { track } from '@/lib/tracking/events';
 import { orientationOf, printSizeFor, type Orientation } from '@/lib/print/print-geometry';
 import { orientedSize } from '@/lib/products/shape-family';
 import { shippingSummary } from '@/lib/shipping/rates';
+import { framedProductAllowed } from '@/lib/frames/rules';
+import { framedPrintShape } from '@/lib/frames/print';
 
 export interface BuyTarget {
   kind: 'catalog' | 'custom';
@@ -29,6 +31,8 @@ export interface BuyTarget {
   themeName?: string | null;
   /** Physical products only (e.g. a mug wrap is sold as a mug, not as a download) */
   physicalOnly?: boolean;
+  /** A framed card: prints only, and each size shows the frame fitted to its shape (watermarked thumbnails from the server) */
+  frame?: { thumbs: Partial<Record<'2:3' | '3:4', string>> | null } | null;
 }
 
 export interface StallOfferView {
@@ -90,7 +94,8 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
     fetch(`/api/public/format-products?formatId=${target.formatId}&country=GB`)
       .then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Could not load prices'); return d.products as ProductRow[]; })
       .then(all => {
-        const rows = target.physicalOnly ? all.filter(p => p.product_type !== 'digital_download') : all;
+        // Framed cards are prints only (lib/frames/rules.ts)
+        const rows = target.frame ? all.filter(framedProductAllowed) : target.physicalOnly ? all.filter(p => p.product_type !== 'digital_download') : all;
         setProducts(rows);
         // sensible default: the print in their hand, else the download for a custom portrait
         const digital = rows.find(p => p.product_type === 'digital_download');
@@ -99,13 +104,13 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
         const size = scannedSize || 'M';
         const medium = prints.find(p => isFoam(p) && p.size_code === size) ?? prints.find(p => p.size_code === size);
         if (stallAvailable) setSelected(new Set([STALL_OPTION]));
-        else if (target.kind === 'custom' && digital) setSelected(new Set([digital.id]));
+        else if (target.kind === 'custom' && digital && !target.frame) setSelected(new Set([digital.id]));
         else if (inline && medium) setSelected(new Set([medium.id]));
         else if (inline && digital && !rows.some(p => p.product_type !== 'digital_download')) setSelected(new Set([digital.id]));
         else if (target.physicalOnly && rows.length === 1) setSelected(new Set([rows[0].id]));
       })
       .catch(e => setLoadError(e.message));
-  }, [open, products, target.formatId, target.kind, target.physicalOnly, stallAvailable]);
+  }, [open, products, target.formatId, target.kind, target.physicalOnly, target.frame, stallAvailable]);
 
   const digital = (products ?? []).filter(p => p.product_type === 'digital_download');
   const printsByMedium = useMemo(() => (products ?? [])
@@ -191,6 +196,14 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
     }
   }
 
+  // A size's thumbnail: the picture cut to its shape; for a framed card, the frame fitted to that shape
+  const thumbFor = (p: ProductRow) => {
+    const size = printSizeFor(p.width_cm!, p.height_cm!, orientation!);
+    const shape = target.frame ? framedPrintShape(size) : null;
+    const framedSrc = shape ? target.frame?.thumbs?.[shape] : null;
+    return <ShapeThumb src={framedSrc || target.imageUrl} {...size} fitted={!!framedSrc} />;
+  };
+
   const sections = (
     <>
           {stallAvailable && (
@@ -252,11 +265,11 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
                   return (
                     <Option key={p.id} checked={selected.has(p.id)} onClick={() => toggle(p.id)}
                       highlight={sameSize && !stallAvailable}
-                      thumb={orientation && p.width_cm && p.height_cm ? <ShapeThumb src={target.imageUrl} {...printSizeFor(p.width_cm, p.height_cm, orientation)} /> : undefined}
+                      thumb={orientation && p.width_cm && p.height_cm ? thumbFor(p) : undefined}
                       badge={p.size_code === 'M' && isFoam(p) && !stallAvailable && !sameSize ? 'Most popular' : undefined}
                       title={`${p.size_name || p.name}${p.width_cm ? ` · ${orientedSize(p, orientation)}` : ''}`}
                       subtitle={sameSize ? (stallAvailable ? 'Same size as the one in your hand, made fresh and delivered' : 'Same size as the print you scanned') : (SIZE_LINES[p.size_code || ''] || p.media_description)}
-                      perk="Includes bonus digital copy"
+                      perk={target.frame ? undefined : 'Includes bonus digital copy'}
                       price={gbp(pence(p.pricing))} />
                   );
                 })}
@@ -343,11 +356,11 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
 }
 
 /** The design cropped to a print's shape — exactly how that size will be printed (centre crop). */
-function ShapeThumb({ src, widthMm, heightMm }: { src: string; widthMm: number; heightMm: number }) {
+function ShapeThumb({ src, widthMm, heightMm, fitted }: { src: string; widthMm: number; heightMm: number; fitted?: boolean }) {
   const h = 44;
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" aria-hidden className="shrink-0 rounded-md object-cover object-center shadow-sm ring-1 ring-black/5"
+    <img src={src} alt="" aria-hidden className={`shrink-0 rounded-md ${fitted ? 'object-fill' : 'object-cover object-center'} shadow-sm ring-1 ring-black/5`}
       style={{ height: h, width: Math.round((h * widthMm) / heightMm) }} />
   );
 }

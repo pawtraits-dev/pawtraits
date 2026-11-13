@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { variationSource, wordsForNewVersion } from '@/lib/picture-words-server';
 import { captionForNewVersion } from '@/lib/captions/server';
+import { frameForNewVersion } from '@/lib/frames/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { v2 as cloudinary } from 'cloudinary';
 import { GeminiVariationService } from '@/lib/gemini-variation-service';
@@ -493,7 +494,9 @@ export async function approveItems(supabase: SupabaseClient, runId: string, ids:
         variation_key: item.variation_key,
       });
       await wordsForNewVersion(supabase, saved.id, item.reference_image_id);
-      if (withCaption) await captionForNewVersion(supabase, saved.id);
+      // A version of a framed design is framed too; otherwise the plate (or frame, for zodiac and tarot) when asked
+      const framed = item.reference_image_id ? await frameForNewVersion(supabase, saved.id, item.reference_image_id) : null;
+      if (!framed && withCaption) await captionForNewVersion(supabase, saved.id);
       await supabase.from('variation_run_items').update({ status: 'approved', saved_image_id: saved.id, preview_public_id: moved.public_id, preview_url: moved.secure_url, updated_at: new Date().toISOString() }).eq('id', item.id);
       results.push({ id: item.id, ok: true, imageId: saved.id });
     } catch (e: any) {

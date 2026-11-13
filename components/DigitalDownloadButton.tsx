@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Check } from 'lucide-react';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
@@ -15,6 +15,37 @@ interface DigitalDownloadButtonProps {
   variant?: 'default' | 'outline' | 'ghost';
 }
 
+// Framed cards are prints only (lib/frames/rules.ts): ask which designs are framed, many at once
+const framedAsked = new Map<string, Promise<boolean>>();
+let framedQueue: { ids: string[]; done: (framed: Record<string, true>) => void } | null = null;
+function isFramedDesign(id: string): Promise<boolean> {
+  let p = framedAsked.get(id);
+  if (!p) {
+    p = new Promise<boolean>(resolve => {
+      if (!framedQueue) {
+        const q = { ids: [] as string[], done: (_f: Record<string, true>) => {} };
+        framedQueue = q;
+        setTimeout(() => {
+          framedQueue = null;
+          fetch(`/api/public/frame-status?ids=${q.ids.join(',')}`).then(r => (r.ok ? r.json() : { framed: {} })).catch(() => ({ framed: {} })).then(d => q.done(d.framed || {}));
+        }, 30);
+      }
+      framedQueue.ids.push(id);
+      const prev = framedQueue.done;
+      framedQueue.done = f => { prev(f); resolve(!!f[id]); };
+    });
+    framedAsked.set(id, p);
+  }
+  return p;
+}
+
+/** Is this catalogue design a framed card (prints only)? false until known */
+export function useIsFramed(imageId?: string | null): boolean {
+  const [framed, setFramed] = useState(false);
+  useEffect(() => { let live = true; if (imageId) isFramedDesign(imageId).then(f => live && setFramed(f)); return () => { live = false; }; }, [imageId]);
+  return framed;
+}
+
 export function DigitalDownloadButton({
   imageId,
   imageUrl,
@@ -27,6 +58,8 @@ export function DigitalDownloadButton({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [added, setAdded] = useState(false);
+  const [framed, setFramed] = useState(false);
+  useEffect(() => { let live = true; isFramedDesign(imageId).then(f => live && setFramed(f)); return () => { live = false; }; }, [imageId]);
 
   // Check if this image is already in cart as digital download
   const isInCart = items.some(item => {
@@ -102,6 +135,8 @@ export function DigitalDownloadButton({
       setLoading(false);
     }
   }
+
+  if (framed) return null;
 
   if (isInCart) {
     return (
