@@ -15,7 +15,7 @@ import type { Product, ProductPricing } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
 import ShareModal from '@/components/share-modal';
 import UserInteractionsService from '@/lib/user-interactions';
-import { useServerCart } from '@/lib/server-cart-context';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
@@ -70,7 +70,8 @@ export default function MyPawtraitsGallery() {
 
   const supabaseService = new SupabaseService();
   // Using SupabaseService for customer access
-  const { cart } = useServerCart();
+  const { items: cartItems, totalItems: cartTotalItems } = useHybridCart();
+  const cart = { items: cartItems, totalItems: cartTotalItems };
 
   useEffect(() => {
     loadUserData();
