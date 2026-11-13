@@ -40,7 +40,7 @@ export function framedPrintTransformation(
   const c = plan.crop, o = plan.outputPx;
   const parts = [`c_crop,x_${c.x},y_${c.y},w_${c.width},h_${c.height}`];
   if (upscale) parts.push(`c_scale,w_${upscale.pre.width},h_${upscale.pre.height}`, 'e_upscale');   // before the frame, so it is never upscaled
-  parts.push(`c_scale,w_${o.width},h_${o.height},q_100`, frameLayers(card, shape, opts.style));
+  parts.push(`c_scale,w_${o.width},h_${o.height},q_100`, frameLayers(card, shape, { width: o.width, height: o.height }, opts.style));
   if (opts.bleedOutputPx) parts.push(`c_pad,w_${opts.bleedOutputPx.width},h_${opts.bleedOutputPx.height},${BLEED_BACKGROUND}`);
   return parts.join('/');
 }

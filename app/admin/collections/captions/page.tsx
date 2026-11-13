@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Loader2, RotateCcw } from 'lucide-react';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { CAPTION_MAX, captionLayer, type Caption, type CaptionWording } from '@/lib/captions/caption';
-import { frameCrop, frameLayers, frameTitle, type FrameCard } from '@/lib/frames/frame';
+import { frameBaseForWidth, frameCrop, frameLayers, frameTitle, type FrameCard } from '@/lib/frames/frame';
 
 type Key = keyof CaptionWording;
 interface Row {
@@ -43,7 +43,8 @@ function RowEditor({ row, cloudName, onSaved }: { row: Row; cloudName: string; o
       const base = animal === 'cat' ? row.catCard : row.dogCard;
       if (!base?.medallion) return null;
       const card: FrameCard = { title: frameTitle(title), tagline: shown[`tagline_${animal}`].trim() || null, medallion: base.medallion };
-      return `https://res.cloudinary.com/${cloudName}/image/upload/${frameCrop('2:3')}/c_limit,w_360/${frameLayers(card, '2:3')}/f_jpg,q_80/${row.sample.publicId}`;
+      const b = frameBaseForWidth('2:3', 360);
+      return `https://res.cloudinary.com/${cloudName}/image/upload/${frameCrop(b)}/${frameLayers(card, '2:3', b)}/f_jpg,q_80/${row.sample.publicId}`;
     }
     const c: Caption = { title, tagline: shown[`tagline_${animal}`].trim() || null, symbol: row.kind === 'zodiac' ? row.slug : null };
     return `https://res.cloudinary.com/${cloudName}/image/upload/c_limit,w_360/${captionLayer(c, row.sample.aspect)}/f_jpg,q_80/${row.sample.publicId}`;

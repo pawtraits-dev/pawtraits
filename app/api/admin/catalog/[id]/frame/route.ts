@@ -6,7 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
-import { FRAME_SHAPES, frameCrop, frameLayers, readFrameOverlay } from '@/lib/frames/frame';
+import { FRAME_SHAPES, frameBaseForWidth, frameCrop, frameLayers, readFrameOverlay } from '@/lib/frames/frame';
 import { FRAME_MIGRATION, designCard, ensureFrameAssets, frameDesignAndVersions } from '@/lib/frames/server';
 import { readCaptionOverlay } from '@/lib/captions/caption';
 
@@ -31,7 +31,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   await ensureFrameAssets().catch(e => console.warn('frame files upload failed', e));
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   const previews = found.card && clean && cloudName
-    ? Object.fromEntries(FRAME_SHAPES.map(s => [s, `https://res.cloudinary.com/${cloudName}/image/upload/${frameCrop(s)}/c_limit,w_400/${frameLayers(found.card!, s)}/f_jpg,q_80/${clean}`]))
+    ? Object.fromEntries(FRAME_SHAPES.map(s => { const b = frameBaseForWidth(s, 400); return [s, `https://res.cloudinary.com/${cloudName}/image/upload/${frameCrop(b)}/${frameLayers(found.card!, s, b)}/f_jpg,q_80/${clean}`]; }))
     : null;
   return NextResponse.json({
     kind: found.kind, card: found.card, dog: found.dog, cat: found.cat, designAnimal: found.designAnimal,

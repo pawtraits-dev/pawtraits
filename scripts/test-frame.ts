@@ -1,5 +1,5 @@
 // Run: npx tsx scripts/test-frame.ts
-import { FRAME_LAYOUT, FRAME_STYLES, RENDER_PX, estimateWidth, fitSize, frameCrop, frameLayers, frameLayout, frameShapeFor, frameTitle, readFrameOverlay, rel, sameCard, type FrameCard } from '../lib/frames/frame';
+import { FRAME_STYLES, estimateWidth, fitSize, frameBase, frameBaseForWidth, frameCrop, frameLayers, frameLayout, frameShapeFor, frameTitle, readFrameOverlay, sameCard, type FrameCard } from '../lib/frames/frame';
 import { TAROT } from '../lib/tarot';
 import { BLEED_BACKGROUND, framedPrintShape, framedPrintTransformation } from '../lib/frames/print';
 import { FRAMED_PRINTS_ONLY, framedProductAllowed, isFramed } from '../lib/frames/rules';
@@ -12,60 +12,80 @@ const ok = (name: string, cond: boolean, extra?: unknown) => { if (cond) pass++;
 ok('shape 2:3', frameShapeFor(2 / 3) === '2:3' && frameShapeFor(0.6) === '2:3' && frameShapeFor(0.7) === '2:3');
 ok('shape 3:4', frameShapeFor(3 / 4) === '3:4' && frameShapeFor(0.8) === '3:4' && frameShapeFor(0.72) === '3:4');
 ok('shape bad aspect', frameShapeFor(0) === '2:3' && frameShapeFor(NaN) === '2:3' && frameShapeFor(-1) === '2:3');
-ok('crop', frameCrop('3:4') === 'c_fill,ar_3:4,g_center');
 ok('title with pet', frameTitle('Taurus', 'Daisy') === 'DAISY · TAURUS');
 ok('title without pet', frameTitle('Taurus') === 'TAURUS' && frameTitle('Taurus', '  ') === 'TAURUS' && frameTitle('Taurus', null) === 'TAURUS');
 ok('pet name capped at 14', frameTitle('Leo', 'Bartholomew The Third') === 'BARTHOLOMEW TH · LEO', frameTitle('Leo', 'Bartholomew The Third'));
 ok('pet name trimmed', frameTitle('Leo', '  Rex  ') === 'REX · LEO');
-ok('relative numbers', rel(1) === '1.0' && rel(0) === '0' && rel(-0.00001) === '0' && rel(0.123456) === '0.1235' && rel(-0.5) === '-0.5');
 
-// Sizing and shrinking
-const plateW = (s: '2:3' | '3:4') => { const p = FRAME_STYLES.celestial.geometry[s].plate; return (p.x1 - p.x0) * FRAME_LAYOUT.fit; };
-ok('fitSize keeps a short line', fitSize('LEO', 0.03, 0.4, 0.1) === 0.03);
-const long = 'BARTHOLOMEW TH · SAGITTARIUS';
-const fitted = fitSize(long, 0.03, plateW('2:3'), 0.1);
-ok('fitSize shrinks a long line to fit', fitted < 0.03 && Math.abs(estimateWidth(long, fitted, 0.1) - plateW('2:3')) < 1e-9);
-const small: FrameCard = { title: 'LEO', tagline: null, medallion: { numeral: 'II' } };
-const lo = frameLayout(small, '2:3');
+// Sizing and shrinking (fitSize and estimateWidth are unit-free)
 const P23 = FRAME_STYLES.celestial.geometry['2:3'].plate;
-ok('plate geometry 2:3', P23.x0 === 0.2689 && P23.x1 === 0.7402 && P23.y0 === 0.9114 && P23.y1 === 0.9561);
 const P34 = FRAME_STYLES.celestial.geometry['3:4'].plate;
+ok('plate geometry 2:3', P23.x0 === 0.2689 && P23.x1 === 0.7402 && P23.y0 === 0.9114 && P23.y1 === 0.9561);
 ok('plate geometry 3:4', P34.x0 === 0.2689 && P34.x1 === 0.7402 && P34.y0 === 0.9002 && P34.y1 === 0.9506);
-const plateHW = (P23.y1 - P23.y0) / (2 / 3);
-ok('solo title is bigger (0.46 of plate height)', Math.abs(lo.title.size - 0.46 * plateHW) < 1e-9 && lo.tagline === null);
-const tag = frameLayout({ ...small, tagline: 'Born to be adored' }, '2:3');
-ok('title 0.36 / tagline 0.24 of plate height', Math.abs(tag.title.size - 0.36 * plateHW) < 1e-9 && Math.abs(tag.tagline!.size - 0.24 * plateHW) < 1e-9);
-ok('title above tagline, both inside the plate', tag.title.y < tag.tagline!.y && tag.title.y > P23.y0 && tag.tagline!.y < P23.y1);
-const mid = (P23.y0 + P23.y1) / 2;
-const both = (tag.title.y + tag.tagline!.y) / 2;
-ok('the two lines sit about the plate centre', Math.abs(both - mid) < 0.01, [both, mid]);
-ok('solo title about the plate centre', Math.abs(lo.title.y - mid) < 0.01);
+ok('fitSize keeps a short line', fitSize('LEO', 30, 400, 0.1) === 30);
+const long = 'BARTHOLOMEW TH · SAGITTARIUS';
+const fitted = fitSize(long, 30, 400, 0.1);
+ok('fitSize shrinks a long line to fit', fitted < 30 && Math.abs(estimateWidth(long, fitted, 0.1) - 400) < 1e-9);
+ok('bases', JSON.stringify(frameBase('2:3', { width: 1664, height: 2496 })) === '{"width":1664,"height":2496}' && JSON.stringify(frameBase('3:4', { width: 1664, height: 2496 })) === '{"width":1662,"height":2216}' && JSON.stringify(frameBaseForWidth('3:4', 900)) === '{"width":900,"height":1200}' && frameCrop({ width: 900, height: 1200 }) === 'c_fill,w_900,h_1200,g_center');
+ok('base is required and whole pixels', (() => { try { (frameLayers as any)({ title: 'A', tagline: null, medallion: null }, '2:3'); return false; } catch { /* needed */ } try { frameLayers({ title: 'A', tagline: null, medallion: null }, '2:3', { width: 1000.5, height: 1500 }); return false; } catch { return true; } })());
+
+// Layout arithmetic on 1000 × 1500 (2:3)
+const B1 = { width: 1000, height: 1500 };
+const solo: FrameCard = { title: 'LEO', tagline: null, medallion: { numeral: 'II' } };
+const lo = frameLayout(solo, '2:3', B1);
+const plateH = (P23.y1 - P23.y0) * 1500;                 // 67.05 px
+ok('plate is about 67 px tall', Math.abs(plateH - 67.05) < 1e-6);
+ok('solo title size is 0.46 of the plate height', lo.title.size === Math.round(0.46 * plateH) && lo.tagline === null, lo.title.size);
+ok('title letter spacing is 0.10 of its size', lo.title.spacing === Math.round(0.10 * lo.title.size));
+const plateCy = ((P23.y0 + P23.y1) / 2) * 1500 - 750;     // offset of the plate centre from the base centre
+ok('solo title: capitals centred on the plate (layer up by 0.02 of its size)', lo.title.dy === Math.round(plateCy - 0.02 * lo.title.size), [lo.title.dy, plateCy]);
+const tag = frameLayout({ ...solo, tagline: 'Born to Rule' }, '2:3', B1);
+const T = 0.36 * plateH, G = 0.24 * plateH, gap = 0.09 * plateH, cap = 0.708;
+ok('title 0.36 / tagline 0.24 of the plate height', tag.title.size === Math.round(T) && tag.tagline!.size === Math.round(G), [tag.title.size, tag.tagline!.size]);
+const block = cap * T + gap + cap * G, top = plateCy - block / 2;
+ok('title cap band centre', tag.title.dy === Math.round(top + cap * T / 2 - 0.02 * tag.title.size), [tag.title.dy, top]);
+ok('tagline cap band centre', tag.tagline!.dy === Math.round(top + cap * T + gap + cap * G / 2 - 0.03 * tag.tagline!.size), [tag.tagline!.dy]);
+ok('ink block is centred on the plate', Math.abs(((top + block / 2)) - plateCy) < 1e-9 && tag.title.dy < tag.tagline!.dy);
+ok('title shifted right by half its letter spacing', tag.title.dx === Math.round(((P23.x0 + P23.x1) / 2) * 1000 - 500 + tag.title.spacing / 2) && tag.tagline!.dx === Math.round(((P23.x0 + P23.x1) / 2) * 1000 - 500), [tag.title.dx, tag.tagline!.dx]);
+ok('engraving: 0.02 of the plate, at least 1 px', tag.engrave === Math.round(0.02 * plateH) && frameLayout(solo, '2:3', { width: 100, height: 150 }).engrave === 1);
+ok('max text width is 88% of the plate width', tag.title.maxWidth === Math.round((P23.x1 - P23.x0) * 1000 * 0.88));
+// Medallion: exact pixels
+const med1 = frameLayout(solo, '2:3', B1).medallion;
+ok('2:3 at 1000 × 1500: medallion centre x 500 (offset 0), y 112 from the top (offset -638)', med1.dx === 0 && med1.dy === -638, med1);
+ok('2:3 at 1000 × 1500: symbol width 102', med1.symbolWidth === 102);
+const B2 = { width: 3540, height: 4720 };
+const med2 = frameLayout(solo, '3:4', B2).medallion;
+ok('3:4 at 3540 × 4720: medallion centre 396 from the top', 2360 + med2.dy === Math.round(0.0838 * 4720) && 2360 + med2.dy === 396, med2);
+ok('3:4 at 3540 × 4720: centre x 1769 (offset -1)', med2.dx === Math.round(0.4997 * 3540 - 1770), med2.dx);
+ok('3:4 at 3540 × 4720: symbol width', med2.symbolWidth === Math.round(1.45 * 0.0704 * 3540));
 // Numerals: short ones keep full size, long ones shrink to the medallion
-const num = (n: string) => frameLayout({ title: 'X', tagline: null, medallion: { numeral: n } }, '2:3').medallion.numeral!;
-ok('numeral fits width 1.5 r', ['0', 'II', 'VIII', 'XVIII', 'XXI'].every(n => estimateWidth(num(n).text, num(n).size) <= 1.5 * 0.0704 + 1e-9));
+const num = (n: string) => frameLayout({ title: 'X', tagline: null, medallion: { numeral: n } }, '2:3', B2).medallion.numeral!;
+const r2 = 0.0704 * 3540;
+ok('numeral fits 1.5 r (estimate)', ['0', 'II', 'VIII', 'XVIII', 'XXI'].every(n => estimateWidth(num(n).text, num(n).size) <= 1.5 * r2 + 1));
 ok('XVIII is smaller than II', num('XVIII').size < num('II').size);
-ok('numeral not taller than 0.9 r (cap height 0.708 em)', TAROT.every(t => num(t.numeral).size * 0.708 <= 0.9 * 0.0704 + 1e-9));
-ok('every tarot numeral lays out', TAROT.every(t => !!num(t.numeral)));
+ok('numeral not taller than 0.9 r (cap height 0.708 em)', TAROT.every(t => num(t.numeral).size * 0.708 <= 0.9 * r2 + 1));
+ok('numeral centred on the medallion (layer up by 0.02 of its size)', num('II').dy === Math.round(0.0744 * 4720 - 0.02 * num('II').size - 2360), num('II').dy);
 
 // Layers
 const dog: FrameCard = { title: 'DAISY · TAURUS', tagline: 'Will not be rushed. Will be fed.', medallion: { symbol: 'taurus' } };
-const a = frameLayers(dog, '2:3'), b = frameLayers(dog, '3:4');
+const a = frameLayers(dog, '2:3', B1), b = frameLayers(dog, '3:4', { width: 1000, height: 1333 });
 ok('frame layer first', a.startsWith('l_pawtraits:frames:celestial-2x3/c_scale,w_1.0,h_1.0,fl_relative/fl_layer_apply/') && b.startsWith('l_pawtraits:frames:celestial-3x4/'));
-ok('symbol layer coloured and sized 1.45 r', a.includes('l_pawtraits:zodiac-symbols:taurus/e_colorize:100,co_rgb:D9C48A/c_scale,w_0.1021,fl_relative'));
+ok('symbol layer coloured, in pixels', a.includes('l_pawtraits:zodiac-symbols:taurus/e_colorize:100,co_rgb:D9C48A/c_scale,w_102/fl_layer_apply,g_center,x_0,y_-638'));
 ok('custom font syntax', a.includes('l_text:pawtraits:frames:fonts:playfair-display-800.woff2_') && a.includes('l_text:pawtraits:frames:fonts:playfair-display-700-italic.woff2_'));
 ok('letter spacing on the title only', /playfair-display-800\.woff2_\d+_letter_spacing_\d+:/.test(a) && !/italic\.woff2_\d+_letter_spacing/.test(a));
 ok('each line twice, highlight then ink', a.indexOf('co_rgb:ECDEAA') < a.indexOf('co_rgb:1E1708') && (a.match(/co_rgb:ECDEAA/g) ?? []).length === 2 && (a.match(/co_rgb:1E1708/g) ?? []).length === 2);
+ok('highlight is lower than ink', (() => { const ys = a.split('/').filter(p => p.startsWith('fl_layer_apply,g_center')).map(p => Number(/y_(-?\d+)/.exec(p)![1])); return ys[1] > ys[2] && ys[3] > ys[4]; })());
 ok('no raw commas or slashes in text', !/Will not/.test(a) && a.includes('Will%20not%20be%20rushed.'));
 ok('no layer left open', (a.match(/(^|\/)l_/g) ?? []).length === (a.match(/fl_layer_apply/g) ?? []).length);
-ok('shapes differ in geometry (frame image, x/y offsets)', a !== b && a.split('/').length === b.split('/').length);
-const sharedParts = a.split('/').filter((p, i) => p === b.split('/')[i]);
-ok('everything but geometry is shared (fonts, colours, sizes, boxes)', sharedParts.length >= a.split('/').length - 8, [sharedParts.length, a.split('/').length]);
-ok('resolution independent: no pixel positions', a.split('/').filter(p => p.startsWith('fl_layer_apply,g_center')).every(p => /x_-?[\d.]+,y_-?[\d.]+,fl_relative$/.test(p)));
-ok('text boxes scale by width share', a.split('/').filter(p => p.startsWith('c_scale,w_')).every(p => /fl_relative$/.test(p)));
-ok('render size is RENDER_PX per width', a.includes(`c_limit,w_${Math.round(plateW('2:3') * RENDER_PX)},`));
+ok('shapes differ', a !== b && a.split('/').length === b.split('/').length);
+const all = [a, b, frameLayers(dog, '2:3', B2), frameLayers(solo, '3:4', B2)];
+ok('no fl_relative except the 1.0 frame layer', all.every(t => (t.match(/fl_relative/g) ?? []).length === 1 && t.includes('c_scale,w_1.0,h_1.0,fl_relative')));
+ok('every size and offset is a whole number', all.every(t => t.replace('w_1.0,h_1.0,fl_relative', '').split('/').every(p => { const m = p.startsWith('l_text:') ? p.slice(p.indexOf(':', 7 + 40)) : p; return !/(^|,)(w|h|x|y)_-?\d+\.\d/.test(m) && !/\.woff2_\d+\.\d/.test(p) && !/letter_spacing_-?\d+\.\d/.test(p); })));
+ok('no c_mpad, no scale of text', all.every(t => !t.includes('c_mpad') && !/fl_layer_apply,g_center.*fl_relative/.test(t)));
+ok('text is limited to the plate width', a.includes(`c_limit,w_${Math.round((P23.x1 - P23.x0) * 1000 * 0.88)}`));
 
 // Awkward text
-const odd = frameLayers({ title: 'Rex, "the" 100% / Zoë\'s', tagline: 'Café (très) bon, 50% off', medallion: { numeral: 'IV' } }, '2:3');
+const odd = frameLayers({ title: 'Rex, "the" 100% / Zoë\'s', tagline: 'Café (très) bon, 50% off', medallion: { numeral: 'IV' } }, '2:3', B1);
 ok('comma double-encoded', odd.includes('%252C') && !/[^%]\,\s*the/.test(odd.split('l_text')[2] ?? ''));
 ok('slash double-encoded', odd.includes('%252F') && !odd.includes('100%25 /'));
 ok('percent encoded', odd.includes('100%25'));
@@ -73,8 +93,8 @@ ok('accents and apostrophes', odd.includes('ZO%C3%8B%27S') && odd.includes('Caf%
 ok('title is capitalised', odd.includes('REX%252C'));
 ok('middle dot', a.includes('%C2%B7'));
 ok('numeral medallion has no symbol layer', !odd.includes('zodiac-symbols') && odd.includes('co_rgb:D9C48A'));
-ok('no medallion = no medallion layer', !frameLayers({ title: 'A', tagline: null, medallion: null }, '2:3').includes('D9C48A'));
-ok('bad symbol slug ignored', !frameLayers({ title: 'A', tagline: null, medallion: { symbol: 'a/b' } }, '2:3').includes('zodiac-symbols'));
+ok('no medallion = no medallion layer', !frameLayers({ title: 'A', tagline: null, medallion: null }, '2:3', B1).includes('D9C48A'));
+ok('bad symbol slug ignored', !frameLayers({ title: 'A', tagline: null, medallion: { symbol: 'a/b' } }, '2:3', B1).includes('zodiac-symbols'));
 
 // Stored value
 const o = readFrameOverlay({ style: 'celestial', clean_public_id: 'x/y', applied: { title: 'T', tagline: '', medallion: { numeral: 'II' }, at: 'now' } });
