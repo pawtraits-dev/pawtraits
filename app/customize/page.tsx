@@ -64,6 +64,7 @@ function CustomerCustomizePageContent() {
   const [catalogImages, setCatalogImages] = useState<ImageCatalogWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [purchasingPack, setPurchasingPack] = useState<string | null>(null);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [imageToCustomize, setImageToCustomize] = useState<ImageCatalogWithDetails | null>(null);
 
@@ -142,6 +143,7 @@ function CustomerCustomizePageContent() {
   };
 
   const handlePurchaseCredits = async (packId: string) => {
+    setPurchaseError(null);
     try {
       setPurchasingPack(packId);
 
@@ -166,7 +168,7 @@ function CustomerCustomizePageContent() {
       window.location.href = checkoutUrl;
     } catch (error) {
       console.error('Error purchasing credits:', error);
-      alert('Failed to initiate purchase. Please try again.');
+      setPurchaseError("We couldn't start your purchase. Please try again.");
       setPurchasingPack(null);
     }
   };
@@ -335,6 +337,11 @@ function CustomerCustomizePageContent() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {purchaseError && (
+              <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {purchaseError}
+              </p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {Array.isArray(creditPacks) && creditPacks.map((pack) => (
                 <Card

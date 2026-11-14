@@ -23,6 +23,7 @@ interface ShareModalProps {
 
 export default function ShareModal({ isOpen, onClose, image, onShare }: ShareModalProps) {
   const [copied, setCopied] = useState(false);
+  const [shareNote, setShareNote] = useState<string | null>(null);
   const [includeDescription, setIncludeDescription] = useState(true);
   const [includeHashtag, setIncludeHashtag] = useState(true);
   const [customMessage, setCustomMessage] = useState<string>('');
@@ -113,6 +114,7 @@ export default function ShareModal({ isOpen, onClose, image, onShare }: ShareMod
   };
 
   const handleSocialShare = (platform: string) => {
+    setShareNote(null);
     const encodedUrl = encodeURIComponent(shareUrl);
     const encodedText = encodeURIComponent(shareText);
     
@@ -172,9 +174,9 @@ export default function ShareModal({ isOpen, onClose, image, onShare }: ShareMod
             // Strategy 2: Fallback with improved UX
             setTimeout(() => {
               navigator.clipboard.writeText(`${shareText} ${shareUrl}`).then(() => {
-                alert('📋 Copied! Open Instagram and paste in your story.');
+                setShareNote('Link copied. Open Instagram and paste it into your story.');
               }).catch(() => {
-                alert('📱 Opening Instagram app...');
+                setShareNote('Opening Instagram...');
               });
             }, 1500);
           };
@@ -186,9 +188,9 @@ export default function ShareModal({ isOpen, onClose, image, onShare }: ShareMod
         } else {
           // For desktop, provide mobile-friendly QR code suggestion
           navigator.clipboard.writeText(`${shareText} ${shareUrl}`).then(() => {
-            alert('📋 Link copied! Open Instagram on your phone and paste.');
+            setShareNote('Link copied. Open Instagram on your phone and paste it in.');
           }).catch(() => {
-            alert('📱 Copy this link to share on Instagram: ' + shareUrl);
+            setShareNote('We couldn\'t copy the link. Use the link box below to copy it, then paste it into Instagram.');
           });
           trackShare(platform);
           onShare?.(platform);
@@ -422,6 +424,12 @@ export default function ShareModal({ isOpen, onClose, image, onShare }: ShareMod
               </Button>
             </div>
           </div>
+
+          {shareNote && (
+            <p role="status" className="text-sm text-gray-700">
+              {shareNote}
+            </p>
+          )}
 
           {/* Copy Link */}
           <div className="space-y-2 w-full">

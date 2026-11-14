@@ -27,6 +27,7 @@ import ImageModal from '@/components/ImageModal';
 import { extractDescriptionTitle } from '@/lib/utils';
 import StickyFilterHeader from '@/components/StickyFilterHeader';
 
+import { useToast } from '@/components/ui/use-toast';
 export const dynamic = 'force-dynamic';
 
 export default function CustomerHomePage() {
@@ -381,6 +382,8 @@ export default function CustomerHomePage() {
     setShowProductModal(true);
   };
 
+  const { toast } = useToast();
+
   const handleAddToCart = (productId: string, quantity: number) => {
     if (!selectedImage) return;
 
@@ -388,7 +391,11 @@ export default function CustomerHomePage() {
     const productPricing = pricing.find(p => p.product_id === productId && p.country_code === selectedCountry);
     
     if (!product || !productPricing) {
-      alert('Product information not found');
+      toast({
+        title: "We couldn't add that to your basket",
+        description: 'Please refresh the page and try again.',
+        variant: 'destructive',
+      });
       return;
     }
 

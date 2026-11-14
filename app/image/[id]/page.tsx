@@ -17,6 +17,7 @@ import ShareModal from '@/components/share-modal';
 import PartnerQRModal from '@/components/PartnerQRModal';
 import type { ImageCatalogWithDetails, Product, ProductPricing } from '@/lib/types';
 
+import { useToast } from '@/components/ui/use-toast';
 interface ImagePageProps {}
 
 export default function ImagePage({}: ImagePageProps) {
@@ -117,6 +118,8 @@ export default function ImagePage({}: ImagePageProps) {
     setShowProductModal(true);
   };
 
+  const { toast } = useToast();
+
   const handleAddToCart = (productId: string, quantity: number) => {
     if (!imageData) return;
 
@@ -124,7 +127,11 @@ export default function ImagePage({}: ImagePageProps) {
     const productPricing = pricing.find(p => p.product_id === productId && p.country_code === selectedCountry);
     
     if (!product || !productPricing) {
-      alert('Product information not found');
+      toast({
+        title: "We couldn't add that to your basket",
+        description: 'Please refresh the page and try again.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -167,7 +174,6 @@ export default function ImagePage({}: ImagePageProps) {
   const copyPromptToClipboard = () => {
     if (imageData?.prompt_text) {
       navigator.clipboard.writeText(imageData.prompt_text);
-      alert('Prompt copied to clipboard!');
     }
   };
 

@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Heart, X, Upload, Camera, Trash2, ImageIcon, Sparkles, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui/use-toast';
 import { getSupabaseClient } from '@/lib/supabase-client';
 import type { UserProfile } from '@/lib/user-types';
 import type { Breed, Coat, AnimalType } from '@/lib/types';
@@ -33,6 +34,11 @@ export default function AddPetPage() {
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  // Messages shown in the page instead of browser pop-ups
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [allBreeds, setAllBreeds] = useState<Breed[]>([]);
   const [allCoats, setAllCoats] = useState<Coat[]>([]);
@@ -77,7 +83,7 @@ export default function AddPetPage() {
       
       if (!user) {
         console.error('🔧 No authenticated user found');
-        alert('Please log in to add a pet.');
+        setLoadError("Please log in to add a pet.");
         return;
       }
       
@@ -107,17 +113,17 @@ export default function AddPetPage() {
               setUserProfile(result.userProfile);
             } else {
               console.error('🔧 No customer profile found in debug API');
-              alert('Customer profile not found. Please contact support.');
+              setLoadError("We couldn't find your customer profile. Please contact support.");
               return;
             }
           } else {
             console.error('🔧 Debug API failed:', response.status);
-            alert('Unable to load profile. Please refresh the page.');
+            setLoadError("We couldn't load your profile. Please refresh the page.");
             return;
           }
         } catch (apiError) {
           console.error('🔧 Debug API error:', apiError);
-          alert('Unable to load profile. Please refresh the page.');
+          setLoadError("We couldn't load your profile. Please refresh the page.");
           return;
         }
       } else {
@@ -148,7 +154,7 @@ export default function AddPetPage() {
       setAvailableCoats(initialCoats);
     } catch (error) {
       console.error('🔧 Error loading initial data:', error);
-      alert('Error loading page data. Please refresh the page.');
+      setLoadError("We couldn't load this page. Please refresh and try again.");
     } finally {
       setLoading(false);
     }
@@ -156,6 +162,7 @@ export default function AddPetPage() {
 
   const handleInputChange = (field: keyof AddPetFormData, value: any) => {
     console.log(`Setting ${field} to:`, value);
+    setFormError(null);
     setFormData(prev => {
       const newData = { ...prev, [field]: value };
       console.log('Updated form data:', newData);
@@ -260,18 +267,25 @@ export default function AddPetPage() {
     const files = e.target.files;
     if (!files) return;
 
+    setPhotoError(null);
+    const photoProblems: string[] = [];
     const maxSize = 10 * 1024 * 1024; // 10MB
     const validFiles = Array.from(files).filter(file => {
       if (!file.type.startsWith('image/')) {
-        alert(`${file.name} is not an image file. Only image files are allowed.`);
+        photoProblems.push(`${file.name} isn't an image. Choose a JPG, PNG or similar photo.`);
         return false;
       }
       if (file.size > maxSize) {
-        alert(`${file.name} is too large. Maximum file size is 10MB.`);
+        photoProblems.push(`${file.name} is too big. Choose a photo under 10 MB.`);
         return false;
       }
       return true;
     });
+
+    if (selectedPhotos.length + validFiles.length > 10) {
+      photoProblems.push('You can add up to 10 photos for each pet.');
+    }
+    if (photoProblems.length > 0) setPhotoError(photoProblems.join(' '));
 
     if (validFiles.length === 0) return;
 
@@ -281,7 +295,6 @@ export default function AddPetPage() {
     setSelectedPhotos(prev => {
       const combined = [...prev, ...validFiles];
       if (combined.length > 10) {
-        alert('Maximum 10 photos allowed per pet.');
         return combined.slice(0, 10);
       }
       return combined;
@@ -473,6 +486,8 @@ export default function AddPetPage() {
       breed_id_length: formData.breed_id.length
     });
     
+    setFormError(null);
+
     // Double-check user profile by getting it fresh if needed
     if (!userProfile || !userProfile.user_id) {
       console.warn('🔧 User profile not available, attempting fresh load...');
@@ -480,7 +495,7 @@ export default function AddPetPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          alert('Please log in to add a pet.');
+          setFormError("Please log in to add a pet.");
           return;
         }
         
@@ -500,11 +515,11 @@ export default function AddPetPage() {
               setUserProfile(result.userProfile);
               console.log('🔧 Fresh profile loaded via debug API');
             } else {
-              alert('Customer profile not found. Please contact support.');
+              setFormError("We couldn't find your customer profile. Please contact support.");
               return;
             }
           } else {
-            alert('Unable to verify your profile. Please refresh the page and try again.');
+            setFormError("We couldn't check your profile. Please refresh the page and try again.");
             return;
           }
         } else {
@@ -513,18 +528,20 @@ export default function AddPetPage() {
         }
       } catch (error) {
         console.error('🔧 Error getting fresh profile:', error);
-        alert('Unable to verify your profile. Please refresh the page and try again.');
+        setFormError("We couldn't check your profile. Please refresh the page and try again.");
         return;
       }
     }
     
     if (!formData.name.trim()) {
-      alert('Please enter your pet\'s name.');
+      setFormError("Please add your pet's name.")
+      document.getElementById('name')?.focus();
       return;
     }
     
     if (!formData.breed_id) {
-      alert('Please select a breed.');
+      setFormError("Please choose your pet's breed.")
+      document.getElementById('breed')?.focus();
       return;
     }
 
@@ -534,7 +551,7 @@ export default function AddPetPage() {
       // Get the authorization token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('You must be logged in to add a pet.');
+        setFormError("Please log in to add a pet.");
         return;
       }
 
@@ -580,27 +597,28 @@ export default function AddPetPage() {
         console.log('🔧 Pet added successfully:', result);
         
         // Upload photos if any were selected
+        const addedName = formData.name.trim();
         if (selectedPhotos.length > 0 && result.pet?.id) {
           try {
             await uploadPhotosForPet(result.pet.id);
-            alert(`${result.message || 'Pet added successfully!'} Photos uploaded successfully!`);
+            toast({ title: `${addedName} has been added.`, description: 'Your photos were uploaded too.' });
           } catch (photoError) {
             console.error('Photo upload failed:', photoError);
-            alert(`${result.message || 'Pet added successfully!'} However, some photos failed to upload. You can add them later from the pet management page.`);
+            toast({ title: `${addedName} has been added.`, description: "Some photos didn't upload. You can add them from your pets page." });
           }
         } else {
-          alert(result.message || 'Pet added successfully!');
+          toast({ title: `${addedName} has been added.` });
         }
-        
+
         router.push('/customer/pets');
       } else {
         const errorData = await response.json();
         console.error('🔧 Failed to add pet:', errorData);
-        alert(`Failed to add pet: ${errorData.error || 'Unknown error'}\n${errorData.details || ''}`);
+        setFormError("We couldn't add your pet. Please try again.");
       }
     } catch (error) {
       console.error('🔧 Error adding pet:', error);
-      alert('Failed to add pet. Please check your connection and try again.');
+      setFormError("We couldn't add your pet. Please check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -635,6 +653,12 @@ export default function AddPetPage() {
           </p>
         </div>
       </div>
+
+      {loadError && (
+        <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {loadError}
+        </div>
+      )}
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -715,6 +739,11 @@ export default function AddPetPage() {
                 </div>
               </label>
             </div>
+            {photoError && (
+              <p role="alert" className="text-sm text-red-700">
+                {photoError}
+              </p>
+            )}
 
             {selectedPhotos.length > 0 && (
               <div>
@@ -920,7 +949,7 @@ export default function AddPetPage() {
               <div className="space-y-2">
                 <Label htmlFor="breed">Breed *</Label>
                 <Select value={formData.breed_id} onValueChange={handleBreedChange}>
-                  <SelectTrigger>
+                  <SelectTrigger id="breed">
                     <SelectValue placeholder={`Select ${formData.animal_type === 'cat' ? 'cat' : 'dog'} breed`} />
                   </SelectTrigger>
                   <SelectContent>
@@ -1056,6 +1085,11 @@ export default function AddPetPage() {
         </Card>
 
         {/* Submit */}
+        {formError && (
+          <p role="alert" className="text-sm text-red-700 text-right">
+            {formError}
+          </p>
+        )}
         <div className="flex justify-end space-x-4">
           <Button 
             type="button" 
