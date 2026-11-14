@@ -480,15 +480,12 @@ export default function CustomerAccountView({ userProfile }: CustomerAccountView
 
                         <div className="flex items-center justify-between">
                           <div>
-                            <Label className="text-sm font-medium">Marketing Emails</Label>
+                            <Label className="text-sm font-medium">Marketing emails</Label>
                             <p className="text-sm text-gray-500">
-                              Promotions, new features, special offers
+                              New designs, birthday treats and offers: choose which, or stop them
                             </p>
                           </div>
-                          <Switch
-                            checked={notifications.marketing_emails_enabled}
-                            onCheckedChange={(checked) => handleNotificationChange('marketing_emails_enabled', checked)}
-                          />
+                          <a href="/email-preferences?me=1" className="text-sm font-semibold text-purple-700 underline">Email preferences</a>
                         </div>
                       </div>
                     </div>

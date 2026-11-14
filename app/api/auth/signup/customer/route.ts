@@ -334,6 +334,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Explicit marketing opt-in ticked on the sign-up form (basis 'consent'); unticked = nothing at all. Never blocks sign-up.
+    if (signupData.marketingOptIn === true) {
+      try {
+        const { recordTick } = await import('@/lib/marketing/preferences');
+        await recordTick(createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } }), { ticked: true, email, source: 'account', customerId });
+      } catch (prefError) {
+        console.warn('Marketing opt-in not recorded (sign-up is fine):', prefError);
+      }
+    }
+
     return NextResponse.json({
       message: 'Account created successfully',
       user: {

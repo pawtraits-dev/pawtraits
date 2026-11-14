@@ -399,6 +399,23 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
       }
     }
 
+    // Marketing email, decided only now the order is PAID (abandoned checkouts subscribe no one):
+    //   marketingOptIn 'true'   an explicit tick from a checkout made before this change → consent
+    //   marketingOptOut 'false' bought and did not say "No thanks" → soft opt-in (never re-subscribes an unsubscribed address)
+    //   marketingOptOut 'true'  "No thanks": only a 'declined' event is recorded
+    //   neither                 an old checkout with no tick: nothing at all
+    // Best-effort: the order is fine either way. This does not touch the Meta event below (that reads the cookie banner).
+    if (customerEmail && (metadata.marketingOptIn === 'true' || metadata.marketingOptOut === 'true' || metadata.marketingOptOut === 'false')) {
+      try {
+        const { recordTick, subscribeFromPurchase } = await import('@/lib/marketing/preferences');
+        const customerId = guestAccount?.customerId ?? orderingUserProfile?.customer_id ?? null;
+        if (metadata.marketingOptIn === 'true') await recordTick(supabase, { ticked: true, email: customerEmail, source: 'checkout', customerId, at: (order as any).created_at ?? null });
+        else await subscribeFromPurchase(supabase, { email: customerEmail, optedOut: metadata.marketingOptOut === 'true', customerId });
+      } catch (prefError) {
+        console.error('Marketing choice not recorded (order is fine):', prefError);
+      }
+    }
+
     if (metadata.priceCheck === 'suspicious' || metadata.priceHold === 'true') {
       // Paid below catalogue price — possible tampering. Don't print; flag for review.
       console.error('🚨 Order HELD for review (price below catalogue):', order.id, order.order_number);

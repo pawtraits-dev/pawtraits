@@ -68,7 +68,8 @@ interface CreatePaymentIntentRequest {
   };
   // Guest checkout extras
   customerPhone?: string;
-  marketingOptIn?: boolean;
+  marketingOptIn?: boolean;   // old checkout (explicit tick): still honoured by the webhook for payments already in flight
+  marketingOptOut?: boolean;  // "No thanks, just my order emails"; absent = an old checkout, so nothing is decided
   digitalOnly?: boolean;
 }
 
@@ -276,6 +277,7 @@ export async function POST(request: NextRequest) {
 
     if (body.customerPhone) metadata.customerPhone = String(body.customerPhone).slice(0, 30);
     if (body.marketingOptIn) metadata.marketingOptIn = 'true';
+    if (typeof body.marketingOptOut === 'boolean') metadata.marketingOptOut = body.marketingOptOut ? 'true' : 'false';   // acted on by the webhook after payment
 
     // Server-side price check: the browser sends the amount, so compare it with catalogue
     // prices, delivery and only the discounts the server can confirm (lib/checkout/price-check.ts).

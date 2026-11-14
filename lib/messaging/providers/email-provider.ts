@@ -82,6 +82,7 @@ export async function sendEmail(params: EmailSendParams): Promise<ProviderRespon
       text: params.text,
       reply_to: replyTo,
       tags: params.tags || [],
+      ...(params.headers && Object.keys(params.headers).length ? { headers: params.headers } : {}),
     });
 
     if (error) {

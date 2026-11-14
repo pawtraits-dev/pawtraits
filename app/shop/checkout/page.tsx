@@ -1,5 +1,6 @@
 "use client"
 
+import MarketingOptOut from '@/components/marketing/MarketingOptOut'
 import type React from "react"
 
 import { useState, useEffect } from "react"
@@ -39,7 +40,8 @@ const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' }
 function CheckoutPageContent() {
   const [currentStep, setCurrentStep] = useState(1)
   // Guest checkout (no account needed — one is created after payment)
-  const [marketingOptIn, setMarketingOptIn] = useState(false)
+  // "No thanks, just my order emails": unticked = subscribed when the order is paid (never before)
+  const [marketingOptOut, setMarketingOptOut] = useState(false)
   const [beganCheckoutTracked, setBeganCheckoutTracked] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const { selectedCountry, getCountryPricing } = useCountryPricing()
@@ -101,6 +103,16 @@ function CheckoutPageContent() {
   const router = useRouter()
   const { userProfile, loading: userLoading } = useUserRouting()
   const isGuest = !userLoading && !userProfile
+  // Marketing line + "No thanks" box: shown to everyone, except a signed-in customer who is already subscribed or has unsubscribed (the server ignores the default for them anyway)
+  const [marketingStatus, setMarketingStatus] = useState<'subscribed' | 'unsubscribed' | 'none' | null>(null)
+  useEffect(() => {
+    if (!userProfile) { setMarketingStatus(null); return }
+    let live = true
+    fetch('/api/public/email-preferences?me=1', { credentials: 'include', cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null)).then(d => { if (live && d?.status) setMarketingStatus(d.status) }).catch(() => {})
+    return () => { live = false }
+  }, [userProfile])
+  const showMarketingTick = isGuest || (!!userProfile && marketingStatus === 'none')
   // Nothing to post (downloads and/or prints taken home from the stall): no address or shipping step
   const isDigitalOnly = items.length > 0 && !items.some((item: any) => itemNeedsShipping(item))
   const hasTakeHomeItems = items.some((item: any) => isStallProductId(item.productId))
@@ -556,7 +568,7 @@ function CheckoutPageContent() {
         postcode: payer.address?.postcode || '',
         country: payer.address?.country || shippingData.country,
       },
-      marketingOptIn: isGuest ? marketingOptIn : undefined,
+      marketingOptOut: showMarketingTick ? marketingOptOut : false,   // sent always, so an in-flight payment from before this change is told apart; the server acts on it only once the order is paid
       digitalOnly: payer.digitalOnly || undefined,
       shippingOption: option,
       cartItems: items.map(item => ({
@@ -800,12 +812,7 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                           : 'Enter your email in the form below to apply it before paying.'}
                       </p>
                     )}
-                    {isGuest && (
-                      <label className="flex items-start gap-3 pt-1 text-sm text-gray-700">
-                        <input type="checkbox" checked={marketingOptIn} onChange={(e) => setMarketingOptIn(e.target.checked)} className="mt-0.5 h-5 w-5 accent-purple-600" />
-                        <span>Send me the occasional new design and offer (unsubscribe any time)</span>
-                      </label>
-                    )}
+                    {showMarketingTick && <MarketingOptOut checked={marketingOptOut} onChange={setMarketingOptOut} />}
                   </CardContent>
                 </Card>
                 {expressFirst ? (
@@ -881,10 +888,7 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                           />
                           {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
                           <p className="text-xs text-gray-500">For your receipt{hasTakeHomeItems ? '' : isDigitalOnly ? ' and download link' : ' and delivery updates'}. We’ll set up a free account with it so you can find your order later — no password needed.</p>
-                          <label className="flex items-start gap-3 pt-1 text-sm text-gray-700">
-                            <input type="checkbox" checked={marketingOptIn} onChange={(e) => setMarketingOptIn(e.target.checked)} className="mt-0.5 h-5 w-5 accent-purple-600" />
-                            <span>Send me the occasional new design and offer (unsubscribe any time)</span>
-                          </label>
+                          {showMarketingTick && <MarketingOptOut checked={marketingOptOut} onChange={setMarketingOptOut} />}
                         </>
                       ) : (
                         <>
@@ -897,6 +901,7 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                             placeholder="Loading from your account..."
                           />
                           <p className="text-xs text-gray-500">Using email from your account</p>
+                          {showMarketingTick && <MarketingOptOut checked={marketingOptOut} onChange={setMarketingOptOut} />}
                         </>
                       )}
                     </div>

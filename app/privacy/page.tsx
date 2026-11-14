@@ -315,6 +315,21 @@ export default function PrivacyPage() {
           </p>
         </div>
 
+        {/* Emails from us */}
+        <div className="my-10">
+          <h2 className="text-gray-900 text-2xl font-semibold mb-4 pb-3 border-b-2 border-purple-100">
+            Emails from us
+          </h2>
+          <p className="text-gray-600 text-base my-4 leading-relaxed">
+            When you buy from us, we&apos;ll email you about new designs, your pet&apos;s birthday and the odd offer, unless you tell us not to in the box at checkout. If you haven&apos;t bought from us, we only email you if you said yes.
+          </p>
+          <p className="text-gray-600 text-base my-4 leading-relaxed">
+            Every one of those emails has a link to stop them or pick what you&apos;d like, and you can do the same any time on our{' '}
+            <Link href="/account" className="text-purple-600 no-underline font-semibold hover:underline">account page</Link>.
+            Order updates, receipts and download links still arrive either way, because you&apos;ll want those.
+          </p>
+        </div>
+
         {/* Contact Section */}
         <div className="bg-gray-50 p-8 rounded-lg mt-12 text-center">
           <h3 className="text-gray-900 text-xl font-semibold mb-4">🔒 Privacy Questions or Concerns?</h3>

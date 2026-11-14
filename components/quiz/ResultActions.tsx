@@ -12,6 +12,7 @@ import { Check, Share2 } from 'lucide-react';
 import ResultPicture from './ResultPicture';
 import { gbp, useLowestPrices } from '@/lib/pricing/use-lowest-prices';
 import { track } from '@/lib/tracking/events';
+import MarketingOptIn from '@/components/marketing/MarketingOptIn';
 
 export interface ResultActionsProps {
   shareCode: string; animal: 'dog' | 'cat'; code: string; typeName: string;
@@ -103,6 +104,7 @@ export function MakePawtrait({ petName, typeName, code, imageId, breedId, animal
 
 export function SaveResult({ shareCode, petName, signedIn }: { shareCode: string; petName: string; signedIn: boolean }) {
   const [email, setEmail] = useState('');
+  const [marketingOptIn, setMarketingOptIn] = useState(false);   // not a buyer yet: explicit, unticked
   const [state, setState] = useState<'idle' | 'busy' | 'emailed' | 'saved' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
 
@@ -110,7 +112,7 @@ export function SaveResult({ shareCode, petName, signedIn }: { shareCode: string
     setState('busy'); setMessage(null);
     try {
       const r = await fetch(`/api/public/quiz-results/${shareCode}/save`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: withEmail }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: withEmail, ...(withEmail ? { marketingOptIn } : {}) }),
       });
       const body = await r.json().catch(() => ({}));
       if (!r.ok) { setState('error'); setMessage(body.error || 'Could not save just now.'); return; }
@@ -158,6 +160,7 @@ export function SaveResult({ shareCode, petName, signedIn }: { shareCode: string
           {state === 'busy' ? 'Saving…' : 'Save'}
         </button>
       </div>
+      <MarketingOptIn checked={marketingOptIn} onChange={setMarketingOptIn} />
       {message && <p role="alert" className="text-sm text-red-700">{message}</p>}
     </form>
   );

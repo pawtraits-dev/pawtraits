@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
+import MarketingOptIn from '@/components/marketing/MarketingOptIn';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ interface FormData {
 }
 
 function UserSignupContent() {
+  const [marketingOptIn, setMarketingOptIn] = useState(false);   // explicit, unticked: not a buyer yet
   const router = useRouter();
   const searchParams = useSearchParams();
   const referralCode = searchParams.get('ref');
@@ -241,6 +243,7 @@ function UserSignupContent() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         phone: formData.phone,
+        marketingOptIn,
 
         // Pet data (optional)
         petName: formData.petName,
@@ -492,6 +495,7 @@ function UserSignupContent() {
                       />
                       {errors.confirmPassword && <p className="text-sm text-red-600">{errors.confirmPassword}</p>}
                     </div>
+                    <MarketingOptIn checked={marketingOptIn} onChange={setMarketingOptIn} />
                   </div>
                 </div>
               )}

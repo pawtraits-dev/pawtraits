@@ -6,6 +6,7 @@
  * - Not signed in: makes sure there's a customer account for the email (no password; same as
  *   guest checkout), records the email on the result, and emails a sign-in link that brings them
  *   back here with ?save=1, where the page calls this again signed in. → { saved: 'emailed' }
+ * { email, marketingOptIn?: true } records an explicit marketing opt-in (source 'quiz_save') when the box was ticked.
  * Limit: 3 emails per address per 15 minutes.
  */
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,6 +18,7 @@ import { renderEmailFile } from '@/lib/messaging/render-file';
 import { getPublicResult } from '@/lib/quiz/results';
 import { afterFrame } from '@/lib/social/feed';
 import { zodiacByKey } from '@/lib/zodiac';
+import { recordTick } from '@/lib/marketing/preferences';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +45,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const email = String(body?.email || '').trim().toLowerCase();
     if (!EMAIL_RE.test(email)) return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
+
+    // Not a buyer: an explicit, unticked box. Ticked → subscribed (basis 'consent'); unticked → nothing at all. Never blocks the save.
+    if (body?.marketingOptIn === true) await recordTick(supabase, { ticked: true, email, source: 'quiz_save' }).catch(e => console.error('marketing opt-in not recorded', e));
 
     const since = new Date(Date.now() - 15 * 60_000).toISOString();
     const { count } = await supabase.from('account_claim_tokens').select('id', { count: 'exact', head: true })
