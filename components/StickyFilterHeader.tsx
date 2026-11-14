@@ -84,6 +84,7 @@ export default function StickyFilterHeader({
                   value={searchTerm}
                   onChange={(e) => onSearchTermChange(e.target.value)}
                   onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                     if (e.key === 'Enter') {
                       onSearchSubmit();
                     }

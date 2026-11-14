@@ -611,6 +611,7 @@ function PartnerSignupFormContent() {
                       <Input
                         id="password"
                         type="password"
+                        autoComplete="new-password"
                         value={formData.password}
                         onChange={(e) => handleInputChange('password', e.target.value)}
                         className={errors.password ? 'border-red-500' : ''}
@@ -624,6 +625,7 @@ function PartnerSignupFormContent() {
                       <Input
                         id="confirmPassword"
                         type="password"
+                        autoComplete="new-password"
                         value={formData.confirmPassword}
                         onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
                         className={errors.confirmPassword ? 'border-red-500' : ''}

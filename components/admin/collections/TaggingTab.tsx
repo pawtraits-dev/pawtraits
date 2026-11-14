@@ -95,7 +95,7 @@ function DesignCard({ d, collections, label, onChanged }: { d: Design; collectio
               {t}<button onClick={() => saveTags(tags.filter(x => x !== t))} aria-label={`Remove tag ${t}`} className="rounded-full hover:bg-gray-200"><X className="h-3 w-3" /></button>
             </span>
           ))}
-          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(); } }} onBlur={addTag}
+          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.nativeEvent.isComposing || e.keyCode === 229) return; if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(); } }} onBlur={addTag}
             placeholder="add tag" aria-label="Add a tag" className="w-24 rounded border border-gray-300 px-1.5 py-0.5 text-xs" />
           {d.tagsEdited && <span className="text-xs text-gray-500">edited by hand</span>}
         </div>

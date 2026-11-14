@@ -108,7 +108,7 @@ function AddChild({ parent, onAdded }: { parent: Collection; onAdded: () => void
   };
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
-      <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} placeholder={`New ${label} name`} className="rounded border border-gray-300 px-3 py-1.5 text-sm" />
+      <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.nativeEvent.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') add(); }} placeholder={`New ${label} name`} className="rounded border border-gray-300 px-3 py-1.5 text-sm" />
       <button onClick={add} disabled={!name.trim()} className="rounded bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">Add</button>
       <button onClick={() => setOpen(false)} className="text-sm text-gray-700 hover:underline">Cancel</button>
       {parent.kind === 'sport' && parent.depth === 1 && <p className="w-full text-xs text-gray-600">Teams added here have no kit yet. Kits for the built-in teams come from lib/collections/sports-teams.ts.</p>}
