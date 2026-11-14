@@ -1,5 +1,5 @@
 /**
- * /p/<token>: the link in the "Email me this preview" email. Verifies the signed token (30 days; it
+ * /pv/<token>: the link in the "Email me this preview" email. Verifies the signed token (30 days; it
  * carries a request id, never an address), gives THIS browser access to that one preview, and
  * redirects to the preview page with ?src=preview_email. Safe to repeat. Link scanners and crawlers
  * (bot user agents) are just redirected: they grant nothing and confirm nothing.

@@ -35,7 +35,7 @@ export function verifyPreviewToken(token: unknown, now = Date.now()): TokenCheck
   return parseInt(exp, 36) < now ? { ok: false, reason: 'expired' } : { ok: true, requestId: id };
 }
 
-export const previewUrl = (baseUrl: string, requestId: string, now = Date.now()) => `${baseUrl.replace(/\/$/, '')}/p/${signPreviewToken(requestId, now)}`;
+export const previewUrl = (baseUrl: string, requestId: string, now = Date.now()) => `${baseUrl.replace(/\/$/, '')}/pv/${signPreviewToken(requestId, now)}`;
 
 /** The pet's first name for an email: the first word, letters only, ≤16; null when nothing is left */
 export function previewFirstName(petName: unknown): string | null {

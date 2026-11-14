@@ -22,7 +22,7 @@ const id = '0b6f1c2e-3d4a-4e5f-8a9b-1c2d3e4f5a6b';
     && (verifyPreviewToken(`${a}.${(parseInt(exp, 36) + 1e9).toString(36)}.${sig}`, now) as any).reason === 'bad'
     && (verifyPreviewToken(`1b6f1c2e-3d4a-4e5f-8a9b-1c2d3e4f5a6b.${exp}.${sig}`, now) as any).reason === 'bad'
     && (verifyPreviewToken('rubbish', now) as any).reason === 'bad' && (verifyPreviewToken(undefined, now) as any).reason === 'bad' && (verifyPreviewToken(`${a}..${sig}`, now) as any).reason === 'bad');
-  ok('link shape', previewUrl('https://pawtraits.pics/', id, now) === `https://pawtraits.pics/p/${t}`);
+  ok('link shape', previewUrl('https://pawtraits.pics/', id, now) === `https://pawtraits.pics/pv/${t}`);
 
   // Names
   ok('first name: first word, letters only, capitalised', previewFirstName('biscuit & luna') === 'Biscuit' && previewFirstName("O'Malley") === 'OMalley' && previewFirstName('Zoë') === 'Zoë');
