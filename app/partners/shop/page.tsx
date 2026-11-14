@@ -684,6 +684,7 @@ export default function PartnerShopPage() {
               >
                 <CatalogImage
                   imageId={image.id}
+                  version={image.public_url}
                   alt={image.description || 'Generated image'}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />

@@ -238,7 +238,7 @@ function HomePageContent({ hero }: { hero: FeedItem | null }) {
               return (
                 <Link key={img.id} href={`/customise/${img.id}`} className="group block">
                   <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-gray-100 [&>div]:h-full">
-                    <CatalogImage imageId={img.id} alt={title} fallbackUrl={img.image_url || img.public_url}
+                    <CatalogImage imageId={img.id} alt={title} fallbackUrl={img.image_url || img.public_url} version={img.public_url || img.image_url}
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
                     {price?.digitalOnly && (
                       <span className="absolute left-2 top-2 rounded-md bg-white/95 px-2 py-0.5 text-[11px] font-semibold text-gray-900">Digital only</span>
@@ -270,7 +270,7 @@ function HomePageContent({ hero }: { hero: FeedItem | null }) {
           <div className="mt-5 flex gap-3 overflow-hidden">
             {(images || []).slice(0, 3).map(img => (
               <div key={img.id} className="aspect-[2/3] w-28 shrink-0 overflow-hidden rounded-xl bg-gray-800 md:w-36 [&>div]:h-full">
-                <CatalogImage imageId={img.id} alt="" fallbackUrl={img.image_url || img.public_url} className="h-full w-full object-cover" />
+                <CatalogImage imageId={img.id} alt="" fallbackUrl={img.image_url || img.public_url} version={img.public_url || img.image_url} className="h-full w-full object-cover" />
               </div>
             ))}
           </div>
@@ -293,7 +293,7 @@ function HeroPicture({ creation, image, className = '' }: { creation: FeedItem |
           // eslint-disable-next-line @next/next/no-img-element
           <img src={creation.afterUrl} alt={name ? `${name}'s Pawtrait` : 'A customer’s Pawtrait'} fetchPriority="high" className="h-full w-full object-cover" />
         ) : image ? (
-          <CatalogImage imageId={image.id} alt={designTitle(image.description)} fallbackUrl={image.image_url || image.public_url} sizes="(min-width: 768px) 340px, 250px" priority className="h-full w-full object-cover" />
+          <CatalogImage imageId={image.id} alt={designTitle(image.description)} fallbackUrl={image.image_url || image.public_url} version={image.public_url || image.image_url} sizes="(min-width: 768px) 340px, 250px" priority className="h-full w-full object-cover" />
         ) : null}
         {creation && <span className="absolute right-2 top-2 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-purple-800">{name ? `${name}’s Pawtrait` : 'Pawtrait'}</span>}
       </div>

@@ -634,6 +634,7 @@ export default function CustomerCustomizePage() {
                     <div className="relative aspect-square overflow-hidden">
                       <CatalogImage
                         imageId={image.id}
+                        version={image.public_url}
                         alt={image.description || 'Pet portrait'}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />

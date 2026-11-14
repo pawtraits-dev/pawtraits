@@ -743,7 +743,7 @@ function GalleryContent() {
             imageId={image.id}
             alt={image.description || image.prompt_text}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            fallbackUrl={image.public_url}
+            fallbackUrl={image.public_url} version={image.public_url}
           />
           
           {/* Interaction type badges */}

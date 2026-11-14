@@ -727,7 +727,7 @@ export default function CustomerHomePage() {
                       imageId={image.id}
                       alt={image.description || 'Generated image'}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      fallbackUrl={image.image_url || image.public_url}
+                      fallbackUrl={image.image_url || image.public_url} version={image.public_url || image.image_url}
                     />
                     {image.rating && image.rating > 0 && (
                       <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
@@ -838,7 +838,7 @@ export default function CustomerHomePage() {
                     imageId={image.id}
                     alt={image.description || 'Generated image'}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    fallbackUrl={image.image_url || image.public_url}
+                    fallbackUrl={image.image_url || image.public_url} version={image.public_url || image.image_url}
                   />
                   
                   {/* Top overlay elements */}
@@ -944,7 +944,7 @@ export default function CustomerHomePage() {
                       imageId={image.id}
                       alt={image.description || 'Generated image'}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      fallbackUrl={image.image_url || image.public_url}
+                      fallbackUrl={image.image_url || image.public_url} version={image.public_url || image.image_url}
                     />
                     {image.rating && image.rating > 0 && (
                       <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">

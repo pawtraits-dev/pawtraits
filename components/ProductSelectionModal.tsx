@@ -188,6 +188,7 @@ export default function ProductSelectionModal({
             <div className="overflow-hidden rounded-lg bg-gray-100 flex-shrink-0">
               <CatalogImage
                 imageId={image.id}
+                version={image.public_url}
                 alt={image.description || 'Generated image'}
                 className="w-full h-auto object-contain max-h-[500px]"
               />

@@ -12,6 +12,27 @@ const rateLimiter = new RateLimiter({
   enableAutoBlock: true
 })
 
+// Catalogue pictures: a page of 24 designs is 24+ picture requests at once, and "load more" adds more.
+// The general limiter treats anonymous API traffic as 20 requests/minute, which a single page load exceeds,
+// so pictures get their own limiter instance (own counters) and a generous limit. Counters live in this
+// server instance's memory (a Map): no database or network call per request, and each warm instance counts
+// separately. Its auto-block threshold is above the per-minute limit, so it never blocks, it only returns 429
+// until the window slides.
+const PICTURE_REQUESTS_PER_MINUTE = 600
+const pictureRateLimiter = new RateLimiter({
+  suspiciousThreshold: PICTURE_REQUESTS_PER_MINUTE,
+  blockThreshold: PICTURE_REQUESTS_PER_MINUTE * 2,
+  enableAutoBlock: true
+})
+pictureRateLimiter.addRule({
+  id: 'secure-images',
+  pattern: '/api/secure-images/*',
+  userTypes: ['anonymous'],
+  config: { windowMs: 60 * 1000, maxRequests: PICTURE_REQUESTS_PER_MINUTE, strategy: 'sliding' },
+  priority: 200,
+  isActive: true
+})
+
 // Initialize DLP middleware - DISABLED to prevent false positives
 const dlpMiddleware = createDLPMiddleware({
   enableAPIProtection: false, // Temporarily disable DLP protection due to false positives
@@ -109,6 +130,13 @@ export async function middleware(req: NextRequest) {
     return new NextResponse('Not found', { status: 404 })
   }
 
+  // Catalogue pictures (GET /api/secure-images/...): the route does its own checks and reads no cookies or
+  // session, so skip the Supabase session, the DLP scan and the account-based rate limit. Pictures are
+  // rate limited as anonymous traffic with their own, generous limit (no session lookup).
+  if (req.method === 'GET' && req.nextUrl.pathname.startsWith('/api/secure-images/')) {
+    return handlePictureRequest(req)
+  }
+
   const res = NextResponse.next()
   
   // Create a Supabase client configured to use cookies
@@ -134,6 +162,30 @@ export async function middleware(req: NextRequest) {
   // Refresh session if expired - required for Server Components
   const { data: { session } } = await supabase.auth.getSession()
 
+  return res
+}
+
+/**
+ * Cheap path for picture requests: anonymous rate limit, one security header, nothing else.
+ */
+async function handlePictureRequest(req: NextRequest): Promise<NextResponse> {
+  try {
+    const info = await pictureRateLimiter.checkRateLimit(req, 'anonymous')
+    if (info.limited) {
+      const limited = NextResponse.json(
+        { error: 'Rate limit exceeded', message: `Too many requests. Try again in ${info.retryAfter} seconds.` },
+        { status: 429 }
+      )
+      if (info.retryAfter) limited.headers.set('Retry-After', info.retryAfter.toString())
+      limited.headers.set('X-Content-Type-Options', 'nosniff')
+      return limited
+    }
+  } catch (error) {
+    console.error('Picture rate limiting error:', error)
+    // Fail open, like the general limiter
+  }
+  const res = NextResponse.next()
+  res.headers.set('X-Content-Type-Options', 'nosniff')
   return res
 }
 

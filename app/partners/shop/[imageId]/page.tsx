@@ -255,7 +255,7 @@ export default function PartnerImageDetailPage() {
                   imageId={imageData.id}
                   alt={imageData.description || 'Pet portrait'}
                   className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
-                  fallbackUrl={imageData.public_url || imageData.image_url}
+                  fallbackUrl={imageData.public_url || imageData.image_url} version={imageData.public_url || imageData.image_url}
                   onLoad={() => setImageLoaded(true)}
                 />
               </div>

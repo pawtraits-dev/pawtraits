@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { PawSpinner } from '@/components/ui/paw-spinner';
+import { pictureVersion } from '@/lib/picture-version';
 
 interface CloudinaryImageDisplayProps {
   imageId: string;
@@ -228,7 +229,7 @@ export function CloudinaryImageDisplay({
  */
 export function CatalogImage({ imageId, className = '', alt = 'Pet Pawtrait', fallbackUrl, sizes = '(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw', priority = false, version }: {
   imageId: string;
-  /** Changes when the design's picture changes (e.g. its cloudinary_public_id), so caches don't show the old one */
+  /** Changes when the design's picture changes (e.g. its public_url or cloudinary_public_id). Wins over fallbackUrl as the source of the address version, so caches never show the old picture */
   version?: string | number | null;
   className?: string;
   alt?: string;
@@ -246,7 +247,9 @@ export function CatalogImage({ imageId, className = '', alt = 'Pet Pawtrait', fa
     const el = imgRef.current;
     if (el?.complete && el.naturalWidth > 0) setLoaded(true);
   }, []);
-  const v = version ? `&v=${encodeURIComponent(String(version).slice(-24))}` : '';
+  // Version in the address = a year of caching. An explicit version wins; otherwise the design's picture URL.
+  const ver = pictureVersion(version ?? fallbackUrl);
+  const v = ver ? `&v=${ver}` : '';
   const src = (w: number) => `/api/secure-images/${imageId}?variant=mid_size&w=${w}${v}`;
 
   if (failed && !fallbackUrl) {
