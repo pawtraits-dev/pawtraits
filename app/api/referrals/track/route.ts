@@ -40,18 +40,14 @@ export async function POST(request: NextRequest) {
     }
     */
 
-    // Update the customer's total_referrals count if it's a share action
+    // Shares only record when the code was last shared. (This used to add one to total_referrals with
+    // supabase.raw(), which does not exist in supabase-js, so every share answered 500; that column is
+    // recalculated from customer_referrals on the referrals page anyway.)
     if (action === 'share') {
-      const { error: updateError } = await supabase
-        .from('customers')
-        .update({
-          total_referrals: supabase.raw('total_referrals + 1'),
-          last_shared_at: new Date().toISOString()
-        })
-        .eq('personal_referral_code', referral_code);
-
-      if (updateError) {
-        console.error('Error updating customer share count:', updateError);
+      try {
+        await supabase.from('customers').update({ last_shared_at: new Date().toISOString() }).eq('personal_referral_code', String(referral_code).toUpperCase());
+      } catch (updateError) {
+        console.error('Error recording share time:', updateError);
       }
     }
 

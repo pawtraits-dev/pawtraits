@@ -81,6 +81,10 @@ export const track = {
   quizResultDesignClick(quiz: string, resultType: string, imageId: string) {
     gtagEvent('quiz_result_design_click', { quiz_type: quiz, result_type: resultType, item_id: imageId });
   },
+  /** A customer shared their referral link ("Give 10%, get 10%"): GA4 standard "share" */
+  referralShare(method: 'native' | 'whatsapp' | 'copy' | 'qr', placement: string) {
+    gtagEvent('share', { content_type: 'referral', method, item_id: placement });
+  },
   /** Site search (GA4 standard "search") and "See more <tag>" links */
   search(term: string, results: number, kind: 'query' | 'tag' = 'query') {
     gtagEvent('search', { search_term: term, results, search_kind: kind });

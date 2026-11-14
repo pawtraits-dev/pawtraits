@@ -7,6 +7,7 @@ import { requireAdmin, serviceClient } from '@/lib/qr/server';
 import { generatePackingSlips } from '@/lib/fulfillment/packing-slips';
 import { needsPosting } from '@/lib/fulfillment/order-fulfilment';
 import { getSetting } from '@/lib/app-settings';
+import { getReferralDetailsForEmails, siteBaseUrl } from '@/lib/referrals/share';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -24,7 +25,17 @@ export async function GET(request: NextRequest) {
   const orders = ids.map(id => (data || []).find((o: any) => o.id === id)).filter((o: any) => o && needsPosting(o));
   if (!orders.length) return NextResponse.json({ error: 'None of those orders have prints to post' }, { status: 400 });
 
-  const bytes = await generatePackingSlips(orders, { returnAddress: await getSetting('return_address') });
+  // The customer's own referral QR for the parcel (read-only: no codes are made while printing)
+  const db = serviceClient();
+  const byEmail = await getReferralDetailsForEmails(db, orders.map((o: any) => o.customer_email), { baseUrl: siteBaseUrl() });
+  const referrals = new Map<string, { code: string; shareUrl: string; shortLink: string }>();
+  for (const o of orders as any[]) {
+    if (String(o.order_type || '').startsWith('partner')) continue; // a partner's order for a client: not the customer's own parcel
+    const d = byEmail.get(String(o.customer_email || '').toLowerCase());
+    if (d) referrals.set(o.id, { code: d.code, shareUrl: d.shareUrl, shortLink: d.shortLink });
+  }
+
+  const bytes = await generatePackingSlips(orders, { returnAddress: await getSetting('return_address'), referrals });
   const name = orders.length === 1 ? `packing-slip-${orders[0].order_number}.pdf` : `packing-slips-${new Date().toISOString().slice(0, 10)}-${orders.length}.pdf`;
   return new NextResponse(Buffer.from(bytes), {
     headers: {

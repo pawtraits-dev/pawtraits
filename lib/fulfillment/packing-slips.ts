@@ -7,6 +7,8 @@
 
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage, PDFImage } from 'pdf-lib';
 import { postedItems, describeOrderItem, itemTitle, itemRef } from './shared';
+import { qrMatrix } from '@/lib/qr/render';
+import { REFERRAL_COPY } from '@/lib/referrals/text';
 
 export { describeOrderItem, itemTitle, itemRef };
 
@@ -98,9 +100,70 @@ function checkbox(page: PDFPage, x: number, y: number, size = mm(4)) {
   page.drawRectangle({ x, y, width: size, height: size, borderColor: BLACK, borderWidth: 0.8 });
 }
 
+/** What the "Give 10%, get 10%" panel on a slip needs for one order's customer */
+export interface SlipReferral { code: string; shareUrl: string; shortLink: string }
+
 export interface PackingSlipOptions {
   /** Shown under the address label, e.g. "Return to: Pawtraits, …" */
   returnAddress?: string | null;
+  /** Referral panel per order id; an order with no entry gets the slip as before */
+  referrals?: Map<string, SlipReferral> | null;
+}
+
+/** Break text into lines no wider than maxWidth (words are never split; an over-long word gets its own line) */
+export function wrapText(measure: (text: string) => number, text: string, maxWidth: number): string[] {
+  const lines: string[] = [];
+  let line = '';
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && measure(next) > maxWidth) { lines.push(line); line = word; } else line = next;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+/** The panel's explanatory line, or null when it would need more than two lines (then QR + heading + code only) */
+export function referralPanelLine(measure: (text: string) => number, maxWidth: number): string[] | null {
+  const lines = wrapText(measure, REFERRAL_COPY.slipLine, maxWidth);
+  return lines.length <= 2 ? lines : null;
+}
+
+/** Height reserved at the bottom of a slip for the referral panel (QR 31 mm with its quiet zone, plus margin) */
+export const REFERRAL_PANEL_TOP_MM = 40;
+export const REFERRAL_QR_BOX_MM = 31;
+
+function drawReferralPanel(page: PDFPage, ref: SlipReferral, regular: PDFFont, bold: PDFFont, left: number, right: number) {
+  const bottom = mm(REFERRAL_PANEL_TOP_MM - REFERRAL_QR_BOX_MM);
+  const box = mm(REFERRAL_QR_BOX_MM);
+  // QR: black on white, drawn as vector squares, with the 4-module quiet zone inside the white box
+  const { size, isDark } = qrMatrix(ref.shareUrl);
+  const module = box / (size + 8);
+  page.drawRectangle({ x: left, y: bottom, width: box, height: box, color: rgb(1, 1, 1) });
+  for (let row = 0; row < size; row++) {
+    let col = 0;
+    while (col < size) {
+      if (!isDark(col, row)) { col++; continue; }
+      let end = col;
+      while (end < size && isDark(end, row)) end++;
+      page.drawRectangle({ x: left + (col + 4) * module, y: bottom + box - (row + 5) * module, width: (end - col) * module, height: module, color: rgb(0, 0, 0) });
+      col = end;
+    }
+  }
+  const tx = left + box + mm(6);
+  const tw = right - tx;
+  let ty = mm(REFERRAL_PANEL_TOP_MM) - mm(5);
+  page.drawText(REFERRAL_COPY.heading, { x: tx, y: ty, size: 12, font: bold, color: BLACK });
+  ty -= mm(5.5);
+  const lines = referralPanelLine(t => regular.widthOfTextAtSize(safe(t), 9), tw);
+  if (lines) {
+    for (const l of lines) { page.drawText(safe(l), { x: tx, y: ty, size: 9, font: regular, color: BLACK }); ty -= mm(4.2); }
+    ty -= mm(2);
+  } else {
+    ty -= mm(2);
+  }
+  page.drawText(fit(bold, ref.shortLink, 10, tw), { x: tx, y: ty, size: 10, font: bold, color: BLACK });
+  ty -= mm(5);
+  page.drawText(fit(regular, `Code: ${ref.code}`, 10, tw), { x: tx, y: ty, size: 10, font: regular, color: GREY });
 }
 
 export async function generatePackingSlips(orders: any[], opts: PackingSlipOptions = {}): Promise<Uint8Array> {
@@ -225,9 +288,12 @@ function drawSlip(pdf: PDFDocument, order: any, regular: PDFFont, bold: PDFFont,
   y -= mm(4);
 
   const rowH = mm(34);
+  // With the referral panel the footer message moves up 22 mm; four items still fit (the fourth ends at about 65 mm)
+  const referral = opts.referrals?.get(order.id) ?? null;
+  const itemsFloor = referral ? mm(64) : mm(40);
   const items = postedItems(order);
   items.forEach((item, idx) => {
-    if (y - rowH < mm(40)) return; // keep space for the footer; very large orders continue on the pick list
+    if (y - rowH < itemsFloor) return; // keep space for the footer; very large orders continue on the pick list
     const top = y;
     const img = images.get(thumbUrl(item.image_url) || '');
     const box = mm(28);
@@ -260,7 +326,7 @@ function drawSlip(pdf: PDFDocument, order: any, regular: PDFFont, bold: PDFFont,
     y -= rowH;
     page.drawLine({ start: { x: left, y: y + mm(3) }, end: { x: right, y: y + mm(3) }, color: LIGHT, thickness: 0.5 });
   });
-  if (items.length && y - rowH < mm(40) && items.length > 1) {
+  if (items.length && y - rowH < itemsFloor && items.length > 1) {
     const shown = Math.floor((labelY - mm(26) - mm(40)) / rowH);
     if (shown < items.length) {
       page.drawText(safe(`+ ${items.length - shown} more item(s) - see the order in admin`), { x: left, y: y - mm(2), size: 10, font: bold, color: rgb(0.8, 0.1, 0.1) });
@@ -268,11 +334,14 @@ function drawSlip(pdf: PDFDocument, order: any, regular: PDFFont, bold: PDFFont,
   }
 
   // --- Footer message for the customer -----------------------------------------
-  const fy = mm(30);
+  const fy = referral ? mm(52) : mm(30);
   page.drawLine({ start: { x: left, y: fy + mm(10) }, end: { x: right, y: fy + mm(10) }, color: LIGHT, thickness: 1 });
   page.drawText('Thank you for your order!', { x: left, y: fy + mm(3), size: 13, font: bold, color: PURPLE });
   page.drawText('Printed and packed by hand in London. Your free digital copy is waiting in your Pawtraits account.', { x: left, y: fy - mm(3), size: 9, font: regular, color: BLACK });
   page.drawText('Questions? support@pawtraits.pics  -  Share your pet\'s portrait and tag us!', { x: left, y: fy - mm(8), size: 9, font: regular, color: GREY });
+
+  // --- Give 10%, get 10%: the customer's own referral QR, at the very bottom ----
+  if (referral) drawReferralPanel(page, referral, regular, bold, left, right);
 }
 
 // ----------------------------------------------------------------------------------

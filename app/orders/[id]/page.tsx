@@ -9,6 +9,7 @@ import { ArrowLeft, Package, Clock, Truck, CheckCircle, MapPin, Calendar, Credit
 import { productDescriptionService } from '@/lib/product-utils';
 import { extractDescriptionTitle } from '@/lib/utils';
 import ItemDownload from '@/components/orders/ItemDownload';
+import ShareReferral from '@/components/referrals/ShareReferral';
 import TrackingTimeline from '@/components/orders/TrackingTimeline';
 import type { TrackingEvent, TrackingStage } from '@/lib/shipping/royal-mail/status';
 
@@ -240,6 +241,15 @@ export default function OrderDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {order.payment_status === 'paid' && (
+          <ShareReferral
+            placement="order_detail"
+            orderId={order.id}
+            imageUrl={order.order_items?.find((i) => /^https:\/\//.test(i.image_url || ''))?.image_url}
+            petName={/^Custom Pawtrait of ([A-Za-zÀ-ÖØ-öø-ÿ'’-]{2,20})/.exec((order.order_items?.[0]?.image_title ?? '').trim())?.[1] ?? null}
+          />
+        )}
       </div>
     </div>
   );

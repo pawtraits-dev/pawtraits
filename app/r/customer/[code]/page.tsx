@@ -51,6 +51,8 @@ export default function CustomerReferralLandingPage() {
       if (response.ok) {
         const data = await response.json();
         setReferralData(data.referral);
+        // Keep the code where checkout reads it (the friend gets 10% off their first order)
+        try { localStorage.setItem('referralCode', String(params.code).toUpperCase()); } catch { /* private mode */ }
         setScanRecorded(true);
 
         // Access tracking is already handled in the verify API
@@ -143,7 +145,7 @@ export default function CustomerReferralLandingPage() {
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               {referralData?.customer_name} wants to share something special with you -
-              beautiful AI-generated portraits of your beloved pets with <strong>20% off your first order</strong>!
+              beautiful AI-generated portraits of your beloved pets with <strong>10% off your first order</strong>!
             </p>
           </div>
 
@@ -181,7 +183,7 @@ export default function CustomerReferralLandingPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Star className="w-5 h-5 text-yellow-500" />
-                    Get 20% Off Your First Order
+                    Get 10% Off Your First Order
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -191,7 +193,7 @@ export default function CustomerReferralLandingPage() {
                       <span className="font-medium text-green-900">Special Offer Active</span>
                     </div>
                     <p className="text-green-800 text-sm">
-                      Use code <strong>{referralData?.referral_code}</strong> at checkout to save 20% on your first Pawtraits order!
+                      Use code <strong>{referralData?.referral_code}</strong> at checkout to save 10% on your first Pawtraits order!
                     </p>
                   </div>
 
@@ -227,7 +229,7 @@ export default function CustomerReferralLandingPage() {
                       <div>
                         <h4 className="font-medium text-gray-900">Apply Your Discount</h4>
                         <p className="text-sm text-gray-600">
-                          Use referral code at checkout and save 20% on your first order
+                          Use referral code at checkout and save 10% on your first order
                         </p>
                       </div>
                     </div>
@@ -237,7 +239,7 @@ export default function CustomerReferralLandingPage() {
                     <Link href={`/signup?ref=${referralData?.referral_code}&returnTo=/browse`}>
                       <Button size="lg" className="w-full bg-purple-600 hover:bg-purple-700">
                         <ArrowRight className="w-5 h-5 mr-2" />
-                        Start Shopping with 20% Off
+                        Start Shopping with 10% Off
                       </Button>
                     </Link>
                     <p className="text-xs text-gray-500 text-center mt-2">
@@ -328,7 +330,7 @@ export default function CustomerReferralLandingPage() {
                   <div className="text-center space-y-4">
                     <div className="p-4 bg-green-50 rounded-lg">
                       <div className="text-center">
-                        <p className="text-3xl font-bold text-green-600">20%</p>
+                        <p className="text-3xl font-bold text-green-600">10%</p>
                         <p className="text-sm text-green-700">OFF First Order</p>
                       </div>
                     </div>

@@ -25,6 +25,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
+import ShareReferral from '@/components/referrals/ShareReferral';
 
 // 🏗️ CUSTOMER REFERRALS VIEW COMPONENT
 // User-type specific view for customer referrals page
@@ -451,6 +452,12 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
 
           {/* Tab 1: Referrals & Activity */}
           <TabsContent value="referrals" className="space-y-6">
+            {/* One-tap share first, then the code, link and QR */}
+            {referralData.primary_code && (
+              <ShareReferral placement="referrals" hideCreditLink details={{ code: referralData.primary_code.code }} />
+            )}
+            <ReferralCodeDisplay code={referralData.primary_code} />
+
             {/* Recent Activity */}
             <Card>
               <CardHeader>

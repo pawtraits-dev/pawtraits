@@ -16,6 +16,7 @@ import { extractDescriptionTitle } from '@/lib/utils'
 import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider } from '@/lib/country-context'
 import { track } from '@/lib/tracking/events'
+import ShareReferral from '@/components/referrals/ShareReferral'
 
 interface OrderItem {
   id: string
@@ -46,6 +47,12 @@ interface Order {
   estimated_delivery: string
   created_at: string
   order_items: OrderItem[]
+}
+
+/** "Custom Pawtrait of Biscuit · Royal" -> "Biscuit" (first pet); anything else -> null */
+function petNameFromTitle(title?: string | null): string | null {
+  const m = /^Custom Pawtrait of ([A-Za-zÀ-ÖØ-öø-ÿ'’-]{2,20})/.exec((title ?? '').trim());
+  return m ? m[1] : null;
 }
 
 function OrderConfirmationContent() {
@@ -417,6 +424,15 @@ function OrderConfirmationContent() {
             </Button>
           </Link>
         </div>
+
+        {/* Give 10%, get 10%: below the main actions */}
+        <ShareReferral
+          className="mt-8"
+          placement="order_confirmation"
+          orderId={order.id}
+          imageUrl={(order.order_items || []).find((i: any) => /^https:\/\//.test(i.image_url || ''))?.image_url}
+          petName={petNameFromTitle((order.order_items || [])[0]?.image_title)}
+        />
 
         {/* Support */}
         <div className="mt-12 text-center">
