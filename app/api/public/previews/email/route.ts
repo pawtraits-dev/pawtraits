@@ -1,5 +1,5 @@
 /**
- * POST /api/public/previews/email  { imageId, email?, marketingOptIn?, website? }
+ * POST /api/public/previews/email  { imageId, email?, website? }
  * "Email me this preview": emails the owner of a finished preview a link to pick it up on any device
  * (lib/previews/). A message the person asked for, not marketing: sent whatever their marketing choice.
  *
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   if (typeof body?.website === 'string' && body.website.trim()) return NextResponse.json({ ok: true, masked: maskEmail(typed ?? 'x@x.co') }, { headers: NO_STORE });
 
   const r = await requestPreviewEmail(supabase, {
-    imageId, email: typed, marketingTicked: !requester.user && body?.marketingOptIn === true,
+    imageId, email: typed, marketingTicked: !requester.user,   // not signed in: asking for the preview is the sign-up (confirmed when the link is opened)
     user: requester.user ? { id: requester.user.id, email: requester.user.email } : null,
     guestId: requester.guestId, qrCookie: req.cookies.get(QR_ATTRIBUTION_COOKIE)?.value ?? null, ip: clientIp(req),
     baseUrl: (process.env.NEXT_PUBLIC_BASE_URL || req.nextUrl.origin).replace(/\/$/, ''),

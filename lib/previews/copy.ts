@@ -1,7 +1,11 @@
 /** Words for "Email me this preview" (client-safe): the card on the preview page, and the email lines. */
 export const PREVIEW_COPY = {
   heading: 'Not ready to decide?',
-  line: 'We\'ll email you this preview so you can pick it up later, on any device.',
+  // Asking for the preview is the sign-up (decided 14 November 2026): no separate tick. These are the
+  // words recorded as what the person agreed to.
+  line: 'Send me this design, and the occasional special treat. Say \'Stop it\' at any time and we will be very obedient.',
+  // Signed-in customers already have their own email choices; for them it is just the preview
+  lineSignedIn: 'We\'ll email you this preview so you can pick it up later, on any device.',
   fieldLabel: 'Your email',
   placeholder: 'you@example.com',
   button: 'Email me this preview',
@@ -22,7 +26,7 @@ export const PREVIEW_EMAIL = {
   heading: 'Here\'s your preview',
   preheader: 'Pick up where you left off, on any device.',
   button: 'See my preview',
-  marketingLine: 'You also said yes to new designs and the odd offer. We\'ll start once you\'ve opened your preview; if that wasn\'t you, do nothing and you won\'t hear from us again.',
+  marketingLine: 'Opening your preview also signs you up for the occasional special treat. Say \'Stop it\' at any time and we will be very obedient. If you didn\'t ask for this, do nothing and you won\'t hear from us again.',
   footerNote: 'You\'re getting this because someone asked for this preview to be sent here from pawtraits.pics. If that wasn\'t you, you can ignore it.',
   subject: (firstName: string | null) => (firstName ? `${firstName}'s Pawtrait preview is ready` : 'Your Pawtrait preview is ready'),
   body: (firstName: string | null) => `Pawcasso has painted ${firstName ?? 'your pet'} in. Have another look, pick a size, and it's yours.`,
