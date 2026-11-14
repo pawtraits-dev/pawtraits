@@ -12,6 +12,7 @@ import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
 import BuyOptionsSheet, { type BuyTarget } from '@/components/customise/BuyOptionsSheet';
 import { customPortraitTitle } from '@/lib/cart/items';
+import EmailPreviewCard from '@/components/previews/EmailPreviewCard';
 import { FrameSwitch, type FrameChoiceInfo } from '@/components/customise/FrameToggle';
 
 export default function CustomPortraitPurchasePage() {
@@ -66,6 +67,7 @@ export default function CustomPortraitPurchasePage() {
             <div className="aspect-square animate-pulse rounded-2xl bg-gray-200" />
           )}
         </div>
+        {target && <div className="mx-auto max-w-xl px-4"><EmailPreviewCard imageId={id} /></div>}
         {target && choice && <div className="mx-auto max-w-xl px-4"><FrameSwitch key={`${id}:${choice.state}`} imageId={id} choice={choice} onChanged={() => setVersion(v => v + 1)} /></div>}
         {target && <BuyOptionsSheet open onClose={() => router.back()} target={target} scannedSize={scannedSize} />}
       </div>

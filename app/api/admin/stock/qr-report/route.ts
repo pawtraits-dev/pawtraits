@@ -57,9 +57,27 @@ export async function GET(request: NextRequest) {
   }
   const topImages = Array.from(byImage.values()).sort((a, b) => b.scans - a.scans).slice(0, 25);
 
+  // "Email me this preview" requests that carried a stall scan, by location (skipped quietly before the preview-emails migration)
+  const previewByCode = new Map<string, { requested: number; opened: number }>();
+  const { data: reqs, error: reqErr } = await supabase.from('preview_email_requests').select('pos_location_id, opened_at')
+    .not('pos_location_id', 'is', null).gte('created_at', fromTs).lt('created_at', toTs).limit(20000);
+  if (!reqErr && reqs?.length) {
+    const { data: locs } = await supabase.from('stock_locations').select('id, code').in('id', Array.from(new Set(reqs.map((r: any) => r.pos_location_id))));
+    const codeOf = new Map((locs ?? []).map((l: any) => [l.id, l.code]));
+    for (const r of reqs as any[]) {
+      const code = codeOf.get(r.pos_location_id);
+      if (!code) continue;
+      const agg = previewByCode.get(code) ?? { requested: 0, opened: 0 };
+      agg.requested++; if (r.opened_at) agg.opened++;
+      previewByCode.set(code, agg);
+    }
+  }
+  const locations = Array.from(byLocation.values()).sort((a, b) => b.scans - a.scans)
+    .map(l => ({ ...l, preview_emails: previewByCode.get(l.location_code)?.requested ?? 0, preview_emails_opened: previewByCode.get(l.location_code)?.opened ?? 0 }));
+
   return NextResponse.json({
     from, to,
-    locations: Array.from(byLocation.values()).sort((a, b) => b.scans - a.scans),
+    locations,
     daily: daily ?? [],
     topImages,
   });

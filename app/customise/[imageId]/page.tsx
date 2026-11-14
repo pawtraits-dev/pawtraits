@@ -34,6 +34,7 @@ import { cleanSlogan, SLOGAN_MAX } from '@/lib/collections/slogan';
 import { cleanPetName, escapeWords, fillWords, PET_NAME_MAX } from '@/lib/picture-words';
 import type { Caption as CaptionText } from '@/lib/captions/caption';
 import { frameTitle, type FrameCard as FrameCardText } from '@/lib/frames/frame';
+import EmailPreviewCard from '@/components/previews/EmailPreviewCard';
 import { FrameSwitch, FrameToggle, type FrameChoiceInfo } from '@/components/customise/FrameToggle';
 import DesignQuizLink from '@/components/quiz/DesignQuizLink';
 import { collectionHref } from '@/lib/collections/href';
@@ -896,6 +897,8 @@ export default function CustomisePage() {
               </div>
               {rating > 0 && <p className="mt-1 text-xs text-purple-700">Thanks — he’s blushing.</p>}
             </div>
+
+            {customImage && <EmailPreviewCard imageId={customImage.id} signedIn={signedIn} />}
 
             {customImage?.frameChoice && <FrameSwitch key={`${customImage.id}:${customImage.frameChoice.state}`} imageId={customImage.id} choice={customImage.frameChoice} onChanged={refreshCustomImage} />}
 
