@@ -13,6 +13,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createHash, randomBytes } from 'crypto';
 import { sendMessage } from '@/lib/messaging/message-service';
 import { quizEmailUrl } from '@/lib/quiz/ways-in';
+import { uniqueReferralCode } from '@/lib/referrals/code';
+import { referralEmailVars } from '@/lib/referrals/share';
 
 export const CLAIM_TOKEN_DAYS = 14;
 
@@ -110,18 +112,6 @@ async function adoptGuestImages(supabase: SupabaseClient, guestSessionId: string
   if (error) console.error('adoptGuestImages failed', error);
 }
 
-async function uniqueReferralCode(supabase: SupabaseClient, name: string): Promise<string | null> {
-  const prefix = name.substring(0, 4).replace(/[^A-Z0-9]/gi, '').toUpperCase() || 'CUST';
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  for (let i = 0; i < 10; i++) {
-    let code = prefix;
-    for (let j = 0; j < 8; j++) code += chars[Math.floor(Math.random() * chars.length)];
-    const { data } = await supabase.from('customers').select('id').eq('personal_referral_code', code).maybeSingle();
-    if (!data) return code;
-  }
-  return null;
-}
-
 export const hashClaimToken = (raw: string) => createHash('sha256').update(raw).digest('hex');
 
 export async function createClaimToken(
@@ -162,6 +152,9 @@ export async function sendAccountReadyEmail(
     giftImageUrl = data?.public_url ?? null;
   }
 
+  // Marketing block: only when this address may get offers (the purchase step has run by now)
+  const referralBlock = await referralEmailVars(supabase, input.email, input.baseUrl);
+
   await sendMessage({
     templateKey: 'guest_account_ready',
     recipientType: 'customer',
@@ -176,7 +169,9 @@ export async function sendAccountReadyEmail(
       expires_days: CLAIM_TOKEN_DAYS,
       base_url: input.baseUrl,
       quiz_url: await quizEmailUrl(input.baseUrl, 'welcome-email'),
+      ...(referralBlock?.vars ?? {}),
     },
     priority: 'high',
+    ...(referralBlock ? { metadata: referralBlock.metadata } : {}),
   } as any);
 }

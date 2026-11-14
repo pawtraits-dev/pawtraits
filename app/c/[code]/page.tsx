@@ -67,36 +67,48 @@ function CustomerInvitationPageContent() {
   }, [params.code]);
 
   const fetchReferralData = async () => {
+    let leaving = false;
     try {
       setLoading(true);
+      const code = String(params.code || '').toUpperCase();
+      const design = new URLSearchParams(window.location.search).get('d');
+      const landingUrl = `/api/public/referral-landing?code=${encodeURIComponent(code)}${design ? `&d=${encodeURIComponent(design)}` : ''}`;
 
-      // Always call /api/c/${code} first to increment scan count for both partners and customers
-      try {
-        await fetch(`/api/c/${params.code}`);
-      } catch (scanError) {
-        console.error('Failed to record scan:', scanError);
-        // Non-critical - continue anyway
+      // Scan count (existing) and "is this a customer's link we honour?" together
+      const [landing] = await Promise.all([
+        fetch(landingUrl, { credentials: 'include' }).then(r => (r.ok ? r.json() : { valid: false })).catch(() => ({ valid: false })),
+        fetch(`/api/c/${encodeURIComponent(code)}`).catch(() => null),
+      ]);
+
+      // A friend arriving by a customer's link: keep the code where checkout reads it, then go straight to a design
+      // (the one in the link, or one the referrer bought) or to Browse. No sign-up first.
+      if (landing?.valid) {
+        try { localStorage.setItem('referralCode', code); } catch { /* private mode */ }
+        leaving = true;
+        router.replace(landing.designId ? `/customise/${landing.designId}?ref=${encodeURIComponent(code)}` : `/browse?ref=${encodeURIComponent(code)}`);
+        return;
       }
 
-      // Then fetch referral data for display
-      const response = await fetch(`/api/referrals/verify/${params.code}`);
-
+      // Partner and other codes keep the invitation page
+      const response = await fetch(`/api/referrals/verify/${encodeURIComponent(code)}`);
       if (response.ok) {
         const data = await response.json();
-        setReferralData(data);
-        setScanRecorded(true);
-      } else if (response.status === 404) {
-        setError('This referral code is not valid or has been deactivated.');
-      } else if (response.status === 410) {
-        setError('This referral code has expired.');
-      } else {
-        setError('Unable to verify referral code. Please try again.');
+        if (data?.referral_type && data.referral_type !== 'CUSTOMER') {
+          setReferralData(data);
+          setScanRecorded(true);
+          return;
+        }
       }
+      // Invalid, inactive, your own code or already used: no error page, just the normal site
+      router.replace('/browse');
+      leaving = true;
     } catch (error) {
       console.error('Error fetching referral code:', error);
-      setError('Unable to verify referral code. Please check your internet connection and try again.');
+      router.replace('/browse');
+      leaving = true;
     } finally {
-      setLoading(false);
+      // Keep the spinner up while the redirect happens
+      if (!leaving) setLoading(false);
     }
   };
 

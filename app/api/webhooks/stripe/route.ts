@@ -8,6 +8,7 @@ import { loadCartSnapshot, createOrderItems } from '@/lib/orders/order-items';
 import { grantEntitlementsForOrder, signDownload } from '@/lib/orders/entitlements';
 import { isStallProductId } from '@/lib/cart/items';
 import { ensureCustomerAccount, createClaimToken, sendAccountReadyEmail } from '@/lib/guest/account';
+import { referralEmailVars } from '@/lib/referrals/share';
 import { sendMetaPurchase } from '@/lib/tracking/meta-capi';
 import { FulfillmentRouter } from '@/lib/fulfillment/fulfillment-router';
 import { markQuizPurchase, quizEmailUrl } from '@/lib/quiz/ways-in';
@@ -1908,6 +1909,7 @@ async function sendCustomerCreditEmail(
         : 'http://localhost:3000');
     const shopUrl = `${baseUrl}/shop`;
     const referralsUrl = `${baseUrl}/customer/referrals`;
+    const referralBlock = await referralEmailVars(supabase, referringCustomer.email, baseUrl);
 
     // Send email via messaging service
     await sendMessage({
@@ -1922,9 +1924,11 @@ async function sendCustomerCreditEmail(
         credit_amount: creditAmount,
         total_credit_balance: totalCreditBalance,
         shop_url: shopUrl,
-        referrals_url: referralsUrl
+        referrals_url: referralsUrl,
+        ...(referralBlock?.vars ?? {}),
       },
-      priority: 'normal'
+      priority: 'normal',
+      ...(referralBlock ? { metadata: referralBlock.metadata } : {}),
     });
 
     console.log('✅ Customer credit email queued successfully:', {
@@ -2071,6 +2075,11 @@ async function sendOrderConfirmationEmail(
       : { data: [] as any[] };
     const socialOptOutUrl = customLines?.length ? optOutUrl(baseUrl, order.id) : null;
 
+    // "Give 10%, get 10%" block: marketing content, so only when this address may get offers. This runs
+    // after the purchase subscription step in the payment handler, so a buyer who just said yes (or did
+    // not say "No thanks") is already subscribed.
+    const referralBlock = await referralEmailVars(supabase, order.customer_email, baseUrl);
+
     // Send email via messaging service
     await sendMessage({
       templateKey: 'order_confirmation',
@@ -2107,8 +2116,10 @@ async function sendOrderConfirmationEmail(
         social_opt_out_url: socialOptOutUrl,
         // Refreshed email design (lib/messaging/templates/customer-order-confirmation.html)
         ...refreshVars,
+        ...(referralBlock?.vars ?? {}),
       },
-      priority: 'high'
+      priority: 'high',
+      ...(referralBlock ? { metadata: referralBlock.metadata } : {}),
     });
 
     console.log('✅ Order confirmation email queued successfully:', {

@@ -16,6 +16,8 @@ import Link from 'next/link';
 import { ArrowLeft, ArrowLeftRight, Camera, ImagePlus, Sparkles, ShoppingBag, Share2, RotateCcw, Check, X, ChevronDown } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
+import ShareReferral from '@/components/referrals/ShareReferral';
+import ReferralBanner from '@/components/referrals/ReferralBanner';
 import { CountryProvider } from '@/lib/country-context';
 import StickyActionBar from '@/components/customise/StickyActionBar';
 import BasketBar from '@/components/customise/BasketBar';
@@ -77,6 +79,8 @@ interface CustomImage {
   frame?: { thumbs: Partial<Record<'2:3' | '3:4', string>> } | null;
   frameChoice?: FrameChoiceInfo | null;   // with or without the frame, and which they have now
   share_token: string | null;
+  /** A paid order has this portrait */
+  purchased?: boolean;
   status: 'pending' | 'generating' | 'complete' | 'failed';
 }
 
@@ -897,6 +901,10 @@ export default function CustomisePage() {
               {rating > 0 && <p className="mt-1 text-xs text-purple-700">Thanks — he’s blushing.</p>}
             </div>
 
+            {customImage.purchased && (
+              <ShareReferral className="mt-4" placement="custom_portrait" petName={customImage.pet_name} designId={catalogImage.id} imageUrl={customImage.generated_image_url} />
+            )}
+
             {customImage?.frameChoice && <FrameSwitch key={`${customImage.id}:${customImage.frameChoice.state}`} imageId={customImage.id} choice={customImage.frameChoice} onChanged={refreshCustomImage} />}
 
             <StickyActionBar>
@@ -967,6 +975,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <CountryProvider>
       <div className="min-h-[100dvh] bg-gray-50">
         <UserAwareNavigation />
+        <ReferralBanner />
         {children}
       </div>
     </CountryProvider>

@@ -16,6 +16,7 @@ import type { FulfilmentStage, SelfPrintStatus, PostageServiceId } from '@/lib/p
 
 export { postedItems, needsPosting, fulfilmentStage, POSTAGE_SERVICES };
 import { sendMessage } from '@/lib/messaging/message-service';
+import { referralEmailVars } from '@/lib/referrals/share';
 import { resolveOrderImage, buildPrintFiles } from '@/lib/orders/order-image';
 
 export type FulfilmentAction =
@@ -241,6 +242,8 @@ export async function sendPostedEmail(supabase: SupabaseClient, orderId: string,
   const itemCount = postedItems(order).reduce((n: number, i: any) => n + (i.quantity || 1), 0);
   const trackingCode = order.tracking_code || order.tracking_number || '';
 
+  const referralBlock = await referralEmailVars(supabase, order.customer_email, baseUrl);
+
   const result = await sendMessage({
     templateKey: 'order_shipped',
     recipientType: 'customer',
@@ -266,8 +269,10 @@ export async function sendPostedEmail(supabase: SupabaseClient, orderId: string,
       shipping_country: order.shipping_country,
       order_url: `${baseUrl}/orders/${order.id}`,
       is_self_print: order.fulfillment_provider !== 'gelato',
+      ...(referralBlock?.vars ?? {}),
     },
     priority: 'high',
+    ...(referralBlock ? { metadata: referralBlock.metadata } : {}),
   } as any);
 
   if (!result.success) {

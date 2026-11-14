@@ -75,6 +75,7 @@ export default function ReferralLandingPage() {
 
         if (customerResponse.ok) {
           const customerData = await customerResponse.json();
+          try { localStorage.setItem('referralCode', String(code).toUpperCase()); } catch { /* private mode */ }
 
           // Convert customer data to referral format
           setReferral({

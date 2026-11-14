@@ -105,5 +105,37 @@ ok('credit-earned hides friend name', !html.includes('Tom'));
 html = renderTemplate(T('customer-on-instagram.html'), { base_url: 'https://pawtraits.pics', pet_name: 'Biscuit', picture_url: 'https://res.cloudinary.com/x/b.jpg', post_url: 'https://www.instagram.com/p/ABC/', opt_out_url: 'https://pawtraits.pics/social/opt-out?o=x&t=y' });
 common('on-instagram', html, ['Biscuit’s on Instagram!', 'See the post', 'instagram.com/p/ABC', 'Tell us']);
 
+
+// ---- Referral block ("Give 10%, get 10%"): present when the sender found details and canEmail said yes; absent otherwise ----
+const REF = { share_code: 'SARA7K3MQ2XP', share_url: 'https://pawtraits.pics/share/referral/SARA7K3MQ2XP', share_link: 'https://pawtraits.pics/c/SARA7K3MQ2XP', share_short: 'pawtraits.pics/c/SARA7K3MQ2XP', unsubscribe_url: 'https://pawtraits.pics/api/public/email-preferences/unsubscribe?p=1&t=2', preferences_url: 'https://pawtraits.pics/email-preferences?p=1&t=2' };
+const BLOCK = ['Give 10%, get 10%', 'Know someone whose pet deserves a Pawtrait? Send them your link: they get 10% off their first, you get 10% of their order as credit.', 'Share my link', 'SARA7K3MQ2XP', 'pawtraits.pics/c/SARA7K3MQ2XP', '/share/referral/SARA7K3MQ2XP'];
+const cases: [string, string, Record<string, any>][] = [
+  ['order-print', 'customer-order-confirmation.html', orderVars([printItem], { show_delivery: true, gift_locked: true })],
+  ['order-stall', 'customer-order-confirmation.html', orderVars([stallItem], { is_collected: true, stall_name: 'Old Spitalfields Market', show_delivery: false, gift_available: true })],
+  ['order-digital', 'customer-order-confirmation.html', orderVars([digitalItem], { is_digital_only: true, show_delivery: false, download_links: [{ title: 'Download my Pawtrait', url: 'https://pawtraits.pics/api/downloads/1?t=a' }] })],
+  ['order-with-friend-code', 'customer-order-confirmation.html', orderVars([printItem], { show_delivery: true, discount_amount: '£3.50', referral_code: 'FRIEND99' })],
+  ['account-ready', 'customer-guest-account-ready.html', { ...base, claim_url: 'https://x', has_gift: true, gift_image_url: null, expires_days: 14 }],
+  ['posted', 'customer-order-shipped.html', { ...base, shipped_date: 'Thursday 1 October', has_tracking: false, tracking_url: '', carrier_name: 'Royal Mail', shipping_method: 'Tracked 48', estimated_delivery_date: shipped, shipping_city: 'Derby', shipping_postcode: 'DE1', is_self_print: true }],
+  ['credit-earned', 'customer-credit-earned.html', { ...base, credit_amount: '£5.00', total_credit_balance: '£10.00', shop_url: 'https://x', referrals_url: 'https://y' }],
+  ['on-instagram', 'customer-on-instagram.html', { base_url: 'https://pawtraits.pics', pet_name: 'Biscuit', picture_url: 'https://res.cloudinary.com/x/b.jpg', post_url: 'https://www.instagram.com/p/ABC/', opt_out_url: 'https://pawtraits.pics/social/opt-out?o=x&t=y' }],
+];
+for (const [name, file, vars] of cases) {
+  const withBlock = renderTemplate(T(file), { ...vars, ...REF });
+  common(`${name}+referral`, withBlock, BLOCK);
+  ok(`${name}+referral: unsubscribe footer`, withBlock.includes('Unsubscribe from these emails') && withBlock.includes('Email preferences'));
+  const without = renderTemplate(T(file), vars);
+  common(`${name}-noreferral`, without, []);
+  ok(`${name}-noreferral: block absent`, !without.includes('Give 10%, get 10%') && !without.includes('Share my link') && !without.includes('/share/referral/'));
+  ok(`${name}-noreferral: no unsubscribe footer`, !without.includes('Unsubscribe from these emails'));
+}
+ok('credit-earned: Keep it going lead-in', renderTemplate(T('customer-credit-earned.html'), { ...cases[6][2], ...REF }).includes('Keep it going'));
+ok('only credit-earned has the lead-in', !renderTemplate(T('customer-order-shipped.html'), { ...cases[5][2], ...REF }).includes('Keep it going'));
+ok('friend code on the receipt does not trigger the block', !renderTemplate(T('customer-order-confirmation.html'), cases[3][2]).includes('Give 10%, get 10%') && renderTemplate(T('customer-order-confirmation.html'), cases[3][2]).includes('FRIEND99'));
+{
+  // Escaping: names and codes with markup never come out raw
+  const evil = renderTemplate(T('customer-order-shipped.html'), { ...cases[5][2], customer_name: '<b>Sarah</b>', ...REF, share_code: '<i>X</i>', share_short: '<u>y</u>' });
+  ok('referral block escapes', !evil.includes('<b>Sarah</b>') && !evil.includes('<i>X</i>') && !evil.includes('<u>y</u>') && evil.includes('&lt;i&gt;X'));
+}
+
 console.log(failed ? `${failed} failed, ${passed} passed` : `${passed} tests passed`);
 process.exit(failed ? 1 : 0);

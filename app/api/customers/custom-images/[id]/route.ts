@@ -60,7 +60,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         frameChoice = { state: 'off', petName: null, nameMax: FRAME_MAX.pet };   // made without the frame: it can still be added
       }
     }
-    return NextResponse.json({ ...safe, mugMockups, frame, frameChoice }, { headers: { 'Cache-Control': 'no-store' } });
+    // Bought? (a paid order has this portrait on a line): the page then offers "Give 10%, get 10%"
+    let purchased = false;
+    if (customImage.status === 'complete') {
+      const { data: lines } = await serviceClient().from('order_items').select('order_id').eq('image_id', id).limit(20);
+      const orderIds = (lines ?? []).map((l: any) => l.order_id).filter(Boolean);
+      if (orderIds.length) {
+        const { data: paid } = await serviceClient().from('orders').select('id').in('id', orderIds).eq('payment_status', 'paid').limit(1);
+        purchased = !!paid?.length;
+      }
+    }
+    return NextResponse.json({ ...safe, mugMockups, frame, frameChoice, purchased }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('custom-image GET failed', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

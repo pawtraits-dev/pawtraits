@@ -31,6 +31,7 @@ import { SupabaseService } from '@/lib/supabase';
 import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import { PetsBadge } from '@/components/collections/DesignGrid';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
+import ReferralBanner from '@/components/referrals/ReferralBanner';
 import type { Breed, Theme, AnimalType, ImageCatalogWithDetails, UserProfile } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
@@ -689,6 +690,7 @@ function BrowsePageContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
       <UserAwareNavigation />
+      <ReferralBanner />
 
       {/* Breed/Theme Detail View OR Browse View */}
       {selectedBreedId || selectedThemeId ? (
