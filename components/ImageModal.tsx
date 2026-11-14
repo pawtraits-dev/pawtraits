@@ -71,6 +71,8 @@ export default function ImageModal({
   onVariationsGenerated
 }: ImageModalProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [variationError, setVariationError] = useState<string | null>(null);
+  const [promptCopied, setPromptCopied] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showVariations, setShowVariations] = useState(false);
   const [isGeneratingVariations, setIsGeneratingVariations] = useState(false);
@@ -121,6 +123,7 @@ export default function ImageModal({
     if (!imageData?.prompt_text || !imageId) return;
     
     setIsGeneratingVariations(true);
+    setVariationError(null);
     setVariationResults([]);
     
     try {
@@ -163,7 +166,7 @@ export default function ImageModal({
       
     } catch (error) {
       console.error('Variation generation error:', error);
-      alert(`Failed to generate variations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setVariationError("We couldn't create the variations. Please try again.");
     } finally {
       setIsGeneratingVariations(false);
     }
@@ -185,7 +188,8 @@ export default function ImageModal({
   const copyPromptToClipboard = () => {
     if (imageData?.prompt_text) {
       navigator.clipboard.writeText(imageData.prompt_text);
-      alert('Prompt copied to clipboard!');
+      setPromptCopied(true);
+      setTimeout(() => setPromptCopied(false), 2500);
     }
   };
 
@@ -313,6 +317,7 @@ export default function ImageModal({
                       className="p-1 h-auto"
                     >
                       <Copy className="w-3 h-3" />
+                      {promptCopied && <span role="status" className="ml-1 text-xs">Copied</span>}
                     </Button>
                   </div>
                   <div className="bg-gray-50 p-3 rounded-lg">
@@ -408,6 +413,10 @@ export default function ImageModal({
                     />
                   </div>
                 </div>
+              )}
+
+              {variationError && (
+                <p role="alert" className="text-sm text-red-700">{variationError}</p>
               )}
 
               {/* Variation Results */}

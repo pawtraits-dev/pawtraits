@@ -42,6 +42,15 @@ export default function PetsClient() {
   const [editingPet, setEditingPet] = useState(false);
   const [editFormData, setEditFormData] = useState<Partial<UserPetData>>({});
   const [deletingPet, setDeletingPet] = useState(false);
+  // Messages shown in the page instead of browser pop-ups
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [pageStatus, setPageStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pageStatus) return;
+    const timer = setTimeout(() => setPageStatus(null), 6000);
+    return () => clearTimeout(timer);
+  }, [pageStatus]);
 
   const supabaseService = new SupabaseService();
   const pawsonalities = usePetPawsonalities(pets.length > 0);
@@ -81,6 +90,7 @@ export default function PetsClient() {
     setSelectedPet(pet);
     setEditFormData(pet);
     setEditingPet(false);
+    setModalError(null);
     setShowPetModal(true);
   };
 
@@ -101,6 +111,7 @@ export default function PetsClient() {
   const saveChanges = async () => {
     if (!selectedPet || !editFormData.pet_id) return;
 
+    setModalError(null);
     try {
       const { error } = await supabaseService.getClient()
         .from('pets')
@@ -116,7 +127,7 @@ export default function PetsClient() {
 
       if (error) {
         console.error('Error updating pet:', error);
-        alert('Failed to save changes. Please try again.');
+        setModalError("We couldn't save those changes. Please try again.");
       } else {
         console.log('Pet updated successfully');
         setEditingPet(false);
@@ -130,7 +141,7 @@ export default function PetsClient() {
       }
     } catch (error) {
       console.error('Error saving pet changes:', error);
-      alert('Failed to save changes. Please try again.');
+      setModalError("We couldn't save those changes. Please try again.");
     }
   };
 
@@ -138,12 +149,14 @@ export default function PetsClient() {
     if (!selectedPet) return;
 
     setDeletingPet(true);
+    setModalError(null);
+    const deletedName = selectedPet.name;
 
     try {
       // Get the authorization header
       const { data: { session } } = await supabaseService.getClient().auth.getSession();
       if (!session) {
-        alert('You must be logged in to delete a pet.');
+        setModalError('Please log in again to delete this pet.');
         return;
       }
 
@@ -168,15 +181,15 @@ export default function PetsClient() {
         await loadUserData();
         
         // Show success message
-        alert(result.message || 'Pet deleted successfully');
+        setPageStatus(`${deletedName} has been removed.`);
       } else {
         const errorData = await response.json();
         console.error('Failed to delete pet:', errorData);
-        alert(`Failed to delete pet: ${errorData.error || 'Unknown error'}`);
+        setModalError(`We couldn't delete ${deletedName}. Please try again.`);
       }
     } catch (error) {
       console.error('Error deleting pet:', error);
-      alert('Failed to delete pet. Please try again.');
+      setModalError(`We couldn't delete ${deletedName}. Please try again.`);
     } finally {
       setDeletingPet(false);
     }
@@ -186,14 +199,15 @@ export default function PetsClient() {
     if (!files || files.length === 0 || !userProfile) return;
 
     // Validate files before upload
+    setModalError(null);
     const maxSize = 10 * 1024 * 1024; // 10MB
     const validFiles = Array.from(files).filter(file => {
       if (!file.type.startsWith('image/')) {
-        alert(`${file.name} is not an image file. Only image files are allowed.`);
+        setModalError(`${file.name} isn't an image. Choose a JPG, PNG or similar photo.`);
         return false;
       }
       if (file.size > maxSize) {
-        alert(`${file.name} is too large. Maximum file size is 10MB.`);
+        setModalError(`${file.name} is too big. Choose a photo under 10 MB.`);
         return false;
       }
       return true;
@@ -251,8 +265,7 @@ export default function PetsClient() {
 
     } catch (error) {
       console.error('Error uploading photos:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      alert(`Failed to upload photos: ${errorMessage}`);
+      setModalError("We couldn't upload your photos. Please try again.");
     } finally {
       setUploading(false);
       setUploadingPetId(null);
@@ -325,6 +338,12 @@ export default function PetsClient() {
           Add Pet
         </Button>
       </div>
+
+      {pageStatus && (
+        <div role="status" className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+          {pageStatus}
+        </div>
+      )}
 
       {/* Pets Grid */}
       {pets.length === 0 ? (
@@ -527,7 +546,7 @@ export default function PetsClient() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete {selectedPet?.name}?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete {selectedPet?.name} and all their photos from your account.
+                            This removes {selectedPet?.name} and their photos from your account. It can't be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -537,7 +556,7 @@ export default function PetsClient() {
                             disabled={deletingPet}
                             className="bg-red-600 hover:bg-red-700"
                           >
-                            {deletingPet ? 'Deleting...' : 'Delete Pet'}
+                            {deletingPet ? 'Deleting...' : `Delete ${selectedPet?.name ?? 'pet'}`}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
@@ -548,6 +567,12 @@ export default function PetsClient() {
             </DialogTitle>
           </DialogHeader>
           
+          {modalError && (
+            <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {modalError}
+            </div>
+          )}
+
           {selectedPet && (
             <div className="space-y-6">
               {/* Upload New Photos */}

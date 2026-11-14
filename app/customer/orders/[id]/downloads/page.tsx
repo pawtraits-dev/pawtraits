@@ -61,6 +61,7 @@ export default function CustomerDownloadsPage() {
   const [loading, setLoading] = useState(true);
   const [downloadingItemId, setDownloadingItemId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const supabaseService = new SupabaseService();
 
@@ -122,12 +123,13 @@ export default function CustomerDownloadsPage() {
   async function handleDownload(item: DownloadItem) {
     try {
       setDownloadingItemId(item.id);
+      setDownloadError(null);
 
       // Get user for authentication
       const { data: { user } } = await supabaseService.getClient().auth.getUser();
 
       if (!user) {
-        alert('Please log in to download');
+        setDownloadError('Please log in to download your files.');
         return;
       }
 
@@ -157,7 +159,7 @@ export default function CustomerDownloadsPage() {
 
     } catch (error: any) {
       console.error('Download error:', error);
-      alert(error.message || 'Failed to download file');
+      setDownloadError("We couldn't prepare that download. Please try again.");
     } finally {
       setDownloadingItemId(null);
     }
@@ -258,6 +260,13 @@ export default function CustomerDownloadsPage() {
           </div>
         </div>
       </div>
+
+      {downloadError && (
+        <Alert role="alert" className="mb-6 border-red-200 bg-red-50">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800">{downloadError}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Status Banner */}
       {order.digital_delivery_status && (

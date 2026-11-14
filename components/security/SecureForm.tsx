@@ -114,6 +114,7 @@ export const SecureForm: React.FC<SecureFormProps> = ({
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [securityViolations, setSecurityViolations] = useState<Record<string, XSSViolation[]>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [csrfToken, setCsrfToken] = useState<string>('')
   const [submissionCount, setSubmissionCount] = useState(0)
   const [lastSubmissionTime, setLastSubmissionTime] = useState<Date | null>(null)
@@ -398,9 +399,11 @@ export const SecureForm: React.FC<SecureFormProps> = ({
     
     if (isSubmitting) return
 
+    setSubmitError(null)
+
     // Rate limiting check
     if (!checkRateLimit()) {
-      alert('Too many submissions. Please wait before trying again.')
+      setSubmitError('You\'ve tried this a few times in a row. Please wait a moment and try again.')
       return
     }
 
@@ -445,12 +448,17 @@ export const SecureForm: React.FC<SecureFormProps> = ({
 
       if (criticalViolations.length > 0 && formConfig.requiredSecurityLevel === 'critical') {
         setSecurityMetrics(prev => ({ ...prev, blockedSubmissions: prev.blockedSubmissions + 1 }))
-        alert('Form submission blocked due to security violations.')
+        setSubmitError('We couldn\'t send that because some of it looks unsafe. Please check what you\'ve entered and try again.')
         return
       }
 
       if (hasErrors && formConfig.requiredSecurityLevel !== 'low') {
-        alert('Please fix validation errors before submitting.')
+        setSubmitError('Please check your details and try again.')
+        const firstInvalid = fields.find(f => {
+          if (f.type === 'file') return false
+          return !validateInput(f, formData[f.name]).isValid
+        })
+        if (firstInvalid) document.getElementById(firstInvalid.name)?.focus()
         return
       }
 
@@ -475,7 +483,7 @@ export const SecureForm: React.FC<SecureFormProps> = ({
 
     } catch (error) {
       console.error('Form submission error:', error)
-      alert('An error occurred during form submission. Please try again.')
+      setSubmitError('Something went wrong and we couldn\'t send that. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -609,6 +617,12 @@ export const SecureForm: React.FC<SecureFormProps> = ({
 
         {/* Custom children */}
         {children}
+
+        {submitError && (
+          <div className="form-error" role="alert">
+            {submitError}
+          </div>
+        )}
 
         {/* Submit Button */}
         <button

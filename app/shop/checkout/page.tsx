@@ -39,6 +39,7 @@ const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' }
 
 function CheckoutPageContent() {
   const [currentStep, setCurrentStep] = useState(1)
+  const [paymentSetupError, setPaymentSetupError] = useState<string | null>(null)
   // Guest checkout (no account needed — one is created after payment)
   // "No thanks, just my order emails": unticked = subscribed when the order is paid (never before)
   const [marketingOptOut, setMarketingOptOut] = useState(false)
@@ -609,6 +610,7 @@ function CheckoutPageContent() {
 
   // Card path: create the PaymentIntent when moving to the payment step
   const createPaymentIntent = async (optionOverride?: any) => {
+    setPaymentSetupError(null)
     try {
       const data = await requestPaymentIntent({
         email: shippingData.email,
@@ -629,7 +631,7 @@ function CheckoutPageContent() {
       return true
     } catch (error) {
       console.error('Error creating Customer PaymentIntent:', error);
-      alert(error instanceof Error && error.message ? error.message : 'Failed to set up payment. Please try again.');
+      setPaymentSetupError("We couldn't set up your payment. Please check your details and try again.");
       setCurrentStep(1); // Go back to shipping step
       return false
     }
@@ -661,14 +663,7 @@ function CheckoutPageContent() {
     console.error('Customer payment failed:', error);
     setIsProcessing(false);
 
-    // Show user-friendly error message
-    let errorMessage = 'Payment failed. Please try again.';
-
-    if (error.type === 'card_error' || error.type === 'validation_error') {
-      errorMessage = error.message;
-    }
-
-    alert(errorMessage);
+    // The message itself is shown by StripePaymentForm, in an alert above the pay button
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -777,6 +772,11 @@ browser: ${typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 160) 
 basket: ${items.map((i: any) => `${i.product?.sku || i.productId?.slice(0, 8)} type=${i.product?.product_type ?? '?'} ship=${itemNeedsShipping(i)}`).join(' | ')}  digital only: ${isDigitalOnly}
 page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
               </pre>
+            )}
+            {paymentSetupError && (
+              <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                {paymentSetupError}
+              </div>
             )}
             {/* Express: Apple Pay / Google Pay / Link — collects email, name, address and delivery in the wallet sheet */}
             {currentStep === 1 && showExpress && (

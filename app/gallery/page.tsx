@@ -64,6 +64,7 @@ interface GalleryImage {
 
 function GalleryContent() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [filteredImages, setFilteredImages] = useState<GalleryImage[]>([]);
@@ -692,6 +693,7 @@ function GalleryContent() {
   };
 
   const handleDownload = async (image: GalleryImage) => {
+    setDownloadError(null);
     try {
       console.log(`🔄 Starting download for image ${image.id}`);
       
@@ -701,7 +703,7 @@ function GalleryContent() {
       if (!downloadResponse.ok) {
         const errorData = await downloadResponse.json();
         console.error('Download API error:', errorData);
-        alert(errorData.error || 'Failed to generate download link');
+        setDownloadError("We couldn't prepare that download. Please try again.");
         return;
       }
       
@@ -726,7 +728,7 @@ function GalleryContent() {
       console.log(`✅ Download completed for ${filename}`);
     } catch (error) {
       console.error('Error downloading image:', error);
-      alert('Failed to download image. Please try again.');
+      setDownloadError("We couldn't download that Pawtrait. Please try again.");
     }
   };
 
@@ -1023,6 +1025,13 @@ function GalleryContent() {
             Your personal collection of loved, shared, and purchased Pawtraits
           </p>
         </div>
+
+        {downloadError && (
+          <div role="alert" className="sticky top-2 z-40 flex items-start justify-between gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <span>{downloadError}</span>
+            <button type="button" onClick={() => setDownloadError(null)} className="font-medium underline">Dismiss</button>
+          </div>
+        )}
 
         {/* Tabs */}
         <Tabs defaultValue="recommended" className="space-y-6">

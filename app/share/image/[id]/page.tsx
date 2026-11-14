@@ -14,6 +14,7 @@ import { formatPrice } from '@/lib/product-types';
 import ProductSelectionModal from '@/components/ProductSelectionModal';
 import ShareModal from '@/components/share-modal';
 
+import { useToast } from '@/components/ui/use-toast';
 interface CatalogImage {
   id: string;
   filename: string;
@@ -163,11 +164,13 @@ function SharedImagePageClient({ id }: { id: string }) {
     console.log(`Image shared on ${platform}:`, image?.id);
   };
 
+  const { toast } = useToast();
+
   const handleAddToBasket = (productId: string, quantity: number) => {
     // TODO: Implement actual basket/cart functionality
     console.log(`Adding ${quantity} of product ${productId} to basket`);
     const product = products.find(p => p.id === productId);
-    alert(`Added ${quantity} x ${product?.name || 'Product'} to basket!`);
+    toast({ title: 'Added to your basket', description: `${quantity} x ${product?.name || 'item'}` });
   };
 
   if (loading) {

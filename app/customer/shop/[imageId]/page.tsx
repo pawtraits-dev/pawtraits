@@ -19,6 +19,7 @@ import type { ImageCatalogWithDetails } from '@/lib/types';
 import type { Product, ProductPricing } from '@/lib/product-types';
 import { formatPrice } from '@/lib/product-types';
 
+import { useToast } from '@/components/ui/use-toast';
 export default function CustomerImageDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -123,6 +124,8 @@ export default function CustomerImageDetailPage() {
     setShowProductModal(true);
   };
 
+  const { toast } = useToast();
+
   const handleAddToCart = (productId: string, quantity: number) => {
     if (!imageData) return;
 
@@ -130,7 +133,11 @@ export default function CustomerImageDetailPage() {
     const productPricing = pricing.find(p => p.product_id === productId && p.country_code === selectedCountry);
 
     if (!product || !productPricing) {
-      alert('Product information not found');
+      toast({
+        title: "We couldn't add that to your basket",
+        description: 'Please refresh the page and try again.',
+        variant: 'destructive',
+      });
       return;
     }
 
