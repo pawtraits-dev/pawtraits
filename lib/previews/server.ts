@@ -9,8 +9,7 @@ import { sendMessageImmediate } from '@/lib/messaging/message-service';
 import { renderEmailFile } from '@/lib/messaging/render-file';
 import { decodeAttribution, hashIp, type QrAttribution } from '@/lib/qr/attribution';
 import { getPreferences, maskEmail, normaliseEmail, subscribe } from '@/lib/marketing/preferences';
-import { CONSENT_LABEL } from '@/lib/marketing/consent-copy';
-import { PREVIEW_EMAIL } from './copy';
+import { PREVIEW_COPY, PREVIEW_EMAIL } from './copy';
 import { appendSend, limitProblem, marketingStep, previewFirstName, previewUrl, sendsInLastDay, type LimitProblem } from './email-link';
 
 const MISSING = /preview_email_requests/;
@@ -125,7 +124,7 @@ export async function openPreviewLink(supabase: SupabaseClient, requestId: strin
   try {
     const step = marketingStep(r, (await getPreferences(supabase, r.email))?.status ?? null);
     if (step === 'subscribe') {
-      await subscribe(supabase, { email: r.email, source: 'preview_email', customerId: r.customer_id, basis: 'consent', wording: CONSENT_LABEL });
+      await subscribe(supabase, { email: r.email, source: 'preview_email', customerId: r.customer_id, basis: 'consent', wording: PREVIEW_COPY.line });
       await supabase.from('preview_email_requests').update({ marketing_confirmed_at: new Date(now).toISOString() }).eq('id', requestId);
     }
   } catch (e) {
