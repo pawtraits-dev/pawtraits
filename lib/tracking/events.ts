@@ -59,6 +59,11 @@ export const track = {
     gtagEvent('preview_ready', { item_id: item.id });
     fbqTrack('PreviewReady', { content_ids: [item.id] }, undefined, true);
   },
+  /** Someone asked for their preview by email ("Email me this preview"): GA4 generate_lead, Meta Lead. Consent-gated like every event here (no-ops until the tags load). */
+  lead(itemId: string, method = 'preview_email') {
+    gtagEvent('generate_lead', { item_id: itemId, method });
+    fbqTrack('Lead', { content_ids: [itemId], content_type: 'product', content_category: method });
+  },
   /** Quiz funnel (spec 5.5): start → each answer → complete → share / design click / save */
   quizStart(quiz: string, petType: string, source?: string) {
     gtagEvent('quiz_start', { quiz_type: quiz, pet_type: petType, ...(source ? { entry_source: source } : {}) });

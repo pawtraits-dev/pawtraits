@@ -63,7 +63,7 @@ export default function QrReportPage() {
             <table className="w-full text-sm">
               <thead><tr className="text-left text-gray-500 border-b">
                 <th className="py-2">Location</th><th className="text-right">Scans</th><th className="text-right">Visitors (daily)</th>
-                <th className="text-right">Orders</th><th className="text-right">Conversion</th><th className="text-right">Revenue</th>
+                <th className="text-right">Preview emails (opened)</th><th className="text-right">Orders</th><th className="text-right">Conversion</th><th className="text-right">Revenue</th>
               </tr></thead>
               <tbody>
                 {data.locations.map(r => (
@@ -71,6 +71,7 @@ export default function QrReportPage() {
                     <td className="py-2 font-mono">{r.location_code}</td>
                     <td className="text-right">{r.scans}</td>
                     <td className="text-right">{r.unique_visitors}</td>
+                    <td className="text-right">{(r as any).preview_emails ?? 0} ({(r as any).preview_emails_opened ?? 0})</td>
                     <td className="text-right">{r.orders}</td>
                     <td className="text-right">{pct(r.orders, r.unique_visitors)}</td>
                     <td className="text-right">{gbp(r.revenue_pence)}</td>
