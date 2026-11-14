@@ -66,7 +66,9 @@ export async function ensureCustomerAccount(
     phone: input.phone || null,
     user_id: userId,
     is_registered: true,
-    marketing_consent: !!input.marketingConsent,
+    // marketing_consent is NOT written here: the person's choice is recorded (with its wording and date) in
+    // email_preferences by lib/marketing/preferences.ts, which keeps this column in step. An account being
+    // made must never switch consent on or off.
     personal_referral_code: referralCode,
     referral_type: 'ORGANIC',
     updated_at: new Date().toISOString(),

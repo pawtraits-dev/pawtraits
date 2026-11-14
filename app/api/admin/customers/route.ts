@@ -1,6 +1,7 @@
 import { requireAdmin } from '@/lib/qr/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { marketingStates } from '@/lib/marketing/admin';
 
 export async function GET(request: NextRequest) {
   const denied = await requireAdmin();
@@ -48,6 +49,10 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('Admin customers API: Found', customerProfiles.length, 'customer profiles');
+
+    // The real marketing choice (email_preferences), not a hard-coded false
+    const marketing = await marketingStates(supabase, customerProfiles.map(p => p.email));
+    const consentOf = (email: string | null) => marketing.get(String(email || '').trim().toLowerCase())?.subscribed ?? false;
 
     // Get pet counts and referral data for each customer
     const customersWithPets = await Promise.all(
@@ -113,7 +118,7 @@ export async function GET(request: NextRequest) {
             last_order_date: lastOrderDate,
             customer_status: profile.status || 'active',
             customer_segment: totalOrders > 0 ? 'Customer' : 'New', // Customer if they have orders
-            marketing_consent: false, // TODO: Get from customer preferences if needed
+            marketing_consent: consentOf(profile.email),
             email_verified: true, // Assume verified if in system
             phone_verified: false, // Default to false
             created_at: profile.created_at,
@@ -144,7 +149,7 @@ export async function GET(request: NextRequest) {
             last_order_date: null,
             customer_status: profile.status || 'active',
             customer_segment: 'New',
-            marketing_consent: false,
+            marketing_consent: consentOf(profile.email),
             email_verified: true,
             phone_verified: false,
             created_at: profile.created_at,

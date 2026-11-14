@@ -262,6 +262,8 @@ export async function processMessageQueue(
               { name: 'recipient_type', value: message.recipient_type },
             ],
             metadata: message.metadata,
+            // Marketing email: List-Unsubscribe headers queued with the message (marketingEmailExtras)
+            ...(message.metadata?.email_headers ? { headers: message.metadata.email_headers } : {}),
           });
 
           if (emailResult.success) {

@@ -36,7 +36,7 @@
           <a href="https://www.instagram.com/pawtraits" style="color:#6b7280;">Instagram</a> &middot;
           <a href="{{#if base_url}}{{base_url}}{{else}}https://pawtraits.pics{{/if}}/help" style="color:#6b7280;">Help &amp; delivery</a>
           {{#if footer_note}}<br><span style="color:#9ca3af;">{{footer_note}}</span>{{/if}}
-          {{#if unsubscribe_url}}<br><a href="{{unsubscribe_url}}" style="color:#9ca3af;">Unsubscribe from these emails</a>{{/if}}
+          {{#if unsubscribe_url}}<br>{{#if preferences_url}}<a href="{{preferences_url}}" style="color:#9ca3af;">Email preferences</a> &middot; {{/if}}<a href="{{unsubscribe_url}}" style="color:#9ca3af;">Unsubscribe from these emails</a>{{/if}}
         </td></tr>
       </table>
     </td></tr>

@@ -1,6 +1,7 @@
 import { requireAdmin } from '@/lib/qr/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { marketingStates } from '@/lib/marketing/admin';
 
 export async function GET(
   request: NextRequest,
@@ -60,6 +61,8 @@ export async function GET(
 
     const petCount = petsError || !pets ? 0 : pets.length;
 
+    const marketing = (await marketingStates(supabase, [customerProfile.email])).get(String(customerProfile.email || '').trim().toLowerCase()) ?? null;
+
     // Transform customer data to match expected Customer interface format
     const customerData = {
       id: customerProfile.id,
@@ -81,7 +84,8 @@ export async function GET(
       last_order_date: null,
       customer_status: customerProfile.status || 'active',
       customer_segment: 'New', // Default segment
-      marketing_consent: false, // TODO: Get from customer preferences if needed
+      marketing_consent: marketing?.subscribed ?? false,
+      marketing,   // Subscribed / Unsubscribed / Never asked, with basis, source, date and topics
       email_verified: true, // Assume verified if in system
       phone_verified: false, // Default to false
       created_at: customerProfile.created_at,

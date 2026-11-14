@@ -22,6 +22,8 @@ export interface EmailSendParams {
   };
   replyTo?: string;
   tags?: Array<{ name: string; value: string }>;
+  /** Extra email headers, e.g. List-Unsubscribe for marketing email (lib/marketing/preferences.ts). Unused by order and account emails. */
+  headers?: Record<string, string>;
   metadata?: Record<string, any>;
 }
 

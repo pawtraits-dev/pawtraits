@@ -31,6 +31,7 @@ import {
   Gift,
   DollarSign
 } from 'lucide-react';
+import { BASIS_WORDS } from '@/lib/marketing/consent-copy';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { Customer, Pet, PetWithDetails } from '@/lib/types';
 
@@ -75,6 +76,8 @@ export default function CustomerDetailPage() {
   const [attributionLoading, setAttributionLoading] = useState(true);
   const [creditsData, setCreditsData] = useState<any>(null);
   const [creditsLoading, setCreditsLoading] = useState(true);
+  const [marketingBusy, setMarketingBusy] = useState(false);
+  const [marketingError, setMarketingError] = useState<string | null>(null);
 
   useEffect(() => {
     if (params.id) {
@@ -535,15 +538,36 @@ export default function CustomerDetailPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3">
-                  <Settings className="w-4 h-4 text-gray-500" />
-                  <div>
-                    <p className="font-medium">
-                      {customer.marketing_consent ? 'Opted In' : 'Opted Out'}
-                    </p>
-                    <p className="text-sm text-gray-600">Marketing Communications</p>
-                  </div>
-                </div>
+                {(() => {
+                  // Marketing email: the real choice (email_preferences), with how and when it was given
+                  const m = (customer as any).marketing as { state: 'subscribed' | 'unsubscribed' | 'never'; basis: 'soft_opt_in' | 'consent' | null; source: string | null; at: string | null; topics: Record<string, boolean> | null } | null;
+                  const label = m?.state === 'subscribed' ? 'Subscribed' : m?.state === 'unsubscribed' ? 'Unsubscribed' : 'Never asked';
+                  const on = m?.topics ? [m.topics.new_designs && 'New designs', m.topics.pet_days && 'Birthday and star-sign treats', m.topics.offers && 'Offers and news'].filter(Boolean).join(', ') : '';
+                  async function unsubscribeNow() {
+                    if (!confirm('Take this customer off all marketing email? Only they can switch it back on.')) return;
+                    setMarketingBusy(true); setMarketingError(null);
+                    const r = await fetch(`/api/admin/customers/${params.id}/marketing`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unsubscribe' }) });
+                    const d = await r.json().catch(() => ({}));
+                    if (r.ok) setCustomer(c => (c ? ({ ...c, marketing_consent: false, marketing: d.marketing } as any) : c)); else setMarketingError(d.error || 'Could not unsubscribe');
+                    setMarketingBusy(false);
+                  }
+                  return (
+                    <div className="flex items-start space-x-3">
+                      <Settings className="mt-1 w-4 h-4 text-gray-500" />
+                      <div>
+                        <p className="font-medium">{label}</p>
+                        <p className="text-sm text-gray-600">Marketing emails</p>
+                        {m?.state === 'subscribed' && <p className="text-sm text-gray-600">{m.basis ? BASIS_WORDS[m.basis] : 'Said yes'}{m.at ? ` · ${formatDate(m.at)}` : ''}{m.source ? ` · ${m.source.replace(/_/g, ' ')}` : ''}</p>}
+                        {m?.state === 'subscribed' && on && <p className="text-sm text-gray-600">{on}</p>}
+                        {m?.state === 'unsubscribed' && <p className="text-sm text-gray-600">{m.at ? formatDate(m.at) : ''}{m.source ? ` · ${m.source.replace(/_/g, ' ')}` : ''}</p>}
+                        {m?.state === 'subscribed' && (
+                          <Button variant="outline" size="sm" className="mt-2" disabled={marketingBusy} onClick={unsubscribeNow}>Unsubscribe</Button>
+                        )}
+                        {marketingError && <p role="alert" className="mt-1 text-sm text-red-600">{marketingError}</p>}
+                      </div>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
 
