@@ -406,7 +406,7 @@ function ItemCard({ it }: { it: Item }) {
           {it.breed ? <>{it.breed}{it.breedSource === 'detected' || it.breedSource === 'unmatched' ? <span className="text-gray-400"> (detected)</span> : null}</> : <span className="text-gray-400">Breed not known</span>}
         </p>
         {it.design && (
-          <Link href={`/customise/${it.design.id}`} target="_blank" className="block truncate text-purple-700 hover:underline" title={it.design.title}>{it.design.title}</Link>
+          <Link href={`/customise/${it.design.id}`} target="_blank" rel="noopener noreferrer" className="block truncate text-purple-700 hover:underline" title={it.design.title}>{it.design.title}</Link>
         )}
         <div className="flex flex-wrap gap-1 pt-1">
           {it.purchased && <Badge className="bg-amber-50 text-amber-800"><ShoppingBag className="h-3 w-3" /> Bought{revenue ? ` · ${revenue}` : ''}</Badge>}

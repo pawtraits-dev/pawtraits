@@ -825,6 +825,7 @@ export default function PartnerAccountView({ userProfile }: PartnerAccountViewPr
                       <Input
                         id="currentPassword"
                         type={showCurrentPassword ? 'text' : 'password'}
+                        autoComplete="current-password"
                         value={passwordData.currentPassword}
                         onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
                         placeholder="Enter current password"
@@ -847,6 +848,7 @@ export default function PartnerAccountView({ userProfile }: PartnerAccountViewPr
                       <Input
                         id="newPassword"
                         type={showNewPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
                         value={passwordData.newPassword}
                         onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
                         placeholder="Enter new password"
@@ -868,6 +870,7 @@ export default function PartnerAccountView({ userProfile }: PartnerAccountViewPr
                     <Input
                       id="confirmPassword"
                       type="password"
+                      autoComplete="new-password"
                       value={passwordData.confirmPassword}
                       onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
                       placeholder="Confirm new password"

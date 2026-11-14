@@ -266,7 +266,7 @@ export function CatalogImage({ imageId, className = '', alt = 'Pet Pawtrait', fa
         {...(priority ? { fetchPriority: 'high' as const } : {})}
         onLoad={() => setLoaded(true)}
         onError={() => { if (!failed) setFailed(true); }}
-        className={`rounded-lg shadow-md bg-gray-100 transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${className}`}
+        className={`rounded-lg shadow-md bg-gray-100 ${priority ? '' : `transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`} ${className}`}
       />
     </div>
   );

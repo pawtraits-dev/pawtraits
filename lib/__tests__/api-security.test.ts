@@ -484,7 +484,7 @@ describe('API Security Test Suite', () => {
         'Content-Security-Policy',
         'X-Frame-Options', 
         'X-Content-Type-Options',
-        'X-XSS-Protection',
+        'Cross-Origin-Opener-Policy',
         'Referrer-Policy',
         'Permissions-Policy',
         'Strict-Transport-Security'

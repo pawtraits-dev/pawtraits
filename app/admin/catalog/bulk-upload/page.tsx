@@ -629,7 +629,7 @@ function TagEditor({ tags, disabled, onChange }: { tags: string[]; disabled: boo
       </div>
       {!disabled && (
         <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Add a tag and press Enter"
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          onKeyDown={(e) => { if (e.nativeEvent.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') { e.preventDefault(); add(); } }}
           className="h-8 w-full rounded-md border px-2 text-xs text-gray-900" />
       )}
     </div>

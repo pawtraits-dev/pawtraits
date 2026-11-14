@@ -165,7 +165,7 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest): void 
     'Content-Security-Policy': csp,
     'X-Frame-Options': 'DENY',
     'X-Content-Type-Options': 'nosniff',
-    'X-XSS-Protection': '1; mode=block',
+    'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(self "https://js.stripe.com")', // Stripe iframe needs payment for Apple/Google Pay
     'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',

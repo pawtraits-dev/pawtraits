@@ -309,7 +309,7 @@ export default function TestEmailPage() {
             <div className="grid grid-cols-2 gap-4">
               <a
                 href="/signup"
-                target="_blank"
+                target="_blank" rel="noopener noreferrer"
                 className="inline-block"
               >
                 <Button variant="outline" className="w-full">
@@ -318,7 +318,7 @@ export default function TestEmailPage() {
               </a>
               <a
                 href="/auth/login"
-                target="_blank"
+                target="_blank" rel="noopener noreferrer"
                 className="inline-block"
               >
                 <Button variant="outline" className="w-full">

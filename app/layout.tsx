@@ -59,12 +59,20 @@ export default function RootLayout({
         <meta name="theme-color" content="#7c3aed" />
       </head>
       <body className={`${inter.className} ${margarine.variable} ${lifeSavers.variable}`}>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-600"
+        >
+          Skip to content
+        </a>
         <EnvironmentIndicator />
         <Analytics />
         <TrackingScripts />
         <div id="root">
           <HybridCartProvider>
-            {children}
+            <div id="main-content" tabIndex={-1} className="outline-none">
+              {children}
+            </div>
             <SiteFooter />
           </HybridCartProvider>
         </div>

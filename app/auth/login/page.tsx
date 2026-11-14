@@ -252,6 +252,7 @@ function LoginPageContent() {
                     id="email"
                     name="email"
                     type="email"
+                    autoComplete="email"
                     required
                     placeholder="your@email.com"
                   />
@@ -263,6 +264,7 @@ function LoginPageContent() {
                     id="password"
                     name="password"
                     type="password"
+                    autoComplete="current-password"
                     required
                     placeholder="Enter your password"
                   />
