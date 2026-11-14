@@ -29,7 +29,8 @@ export function donePage(preferencesLink: string): string {
 <a href="${escapeHtml(preferencesLink)}" style="${link}">${escapeHtml(PREFS_COPY.changedMind)}</a>`);
 }
 
-export function badLinkPage(): string {
+export function badLinkPage(opts: { browseUrl?: string } = {}): string {
   return shell(PREFS_COPY.badHeading, `<h1 style="font-size:28px;line-height:1.2;margin:0 0 12px;">${escapeHtml(PREFS_COPY.badHeading)}</h1>
-<p style="color:#374151;line-height:1.5;">${escapeHtml(PREFS_COPY.badBody)}</p>`);
+<p style="color:#374151;line-height:1.5;">${escapeHtml(PREFS_COPY.badBody)}</p>${opts.browseUrl ? `
+<a href="${escapeHtml(opts.browseUrl)}" style="${button.replace('display:block;', 'display:block;line-height:56px;text-align:center;text-decoration:none;')}">Browse designs</a>` : ''}`);
 }

@@ -1,0 +1,11 @@
+{{#> layout title="Here's your preview" preheader="Pick up where you left off, on any device." footer_note="You're getting this because someone asked for this preview to be sent here from pawtraits.pics. If that wasn't you, you can ignore it."}}
+<tr><td class="pt-pad" style="padding:4px 32px 0;font-family:Arial,Helvetica,sans-serif;">
+  {{> heading text="Here's your preview"}}
+  <p style="margin:0;font-size:16px;line-height:1.55;color:#374151;">{{body_line}}</p>
+</td></tr>
+{{> portrait src=picture_url alt="Your Pawtrait preview"}}
+<tr><td class="pt-pad" style="padding:4px 32px 26px;font-family:Arial,Helvetica,sans-serif;">
+  {{> button url=preview_url label="See my preview"}}
+  {{#if marketing_line}}<p style="margin:10px 0 0;font-size:13px;line-height:1.5;color:#6b7280;">{{marketing_line}}</p>{{/if}}
+</td></tr>
+{{/layout}}

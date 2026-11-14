@@ -8,6 +8,8 @@ import fs from 'fs';
 import path from 'path';
 import { renderTemplate } from '../lib/messaging/template-engine';
 import { renderEmailFile } from '../lib/messaging/render-file';
+import { PREVIEW_EMAIL } from '../lib/previews/copy';
+import { previewFirstName } from '../lib/previews/email-link';
 import { countryName, deliveryFor, deliveryWindow, emailItems, heroImage, petPossessive, describeItem } from '../lib/messaging/order-email';
 
 let failed = 0, passed = 0;
@@ -87,6 +89,23 @@ common('posted', html, ['It’s on its way, Sarah!', 'printed, packed by hand an
 html = renderTemplate(T('customer-order-shipped.html'), { ...base, shipped_date: 'Thursday 1 October', has_tracking: false, tracking_url: '', carrier_name: 'Royal Mail', shipping_method: '2nd Class', estimated_delivery_date: shipped, shipping_city: 'Derby', shipping_postcode: 'DE1', is_self_print: true });
 common('posted-untracked', html, ['View your order']);
 ok('posted-untracked no tracking', !html.includes('Tracking number'));
+
+
+// "Email me this preview" (rendered exactly as lib/previews/server.ts does)
+{
+  const dec = (h: string) => h.replace(/&#x27;/g, "'");   // the engine escapes apostrophes; mail clients show them as ' 
+  const pv = (name: string | null, tick: boolean) => dec(renderEmailFile('customer-preview-link.html', { pet_name: name, body_line: PREVIEW_EMAIL.body(name), picture_url: 'https://res.cloudinary.com/x/preview.jpg', preview_url: 'https://pawtraits.pics/p/abc.def.ghi', marketing_line: tick ? PREVIEW_EMAIL.marketingLine : null }));
+  html = pv('Biscuit', false);
+  common('preview-link', html, ['Here\'s your preview', 'Pawcasso has painted Biscuit in. Have another look, pick a size, and it\'s yours.', 'See my preview', 'https://pawtraits.pics/p/abc.def.ghi', 'Pick up where you left off, on any device.', 'You\'re getting this because someone asked for this preview to be sent here from pawtraits.pics. If that wasn\'t you, you can ignore it.']);
+  ok('preview-link: no marketing line when unticked', !html.includes('You also said yes'));
+  ok('preview-link: not marketing, so no unsubscribe link', !html.includes('Unsubscribe from these emails'));
+  html = pv(null, true);
+  common('preview-link-no-name', html, ['Pawcasso has painted your pet in.', 'You also said yes to new designs and the odd offer. We\'ll start once you\'ve opened your preview; if that wasn\'t you, do nothing and you won\'t hear from us again.']);
+  ok('preview subject with and without a name', PREVIEW_EMAIL.subject('Biscuit') === 'Biscuit\'s Pawtrait preview is ready' && PREVIEW_EMAIL.subject(null) === 'Your Pawtrait preview is ready');
+  ok('preview first name is sanitised (first word, letters only)', previewFirstName('<b>Rex</b> & Luna') === 'BRexb' && previewFirstName('biscuit & luna') === 'Biscuit' && previewFirstName('  ') === null && previewFirstName('123') === null);
+  html = pv(previewFirstName('<img src=x onerror=1>'), false);
+  ok('preview-link: nothing typed can inject markup', !/<img src=x|onerror/.test(html));
+}
 
 // Sign-in, quiz save (rendered exactly as the routes do)
 html = renderEmailFile('customer-sign-in.html', { customer_name: 'Sarah', sign_in_url: 'https://pawtraits.pics/auth/claim?t=abc&login=1' });

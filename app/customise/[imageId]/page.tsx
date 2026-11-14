@@ -36,6 +36,7 @@ import { cleanSlogan, SLOGAN_MAX } from '@/lib/collections/slogan';
 import { cleanPetName, escapeWords, fillWords, PET_NAME_MAX } from '@/lib/picture-words';
 import type { Caption as CaptionText } from '@/lib/captions/caption';
 import { frameTitle, type FrameCard as FrameCardText } from '@/lib/frames/frame';
+import EmailPreviewCard from '@/components/previews/EmailPreviewCard';
 import { FrameSwitch, FrameToggle, type FrameChoiceInfo } from '@/components/customise/FrameToggle';
 import DesignQuizLink from '@/components/quiz/DesignQuizLink';
 import { collectionHref } from '@/lib/collections/href';
@@ -900,6 +901,8 @@ export default function CustomisePage() {
               </div>
               {rating > 0 && <p className="mt-1 text-xs text-purple-700">Thanks — he’s blushing.</p>}
             </div>
+
+            {customImage && <EmailPreviewCard imageId={customImage.id} signedIn={signedIn} />}
 
             {customImage.purchased && (
               <ShareReferral className="mt-4" placement="custom_portrait" petName={customImage.pet_name} designId={catalogImage.id} imageUrl={customImage.generated_image_url} />

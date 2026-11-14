@@ -30,7 +30,7 @@ export const TOPIC_KEYS: EmailTopic[] = EMAIL_TOPICS.map(t => t.key);
 export type EmailTopics = Record<EmailTopic, boolean>;
 
 /** Where a person agreed (stored as consent_source) */
-export type ConsentSource = 'checkout' | 'quiz_save' | 'preferences_page' | 'account' | 'checkout_legacy';
+export type ConsentSource = 'checkout' | 'quiz_save' | 'preview_email' | 'preferences_page' | 'account' | 'checkout_legacy';
 /** How a person stopped (stored as unsubscribe_source) */
 export type UnsubscribeSource = 'email_link' | 'one_click' | 'preferences_page' | 'account' | 'admin';
 
