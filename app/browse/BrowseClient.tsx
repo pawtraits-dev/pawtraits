@@ -1,0 +1,1695 @@
+'use client';
+
+import { productMatchesFormat } from '@/lib/products/shape-family';
+import type { BrowseFacets } from '@/lib/catalog/browse-query';
+import { useState, useEffect, useRef, Suspense, type MouseEvent as ReactMouseEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import {
+  Heart,
+  Share2,
+  ShoppingCart,
+  Star,
+  Sparkles,
+  ArrowRight,
+  ArrowLeft,
+  Search,
+  Filter,
+  Dog,
+  Cat,
+  Palette,
+  QrCode,
+  Wand2,
+  Camera,
+  Paintbrush
+} from 'lucide-react';
+// Import SupabaseService for authentication checking
+import { SupabaseService } from '@/lib/supabase';
+import { CatalogImage } from '@/components/CloudinaryImageDisplay';
+import { PetsBadge } from '@/components/collections/DesignGrid';
+import UserAwareNavigation from '@/components/UserAwareNavigation';
+import ReferralBanner from '@/components/referrals/ReferralBanner';
+import type { Breed, Theme, AnimalType, ImageCatalogWithDetails, UserProfile } from '@/lib/types';
+import type { Product, ProductPricing } from '@/lib/product-types';
+import { formatPrice } from '@/lib/product-types';
+import ShareModal from '@/components/share-modal';
+import PartnerQRModal from '@/components/PartnerQRModal';
+import UserInteractionsService from '@/lib/user-interactions';
+import { useHybridCart } from '@/lib/hybrid-cart-context';
+import { CountryProvider, useCountry, useCountryPricing } from '@/lib/country-context';
+import {
+  BROWSE_PAGE_SIZE,
+  BROWSE_PRIORITY_COUNT,
+  browseGridKey,
+  browseGridVisible,
+  browseStateFromGetter,
+  browseUrlFor,
+  type BrowseTab,
+  type BrowseUrlState,
+} from '@/lib/catalog/browse-params';
+import { useUserRouting } from '@/hooks/use-user-routing';
+import ContentBasedCarousel from '@/components/ContentBasedCarousel';
+import { PageType } from '@/lib/carousel-types';
+import ReactMarkdown from 'react-markdown';
+import { DigitalDownloadButton } from '@/components/DigitalDownloadButton';
+
+// Only show breeds and themes that have at least one public design (customer UX round 2).
+// Comes from the server-side facets (counts per breed / theme), not from a full image list.
+function idsWithDesigns(f: BrowseFacets | null) {
+  return {
+    breeds: new Set<string>(Object.keys(f?.byBreed || {})),
+    themes: new Set<string>(Object.keys(f?.byTheme || {})),
+  };
+}
+
+// Coming back from a design (browser Back) returns to the same place in the gallery: where the
+// page was scrolled is saved when a design is opened, and restored once the gallery has loaded
+const SCROLL_KEY = 'pt_browse_scroll';
+function saveBrowseScroll() {
+  try { sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ url: window.location.pathname + window.location.search, y: window.scrollY, at: Date.now() })); } catch { /* private mode */ }
+}
+function savedBrowseScroll(): number | null {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(SCROLL_KEY) || 'null');
+    if (!v || Date.now() - v.at > 30 * 60_000 || v.url !== window.location.pathname + window.location.search) return null;
+    return Number(v.y) || 0;
+  } catch { return null; }
+}
+
+// Paged loading: designs are fetched PAGE_SIZE at a time from /api/public/browse; the number loaded is
+// remembered so Back from a design can restore the scroll
+const PAGE_SIZE = BROWSE_PAGE_SIZE;
+let browseVisibleCount = PAGE_SIZE;
+
+// Grid rows loaded for one filter set, kept so Back from a design restores the same cards without refetching
+let browseGridCache: { key: string; rows: any[]; total: number; page: number; hasMore: boolean; at: number } | null = null;
+
+type BrowseCounts = { all: number; dogs: number; cats: number };
+
+/**
+ * What the server page loaded (same shapes as /api/public/browse and the breed / theme records),
+ * and the URL query it loaded them for. `initialData` is null when the server load failed: the page
+ * then fetches everything itself.
+ */
+export interface BrowseInitialData {
+  images: ImageCatalogWithDetails[];
+  total: number;
+  hasMore: boolean;
+  counts: BrowseCounts | null;
+  breed: Breed | null;
+  theme: Theme | null;
+}
+export interface BrowseInitialQuery extends BrowseUrlState {
+  /** The designs query the images were loaded for ('' when no grid was loaded) */
+  gridKey: string;
+}
+
+// Address bar changes made by the page itself (filters, tabs, search) must not ask the server for
+// the page again (it would load the designs a second time and answer after the typing), so they
+// go through the History API, which Next.js keeps in step with useSearchParams
+function setBrowseUrl(url: string) {
+  window.history.pushState(null, '', url);
+}
+
+// Simple in-memory cache to prevent rate limiting
+const dataCache = {
+  breeds: null as Breed[] | null,
+  themes: null as Theme[] | null,
+  facets: null as (BrowseFacets & { counts?: BrowseCounts }) | null,
+  products: null as Product[] | null,
+  pricing: null as ProductPricing[] | null,
+  lastCacheTime: 0,
+  cacheTimeout: 10000 // 10 seconds (reduced from 60s for faster updates)
+};
+
+function BrowsePageContent({ initialData, initialQuery }: { initialData: BrowseInitialData | null; initialQuery: BrowseInitialQuery }) {
+  // "Prints from £X · digital £Y" when both are known; otherwise plain "from £X"
+  const priceLine = (info: { lowestPrice: any; currency: any; currencySymbol: any; physicalPrice?: number | null; digitalPrice?: number | null }) => {
+    // £15, not £15.00 (whole pounds lose the pence)
+    const fmt = (v: number) => formatPrice(v, info.currency || 'GBP', info.currencySymbol).replace(/\.00$/, '');
+    if (info.physicalPrice != null && info.digitalPrice != null) {
+      return `Prints from ${fmt(info.physicalPrice)} · digital ${fmt(info.digitalPrice)}`;
+    }
+    return `from ${fmt(info.lowestPrice)}`;
+  };
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const openDesign = (href: string) => { saveBrowseScroll(); router.push(href); };
+  // A real link (for crawlers, middle-click, "open in new tab"); a plain click opens it the usual way
+  const designLinkClick = (href: string) => (e: ReactMouseEvent) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    openDesign(href);
+  };
+
+  // The URL's filters (the same mapping the server page used to load the first designs). The server's
+  // own reading of the URL is the fallback when the hook has nothing, so the first render matches the HTML.
+  const urlState = searchParams ? browseStateFromGetter(name => searchParams.get(name)) : initialQuery;
+  const getInitialTab = (): BrowseTab => urlState.tab;
+
+  const [activeTab, setActiveTab] = useState<BrowseTab>(urlState.tab);
+
+  const [searchTerm, setSearchTerm] = useState(urlState.search);
+  const [selectedBreedId, setSelectedBreedId] = useState(urlState.breed);
+  const [selectedThemeId, setSelectedThemeId] = useState(urlState.theme);
+  // Full-page spinner only when the server sent nothing; otherwise the page shows at once and the
+  // lists that still load on the client (breeds, themes, facets, prices) fill in
+  const [loading, setLoading] = useState(!initialData);
+  // Breeds, themes, facets, products and pricing have been requested and answered (or failed)
+  const [metaReady, setMetaReady] = useState(false);
+  const { isLoading: countryLoading } = useCountry();
+  // Prices wait for the pricing data AND the visitor's country, so a wrong country's price is never shown
+  const pricesReady = metaReady && !countryLoading;
+  // The server's records for the selected breed / theme heading, used until the full lists arrive
+  const [seedBreed] = useState<Breed | null>(initialData?.breed ?? null);
+  const [seedTheme] = useState<Theme | null>(initialData?.theme ?? null);
+
+  // Theme-specific filtering when viewing a specific theme
+  const [themeAnimalFilter, setThemeAnimalFilter] = useState<'all' | 'dogs' | 'cats'>('all');
+  const [themeBreedSearch, setThemeBreedSearch] = useState('');
+
+  // The server's first page is used as the starting point only when it was loaded for exactly the
+  // designs this URL asks for (a stale page from the router cache, or a failed server load, is not)
+  const urlGridKey = browseGridKey(urlState);
+  const seedRows = !!initialData && browseGridVisible(urlState) && initialQuery.gridKey === urlGridKey;
+  // Consumed by the first filter effect below; `leftSeed` flips once the visitor moves off that view
+  const seed = useRef(seedRows && initialData ? { key: urlGridKey, rows: initialData.images, total: initialData.total, hasMore: initialData.hasMore } : null);
+  const leftSeed = useRef(false);
+  const growingRef = useRef(false);
+
+  // Data states
+  const [dogBreeds, setDogBreeds] = useState<Breed[]>([]);
+  const [catBreeds, setCatBreeds] = useState<Breed[]>([]);
+  const [themes, setThemes] = useState<Theme[]>([]);
+  const [images, setImages] = useState<ImageCatalogWithDetails[]>(() => (seedRows && initialData ? initialData.images : []));
+  const [products, setProducts] = useState<Product[]>([]);
+  const [pricing, setPricing] = useState<ProductPricing[]>([]);
+
+  // Modal states
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [imageToShare, setImageToShare] = useState<ImageCatalogWithDetails | null>(null);
+  const [imageForQR, setImageForQR] = useState<ImageCatalogWithDetails | null>(null);
+
+  // Authentication and user states
+  const { userProfile, userLoading } = useUserRouting();
+  const [partnerInfo, setPartnerInfo] = useState<any>(null);
+
+  // Interaction states
+  const [likedImages, setLikedImages] = useState<Set<string>>(new Set());
+  const [sharedImages, setSharedImages] = useState<Set<string>>(new Set());
+  const [purchasedImages, setPurchasedImages] = useState<Set<string>>(new Set());
+
+  // Paged gallery: `images` holds the rows loaded so far for the current filter set
+  const [facets, setFacets] = useState<BrowseFacets | null>(null);
+  const [counts, setCounts] = useState<BrowseCounts>(initialData?.counts ?? { all: 0, dogs: 0, cats: 0 });
+  const [total, setTotal] = useState(seed.current?.total ?? 0);
+  const [hasMore, setHasMore] = useState(seed.current?.hasMore ?? false);
+  const [gridLoading, setGridLoading] = useState(!seed.current);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [gridPage, setGridPage] = useState(1);
+  const [loadedKey, setLoadedKey] = useState(seed.current?.key ?? '');
+  // How many cards to bring back when returning from a design (the count remembered at that time)
+  const [restoreTarget] = useState<number>(() => (savedBrowseScroll() !== null ? Math.max(PAGE_SIZE, browseVisibleCount) : PAGE_SIZE));
+  const gridReqId = useRef(0);
+  const loadingMoreRef = useRef(false);
+  const firstGridLoad = useRef(true);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const { addToCart } = useHybridCart();
+  const { selectedCountry, getCountryPricing } = useCountryPricing();
+
+  useEffect(() => {
+    loadData();
+    loadUserInteractions();
+  }, []);
+
+  // Load partner info when user is authenticated and is a partner
+  useEffect(() => {
+    const loadPartnerInfo = async () => {
+      if (userProfile?.user_type === 'partner') {
+        try {
+          const supabaseService = new SupabaseService();
+          const partnerData = await supabaseService.getCurrentPartner();
+          setPartnerInfo(partnerData);
+        } catch (error) {
+          console.error('Error loading partner info:', error);
+        }
+      }
+    };
+
+    if (!userLoading && userProfile) {
+      loadPartnerInfo();
+    }
+  }, [userProfile, userLoading]);
+
+  // Listen for URL parameter changes and update state
+  useEffect(() => {
+    if (!searchParams) return;
+    const next = browseStateFromGetter(name => searchParams.get(name));
+
+    setActiveTab(next.tab);
+    setSearchTerm(next.search);
+    setSelectedBreedId(next.breed);
+    setSelectedThemeId(next.theme);
+  }, [searchParams]);
+
+  useEffect(() => {
+    // Update URL when tab changes (but prevent infinite loop)
+    updateUrl();
+  }, [activeTab, searchTerm, selectedBreedId, selectedThemeId]);
+
+  const updateUrl = () => {
+    const newUrl = browseUrlFor({ tab: activeTab, search: searchTerm, breed: selectedBreedId, theme: selectedThemeId });
+    const currentUrl = window.location.pathname + window.location.search;
+
+    // Only push if URL is actually different
+    if (newUrl !== currentUrl) {
+      setBrowseUrl(newUrl);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      // With the server's first page on screen the page stays visible while these load
+      if (!initialData) setLoading(true);
+
+      // Check if cache is valid
+      const now = Date.now();
+      // Coming back from a design: reuse the gallery from the last 10 minutes (instant, same order)
+      const returning = savedBrowseScroll() !== null;
+      const cacheIsValid = dataCache.lastCacheTime > 0 &&
+        (now - dataCache.lastCacheTime) < (returning ? 10 * 60_000 : dataCache.cacheTimeout) &&
+        dataCache.breeds && dataCache.themes && dataCache.facets &&
+        dataCache.products && dataCache.pricing;
+
+      if (cacheIsValid) {
+        // Use cached data
+        const has = idsWithDesigns(dataCache.facets!);
+        const dogs = dataCache.breeds!.filter(breed => breed.animal_type === 'dog' && has.breeds.has(breed.id)).sort((a, b) => a.name.localeCompare(b.name));
+        const cats = dataCache.breeds!.filter(breed => breed.animal_type === 'cat' && has.breeds.has(breed.id)).sort((a, b) => a.name.localeCompare(b.name));
+
+        setDogBreeds(dogs);
+        setCatBreeds(cats);
+        setThemes(dataCache.themes!.filter(theme => theme.is_active && has.themes.has(theme.id)).sort((a, b) => a.name.localeCompare(b.name)));
+        setFacets(dataCache.facets!);
+        setCounts(dataCache.facets!.counts || { all: 0, dogs: 0, cats: 0 });
+        setProducts(dataCache.products! || []);
+        setPricing(dataCache.pricing! || []);
+      } else {
+        // Fetch data via API endpoints with individual error handling
+        console.log('Fetching fresh data from API endpoints...');
+
+        // Fetch breeds with fallback
+        let breedsData = [];
+        try {
+          const breedsResponse = await fetch('/api/public/breeds');
+          if (breedsResponse.ok) {
+            breedsData = await breedsResponse.json();
+          } else {
+            console.warn('Breeds API failed, using empty array');
+          }
+        } catch (error) {
+          console.warn('Breeds API error, using empty array:', error);
+        }
+
+        // Fetch themes with fallback
+        let themesData = [];
+        try {
+          const themesResponse = await fetch('/api/public/themes');
+          if (themesResponse.ok) {
+            themesData = await themesResponse.json();
+          } else {
+            console.warn('Themes API failed, using empty array');
+          }
+        } catch (error) {
+          console.warn('Themes API error, using empty array:', error);
+        }
+
+        // Fetch other data that usually works
+        const [facetsData, productsData, pricingData] = await Promise.all([
+          // Per-breed / per-theme design counts and tab counts (no image rows)
+          fetch('/api/public/browse?facets=1&counts=1').then(res => res.json()),
+          fetch('/api/public/products').then(res => res.json()),
+          fetch('/api/public/pricing').then(res => res.json())
+        ]);
+
+        // Cache the data
+        dataCache.breeds = breedsData;
+        dataCache.themes = themesData;
+        dataCache.facets = facetsData;
+        dataCache.products = productsData;
+        dataCache.pricing = pricingData;
+        dataCache.lastCacheTime = now;
+
+        // Separate dog and cat breeds and sort alphabetically; only those with designs
+        const has = idsWithDesigns(facetsData);
+        const dogs = (breedsData || []).filter(breed => breed.animal_type === 'dog' && has.breeds.has(breed.id)).sort((a, b) => a.name.localeCompare(b.name));
+        const cats = (breedsData || []).filter(breed => breed.animal_type === 'cat' && has.breeds.has(breed.id)).sort((a, b) => a.name.localeCompare(b.name));
+
+        setDogBreeds(dogs);
+        setCatBreeds(cats);
+        setThemes((themesData || []).filter(theme => theme.is_active && has.themes.has(theme.id)).sort((a, b) => a.name.localeCompare(b.name)));
+        setFacets(facetsData);
+        setCounts(facetsData?.counts || { all: 0, dogs: 0, cats: 0 });
+        setProducts(productsData || []);
+        setPricing(pricingData || []);
+      }
+    } catch (error) {
+      console.error('Error loading browse data:', error);
+    } finally {
+      setLoading(false);
+      setMetaReady(true);
+    }
+  };
+
+  const loadUserInteractions = () => {
+    const liked = UserInteractionsService.getLikedImageIds();
+    const shared = UserInteractionsService.getSharedImageIds();
+    const purchased = UserInteractionsService.getPurchasedImageIds();
+
+    setLikedImages(new Set(liked));
+    setSharedImages(new Set(shared));
+    setPurchasedImages(new Set(purchased));
+  };
+
+  const handleLike = (imageId: string) => {
+    const image = images.find(img => img.id === imageId);
+    const isNowLiked = UserInteractionsService.toggleLikeSync(imageId, image);
+
+    setLikedImages(prev => {
+      const newLiked = new Set(prev);
+      if (isNowLiked) {
+        newLiked.add(imageId);
+      } else {
+        newLiked.delete(imageId);
+      }
+      return newLiked;
+    });
+  };
+
+  const handleShare = (image: ImageCatalogWithDetails) => {
+    setImageToShare(image);
+    setShowShareModal(true);
+  };
+
+  const handleShareComplete = (platform: string) => {
+    if (imageToShare) {
+      UserInteractionsService.recordShare(imageToShare.id, platform, imageToShare);
+      setSharedImages(prev => new Set(prev).add(imageToShare.id));
+    }
+    setShowShareModal(false);
+    setImageToShare(null);
+  };
+
+  const handleQRShare = (image: ImageCatalogWithDetails) => {
+    setImageForQR(image);
+    setShowQRModal(true);
+  };
+
+  const handleCustomize = (image: ImageCatalogWithDetails) => {
+    // Guests can customise too (free previews, no sign-up) — account is created at checkout
+    // Navigate to customise page instead of opening modal
+    openDesign(`/customise/${image.id}`);
+  };
+
+  const getCarouselPageType = (): PageType => {
+    switch (activeTab) {
+      case 'dogs': return 'dogs';
+      case 'cats': return 'cats';
+      case 'themes': return 'themes';
+      case 'all':
+      default: return 'dogs'; // Default carousel for 'all' tab
+    }
+  };
+
+  const getFilteredBreeds = (breeds: Breed[]) => {
+    if (!searchTerm) return breeds;
+
+    return breeds.filter(breed =>
+      breed.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  };
+
+  const getFilteredThemes = () => {
+    if (!searchTerm) return themes;
+
+    return themes.filter(theme =>
+      theme.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  };
+
+  // Per-breed / per-theme counts come from the server-side facets (a design counts for its primary breed
+  // and for every pet in generation_parameters.subjects)
+  const getBreedImageCount = (breedId: string) => facets?.byBreed?.[breedId] || 0;
+
+  const getThemeImageCount = (themeId: string) => facets?.byTheme?.[themeId] || 0;
+
+  const getThemeDogImageCount = (themeId: string) => facets?.themeAnimal?.[themeId]?.dogs || 0;
+
+  const getThemeCatImageCount = (themeId: string) => facets?.themeAnimal?.[themeId]?.cats || 0;
+
+  const getLowestPriceForBreed = (breedId: string) => {
+    // Distinct formats of this breed's designs (server-side), instead of walking every design
+    const formatIds = facets?.breedFormats?.[breedId] || [];
+    if (formatIds.length === 0) return null;
+
+    const countryPricing = getCountryPricing(pricing);
+    let lowestPrice: any = null;
+    let currency: any = null;
+    let currencySymbol: any = null;
+
+    formatIds.forEach(formatId => {
+      const availableProducts = products.filter(p => p.is_active && productMatchesFormat(p, formatId));
+      availableProducts.forEach(product => {
+        const productPricing = countryPricing.find(p => p.product_id === product.id);
+        if (productPricing && (lowestPrice === null || productPricing.sale_price < lowestPrice)) {
+          lowestPrice = productPricing.sale_price;
+          currency = productPricing.currency_code;
+          currencySymbol = productPricing.currency_symbol;
+        }
+      });
+    });
+
+    return lowestPrice ? { lowestPrice, currency, currencySymbol } : null;
+  };
+
+  // Until the full lists arrive, the heading uses the record the server loaded for this URL
+  const getSelectedBreed = () => {
+    if (!selectedBreedId) return null;
+    const allBreeds = [...dogBreeds, ...catBreeds];
+    const found = allBreeds.find(breed => breed.id === selectedBreedId);
+    if (found) return found;
+    return !metaReady && seedBreed && seedBreed.id === selectedBreedId ? seedBreed : null;
+  };
+
+  const getSelectedTheme = () => {
+    if (!selectedThemeId) return null;
+    const found = themes.find(theme => theme.id === selectedThemeId);
+    if (found) return found;
+    return !metaReady && seedTheme && seedTheme.id === selectedThemeId ? seedTheme : null;
+  };
+
+  const handleTabChange = (tab: BrowseTab) => {
+    setActiveTab(tab);
+    // Clear breed/theme selection when switching tabs
+    setSelectedBreedId('');
+    setSelectedThemeId('');
+    // Clear theme-specific filters
+    setThemeAnimalFilter('all');
+    setThemeBreedSearch('');
+    // Scroll to top smoothly when changing tabs
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleBreedClick = (breed: Breed) => {
+    const animalType = breed.animal_type as AnimalType;
+    setActiveTab(animalType === 'dog' ? 'dogs' : 'cats');
+    setSelectedBreedId(breed.id);
+    setSelectedThemeId(''); // Clear theme selection
+    setSearchTerm(''); // Clear search when selecting specific breed
+    // Scroll to top smoothly when viewing breed pawtraits
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleThemeClick = (theme: Theme, animalType?: 'dogs' | 'cats') => {
+    const type = animalType || 'dogs';
+    setActiveTab(type);
+    setSelectedThemeId(theme.id);
+    setSelectedBreedId(''); // Clear breed selection
+    setSearchTerm(''); // Clear search when selecting specific theme
+    // Scroll to top smoothly when viewing theme pawtraits
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleBackToBrowse = () => {
+    setSelectedBreedId('');
+    setSelectedThemeId('');
+    setSearchTerm('');
+    // Clear theme-specific filters
+    setThemeAnimalFilter('all');
+    setThemeBreedSearch('');
+  };
+
+  const getImageProductInfo = (imageId: string) => {
+    const image = images.find(img => img.id === imageId);
+
+    if (!image || !image.format_id) {
+      return { productCount: 0, lowestPrice: null, currency: null, currencySymbol: null };
+    }
+
+    const availableProducts = (products || []).filter(p =>
+      p.is_active && productMatchesFormat(p, image.format_id)
+    );
+
+    if (availableProducts.length === 0) {
+      return { productCount: 0, lowestPrice: null, currency: null, currencySymbol: null };
+    }
+
+    const countryPricing = getCountryPricing(pricing || []).filter(p =>
+      availableProducts.some(product => product.id === p.product_id)
+    );
+
+    if (countryPricing.length === 0) {
+      return { productCount: availableProducts.length, lowestPrice: null, currency: null, currencySymbol: null };
+    }
+
+    const lowestPricing = countryPricing.reduce((lowest, current) =>
+      current.sale_price < lowest.sale_price ? current : lowest
+    );
+
+    // Split physical prints from the digital download so the card can label each price accurately
+    const isDigital = (productId: string) =>
+      (availableProducts.find(p => p.id === productId) as any)?.product_type === 'digital_download';
+    const lowestOf = (rows: typeof countryPricing) =>
+      rows.length ? rows.reduce((l, c) => (c.sale_price < l.sale_price ? c : l)) : null;
+    const physicalLowest = lowestOf(countryPricing.filter(p => !isDigital(p.product_id)));
+    const digitalLowest = lowestOf(countryPricing.filter(p => isDigital(p.product_id)));
+
+    return {
+      productCount: availableProducts.length,
+      lowestPrice: lowestPricing.sale_price,
+      currency: lowestPricing.currency_code,
+      currencySymbol: lowestPricing.currency_symbol,
+      physicalPrice: physicalLowest ? physicalLowest.sale_price : null,
+      digitalPrice: digitalLowest ? digitalLowest.sale_price : null
+    };
+  };
+
+  // Paged rendering: the gallery shows the rows loaded so far for the current filters; more are fetched
+  // from /api/public/browse when the sentinel under the grid nears the viewport (or "Show more designs" is pressed)
+  const viewState: BrowseUrlState = { tab: activeTab, search: searchTerm, breed: selectedBreedId, theme: selectedThemeId };
+  const gridVisible = browseGridVisible(viewState);
+  // Same mapping the server page used for the first designs (lib/catalog/browse-params.ts)
+  const gridKeyNow = browseGridKey(viewState, { themeAnimal: themeAnimalFilter, themeBreedSearch });
+
+  // Filters are applied after a short pause when only the text changed (typing), at once otherwise
+  const [gridKey, setGridKey] = useState(gridKeyNow);
+  const gridKeyRef = useRef(gridKey);
+  useEffect(() => {
+    if (gridKeyNow === gridKeyRef.current) return;
+    const strip = (k: string) => { const p = new URLSearchParams(k); p.delete('search'); p.delete('breedName'); return p.toString(); };
+    const typing = strip(gridKeyNow) === strip(gridKeyRef.current);
+    const t = setTimeout(() => { gridKeyRef.current = gridKeyNow; setGridKey(gridKeyNow); }, typing ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [gridKeyNow]);
+
+  const fetchGridPage = async (key: string, pageNo: number, signal?: AbortSignal) => {
+    const qs = new URLSearchParams(key);
+    qs.set('page', String(pageNo));
+    qs.set('limit', String(PAGE_SIZE));
+    const res = await fetch(`/api/public/browse?${qs.toString()}`, { signal });
+    if (!res.ok) throw new Error(`browse ${res.status}`);
+    return res.json() as Promise<{ images: ImageCatalogWithDetails[]; total: number; hasMore: boolean }>;
+  };
+  const mergeById = (a: ImageCatalogWithDetails[], b: ImageCatalogWithDetails[]) => {
+    const seen = new Set(a.map(i => i.id));
+    return [...a, ...b.filter(i => !seen.has(i.id))];
+  };
+
+  // Filter set changed: start again from page 1 (or, coming Back from a design, bring back the same cards)
+  useEffect(() => {
+    const myReq = ++gridReqId.current;
+    const ctrl = new AbortController();
+    loadingMoreRef.current = false;
+    setLoadingMore(false);
+    if (!gridVisible) { leftSeed.current = true; growingRef.current = false; setGridLoading(false); return () => ctrl.abort(); }
+
+    const c = browseGridCache;
+    if (savedBrowseScroll() !== null && c && c.key === gridKey && Date.now() - c.at < 10 * 60_000) {
+      setImages(c.rows); setTotal(c.total); setGridPage(c.page); setHasMore(c.hasMore); setLoadedKey(gridKey); setGridLoading(false);
+      firstGridLoad.current = false;
+      leftSeed.current = true;
+      return () => ctrl.abort();
+    }
+
+    // First view, and the server already loaded exactly these designs: they are on screen, so there is
+    // nothing to fetch (and nothing to clear). Only when Back from a design needs MORE cards than the
+    // server's first page is the rest fetched, page by page, behind the cards already shown.
+    const seeded = seed.current;
+    if (seeded && !leftSeed.current && seeded.key === gridKey && gridKey === gridKeyNow) {
+      const want = firstGridLoad.current ? restoreTarget : PAGE_SIZE;
+      if (seeded.rows.length >= want || !seeded.hasMore) {
+        firstGridLoad.current = false;
+        setLoadedKey(gridKey); setGridLoading(false);
+        return () => ctrl.abort();
+      }
+      growingRef.current = true;
+      setGridLoading(true);
+      (async () => {
+        try {
+          let rows: ImageCatalogWithDetails[] = seeded.rows;
+          let pageNo = 1;
+          let data: { images: ImageCatalogWithDetails[]; total: number; hasMore: boolean } = { images: [], total: seeded.total, hasMore: seeded.hasMore };
+          while (rows.length < want && data.hasMore && pageNo < 10) {
+            pageNo += 1;
+            data = await fetchGridPage(gridKey, pageNo, ctrl.signal);
+            rows = mergeById(rows, data.images || []);
+          }
+          if (myReq !== gridReqId.current) return;
+          firstGridLoad.current = false;
+          setImages(rows); setTotal(data.total || 0); setHasMore(!!data.hasMore); setGridPage(pageNo); setLoadedKey(gridKey);
+        } catch (err: any) {
+          if (err?.name === 'AbortError' || myReq !== gridReqId.current) return;
+          console.error('Error loading designs:', err);
+          setHasMore(false);
+        } finally {
+          if (myReq === gridReqId.current) { growingRef.current = false; setGridLoading(false); }
+        }
+      })();
+      return () => ctrl.abort();
+    }
+    leftSeed.current = true;
+
+    // Filters are about to change (debounce pending): wait for the new key instead of fetching the old one
+    if (gridKey !== gridKeyNow) { setImages([]); setTotal(0); setHasMore(false); setGridLoading(true); return; }
+
+    const target = firstGridLoad.current ? restoreTarget : PAGE_SIZE;
+    setImages([]); setTotal(0); setHasMore(false); setGridPage(1); setGridLoading(true);
+    (async () => {
+      try {
+        let rows: ImageCatalogWithDetails[] = [];
+        let pageNo = 1;
+        let data = await fetchGridPage(gridKey, pageNo, ctrl.signal);
+        rows = mergeById(rows, data.images || []);
+        while (rows.length < target && data.hasMore && pageNo < 10) {
+          pageNo += 1;
+          data = await fetchGridPage(gridKey, pageNo, ctrl.signal);
+          rows = mergeById(rows, data.images || []);
+        }
+        if (myReq !== gridReqId.current) return;
+        firstGridLoad.current = false;
+        setImages(rows); setTotal(data.total || 0); setHasMore(!!data.hasMore); setGridPage(pageNo); setLoadedKey(gridKey);
+      } catch (err: any) {
+        if (err?.name === 'AbortError' || myReq !== gridReqId.current) return;
+        console.error('Error loading designs:', err);
+        setHasMore(false);
+      } finally {
+        if (myReq === gridReqId.current) setGridLoading(false);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [gridKey, gridVisible]);
+
+  // Back from a design: scroll to where the visitor was (cards have a fixed shape, so the page
+  // is the right height as soon as the gallery renders; tried again briefly while it settles).
+  // Placed after the filter effect above, which decides first whether the gallery is restored.
+  useEffect(() => {
+    if (loading || gridLoading || growingRef.current) return;
+    const y = savedBrowseScroll();
+    if (y === null) return;
+    try { sessionStorage.removeItem(SCROLL_KEY); } catch { /* private mode */ }
+    let tries = 0;
+    const go = () => {
+      window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior });
+      if (Math.abs(window.scrollY - y) > 4 && ++tries < 20) setTimeout(go, 50);
+    };
+    requestAnimationFrame(go);
+  }, [loading, gridLoading]);
+
+
+  const loadMore = async () => {
+    if (loadingMoreRef.current || !hasMore || gridLoading) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    const myReq = gridReqId.current;
+    try {
+      const data = await fetchGridPage(gridKey, gridPage + 1);
+      if (myReq !== gridReqId.current) return; // filters changed while loading
+      setImages(prev => mergeById(prev, data.images || []));
+      setTotal(data.total || 0);
+      setHasMore(!!data.hasMore);
+      setGridPage(p => p + 1);
+    } catch (err) {
+      console.error('Error loading more designs:', err);
+    } finally {
+      if (myReq === gridReqId.current) { loadingMoreRef.current = false; setLoadingMore(false); }
+    }
+  };
+
+  // Remember what is loaded so Back from a design restores it
+  useEffect(() => {
+    if (images.length > 0) browseVisibleCount = images.length;
+    if (!gridLoading && loadedKey === gridKey && images.length > 0) {
+      browseGridCache = { key: gridKey, rows: images, total, page: gridPage, hasMore, at: Date.now() };
+    }
+  }, [images, total, hasMore, gridPage, gridLoading, loadedKey, gridKey]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (loading || !el || !hasMore || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) loadMore();
+    }, { rootMargin: '600px 0px' });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loading, hasMore, images.length, gridLoading, loadingMore]);
+  const showMoreControls = (hasMore || loadingMore) && (
+    <div className="mt-8 flex flex-col items-center gap-3">
+      <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
+      <Button variant="outline" disabled={loadingMore} onClick={() => loadMore()}>
+        {loadingMore ? (
+          <><span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-b-2 border-purple-600" aria-hidden="true" />Loading…</>
+        ) : 'Show more designs'}
+      </Button>
+    </div>
+  );
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+        <UserAwareNavigation />
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  const currentBreeds = activeTab === 'dogs' ? getFilteredBreeds(dogBreeds) :
+                      activeTab === 'cats' ? getFilteredBreeds(catBreeds) :
+                      activeTab === 'all' ? getFilteredBreeds([...dogBreeds, ...catBreeds].sort((a, b) => a.name.localeCompare(b.name))) : [];
+  const currentThemes = getFilteredThemes();
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+      <UserAwareNavigation />
+      <ReferralBanner />
+
+      {/* Breed/Theme Detail View OR Browse View */}
+      {selectedBreedId || selectedThemeId ? (
+        // Detailed breed/theme view with filtered images
+        <>
+          {/* Breed/Theme Header */}
+          <section className="py-8 bg-white">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="mb-6">
+                <Button
+                  onClick={handleBackToBrowse}
+                  variant="outline"
+                  className="mb-4"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Browse
+                </Button>
+
+                {/* Breed Description */}
+                {selectedBreedId && (() => {
+                  const selectedBreed = getSelectedBreed();
+                  if (!selectedBreed) return null;
+
+                  return (
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-6">
+                      <div className="flex flex-col lg:flex-row gap-6">
+                        {selectedBreed.hero_image_url && (
+                          <div className="lg:w-1/3 flex-shrink-0">
+                            <img
+                              src={selectedBreed.hero_image_url}
+                              alt={selectedBreed.hero_image_alt || `${selectedBreed.name} hero image`}
+                              className="w-full aspect-square object-cover bg-gray-50 rounded-lg shadow-md"
+                            />
+                          </div>
+                        )}
+
+                        <div className="flex-1">
+                          <h1 className="text-3xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            {selectedBreed.animal_type === 'dog' ? '🐕' : '🐱'} {selectedBreed.name}
+                          </h1>
+                          {selectedBreed.description && (
+                            <div className="text-gray-700 text-lg leading-relaxed prose prose-gray max-w-none mb-4">
+                              <ReactMarkdown>{selectedBreed.description}</ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {/* Any design can be personalised — so a breed with few designs never looks like a dead end */}
+                      <div className="mt-5 flex items-start gap-3 rounded-xl border border-purple-200 bg-white p-4">
+                        <Paintbrush className="mt-0.5 h-5 w-5 shrink-0 text-purple-700" />
+                        <div>
+                          <p className="font-semibold text-gray-900">Any design can star your {selectedBreed.name}</p>
+                          <p className="text-sm text-gray-600">
+                            The pet in each picture is a stand-in. Pick any Pawtrait in the gallery and Pawcasso paints your pet in.{' '}
+                            <button onClick={() => { setSelectedBreedId(''); setBrowseUrl('/browse'); }} className="font-semibold text-purple-700 underline">Browse all designs</button>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Theme Description */}
+                {selectedThemeId && (() => {
+                  const selectedTheme = getSelectedTheme();
+                  if (!selectedTheme) return null;
+
+                  return (
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
+                      <div className="flex flex-col lg:flex-row gap-6">
+                        {selectedTheme.hero_image_url && (
+                          <div className="lg:w-1/3 flex-shrink-0">
+                            <img
+                              src={selectedTheme.hero_image_url}
+                              alt={selectedTheme.hero_image_alt || `${selectedTheme.name} theme hero image`}
+                              className="w-full aspect-square object-cover rounded-lg shadow-md"
+                            />
+                          </div>
+                        )}
+
+                        <div className="flex-1">
+                          <h1 className="text-3xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            🎨 {selectedTheme.name}
+                          </h1>
+                          {selectedTheme.description && (
+                            <div className="text-gray-700 text-lg leading-relaxed prose prose-gray max-w-none mb-4">
+                              <ReactMarkdown>{selectedTheme.description}</ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </section>
+
+          {/* Filtered Images Grid */}
+          <section className="py-8 bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                Available Portraits ({total})
+              </h2>
+
+              {/* Breed and Theme-specific filtering controls */}
+              {(selectedBreedId || selectedThemeId) && (
+                <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    {/* Theme-specific Animal Type Filter */}
+                    {selectedThemeId && (
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Animal Type
+                        </label>
+                        <div className="flex gap-2">
+                          <Button
+                            variant={themeAnimalFilter === 'all' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setThemeAnimalFilter('all')}
+                          >
+                            All
+                          </Button>
+                          <Button
+                            variant={themeAnimalFilter === 'dogs' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setThemeAnimalFilter('dogs')}
+                          >
+                            <Dog className="w-4 h-4 mr-1" />
+                            Dogs
+                          </Button>
+                          <Button
+                            variant={themeAnimalFilter === 'cats' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setThemeAnimalFilter('cats')}
+                          >
+                            <Cat className="w-4 h-4 mr-1" />
+                            Cats
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Breed/Color Search */}
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {selectedThemeId ? 'Search Breeds' : 'Search by Color or Coat'}
+                      </label>
+                      <div className="relative">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                        <Input
+                          type="text"
+                          placeholder={
+                            selectedThemeId
+                              ? "What breed are we looking for?"
+                              : "Search by color or coat (e.g., golden, fluffy, spotted)..."
+                          }
+                          value={selectedThemeId ? themeBreedSearch : searchTerm}
+                          onChange={(e) => selectedThemeId ? setThemeBreedSearch(e.target.value) : setSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Clear Filters */}
+                    <div className="flex items-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (selectedThemeId) {
+                            setThemeAnimalFilter('all');
+                            setThemeBreedSearch('');
+                          } else {
+                            setSearchTerm('');
+                          }
+                        }}
+                        disabled={selectedThemeId ? (themeAnimalFilter === 'all' && !themeBreedSearch) : !searchTerm}
+                      >
+                        Clear Filters
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {images.length === 0 && gridLoading ? (
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                </div>
+              ) : images.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 text-gray-300 mx-auto mb-4">🖼️</div>
+                  <p className="text-gray-600">
+                    {selectedBreedId ? 'This breed is still in the art studio! Try another one or check back soon.' : 'This theme is still being perfected! Try another style or check back soon.'}
+                  </p>
+                  <p className="text-gray-500 text-sm mt-2">Fresh pawtraits are added regularly - your perfect match is coming!</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                  {images.map((image, index) => {
+                    const isLiked = likedImages.has(image.id);
+                    const isShared = sharedImages.has(image.id);
+                    const isPurchased = purchasedImages.has(image.id);
+                    const productInfo = getImageProductInfo(image.id);
+
+                    return (
+                      <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
+                        <div
+                          className="relative aspect-[2/3] overflow-hidden bg-gray-100 cursor-pointer"
+                          onClick={() => openDesign(`/customise/${image.id}`)}
+                        >
+                          <CatalogImage
+                            imageId={image.id}
+                            alt={image.description || 'Generated image'}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            fallbackUrl={image.image_url || image.public_url}
+                            priority={index < BROWSE_PRIORITY_COUNT}
+                          />
+                          {((image as any).subject_count ?? 1) > 1 && <PetsBadge n={(image as any).subject_count} />}
+
+                          {/* Like, Share, Customize, and Purchase status overlay */}
+                          <div className="absolute top-2 right-2 flex flex-col gap-2">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleLike(image.id);
+                                }}
+                                className={`p-2 rounded-full transition-all ${
+                                  isLiked
+                                    ? 'bg-red-500 text-white'
+                                    : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
+                                }`}
+                                title={isLiked ? 'Unlike' : 'Like'}
+                            aria-label={isLiked ? 'Remove from favourites' : 'Save to favourites'}
+                            aria-pressed={isLiked}
+                              >
+                                <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleShare(image);
+                                }}
+                                className={`p-2 rounded-full transition-all ${
+                                  isShared
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
+                                }`}
+                                title={isShared ? 'Shared' : 'Share'}
+                            aria-label="Share this design"
+                              >
+                                <Share2 className="w-4 h-4" />
+                              </button>
+
+                              {/* Partner QR Code Sharing Button */}
+                              {userProfile?.user_type === 'partner' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleQRShare(image);
+                                  }}
+                                  className="p-2 rounded-full transition-all bg-white bg-opacity-80 text-gray-700 hover:bg-green-500 hover:text-white"
+                                  title="Generate QR Code for Client"
+                                  aria-label="Generate QR code for client"
+                                >
+                                  <QrCode className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {isPurchased && (
+                                <div className="bg-green-500 text-white p-2 rounded-full" title="Purchased">
+                                  <ShoppingCart className="w-4 h-4 fill-current" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Customize Button - Visible to All, Redirects Non-Customers to Sign Up */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCustomize(image);
+                              }}
+                              className="p-2 rounded-full transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-lg"
+                              title="Customize this image"
+                              aria-label="Personalise this design"
+                            >
+                              <Wand2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                      <CardContent className="p-4">
+                        {image.description && (
+                          <p className="text-sm text-gray-900 font-medium line-clamp-2 mb-2">
+                            <a href={`/customise/${image.id}`} onClick={designLinkClick(`/customise/${image.id}`)}>{image.description.split('\n')[0].replace(/\*\*(.*?)\*\*/g, '$1')}</a>
+                          </p>
+                        )}
+
+                        <div className="space-y-1 mb-3">
+                          {image.breed_name && image.breed_id && (
+                            <div>
+                              <Badge
+                                variant="secondary"
+                                className="text-xs cursor-pointer hover:bg-blue-200 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedBreedId(image.breed_id);
+                                  setSelectedThemeId('');
+                                  setSearchTerm('');
+                                }}
+                              >
+                                {image.breed_name}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Country-aware pricing */}
+                        {!pricesReady && <div className="mb-3 h-9" aria-hidden="true" />}
+                        {pricesReady && productInfo.lowestPrice && (
+                          <div className="mb-3">
+                            <p className="text-sm font-medium text-green-600">
+                              {priceLine(productInfo)}
+                            </p>
+                            {productInfo.productCount > 1 && (
+                              <p className="text-xs text-gray-500">
+                                {productInfo.productCount} options
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          <Button
+                            className="w-full bg-blue-600 hover:bg-blue-700"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDesign(`/customise/${image.id}?start=photo`);
+                            }}
+                          >
+                            <Camera className="w-4 h-4 mr-2" />
+                            Put My Pet in This Pic
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDesign(`/customise/${image.id}`);
+                            }}
+                          >
+                            <ShoppingCart className="w-4 h-4 mr-2" />
+                            View & Buy
+                          </Button>
+                          <DigitalDownloadButton
+                            imageId={image.id}
+                            imageUrl={image.public_url || image.image_url || ''}
+                            imageTitle={image.description?.split('\n')[0].replace(/\*\*(.*?)\*\*/g, '$1') || 'Pet Portrait'}
+                            className="w-full"
+                            variant="outline"
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    );
+                  })}
+                </div>
+              )}
+              {showMoreControls}
+            </div>
+          </section>
+        </>
+      ) : (
+        // Browse view with carousel and cards
+        <>
+          <h1 className="sr-only">Browse Pawtrait designs</h1>
+          {/* Hero Carousel - Dynamic based on active tab */}
+          <section className="relative">
+            <ContentBasedCarousel
+              pageType={getCarouselPageType()}
+              className="h-[40vh] min-h-[220px] sm:h-96 lg:h-[500px]"
+            />
+          </section>
+
+          {/* Filter Tabs and Search */}
+          <section className="py-8 bg-white/50 backdrop-blur-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+              {/* Tab Navigation */}
+              {/* Scrolls sideways on its own on phones instead of widening the page */}
+              <div className="flex sm:justify-center mb-8 -mx-4 px-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex flex-shrink-0 bg-white rounded-lg p-1 shadow-lg">
+                  <Button
+                    variant={activeTab === 'all' ? 'default' : 'ghost'}
+                    onClick={() => handleTabChange('all')}
+                    className={`px-4 sm:px-6 py-3 rounded-md whitespace-nowrap transition-all ${
+                      activeTab === 'all'
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'text-gray-700 hover:text-purple-600'
+                    }`}
+                  >
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    All ({counts.all})
+                  </Button>
+                  <Button
+                    variant={activeTab === 'dogs' ? 'default' : 'ghost'}
+                    onClick={() => handleTabChange('dogs')}
+                    className={`px-4 sm:px-6 py-3 rounded-md whitespace-nowrap transition-all ${
+                      activeTab === 'dogs'
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'text-gray-700 hover:text-purple-600'
+                    }`}
+                  >
+                    <Dog className="w-5 h-5 mr-2" />
+                    Dogs ({counts.dogs})
+                  </Button>
+                  <Button
+                    variant={activeTab === 'cats' ? 'default' : 'ghost'}
+                    onClick={() => handleTabChange('cats')}
+                    className={`px-4 sm:px-6 py-3 rounded-md whitespace-nowrap transition-all ${
+                      activeTab === 'cats'
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'text-gray-700 hover:text-purple-600'
+                    }`}
+                  >
+                    <Cat className="w-5 h-5 mr-2" />
+                    Cats ({counts.cats})
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => router.push('/collections')}
+                    className="px-4 sm:px-6 py-3 rounded-md whitespace-nowrap transition-all text-gray-700 hover:text-purple-600"
+                  >
+                    <Palette className="w-5 h-5 mr-2" />
+                    Collections
+                  </Button>
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div className="max-w-2xl mx-auto">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    type="text"
+                    placeholder={`Search ${activeTab}...`}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-4 py-3 text-lg border-2 border-gray-200 focus:border-purple-500 rounded-xl"
+                  />
+                  {searchTerm && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                    >
+                      ×
+                    </Button>
+                  )}
+                </div>
+
+                {searchTerm && (
+                  <div className="mt-4 text-center">
+                    <Badge variant="secondary" className="text-sm">
+                      Searching for: "{searchTerm}"
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSearchTerm('')}
+                        className="ml-2 p-0 h-auto"
+                      >
+                        ×
+                      </Button>
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+        {/* Cards Grid Section (default browse view) */}
+        <section className="py-12 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+
+          {/* Image Cards (All Tab) */}
+          {activeTab === 'all' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              {images.map((image, index) => {
+                const isLiked = likedImages.has(image.id);
+                const isShared = sharedImages.has(image.id);
+                const isPurchased = purchasedImages.has(image.id);
+                const productInfo = getImageProductInfo(image.id);
+
+                return (
+                  <Card key={image.id} className="group hover:shadow-lg transition-shadow overflow-hidden">
+                    <div
+                      className="relative aspect-[2/3] overflow-hidden bg-gray-100 cursor-pointer"
+                      onClick={() => openDesign(`/customise/${image.id}`)}
+                    >
+                      <CatalogImage
+                        imageId={image.id}
+                        alt={image.description || 'Generated image'}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        fallbackUrl={image.image_url || image.public_url}
+                        priority={index < BROWSE_PRIORITY_COUNT}
+                      />
+                      {((image as any).subject_count ?? 1) > 1 && <PetsBadge n={(image as any).subject_count} />}
+
+                      {/* Like, Share, Customize, and Purchase status overlay */}
+                      <div className="absolute top-2 right-2 flex flex-col gap-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLike(image.id);
+                            }}
+                            className={`p-2 rounded-full transition-all ${
+                              isLiked
+                                ? 'bg-red-500 text-white'
+                                : 'bg-white bg-opacity-80 text-gray-700 hover:bg-red-500 hover:text-white'
+                            }`}
+                            title={isLiked ? 'Unlike' : 'Like'}
+                            aria-label={isLiked ? 'Remove from favourites' : 'Save to favourites'}
+                            aria-pressed={isLiked}
+                          >
+                            <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShare(image);
+                            }}
+                            className={`p-2 rounded-full transition-all ${
+                              isShared
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-white bg-opacity-80 text-gray-700 hover:bg-blue-500 hover:text-white'
+                            }`}
+                            title={isShared ? 'Shared' : 'Share'}
+                            aria-label="Share this design"
+                          >
+                            <Share2 className="w-4 h-4" />
+                          </button>
+
+                          {/* Partner QR Code Sharing Button */}
+                          {userProfile?.user_type === 'partner' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleQRShare(image);
+                              }}
+                              className="p-2 rounded-full transition-all bg-white bg-opacity-80 text-gray-700 hover:bg-green-500 hover:text-white"
+                              title="Generate QR Code for Client"
+                                  aria-label="Generate QR code for client"
+                            >
+                              <QrCode className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {isPurchased && (
+                            <div className="bg-green-500 text-white p-2 rounded-full" title="Purchased">
+                              <ShoppingCart className="w-4 h-4 fill-current" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <CardContent className="p-4">
+                      {image.description && (
+                        <p className="text-sm text-gray-900 font-medium line-clamp-2 mb-2">
+                          <a href={`/customise/${image.id}`} onClick={designLinkClick(`/customise/${image.id}`)}>{image.description.split('\n')[0].replace(/\*\*(.*?)\*\*/g, '$1')}</a>
+                        </p>
+                      )}
+
+                      <div className="space-y-1 mb-3">
+                        {image.breed_name && image.breed_id && (
+                          <div>
+                            <Badge
+                              variant="secondary"
+                              className="text-xs cursor-pointer hover:bg-blue-200 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedBreedId(image.breed_id);
+                                setSelectedThemeId('');
+                                setSearchTerm('');
+                              }}
+                            >
+                              {image.breed_name}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Country-aware pricing */}
+                      {!pricesReady && <div className="mb-3 h-9" aria-hidden="true" />}
+                        {pricesReady && productInfo.lowestPrice && (
+                        <div className="mb-3">
+                          <p className="text-sm font-medium text-green-600">
+                            {priceLine(productInfo)}
+                          </p>
+                          {productInfo.productCount > 1 && (
+                            <p className="text-xs text-gray-500">
+                              {productInfo.productCount} options
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <Button
+                          className="w-full bg-purple-600 hover:bg-purple-700"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDesign(`/customise/${image.id}`);
+                          }}
+                        >
+                          <Camera className="w-4 h-4 mr-2" />
+                          Put My Pet in This Pic
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDesign(`/customise/${image.id}`);
+                          }}
+                        >
+                          <ShoppingCart className="w-4 h-4 mr-2" />
+                          View Details
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+          {activeTab === 'all' && gridLoading && images.length === 0 && (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+            </div>
+          )}
+          {activeTab === 'all' && showMoreControls}
+
+          {/* Breeds, themes and their counts load after the page: a spinner until they are here */}
+          {!metaReady && activeTab !== 'all' && (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+            </div>
+          )}
+
+          {/* Breed Cards (Dogs/Cats) */}
+          {metaReady && (activeTab === 'dogs' || activeTab === 'cats') && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              {currentBreeds.map((breed) => {
+                const imageCount = getBreedImageCount(breed.id);
+                const priceInfo = getLowestPriceForBreed(breed.id);
+
+                return (
+                  <Card key={breed.id} className="group hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden">
+                    <div
+                      className="relative aspect-square overflow-hidden bg-gradient-to-br from-blue-50 to-purple-50"
+                      onClick={() => handleBreedClick(breed)}
+                    >
+                      {breed.hero_image_url ? (
+                        <img
+                          src={breed.hero_image_url}
+                          alt={breed.hero_image_alt || `${breed.name} breed`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          {breed.animal_type === 'dog' ? (
+                            <Dog className="w-16 h-16 text-purple-400" />
+                          ) : (
+                            <Cat className="w-16 h-16 text-purple-400" />
+                          )}
+                        </div>
+                      )}
+
+                      {/* Animal type badge for 'all' tab */}
+                      {activeTab === 'all' && (
+                        <div className="absolute top-2 left-2">
+                          <Badge
+                            variant="secondary"
+                            className="bg-white/90 text-gray-700 text-xs"
+                          >
+                            {breed.animal_type === 'dog' ? '🐕 Dog' : '🐱 Cat'}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Hover overlay with stats */}
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300">
+                        <div className="absolute bottom-4 left-4 right-4 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                          <p className="text-sm font-medium">{imageCount} portraits available</p>
+                          {priceInfo && (
+                            <p className="text-xs">From {formatPrice(priceInfo.lowestPrice, priceInfo.currency, priceInfo.currencySymbol)}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <CardContent className="p-4" onClick={() => handleBreedClick(breed)}>
+                      <h3 className="font-semibold text-lg text-gray-900 mb-2">{breed.name}</h3>
+                      {breed.description && (
+                        <p className="text-sm text-gray-600 line-clamp-3 mb-3">
+                          {(() => {
+                            const match = breed.description.match(/\*\*(.*?)\*\*/);
+                            return match ? match[1] : breed.description;
+                          })()}
+                        </p>
+                      )}
+
+                      <Button
+                        className="w-full bg-purple-600 hover:bg-purple-700"
+                        size="sm"
+                        disabled={imageCount === 0}
+                      >
+                        View {imageCount} Pawtraits
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Theme Cards */}
+          {metaReady && activeTab === 'themes' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              {currentThemes.map((theme) => {
+                const dogImageCount = getThemeDogImageCount(theme.id);
+                const catImageCount = getThemeCatImageCount(theme.id);
+
+                return (
+                  <Card key={theme.id} className="group hover:shadow-xl transition-all duration-300 overflow-hidden">
+                    <div
+                      className="relative aspect-square overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50 cursor-pointer"
+                      onClick={() => handleThemeClick(theme)}
+                    >
+                      {theme.hero_image_url ? (
+                        <img
+                          src={theme.hero_image_url}
+                          alt={theme.hero_image_alt || `${theme.name} theme`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Palette className="w-16 h-16 text-purple-400" />
+                        </div>
+                      )}
+                    </div>
+
+                    <CardContent className="p-4">
+                      <h3 className="font-semibold text-lg text-gray-900 mb-2">{theme.name}</h3>
+                      {theme.description && (
+                        <p className="text-sm text-gray-600 line-clamp-3 mb-3">
+                          {(() => {
+                            const match = theme.description.match(/\*\*(.*?)\*\*/);
+                            return match ? match[1] : theme.description;
+                          })()}
+                        </p>
+                      )}
+
+                      {/* Quick navigation buttons */}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="flex-1 text-xs bg-purple-600 hover:bg-purple-700"
+                          onClick={() => handleThemeClick(theme, 'dogs')}
+                          disabled={dogImageCount === 0}
+                        >
+                          View {dogImageCount} Dogs
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="flex-1 text-xs bg-purple-600 hover:bg-purple-700"
+                          onClick={() => handleThemeClick(theme, 'cats')}
+                          disabled={catImageCount === 0}
+                        >
+                          View {catImageCount} Cats
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Empty states */}
+          {activeTab === 'all' && images.length === 0 && !gridLoading && (
+            <div className="text-center py-12">
+              <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-600">
+                No pawtraits available yet. Check back soon!
+              </p>
+              <p className="text-gray-500 text-sm mt-2">Fresh pawtraits are added regularly!</p>
+            </div>
+          )}
+
+          {metaReady && (activeTab === 'dogs' || activeTab === 'cats') && currentBreeds.length === 0 && (
+            <div className="text-center py-12">
+              {activeTab === 'dogs' ? (
+                <Dog className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              ) : (
+                <Cat className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              )}
+              <p className="text-gray-600">
+                {searchTerm
+                  ? `No ${activeTab} breeds match your search "${searchTerm}"`
+                  : `${activeTab === 'dogs' ? 'Dog' : 'Cat'} breeds coming soon...`
+                }
+              </p>
+              {searchTerm && (
+                <Button
+                  variant="outline"
+                  onClick={() => setSearchTerm('')}
+                  className="mt-4"
+                >
+                  Clear search
+                </Button>
+              )}
+            </div>
+          )}
+
+          {metaReady && activeTab === 'themes' && currentThemes.length === 0 && (
+            <div className="text-center py-12">
+              <Palette className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-600">
+                {searchTerm
+                  ? `No themes match your search "${searchTerm}"`
+                  : 'Themes coming soon...'
+                }
+              </p>
+              {searchTerm && (
+                <Button
+                  variant="outline"
+                  onClick={() => setSearchTerm('')}
+                  className="mt-4"
+                >
+                  Clear search
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+        </>
+      )}
+
+      {/* Modals */}
+      {imageToShare && (
+        <ShareModal
+          isOpen={showShareModal}
+          onClose={() => {
+            setShowShareModal(false);
+            setImageToShare(null);
+          }}
+          image={imageToShare as any}
+          onShare={handleShareComplete}
+        />
+      )}
+
+      {/* Partner QR Modal */}
+      {imageForQR && userProfile?.user_type === 'partner' && (
+        <PartnerQRModal
+          isOpen={showQRModal}
+          onClose={() => {
+            setShowQRModal(false);
+            setImageForQR(null);
+          }}
+          image={imageForQR}
+          partnerId={userProfile.id}
+          partnerInfo={partnerInfo}
+        />
+      )}
+
+      {/* Customer Image Customization - Now handled by /customise/[imageId] page */}
+      {/* Old modal-based customization removed - navigation happens in handleCustomize() */}
+    </div>
+  );
+}
+
+export default function BrowseClient({ initialData = null, initialQuery }: { initialData?: BrowseInitialData | null; initialQuery: BrowseInitialQuery }) {
+  // The page is rendered per request (it reads searchParams), so useSearchParams has the real URL on
+  // the server and this boundary does not show its fallback: the server HTML holds the real page.
+  // The boundary stays because the hook requires one whenever a page is prerendered.
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        </div>
+      </div>
+    }>
+      <CountryProvider>
+        <BrowsePageContent initialData={initialData} initialQuery={initialQuery} />
+      </CountryProvider>
+    </Suspense>
+  );
+}
