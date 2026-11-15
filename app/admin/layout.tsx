@@ -174,6 +174,7 @@ const navigationSections = [
     items: [
       { name: 'Preview Size Test', href: '/admin/size-test', icon: ImageIcon },
       { name: 'Consistency Test', href: '/admin/consistency-test', icon: ScanSearch },
+      { name: 'CSP Reports', href: '/admin/security/csp-reports', icon: Shield },
     ]
   },
 ];
