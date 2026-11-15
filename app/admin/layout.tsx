@@ -132,6 +132,7 @@ const navigationSections = [
     title: 'Customers & Partners',
     items: [
       { name: 'Customers', href: '/admin/customers', icon: Users },
+      { name: 'Audiences', href: '/admin/audiences', icon: Target },
       { name: 'Customer Referrals', href: '/admin/customer-referrals', icon: UserPlus },
       { name: 'Credit Pack Settings', href: '/admin/settings/credit-packs', icon: CreditCard },
       { name: 'Partners', href: '/admin/partners', icon: Users },
