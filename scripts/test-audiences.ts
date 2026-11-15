@@ -4,7 +4,8 @@
  */
 import {
   groupBuyers, groupPreviewers, groupScanners, scannerStage, toMetaCsv, csvField, countryCode, dateBounds, designTitle,
-  type OrderRow, type ScanRow, type ScannerContext, type PreviewRequestRow,
+  applySegmentFilter, segmentFacets, scannerFacets, scannerBreakdown, previewerBreakdown, pctLabel, emptyNames, withoutSeg,
+  type OrderRow, type ScanRow, type ScannerContext, type PreviewRequestRow, type SegmentNames, type PreviewMeta,
 } from '../lib/marketing/audiences';
 
 let pass = 0, fail = 0;
@@ -114,6 +115,105 @@ const b = dateBounds('2026-10-01', '2026-10-31');
 ok('dates: inclusive end', b.fromTs === '2026-10-01T00:00:00.000Z' && b.toTs === '2026-11-01T00:00:00.000Z');
 ok('dates: bad input ignored', dateBounds('nope', null).fromTs === null);
 ok('designTitle', designTitle('**Sir Biscuit** at the races') === 'Sir Biscuit' && designTitle(null) === 'Untitled design');
+
+// ---- Segments: breed, coat, design
+const names: SegmentNames = {
+  designs: new Map([
+    ['IMG-lab', { id: 'IMG-lab', title: 'Sir Biscuit', stockRef: 1001, breedId: 'B-lab', coatId: 'C-black', thumb: null }],
+    ['IMG-pug', { id: 'IMG-pug', title: 'Lady Pug', stockRef: 1002, breedId: 'B-pug', coatId: 'C-fawn', thumb: null }],
+    ['IMG-none', { id: 'IMG-none', title: 'Mystery', stockRef: 1003, breedId: null, coatId: null, thumb: null }],
+  ]),
+  breeds: new Map([['B-lab', 'Labrador'], ['B-pug', 'Pug'], ['B-cav', 'Cavalier']]),
+  coats: new Map([['C-black', 'Black'], ['C-fawn', 'Fawn'], ['C-red', 'Red']]),
+};
+const sctx = (over: Partial<ScannerContext> = {}): ScannerContext => ({
+  locNames: locs, paidOrderIds: new Set(), paidOrderScanIds: new Set(), paidOrderVisitors: new Set(['V-buyer']),
+  emailVisitors: new Set(['V-mail']), previewVisitors: new Set(['V-mail', 'V-prev']), names, ...over,
+});
+const segScans = [
+  scan({ id: 'A1', visitor_id: 'V-two', image_id: 'IMG-lab', stock_ref: 1001 }),
+  scan({ id: 'A2', visitor_id: 'V-two', image_id: 'IMG-lab', stock_ref: 1001, is_repeat: true }),
+  scan({ id: 'A3', visitor_id: 'V-two', image_id: 'IMG-pug', stock_ref: 1002 }),
+  scan({ id: 'B1', visitor_id: 'V-mail', image_id: 'IMG-pug', stock_ref: 1002 }),
+  scan({ id: 'C1', visitor_id: 'V-buyer', image_id: 'IMG-lab', stock_ref: 1001 }),
+  scan({ id: 'D1', visitor_id: 'V-prev', image_id: 'IMG-none', stock_ref: 1003 }),
+  scan({ id: 'E1', visitor_id: 'V-gone', image_id: null, stock_ref: 1999 }),
+];
+const sRows = groupScanners(segScans, sctx());
+const sv = (v: string) => sRows.find(r => r.visitorId === v)!;
+ok('segments: scanner row shows most scanned design with breed and coat', sv('V-two').topDesign?.title === 'Sir Biscuit' && sv('V-two').breed?.name === 'Labrador' && sv('V-two').coat?.name === 'Black');
+ok('segments: +1 more when two designs', sv('V-two').moreDesigns === 1 && sv('V-mail').moreDesigns === 0);
+ok('segments: image with no breed gives no breed label', sv('V-prev').breed === null && sv('V-prev').topDesign?.stockRef === 1003);
+ok('segments: scan without an image has no design', sv('V-gone').topDesign === null);
+const labF = applySegmentFilter(sRows, { breed: 'B-lab' }).map(r => r.visitorId).sort().join();
+const pugF = applySegmentFilter(sRows, { breed: 'B-pug' }).map(r => r.visitorId).sort().join();
+ok('filter: scanner of two breeds matches the first breed', labF === 'V-buyer,V-two');
+ok('filter: scanner of two breeds matches the second breed', pugF === 'V-mail,V-two');
+ok('filter: coat and design', applySegmentFilter(sRows, { coat: 'C-fawn' }).length === 2 && applySegmentFilter(sRows, { design: 'IMG-none' }).length === 1);
+ok('filter: all filters must match', applySegmentFilter(sRows, { breed: 'B-lab', coat: 'C-fawn' }).map(r => r.visitorId).join() === 'V-two');
+ok('filter: empty filter keeps everything', applySegmentFilter(sRows, {}).length === sRows.length);
+
+// facets are computed on rows BEFORE the segment filter, so choosing a breed does not empty the dropdowns
+const facets = scannerFacets(sRows, names);
+const afterFilter = applySegmentFilter(sRows, { breed: 'B-lab' });
+ok('facets: all breeds present, sorted, with counts', facets.breeds.map(b => `${b.name}:${b.count}`).join() === 'Labrador:2,Pug:2');
+ok('facets: unknown is not an option', facets.designs.every(d => d.id !== null) && facets.designs.length === 3);
+ok('facets: designs carry title and ref', facets.designs.find(d => d.id === 'IMG-lab')?.stockRef === 1001);
+ok('facets: taken before the filter keep the other breed', afterFilter.length === 2 && segmentFacets(sRows, names).breeds.some(b => b.id === 'B-pug'));
+ok('facets: taken after the filter would have dropped it (so the route must not)', !segmentFacets(afterFilter, names).breeds.some(b => b.id === 'B-cav') && segmentFacets(afterFilter, names).breeds.length === 2);
+
+const bb = scannerBreakdown(sRows, 'breed', false, names);
+const row = (id: string | null) => bb.find(r => r.id === id)!;
+ok('breakdown: visitor of two breeds appears in both rows', row('B-lab').scanners === 1 && row('B-pug').scanners === 2);
+ok('breakdown: scans counted per breed', row('B-lab').scans === 2 && row('B-pug').scans === 2);
+ok('breakdown: sorted by scans, descending', bb[0].scans >= bb[1].scans);
+ok('breakdown: Unknown row where breed missing, and last', row(null).name === 'Unknown' && row(null).scanners === 2 && bb[bb.length - 1].id === null);
+ok('breakdown: made a preview, left email', row('B-pug').madePreview === 1 && row('B-pug').leftEmail === 1);
+ok('breakdown: scan to preview is progressed / scanners', row('B-pug').scanToPreview === '50%');
+ok('breakdown: Bought ignores the include-bought toggle', row('B-lab').bought === 1 && scannerBreakdown(sRows, 'breed', true, names).find(r => r.id === 'B-lab')!.bought === 1);
+ok('breakdown: buyers left out of the other columns when hidden', row('B-lab').scanners === 1 && scannerBreakdown(sRows, 'breed', true, names).find(r => r.id === 'B-lab')!.scanners === 2);
+ok('breakdown: include-bought counts buyer as progressed', scannerBreakdown(sRows, 'breed', true, names).find(r => r.id === 'B-lab')!.scanToPreview === '50%');
+const onlyBuyer = scannerBreakdown(applySegmentFilter(sRows, { design: 'IMG-lab' }).filter(r => r.visitorId === 'V-buyer'), 'design', false, names)[0];
+ok('breakdown: zero scanners shows a dash but still counts the buyer', onlyBuyer.scanners === 0 && onlyBuyer.scanToPreview === '–' && onlyBuyer.bought === 1);
+ok('pctLabel: dash on zero', pctLabel(0, 0) === '–' && pctLabel(1, 3) === '33%' && pctLabel(0, 4) === '0%');
+const byDesign = scannerBreakdown(sRows, 'design', false, names);
+ok('breakdown: by design has a title and ref, and an Unknown for no image', byDesign.find(r => r.id === 'IMG-pug')?.stockRef === 1002 && byDesign.find(r => r.id === null)!.scanners === 1);
+ok('breakdown: by coat', scannerBreakdown(sRows, 'coat', false, names).find(r => r.id === 'C-black')!.scanners === 1);
+ok('withoutSeg removes the internal lists', !('seg' in withoutSeg(sRows)[0]));
+ok('scanners without names are all unknown', scannerBreakdown(groupScanners(segScans, sctx({ names: undefined })), 'breed', true, emptyNames()).length === 1);
+
+// previews: pet breed, else design breed
+const pmeta = new Map<string, PreviewMeta>([
+  ['C-pet', { catalogImageId: 'IMG-lab', petBreedId: 'B-cav', petCoatId: 'C-red' }],
+  ['C-nopet', { catalogImageId: 'IMG-pug', petBreedId: null, petCoatId: null }],
+  ['C-nobreed', { catalogImageId: 'IMG-none', petBreedId: null, petCoatId: null }],
+  ['C-old', { catalogImageId: 'IMG-lab', petBreedId: 'B-cav', petCoatId: null }],
+]);
+const pRows = groupPreviewers([
+  req({ id: 'p1', email: 'pet@x.com', custom_image_id: 'C-pet', last_sent_at: '2026-10-01T10:01:00Z', opened_at: '2026-10-02T00:00:00Z' }),
+  req({ id: 'p2', email: 'nopet@x.com', custom_image_id: 'C-nopet', last_sent_at: '2026-10-01T10:01:00Z' }),
+  req({ id: 'p3', email: 'nobreed@x.com', custom_image_id: 'C-nobreed', last_sent_at: '2026-10-01T10:01:00Z' }),
+  req({ id: 'p4', email: 'buyer@x.com', custom_image_id: 'C-old', last_sent_at: '2026-10-01T10:01:00Z' }),
+  req({ id: 'p5', email: 'buyer@x.com', custom_image_id: 'C-nopet', created_at: '2026-10-05T10:00:00Z', last_sent_at: '2026-10-05T10:01:00Z' }),
+], {
+  boughtEmails: new Set(['buyer@x.com']), marketing: new Map([['pet@x.com', 'subscribed' as const], ['nopet@x.com', 'subscribed' as const]]),
+  locNames: locs, designs: new Map(), meta: pmeta, names,
+});
+const pv = (e: string) => pRows.find(r => r.email === e)!;
+ok('preview: pet breed wins over the design breed', pv('pet@x.com').breed?.name === 'Cavalier' && !pv('pet@x.com').breed?.fromDesign);
+ok('preview: coat is the pet coat when stored', pv('pet@x.com').coat?.name === 'Red' && !pv('pet@x.com').coat?.fromDesign);
+ok('preview: falls back to the design breed and coat, marked as design', pv('nopet@x.com').breed?.name === 'Pug' && pv('nopet@x.com').breed?.fromDesign === true && pv('nopet@x.com').coat?.name === 'Fawn' && pv('nopet@x.com').coat?.fromDesign === true);
+ok('preview: unknown when neither has a breed', pv('nobreed@x.com').breed === null && pv('nobreed@x.com').designId === 'IMG-none');
+ok('preview: latest emailed preview decides', pv('buyer@x.com').breed?.name === 'Pug' && pv('buyer@x.com').designId === 'IMG-pug');
+ok('preview filter: by the effective breed', applySegmentFilter(pRows, { breed: 'B-pug' }).map(r => r.email).sort().join() === 'buyer@x.com,nopet@x.com');
+const pb = previewerBreakdown(pRows, 'breed', false, names);
+const prow = (id: string | null) => pb.find(r => r.id === id)!;
+ok('preview breakdown: people, opened, subscribed', prow('B-cav').people === 1 && prow('B-cav').opened === 1 && prow('B-cav').subscribed === 1);
+ok('preview breakdown: buyers hidden from people but counted as bought', prow('B-pug').people === 1 && prow('B-pug').bought === 1);
+ok('preview breakdown: include-bought adds them to people', previewerBreakdown(pRows, 'breed', true, names).find(r => r.id === 'B-pug')!.people === 2);
+ok('preview breakdown: Unknown row last', pb[pb.length - 1].id === null && pb[pb.length - 1].people === 1);
+ok('preview breakdown: sorted by people', pb.every((r, i) => i === 0 || pb[i - 1].id === null || r.id === null || pb[i - 1].people >= r.people));
+ok('preview facets: before filter, from the effective breed', segmentFacets(pRows, names).breeds.map(b => b.name).join() === 'Cavalier,Pug');
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
