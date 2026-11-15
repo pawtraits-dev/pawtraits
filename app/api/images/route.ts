@@ -21,6 +21,9 @@ export async function GET(request: NextRequest) {
     const tags = searchParams.get('tags');
     const featured = searchParams.get('featured');
     const publicOnly = searchParams.get('public') !== 'false'; // Default to public only
+    // 'uploads' = original designs only, leaving out the breed, coat and other versions made from
+    // them (a bulk variation run can add dozens of near-identical pictures at once)
+    const origin = searchParams.get('origin') === 'uploads' ? 'uploads' as const : undefined;
 
     const images = await supabaseService.getImages({
       page,
@@ -31,7 +34,8 @@ export async function GET(request: NextRequest) {
       formatId,
       tags: tags?.split(','),
       featured: featured === 'true',
-      publicOnly
+      publicOnly,
+      origin
     });
 
     // Return in the expected format for public pages

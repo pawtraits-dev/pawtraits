@@ -80,7 +80,8 @@ function HomePageContent({ hero }: { hero: FeedItem | null }) {
       })
       .catch(() => {});
 
-    fetch('/api/images?public=true&limit=60')
+    // Uploads only: a bulk variation run would otherwise fill the page with versions of one design
+    fetch('/api/images?public=true&limit=60&origin=uploads')
       .then(r => (r.ok ? r.json() : { images: [] }))
       .then(d => setImages((d.images || []).filter((i: any) => !i.is_customer_generated)))
       .catch(() => setImages([]));
