@@ -362,7 +362,7 @@ export default function CustomiseClient({ initialData = null, initialQuery = {},
             const shown = Date.now();
             setCustomImage(d);
             setStep('result');
-            if (trackItem) track.previewReady(trackItem);
+            if (trackItem) track.previewReady(trackItem, id);
             window.scrollTo({ top: 0, behavior: 'smooth' });
             reportTiming(id, seen, shown);
             return;

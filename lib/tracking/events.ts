@@ -4,7 +4,7 @@
  * (and they only load after consent). GA4 + Google Ads via gtag, Meta via fbq.
  *
  * Retargeting relies on: ViewContent/view_item on every customise page,
- * CustomizeProduct when a preview is requested, AddToCart, InitiateCheckout, Purchase.
+ * CustomizeProduct when a preview is ready (also sent server-side), AddToCart, InitiateCheckout, Purchase.
  */
 declare global {
   interface Window {
@@ -50,19 +50,20 @@ export const track = {
     gtagEvent('pet_photo_added', { item_id: item.id });
     fbqTrack('PetPhotoAdded', { content_ids: [item.id] }, undefined, true);
   },
-  /** Preview requested — Meta standard "CustomizeProduct" */
+  /** Preview requested: GA4 generate_preview; Meta custom event PreviewRequested (the standard CustomizeProduct now fires when it is ready) */
   previewRequested(item: TrackItem) {
     gtagEvent('generate_preview', { item_id: item.id, item_name: item.name });
-    fbqTrack('CustomizeProduct', { content_ids: [item.id], content_type: 'product', content_name: item.name });
+    fbqTrack('PreviewRequested', { content_ids: [item.id], content_type: 'product', content_name: item.name }, undefined, true);
   },
-  previewReady(item: TrackItem) {
+  /** Preview ready: GA4 preview_ready; Meta standard CustomizeProduct. eventID "preview_<custom image id>" matches the server-side Conversions API event. */
+  previewReady(item: TrackItem, customImageId: string) {
     gtagEvent('preview_ready', { item_id: item.id });
-    fbqTrack('PreviewReady', { content_ids: [item.id] }, undefined, true);
+    fbqTrack('CustomizeProduct', { content_ids: [item.id], content_type: 'product', content_name: item.name }, `preview_${customImageId}`);
   },
   /** Someone asked for their preview by email ("Email me this preview"): GA4 generate_lead, Meta Lead. Consent-gated like every event here (no-ops until the tags load). */
-  lead(itemId: string, method = 'preview_email') {
+  lead(itemId: string, method = 'preview_email', eventId?: string) {
     gtagEvent('generate_lead', { item_id: itemId, method });
-    fbqTrack('Lead', { content_ids: [itemId], content_type: 'product', content_category: method });
+    fbqTrack('Lead', { content_ids: [itemId], content_type: 'product', content_category: method }, eventId);
   },
   /** Quiz funnel (spec 5.5): start → each answer → complete → share / design click / save */
   quizStart(quiz: string, petType: string, source?: string) {

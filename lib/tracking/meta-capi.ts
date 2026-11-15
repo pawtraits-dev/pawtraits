@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 
 /**
- * Meta Conversions API (server-side) — sends Purchase so iOS/ad-blocked conversions still
+ * Meta Conversions API (server-side) — sends Purchase (and the earlier funnel steps, CustomizeProduct and Lead) so iOS/ad-blocked conversions still
  * count. Only called when the buyer gave marketing consent. De-duplicated against the
  * browser Pixel via event_id (the Stripe PaymentIntent id).
  */
@@ -25,14 +25,29 @@ export interface CapiPurchase {
   sourceUrl?: string | null;
 }
 
-export async function sendMetaPurchase(p: CapiPurchase): Promise<void> {
-  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
-  const token = process.env.META_CAPI_ACCESS_TOKEN;
-  if (!pixelId || !token) return;
+export interface MetaEventInput {
+  name: string;                       // Meta event name, e.g. 'Purchase', 'CustomizeProduct', 'Lead'
+  eventId: string;                    // must equal the browser pixel's eventID for de-duplication
+  eventTimeS?: number;
+  email?: string | null;
+  phone?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  postcode?: string | null;
+  country?: string | null;
+  fbp?: string | null;
+  fbc?: string | null;
+  clientIp?: string | null;
+  userAgent?: string | null;
+  sourceUrl?: string | null;
+  customData?: Record<string, unknown>;
+}
 
-  const body = {
+/** The JSON body for one Conversions API event (pure: no network, no secrets) */
+export function buildMetaEvent(p: MetaEventInput) {
+  return {
     data: [{
-      event_name: 'Purchase',
+      event_name: p.name,
       event_time: p.eventTimeS ?? Math.floor(Date.now() / 1000),
       event_id: p.eventId,
       action_source: 'website',
@@ -49,20 +64,35 @@ export async function sendMetaPurchase(p: CapiPurchase): Promise<void> {
         client_ip_address: p.clientIp ?? undefined,
         client_user_agent: p.userAgent ?? undefined,
       },
-      custom_data: { currency: 'GBP', value: p.valuePounds, content_ids: p.contentIds, content_type: 'product' },
+      custom_data: p.customData ?? {},
     }],
     ...(process.env.META_CAPI_TEST_EVENT_CODE ? { test_event_code: process.env.META_CAPI_TEST_EVENT_CODE } : {}),
   };
+}
 
+/** Posts one event. Never throws; a no-op without the pixel id / access token. Logs no addresses or tokens. */
+export async function sendMetaEvent(p: MetaEventInput): Promise<void> {
+  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
+  const token = process.env.META_CAPI_ACCESS_TOKEN;
+  if (!pixelId || !token) return;
   try {
     const res = await fetch(`https://graph.facebook.com/v21.0/${pixelId}/events?access_token=${encodeURIComponent(token)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(buildMetaEvent(p)),
       signal: AbortSignal.timeout(8000),
     });
-    if (!res.ok) console.warn('Meta CAPI Purchase failed', res.status, (await res.text()).slice(0, 300));
+    if (!res.ok) console.warn(`Meta CAPI ${p.name} failed`, res.status, (await res.text()).slice(0, 300));
   } catch (e) {
-    console.warn('Meta CAPI Purchase error', e);
+    console.warn(`Meta CAPI ${p.name} error`, e instanceof Error ? e.message : 'unknown');
   }
+}
+
+export async function sendMetaPurchase(p: CapiPurchase): Promise<void> {
+  const { valuePounds, contentIds, ...rest } = p;
+  await sendMetaEvent({
+    ...rest,
+    name: 'Purchase',
+    customData: { currency: 'GBP', value: valuePounds, content_ids: contentIds, content_type: 'product' },
+  });
 }
