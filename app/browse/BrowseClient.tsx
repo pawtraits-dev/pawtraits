@@ -995,7 +995,7 @@ function BrowsePageContent({ initialData, initialQuery }: { initialData: BrowseI
                             imageId={image.id}
                             alt={image.description || 'Generated image'}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            fallbackUrl={image.image_url || image.public_url}
+                            fallbackUrl={image.image_url || image.public_url} version={image.public_url || image.image_url}
                             priority={index < BROWSE_PRIORITY_COUNT}
                           />
                           {((image as any).subject_count ?? 1) > 1 && <PetsBadge n={(image as any).subject_count} />}
@@ -1289,7 +1289,7 @@ function BrowsePageContent({ initialData, initialQuery }: { initialData: BrowseI
                         imageId={image.id}
                         alt={image.description || 'Generated image'}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        fallbackUrl={image.image_url || image.public_url}
+                        fallbackUrl={image.image_url || image.public_url} version={image.public_url || image.image_url}
                         priority={index < BROWSE_PRIORITY_COUNT}
                       />
                       {((image as any).subject_count ?? 1) > 1 && <PetsBadge n={(image as any).subject_count} />}

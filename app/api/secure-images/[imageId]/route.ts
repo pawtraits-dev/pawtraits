@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SupabaseService } from '@/lib/supabase';
 import { cloudinaryService } from '@/lib/cloudinary';
 import { createClient } from '@supabase/supabase-js';
+import { CACHE_PICTURE_PRIVATE, cleanPictureVersion, pictureCacheControl } from '@/lib/picture-version';
 import { requireAdmin } from '@/lib/qr/server';
 
 const supabaseService = new SupabaseService();
@@ -34,6 +35,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const orderId = searchParams.get('orderId');
     const token = searchParams.get('token');
     const width = parseInt(searchParams.get('w') || '', 10) || undefined;
+    // `v` is only a cache key (see lib/picture-version.ts): it never reaches the lookup below
+    const hasVersion = !!cleanPictureVersion(searchParams.get('v'));
 
     // Unwatermarked variants (original, download, social) are for admins only. This route used to
     // hand them to anyone who added any orderId to the address: the purchase check was never
@@ -58,8 +61,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // If not found in image_catalog, check customer_generated_images
     let isCustomerImage = false;
     if (!image) {
-      console.log(`🔍 Image not found in catalog, checking customer_generated_images for ID: ${imageId}`);
-
       const { data: customerImage, error: customerError } = await supabaseAdmin
         .from('customer_generated_images')
         .select('*')
@@ -67,7 +68,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         .single();
 
       if (!customerError && customerImage) {
-        console.log(`✅ Found customer-generated image: ${customerImage.cloudinary_public_id || 'no cloudinary ID'}`);
         isCustomerImage = true;
 
         // Transform customer image to match image catalog structure
@@ -101,6 +101,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Generate secure URL based on variant and access level
     let imageUrl: string;
+    // True when the bytes come from the stored legacy URL rather than a generated variant
+    let usedLegacyUrl = false;
     
     try {
       if (image.cloudinary_public_id) {
@@ -116,13 +118,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       } else {
         // Fallback to legacy URL for non-migrated images
         imageUrl = image.image_url || image.public_url;
-        console.log(`🔄 Using legacy URL: ${imageUrl}`);
+        usedLegacyUrl = true;
       }
     } catch (error) {
       console.error('Error generating secure URL:', error);
       // Fallback to legacy URL
       imageUrl = image.image_url || image.public_url;
-      console.log(`🔄 Fallback to legacy URL due to error: ${imageUrl}`);
+      usedLegacyUrl = true;
     }
 
     // Ensure we have a valid URL
@@ -135,7 +137,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch the image from Cloudinary/storage with enhanced error handling
-    console.log(`🔄 Fetching image from URL: ${imageUrl}`);
     
     let imageResponse: Response;
     try {
@@ -171,7 +172,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       // Try fallback to legacy URLs if original fails
       const fallbackUrl = image.image_url || image.public_url;
       if (fallbackUrl && fallbackUrl !== imageUrl) {
-        console.log(`🔄 Trying fallback URL: ${fallbackUrl}`);
         try {
           const fallbackResponse = await fetch(fallbackUrl, {
             headers: {
@@ -181,7 +181,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           });
           
           if (fallbackResponse.ok) {
-            console.log('✅ Fallback URL succeeded');
             const fallbackBuffer = await fallbackResponse.arrayBuffer();
             const fallbackContentType = fallbackResponse.headers.get('content-type') || 'image/jpeg';
             
@@ -189,7 +188,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
               status: 200,
               headers: {
                 'Content-Type': fallbackContentType,
-                'Cache-Control': 'private, max-age=300',
+                'Cache-Control': CACHE_PICTURE_PRIVATE,
                 'X-Content-Type-Options': 'nosniff',
                 'X-Frame-Options': 'DENY',
                 'Referrer-Policy': 'strict-origin',
@@ -213,7 +212,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Public catalogue designs (watermarked/small browsing variants) can be cached by the
     // browser and Vercel's edge, so repeat views skip this function and Cloudinary.
-    // Customers' own images and anything else stay private.
+    // Customers' own images and anything else stay private. See pictureCacheControl for the rule.
     const isPublicCatalogue = !isCustomerImage
       && (image as any).is_public !== false
       && !(image as any).is_customer_generated
@@ -224,10 +223,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': isPublicCatalogue
-          // An hour: a design's picture can change (words drawn on, lettering repainted)
-          ? 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400'
-          : 'private, max-age=300',
+        // Public catalogue variants: a year when the address carries a picture version (v=),
+        // an hour when it does not or when the bytes came from the legacy URL. Everything else stays private.
+        'Cache-Control': pictureCacheControl({ isPublicCatalogue, hasVersion, isFallback: usedLegacyUrl }),
         'Vary': 'Accept',
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
@@ -289,7 +287,6 @@ async function validateImageRequest(
     });
     
     if (!isAllowedDomain) {
-      console.log(`🚫 Referer validation failed. Referer: ${referer}, Hostname: ${refererUrl.hostname}`);
       return {
         allowed: false,
         reason: 'Invalid referer',
@@ -373,7 +370,6 @@ async function getSecureVariantUrl(
   width?: number
 ): Promise<string> {
   
-  console.log(`🔄 Generating secure URL for publicId: ${publicId}, variant: ${variant}, accessLevel: ${accessLevel}`);
   
   switch (variant) {
     case 'original':
@@ -401,7 +397,6 @@ async function getSecureVariantUrl(
     case 'mid_size':
       // Use public variant URL generation with short expiration for security
       const url = cloudinaryService.getPublicVariantUrl(publicId, variant as any, { width });
-      console.log(`✅ Generated URL: ${url}`);
       return url;
       
     default:

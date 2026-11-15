@@ -322,6 +322,7 @@ function QRLandingPageContent() {
               <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 relative">
                 <CatalogImage
                   imageId={image.id}
+                  version={image.public_url}
                   alt={image.description || 'Pet portrait'}
                   className="w-full h-full object-cover"
                   variant="catalog_watermarked"

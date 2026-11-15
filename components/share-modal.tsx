@@ -292,6 +292,7 @@ export default function ShareModal({ isOpen, onClose, image, onShare }: ShareMod
           <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
             <CatalogImage
               imageId={image.id}
+              version={image.public_url}
               alt={image.prompt_text}
               className="w-[60px] h-[60px] rounded-lg object-cover"
             />

@@ -48,7 +48,7 @@ function Cards({ designs, from }: { designs: GridDesign[]; from?: string }) {
           <li key={d.id}>
             <Link href={`/customise/${d.id}${from ? `?from=${encodeURIComponent(from)}` : ''}`} className="group block">
               <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-gray-100 [&>div]:h-full">
-                <CatalogImage imageId={d.id} alt={title} fallbackUrl={d.publicUrl || undefined}
+                <CatalogImage imageId={d.id} alt={title} fallbackUrl={d.publicUrl || undefined} version={d.publicUrl}
                   className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
                 {(d.pets ?? 1) > 1 && <PetsBadge n={d.pets!} />}
               </div>

@@ -56,7 +56,7 @@ export default function MoreLikeThis({ imageId, breedId, collection, tag, max = 
         {items.map(img => (
           <Link key={img.id} href={`/customise/${img.id}`} className="group block">
             <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-gray-100 [&>div]:h-full">
-              <CatalogImage imageId={img.id} alt={designTitle(img.description)} fallbackUrl={img.image_url || img.public_url}
+              <CatalogImage imageId={img.id} alt={designTitle(img.description)} fallbackUrl={img.image_url || img.public_url} version={img.public_url || img.image_url}
                 className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
               {(img.subject_count ?? 1) > 1 && <PetsBadge n={img.subject_count!} />}
             </div>
