@@ -111,6 +111,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const orderId = searchParams.get('orderId');
 
     if (variant) {
+      // Unwatermarked variants are for admins only: the purchase checks below were never written,
+      // so any orderId used to be accepted. Customers download through /api/downloads.
+      if (!['mid_size', 'thumbnail', 'full_size'].includes(variant)) {
+        const denied = await requireAdmin();
+        if (denied) return denied;
+      }
       // Return Cloudinary variant with access control
       return handleVariantRequest(id, variant, userId, orderId);
     }

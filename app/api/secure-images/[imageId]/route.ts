@@ -3,6 +3,7 @@ import { SupabaseService } from '@/lib/supabase';
 import { cloudinaryService } from '@/lib/cloudinary';
 import { createClient } from '@supabase/supabase-js';
 import { CACHE_PICTURE_PRIVATE, cleanPictureVersion, pictureCacheControl } from '@/lib/picture-version';
+import { requireAdmin } from '@/lib/qr/server';
 
 const supabaseService = new SupabaseService();
 
@@ -11,6 +12,9 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false }
 });
+
+/** The only variants anyone may fetch without being an admin: all carry the watermark */
+const WATERMARKED_VARIANTS = new Set(['mid_size', 'thumbnail', 'full_size']);
 
 interface RouteParams {
   params: Promise<{ imageId: string }>;
@@ -33,6 +37,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const width = parseInt(searchParams.get('w') || '', 10) || undefined;
     // `v` is only a cache key (see lib/picture-version.ts): it never reaches the lookup below
     const hasVersion = !!cleanPictureVersion(searchParams.get('v'));
+
+    // Unwatermarked variants (original, download, social) are for admins only. This route used to
+    // hand them to anyone who added any orderId to the address: the purchase check was never
+    // written. Customers get their files through /api/downloads, which checks what they bought.
+    if (!WATERMARKED_VARIANTS.has(variant)) {
+      const denied = await requireAdmin();
+      if (denied) return denied;
+    }
 
     // Security checks
     const security = await validateImageRequest(request, imageId, variant, userId, orderId, token);

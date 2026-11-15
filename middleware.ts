@@ -130,8 +130,9 @@ export async function middleware(req: NextRequest) {
     return new NextResponse('Not found', { status: 404 })
   }
 
-  // Catalogue pictures (GET /api/secure-images/...): the route does its own checks and reads no cookies or
-  // session, so skip the Supabase session, the DLP scan and the account-based rate limit. Pictures are
+  // Catalogue pictures (GET /api/secure-images/...): the route does its own checks (watermarked variants
+  // need no session; unwatermarked ones check for an admin themselves), so skip the Supabase session
+  // refresh, the DLP scan and the account-based rate limit. Pictures are
   // rate limited as anonymous traffic with their own, generous limit (no session lookup).
   if (req.method === 'GET' && req.nextUrl.pathname.startsWith('/api/secure-images/')) {
     return handlePictureRequest(req)
