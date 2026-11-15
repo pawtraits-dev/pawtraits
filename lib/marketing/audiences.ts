@@ -330,13 +330,17 @@ export async function listLocations(supabase: SupabaseClient): Promise<{ id: str
   return Array.from(m, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-const ORDER_COLS = 'id, customer_email, shipping_first_name, shipping_last_name, shipping_postcode, shipping_country, total_amount, created_at, pos_location_id, qr_scan_id, guest_session_id';
+const ORDER_COLS = 'id, status, customer_email, shipping_first_name, shipping_last_name, shipping_postcode, shipping_country, total_amount, created_at, pos_location_id, qr_scan_id, guest_session_id';
+
+const NOT_A_SALE = new Set(['cancelled', 'canceled', 'refunded', 'failed']);
 
 /** Every paid order (not date filtered: "has this person ever bought" must not depend on the filters) */
 async function loadPaidOrders(supabase: SupabaseClient) {
-  return fetchAll<OrderRow>((a, b) =>
+  const all = await fetchAll<OrderRow & { status?: string | null }>((a, b) =>
     supabase.from('orders').select(ORDER_COLS).eq('payment_status', 'paid')
       .order('created_at', { ascending: false }).order('id').range(a, b));
+  // Same rule as the admin dashboard: a cancelled or refunded order does not make someone a buyer
+  return { rows: all.rows.filter(o => !NOT_A_SALE.has(String(o.status || '').toLowerCase())) as OrderRow[], truncated: all.truncated };
 }
 
 const mapStates = (m: Map<string, MarketingState>) => new Map(Array.from(m, ([e, s]) => [e, statusOf(s)] as const));
@@ -422,8 +426,10 @@ export async function loadScanners(supabase: SupabaseClient, filters: AudienceFi
       if (filters.locationId) q = q.eq('location_id', filters.locationId);
       return q.order('created_at', { ascending: false }).order('id').range(a, b);
     }),
+    // Tolerant: before the preview-emails migration has been run this table does not exist; scanners still load
     fetchAll<{ guest_session_id: string }>((a, b) =>
-      supabase.from('preview_email_requests').select('guest_session_id').not('guest_session_id', 'is', null).order('id').range(a, b)),
+      supabase.from('preview_email_requests').select('guest_session_id').not('guest_session_id', 'is', null).order('id').range(a, b))
+      .catch(() => ({ rows: [] as { guest_session_id: string }[], truncated: false })),
     fetchAll<{ guest_session_id: string }>((a, b) =>
       supabase.from('customer_custom_images').select('guest_session_id').not('guest_session_id', 'is', null).order('id').range(a, b)),
   ]);
