@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { RateLimiter } from './lib/rate-limiter'
 import { createDLPMiddleware } from './lib/dlp-integration'
+import {
+  buildEnforcedCsp, buildReportOnlyCsp, generateNonce, isCspReportOnlyEnabled,
+  reportingEndpointsHeader, wantsHtmlDocument,
+} from './lib/security/csp'
 
 // Initialize global rate limiter
 const rateLimiter = new RateLimiter({
@@ -29,6 +33,24 @@ pictureRateLimiter.addRule({
   pattern: '/api/secure-images/*',
   userTypes: ['anonymous'],
   config: { windowMs: 60 * 1000, maxRequests: PICTURE_REQUESTS_PER_MINUTE, strategy: 'sliding' },
+  priority: 200,
+  isActive: true
+})
+
+// CSP violation reports (POST /api/csp-report) come from browsers, in bursts when a page has many blocked scripts.
+// They get their own limiter (own counters, in-memory like the picture one) so they are not 429ed by the general
+// 20 requests/minute anonymous API limit, and skip the session refresh and DLP scan (no cookies, nothing to protect).
+const CSP_REPORTS_PER_MINUTE = 120
+const cspReportRateLimiter = new RateLimiter({
+  suspiciousThreshold: CSP_REPORTS_PER_MINUTE,
+  blockThreshold: CSP_REPORTS_PER_MINUTE * 2,
+  enableAutoBlock: true
+})
+cspReportRateLimiter.addRule({
+  id: 'csp-report',
+  pattern: '/api/csp-report',
+  userTypes: ['anonymous'],
+  config: { windowMs: 60 * 1000, maxRequests: CSP_REPORTS_PER_MINUTE, strategy: 'sliding' },
   priority: 200,
   isActive: true
 })
@@ -138,13 +160,33 @@ export async function middleware(req: NextRequest) {
     return handlePictureRequest(req)
   }
 
-  const res = NextResponse.next()
+  // Browser violation reports: own rate limit, nothing else (the route validates and bounds the body itself)
+  if (req.method === 'POST' && req.nextUrl.pathname === '/api/csp-report') {
+    return handleCspReport(req)
+  }
+
+  // CSP report-only trial (kill switch: CSP_REPORT_ONLY=off). Only for requests that return an HTML page.
+  // The nonce policy goes on the REQUEST so Next.js puts the nonce on its own scripts (it reads
+  // content-security-policy-report-only as well as content-security-policy); the browser never sees request headers.
+  // The enforced policy on the RESPONSE is untouched.
+  let reportOnlyNonce: string | null = null
+  let res: NextResponse
+  if (isCspReportOnlyEnabled(process.env.CSP_REPORT_ONLY) && wantsHtmlDocument(req.method, req.nextUrl.pathname, req.headers)) {
+    reportOnlyNonce = generateNonce()
+    const requestHeaders = new Headers(req.headers)
+    requestHeaders.delete('content-security-policy') // Next prefers this name; never let a client-supplied one win
+    requestHeaders.set('content-security-policy-report-only', buildReportOnlyCsp(reportOnlyNonce))
+    requestHeaders.set('x-nonce', reportOnlyNonce)
+    res = NextResponse.next({ request: { headers: requestHeaders } })
+  } else {
+    res = NextResponse.next()
+  }
   
   // Create a Supabase client configured to use cookies
   const supabase = createMiddlewareClient({ req, res })
 
   // Add comprehensive security headers
-  addSecurityHeaders(res, req)
+  addSecurityHeaders(res, req, reportOnlyNonce)
 
   // Apply DLP scanning for API routes and sensitive paths
   const dlpResult = await dlpMiddleware(req)
@@ -191,27 +233,33 @@ async function handlePictureRequest(req: NextRequest): Promise<NextResponse> {
 }
 
 /**
- * Add comprehensive security headers to response
+ * Violation reports from browsers: anonymous, own in-memory limit, no session work, no DLP.
  */
-function addSecurityHeaders(response: NextResponse, request: NextRequest): void {
-  // Generate nonce for CSP
-  const nonce = crypto.randomUUID()
+async function handleCspReport(req: NextRequest): Promise<NextResponse> {
+  try {
+    const info = await cspReportRateLimiter.checkRateLimit(req, 'anonymous')
+    if (info.limited) {
+      const limited = new NextResponse(null, { status: 429 })
+      if (info.retryAfter) limited.headers.set('Retry-After', info.retryAfter.toString())
+      return limited
+    }
+  } catch (error) {
+    console.error('CSP report rate limiting error:', error)
+    // Fail open, like the other limiters
+  }
+  return NextResponse.next()
+}
+
+/**
+ * Add comprehensive security headers to response.
+ * reportOnlyNonce is set only for HTML page requests while the CSP report-only trial is on.
+ */
+function addSecurityHeaders(response: NextResponse, request: NextRequest, reportOnlyNonce: string | null): void {
+  // Nonce exposed to components (X-Nonce); the report-only trial supplies a proper one, otherwise as before
+  const nonce = reportOnlyNonce ?? crypto.randomUUID()
   
   // Content Security Policy - More permissive for Next.js while maintaining security
-  const csp = [
-    "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.js.stripe.com https://pay.google.com https://maps.googleapis.com https://vercel.live https://www.googletagmanager.com https://connect.facebook.net https://challenges.cloudflare.com`,
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https://www.googletagmanager.com https://*.google-analytics.com https://*.g.doubleclick.net https://www.google.com https://www.google.co.uk https://www.facebook.com https://res.cloudinary.com https://lh3.googleusercontent.com https://images.unsplash.com https://*.stripe.com https://*.supabase.co https://pawtraits.pics https://www.pawtraits.pics",
-    "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://www.facebook.com https://connect.facebook.net https://api.stripe.com https://upload.stripe.com https://*.stripe.com https://*.stripe.network https://*.link.com https://pay.google.com https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://api.cloudinary.com https://res.cloudinary.com https://vercel.live wss://ws-us3.pusher.com",
-    "frame-src 'self' https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://pay.google.com https://*.link.com https://td.doubleclick.net https://www.googletagmanager.com",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-    "upgrade-insecure-requests"
-  ].join('; ')
+  const csp = buildEnforcedCsp() // directive list lives in lib/security/csp.ts (shared with the report-only policy)
 
   // Set security headers
   const headers: Record<string, string> = {
@@ -250,6 +298,12 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest): void 
   Object.entries(headers).forEach(([key, value]) => {
     response.headers.set(key, value)
   })
+
+  // Report-only trial of the strict nonce policy: observe only, nothing is blocked
+  if (reportOnlyNonce) {
+    response.headers.set('Content-Security-Policy-Report-Only', buildReportOnlyCsp(reportOnlyNonce))
+    response.headers.set('Reporting-Endpoints', reportingEndpointsHeader())
+  }
 
   // Store nonce for use in components
   response.headers.set('X-Nonce', nonce)
