@@ -16,7 +16,7 @@ const MISSING = /preview_email_requests/;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type RequestResult =
-  | { ok: true; masked: string; sent: boolean }
+  | { ok: true; masked: string; sent: boolean; email: string }
   | { ok: false; status: number; code: 'bad_email' | 'limit' | 'unavailable' | 'other' | 'not_found'; limit?: LimitProblem };
 
 export interface RequestInput {
@@ -86,7 +86,7 @@ export async function requestPreviewEmail(supabase: SupabaseClient, input: Reque
     const sent = await sendMessageImmediate({ channel: 'email', recipientEmail: email, subject: PREVIEW_EMAIL.subject(firstName), body: html });
     if (!sent.success) { console.error('preview email: send failed', sent.error); return { ok: false, status: 502, code: 'other' }; }
     await supabase.from('preview_email_requests').update({ send_count: ((row as any).send_count ?? 0) + 1, sends: appendSend((row as any).sends, now), last_sent_at: new Date(now).toISOString() }).eq('id', (row as any).id);
-    return { ok: true, masked: maskEmail(email), sent: true };
+    return { ok: true, masked: maskEmail(email), sent: true, email };
   } catch (e) {
     console.error('preview email failed', e);
     return { ok: false, status: 500, code: 'other' };

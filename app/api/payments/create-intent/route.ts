@@ -4,6 +4,7 @@ import { getSupabaseClient } from '@/lib/supabase-client';
 import { checkoutValidation } from '@/lib/checkout-validation';
 import { QR_ATTRIBUTION_COOKIE, VISITOR_COOKIE, decodeAttribution, validVisitorId } from '@/lib/qr/attribution';
 import { CONSENT_COOKIE, parseConsent } from '@/lib/tracking/consent';
+import { metaClientFromRequest } from '@/lib/tracking/meta-request';
 import { serviceClient } from '@/lib/qr/server';
 import { isStallProductId, stallSizeFromProductId } from '@/lib/cart/items';
 import { getStallOffer } from '@/lib/stall/offer';
@@ -347,13 +348,7 @@ export async function POST(request: NextRequest) {
           : body.digitalOnly ? 'digital' : 'ship',
         guest_session_id: validVisitorId(request.cookies.get(VISITOR_COOKIE)?.value),
         consent,
-        client: consent?.marketing ? {
-          ip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
-          ua: request.headers.get('user-agent'),
-          fbp: request.cookies.get('_fbp')?.value ?? null,
-          fbc: request.cookies.get('_fbc')?.value ?? null,
-          url: request.headers.get('referer'),
-        } : null,
+        client: metaClientFromRequest(request),
       }, { onConflict: 'payment_intent_id' });
     } catch (snapshotError) {
       console.error('⚠️ Failed to store basket snapshot (webhook will fall back to metadata):', snapshotError);

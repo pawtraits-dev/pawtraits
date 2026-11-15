@@ -28,6 +28,8 @@ import { capturePreviews } from '@/lib/social/capture';
 import { generateWithUsage } from '@/lib/ai/usage';
 import { buildPaintingPrompt, paintingRequest, imageFrom, sniffImageType } from '@/lib/customise/painting';
 import { randomUUID } from 'crypto';
+import { sendMetaEvent } from '@/lib/tracking/meta-capi';
+import { metaClientFromRequest, type MetaClient } from '@/lib/tracking/meta-request';
 
 // Generation continues after the response (via after()); give it room to finish.
 export const maxDuration = 300;
@@ -131,6 +133,8 @@ interface GenerateJob {
   words?: { settings: PictureWords; phrase: string | null; animal: 'dog' | 'cat' | null } | null;  // words on the picture; phrase null = from the detected breed
   caption?: { dog: Caption | null; cat: Caption | null; animal: 'dog' | 'cat' | null; designAnimal: 'dog' | 'cat' } | null;  // type/sign plate; animal null = from the detected pet
   frame?: { dog: FrameCard | null; cat: FrameCard | null; animal: 'dog' | 'cat' | null; designAnimal: 'dog' | 'cat'; petName: string | null } | null;  // zodiac sign / tarot card frame; animal null = from the detected pet
+  catalogImageId: string;
+  metaClient: MetaClient | null;       // set only when the visitor accepted marketing cookies: Meta server event on completion
   requestStarted: number;
   timings: Timings;
 }
@@ -365,6 +369,17 @@ async function generateCustomImage(job: GenerateJob): Promise<void> {
     const statusMs = since(t);
 
     console.log(`✅ Custom image ${customImageId}: ${JSON.stringify({ ...timings, status_update: statusMs })}`);
+
+    // Meta Conversions API "CustomizeProduct": the preview is ready (the row just became 'complete').
+    // This runs once per generation, in the same request that holds the visitor's cookies, so no repeat
+    // on polls. event_id matches the browser pixel (CustomiseClient: "preview_" + custom image id). Never throws.
+    if (job.metaClient) {
+      await sendMetaEvent({
+        name: 'CustomizeProduct', eventId: `preview_${customImageId}`,
+        fbp: job.metaClient.fbp, fbc: job.metaClient.fbc, clientIp: job.metaClient.ip, userAgent: job.metaClient.ua, sourceUrl: job.metaClient.url,
+        customData: { content_ids: [job.catalogImageId], content_type: 'product' },
+      }).catch(() => {});
+    }
   } catch (error) {
     console.error('❌ Error in generateCustomImage:', error);
     throw error;
@@ -846,6 +861,7 @@ export async function POST(request: NextRequest) {
 
     step('slots');
     const timings: Timings = { post: postTimings };
+    const metaClient = metaClientFromRequest(request);   // null unless marketing cookies were accepted
 
     // Run generation after the response is sent; after() keeps the function alive until it finishes
     after(() =>
@@ -869,6 +885,8 @@ export async function POST(request: NextRequest) {
         words,
         caption,
         frame,
+        catalogImageId,
+        metaClient,
         requestStarted,
         timings,
       }).then(() => capturePreviews({ ids: [customImage.id] })) // social loop: only if "Include free previews" is on

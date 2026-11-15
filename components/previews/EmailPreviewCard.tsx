@@ -35,7 +35,7 @@ export default function EmailPreviewCard({ imageId, signedIn }: { imageId: strin
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setError(d.error || PREVIEW_COPY.errOther); setState(masked ? 'sent' : 'idle'); return; }
       setMasked(d.masked || ''); setState('sent');
-      track.lead(imageId);
+      track.lead(imageId, 'preview_email', typeof d.metaEventId === 'string' ? d.metaEventId : undefined);
     } catch {
       setError(PREVIEW_COPY.errOther); setState(masked ? 'sent' : 'idle');
     }

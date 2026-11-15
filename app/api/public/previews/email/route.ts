@@ -10,7 +10,10 @@
  * per day, plus the middleware's IP rate limit. `website` is a honeypot: filled in = pretend success.
  * The email contains nothing the visitor typed (the pet's first name, letters only, is the only name).
  */
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
+import { randomUUID } from 'crypto';
+import { sendMetaEvent } from '@/lib/tracking/meta-capi';
+import { metaClientFromRequest } from '@/lib/tracking/meta-request';
 import { serviceClient } from '@/lib/qr/server';
 import { canAccessCustomImage, clientIp, getRequester } from '@/lib/guest/access';
 import { QR_ATTRIBUTION_COOKIE } from '@/lib/qr/attribution';
@@ -30,9 +33,10 @@ export async function POST(req: NextRequest) {
   const requester = await getRequester(req);
   if (!requester.user && !requester.guestId) return NextResponse.json({ error: 'Not found' }, { status: 404, headers: NO_STORE });
   const supabase = serviceClient();
-  const { data: row } = await supabase.from('customer_custom_images').select('id, customer_email, guest_session_id').eq('id', imageId).maybeSingle();
+  const { data: row } = await supabase.from('customer_custom_images').select('id, customer_email, guest_session_id, catalog_image_id').eq('id', imageId).maybeSingle();
   if (!row || !canAccessCustomImage(row as any, requester)) return NextResponse.json({ error: 'Not found' }, { status: 404, headers: NO_STORE });
 
+  const catalogImageId = String((row as any).catalog_image_id ?? '');
   const typed = normaliseEmail(body?.email);
   if (!requester.user && !typed) return NextResponse.json({ error: PREVIEW_COPY.errBad, code: 'bad_email' }, { status: 400, headers: NO_STORE });
   // Honeypot: a bot fills the hidden field. Look successful, send nothing.
@@ -44,7 +48,23 @@ export async function POST(req: NextRequest) {
     guestId: requester.guestId, qrCookie: req.cookies.get(QR_ATTRIBUTION_COOKIE)?.value ?? null, ip: clientIp(req),
     baseUrl: (process.env.NEXT_PUBLIC_BASE_URL || req.nextUrl.origin).replace(/\/$/, ''),
   });
-  if (r.ok) return NextResponse.json({ ok: true, masked: r.masked }, { headers: NO_STORE });
+  if (r.ok) {
+    // Meta "Lead" (server side), only with marketing cookies. The event id is a fresh random one, not the
+    // preview_email_requests row id: that id is the key of the signed link, and the same row is reused when
+    // an address asks again, so returning it would reveal "this address is already known". The browser
+    // pixel gets the same id from this response, so the two de-duplicate.
+    const client = metaClientFromRequest(req);
+    const metaEventId = client ? `lead_${randomUUID()}` : undefined;
+    if (client && metaEventId) {
+      const email = r.email;
+      after(() => sendMetaEvent({
+        name: 'Lead', eventId: metaEventId, email,
+        fbp: client.fbp, fbc: client.fbc, clientIp: client.ip, userAgent: client.ua, sourceUrl: client.url,
+        customData: { content_ids: [catalogImageId], content_type: 'product', content_category: 'preview_email' },
+      }));
+    }
+    return NextResponse.json({ ok: true, masked: r.masked, ...(metaEventId ? { metaEventId } : {}) }, { headers: NO_STORE });
+  }
   const error = r.code === 'bad_email' ? PREVIEW_COPY.errBad : r.code === 'limit' ? PREVIEW_COPY.errLimit : r.code === 'unavailable' ? PREVIEW_COPY.errUnavailable : r.code === 'not_found' ? 'Not found' : PREVIEW_COPY.errOther;
   return NextResponse.json({ error, code: r.code }, { status: r.status, headers: NO_STORE });
 }
