@@ -4,7 +4,12 @@
  * customer list for Meta, but ONLY addresses that are subscribed (email_preferences) are ever included.
  *
  * Tables read: orders (payment_status = 'paid'), preview_email_requests, qr_scans, customer_custom_images,
- * image_catalog, stock_locations, user_profiles, email_preferences (through marketingStates).
+ * image_catalog (breed_id, coat_id), breeds, coats, stock_locations, user_profiles, email_preferences (through marketingStates).
+ *
+ * Segments (breed, coat, design) for previews and scans:
+ *  - Scanner: from the designs scanned (qr_scans.image_id -> image_catalog.breed_id / coat_id / id).
+ *  - Preview emailer: breed = customer_custom_images.pet_breed_id of the latest preview, else the design's breed;
+ *    coat = customer_custom_images.pet_coat_id, else the design's coat; design = customer_custom_images.catalog_image_id.
  * The grouping, stage and CSV functions are pure (no database) so scripts/test-audiences.ts can test them.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -50,6 +55,7 @@ export interface ScanRow {
   id: string;
   visitor_id: string;
   stock_ref: number;
+  image_id?: string | null;          // image_catalog.id
   location_id: string | null;
   location_code: string | null;
   is_repeat: boolean;
@@ -69,6 +75,41 @@ export interface PreviewRequestRow {
 }
 
 export interface DesignInfo { title: string; stockRef: number | null; thumb: string | null }
+
+// ---------------------------------------------------------------------------------------------
+// Segments: breed, coat and design
+
+/** A breed, coat or design id, or null when it is not known */
+export type SegKey = string | null;
+export type SegmentView = 'breed' | 'coat' | 'design';
+export interface SegmentFilter { breed?: string | null; coat?: string | null; design?: string | null }
+
+/** Each key with how many times it applies to one row (scans for a scanner, 1 for a preview emailer) */
+export interface SegCounts {
+  breeds: Array<[SegKey, number]>;
+  coats: Array<[SegKey, number]>;
+  designs: Array<[SegKey, number]>;
+}
+
+export interface SegLabel { id: string; name: string; fromDesign: boolean }
+export interface CatalogDesign { id: string; title: string; stockRef: number | null; breedId: string | null; coatId: string | null; thumb: string | null }
+export interface SegmentNames {
+  designs: Map<string, CatalogDesign>;
+  breeds: Map<string, string>;
+  coats: Map<string, string>;
+}
+export const emptyNames = (): SegmentNames => ({ designs: new Map(), breeds: new Map(), coats: new Map() });
+
+export interface Facets {
+  breeds: { id: string; name: string; count: number }[];
+  coats: { id: string; name: string; count: number }[];
+  designs: { id: string; title: string; stockRef: number | null; count: number }[];
+}
+
+export interface ScanDesign { id: string; title: string; stockRef: number | null; thumb: string | null }
+
+/** What one preview emailer's design, pet and the catalogue say about breed and coat */
+export interface PreviewMeta { catalogImageId: string | null; petBreedId: string | null; petCoatId: string | null }
 
 // ---------------------------------------------------------------------------------------------
 // Output rows
@@ -97,8 +138,12 @@ export interface PreviewerRow {
   marketing: MarketingStatus;
   stall: string | null;
   design: DesignInfo | null;
+  designId: string | null;             // image_catalog.id of the latest emailed preview
+  breed: SegLabel | null;              // the pet's breed, else the design's (fromDesign)
+  coat: SegLabel | null;
   hasBought: boolean;
   lastAt: string;
+  seg: SegCounts;
 }
 
 export interface ScannerRow {
@@ -110,9 +155,17 @@ export interface ScannerRow {
   stalls: string[];
   designs: string[];                   // stock refs, up to 3, most scanned first
   stage: ScannerStage;
+  flags: StageFlags;
+  topDesign: ScanDesign | null;        // the most scanned design
+  moreDesigns: number;                 // other different designs scanned
+  breed: SegLabel | null;              // of the most scanned design
+  coat: SegLabel | null;
+  seg: SegCounts;
 }
 
 export interface LoadResult<T> { rows: T[]; summary: Summary; truncated: boolean }
+/** Preview emailers and scanners: rows honour include-bought; allRows never drop buyers (for the Bought column) */
+export interface SegmentLoad<T> extends LoadResult<T> { allRows: T[]; names: SegmentNames }
 
 // ---------------------------------------------------------------------------------------------
 // Pure helpers
@@ -135,6 +188,13 @@ export function dateBounds(from?: string | null, to?: string | null): { fromTs: 
 
 const inRange = (iso: string, fromTs: string | null, toTs: string | null) =>
   (!fromTs || iso >= fromTs) && (!toTs || iso < toTs);
+
+/** Count how often each key occurs, in order of first appearance */
+export function tally(keys: SegKey[]): Array<[SegKey, number]> {
+  const m = new Map<SegKey, number>();
+  for (const k of keys) m.set(k, (m.get(k) ?? 0) + 1);
+  return Array.from(m.entries());
+}
 
 /** Group paid orders into one buyer per lower-cased email. Newest activity first. */
 export function groupBuyers(orders: OrderRow[], locNames: Map<string, string>): BuyerRow[] {
@@ -181,6 +241,8 @@ export interface ScannerContext {
   paidOrderVisitors: Set<string>;
   emailVisitors: Set<string>;
   previewVisitors: Set<string>;
+  /** names for the segments; without it every breed, coat and design is unknown */
+  names?: SegmentNames;
 }
 
 /** Group scans into one row per visitor id. Newest activity first. */
@@ -195,7 +257,16 @@ export function groupScanners(scans: ScanRow[], ctx: ScannerContext): ScannerRow
     let first = list[0].created_at, last = list[0].created_at, newScans = 0, bought = ctx.paidOrderVisitors.has(visitorId);
     const stalls = new Map<string, true>();
     const refs = new Map<number, number>();
+    const names = ctx.names ?? emptyNames();
+    const imageCounts = new Map<string, number>();
+    const imageRefs = new Map<string, number>();
+    const breedKeys: SegKey[] = [], coatKeys: SegKey[] = [], designKeys: SegKey[] = [];
     for (const s of list) {
+      const cat = s.image_id ? names.designs.get(s.image_id) : undefined;
+      designKeys.push(s.image_id ?? null);
+      breedKeys.push(cat?.breedId ?? null);
+      coatKeys.push(cat?.coatId ?? null);
+      if (s.image_id) { imageCounts.set(s.image_id, (imageCounts.get(s.image_id) ?? 0) + 1); imageRefs.set(s.image_id, s.stock_ref); }
       if (s.created_at < first) first = s.created_at;
       if (s.created_at > last) last = s.created_at;
       if (!s.is_repeat) newScans++;
@@ -204,11 +275,23 @@ export function groupScanners(scans: ScanRow[], ctx: ScannerContext): ScannerRow
       if (stall) stalls.set(stall, true);
       refs.set(s.stock_ref, (refs.get(s.stock_ref) ?? 0) + 1);
     }
+    const flags: StageFlags = { bought, leftEmail: ctx.emailVisitors.has(visitorId), madePreview: ctx.previewVisitors.has(visitorId) };
+    const topId = Array.from(imageCounts.entries())
+      .sort((a, b) => b[1] - a[1] || (imageRefs.get(a[0]) ?? 0) - (imageRefs.get(b[0]) ?? 0) || (a[0] < b[0] ? -1 : 1))[0]?.[0] ?? null;
+    const topCat = topId ? names.designs.get(topId) : undefined;
+    const label = (id: string | null | undefined, map: Map<string, string>): SegLabel | null =>
+      id ? { id, name: map.get(id) ?? 'Unknown', fromDesign: false } : null;
     rows.push({
       visitorId, firstScanAt: first, lastScanAt: last, scans: list.length, newScans,
       stalls: Array.from(stalls.keys()),
       designs: Array.from(refs.entries()).sort((a, b) => b[1] - a[1] || a[0] - b[0]).slice(0, 3).map(([r]) => `#${r}`),
-      stage: scannerStage({ bought, leftEmail: ctx.emailVisitors.has(visitorId), madePreview: ctx.previewVisitors.has(visitorId) }),
+      stage: scannerStage(flags),
+      flags,
+      topDesign: topId ? { id: topId, title: topCat?.title ?? 'Design', stockRef: topCat?.stockRef ?? imageRefs.get(topId) ?? null, thumb: topCat?.thumb ?? null } : null,
+      moreDesigns: Math.max(0, imageCounts.size - 1),
+      breed: label(topCat?.breedId, names.breeds),
+      coat: label(topCat?.coatId, names.coats),
+      seg: { breeds: tally(breedKeys), coats: tally(coatKeys), designs: tally(designKeys) },
     });
   }
   return rows.sort((a, b) => (a.lastScanAt < b.lastScanAt ? 1 : a.lastScanAt > b.lastScanAt ? -1 : 0));
@@ -217,7 +300,12 @@ export function groupScanners(scans: ScanRow[], ctx: ScannerContext): ScannerRow
 /** Group preview email requests into one row per lower-cased email. Newest activity first. */
 export function groupPreviewers(
   reqs: PreviewRequestRow[],
-  ctx: { boughtEmails: Set<string>; marketing: Map<string, MarketingStatus>; locNames: Map<string, string>; designs: Map<string, DesignInfo> },
+  ctx: {
+    boughtEmails: Set<string>; marketing: Map<string, MarketingStatus>; locNames: Map<string, string>; designs: Map<string, DesignInfo>;
+    /** per custom image id: the catalogue design and the pet's breed and coat */
+    meta?: Map<string, PreviewMeta>;
+    names?: SegmentNames;
+  },
 ): PreviewerRow[] {
   const by = new Map<string, PreviewRequestRow[]>();
   for (const r of reqs) {
@@ -232,6 +320,14 @@ export function groupPreviewers(
     const latest = list[list.length - 1];
     const sent = list.map(r => r.last_sent_at).filter((s): s is string => !!s).sort();
     const stallId = [...list].reverse().find(r => r.pos_location_id)?.pos_location_id ?? null;
+    const names = ctx.names ?? emptyNames();
+    const meta = ctx.meta?.get(latest.custom_image_id);
+    const cat = meta?.catalogImageId ? names.designs.get(meta.catalogImageId) : undefined;
+    const breedId = meta?.petBreedId ?? cat?.breedId ?? null;
+    const coatId = meta?.petCoatId ?? cat?.coatId ?? null;
+    const breed: SegLabel | null = breedId ? { id: breedId, name: names.breeds.get(breedId) ?? 'Unknown', fromDesign: !meta?.petBreedId } : null;
+    const coat: SegLabel | null = coatId ? { id: coatId, name: names.coats.get(coatId) ?? 'Unknown', fromDesign: !meta?.petCoatId } : null;
+    const designId = meta?.catalogImageId ?? null;
     rows.push({
       email, previews: list.length,
       lastSentAt: sent.length ? sent[sent.length - 1] : null,
@@ -239,6 +335,8 @@ export function groupPreviewers(
       marketing: ctx.marketing.get(email) ?? 'not asked',
       stall: stallId ? ctx.locNames.get(stallId) ?? null : null,
       design: ctx.designs.get(latest.custom_image_id) ?? null,
+      designId, breed, coat,
+      seg: { breeds: [[breedId, 1]], coats: [[coatId, 1]], designs: [[designId, 1]] },
       hasBought: ctx.boughtEmails.has(email),
       lastAt: sent.length && sent[sent.length - 1] > latest.created_at ? sent[sent.length - 1] : latest.created_at,
     });
@@ -303,6 +401,137 @@ export function designTitle(description: string | null | undefined): string {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Segment filters, facets and breakdowns (pure)
+
+type Segmented = { seg: SegCounts };
+const SEG_FIELD = { breed: 'breeds', coat: 'coats', design: 'designs' } as const;
+
+const hasKey = (list: Array<[SegKey, number]>, id: string) => list.some(([k]) => k === id);
+
+/** Keep rows that match every chosen filter. A row with several designs matches if ANY of them matches. */
+export function applySegmentFilter<T extends Segmented>(rows: T[], f: SegmentFilter): T[] {
+  if (!f.breed && !f.coat && !f.design) return rows;
+  return rows.filter(r =>
+    (!f.breed || hasKey(r.seg.breeds, f.breed)) &&
+    (!f.coat || hasKey(r.seg.coats, f.coat)) &&
+    (!f.design || hasKey(r.seg.designs, f.design)));
+}
+
+const byName = (a: string, b: string) => a.localeCompare(b, 'en-GB', { sensitivity: 'base' });
+
+/** The dropdown options present in these rows, each with how many rows (people or scanners) have it. Unknown is left out. */
+export function segmentFacets<T extends Segmented>(rows: T[], names: SegmentNames): Facets {
+  const count = (field: 'breeds' | 'coats' | 'designs') => {
+    const m = new Map<string, number>();
+    for (const r of rows) for (const [k] of r.seg[field]) if (k) m.set(k, (m.get(k) ?? 0) + 1);
+    return m;
+  };
+  const named = (field: 'breeds' | 'coats', lookup: Map<string, string>) =>
+    Array.from(count(field).entries()).map(([id, n]) => ({ id, name: lookup.get(id) ?? 'Unknown', count: n })).sort((a, b) => byName(a.name, b.name));
+  return {
+    breeds: named('breeds', names.breeds),
+    coats: named('coats', names.coats),
+    designs: Array.from(count('designs').entries())
+      .map(([id, n]) => { const d = names.designs.get(id); return { id, title: d?.title ?? 'Unknown design', stockRef: d?.stockRef ?? null, count: n }; })
+      .sort((a, b) => byName(a.title, b.title) || (a.stockRef ?? 0) - (b.stockRef ?? 0)),
+  };
+}
+export const scannerFacets = (rows: ScannerRow[], names: SegmentNames): Facets => segmentFacets(rows, names);
+export const previewerFacets = (rows: PreviewerRow[], names: SegmentNames): Facets => segmentFacets(rows, names);
+
+export interface BreakdownRow {
+  id: string | null;                   // null is the Unknown row
+  name: string;
+  stockRef: number | null;             // designs only
+  [k: string]: string | number | null;
+}
+export interface ScannerBreakdownRow extends BreakdownRow {
+  scans: number; scanners: number; madePreview: number; leftEmail: number; bought: number; scanToPreview: string;
+}
+export interface PreviewerBreakdownRow extends BreakdownRow {
+  people: number; opened: number; subscribed: number; bought: number;
+}
+
+/** A percentage, or a dash when there is nothing to divide by */
+export const pctLabel = (part: number, whole: number): string => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : '–');
+
+const labelFor = (by: SegmentView, id: string | null, names: SegmentNames): { name: string; stockRef: number | null } => {
+  if (!id) return { name: 'Unknown', stockRef: null };
+  if (by === 'breed') return { name: names.breeds.get(id) ?? 'Unknown', stockRef: null };
+  if (by === 'coat') return { name: names.coats.get(id) ?? 'Unknown', stockRef: null };
+  const d = names.designs.get(id);
+  return { name: d?.title ?? 'Unknown design', stockRef: d?.stockRef ?? null };
+};
+
+/** Biggest first by the named number; the Unknown row always last */
+function sortBreakdown<T extends BreakdownRow>(rows: T[], first: keyof T & string): T[] {
+  return rows.sort((a, b) => {
+    if ((a.id === null) !== (b.id === null)) return a.id === null ? 1 : -1;
+    return (Number(b[first]) - Number(a[first])) || byName(a.name, b.name) || (a.stockRef ?? 0) - (b.stockRef ?? 0);
+  });
+}
+
+/**
+ * One row per breed, coat or design. A scanner counts once in every row they scanned (so rows can add up to more than
+ * the number of scanners). Buyers are left out of every column but Bought unless includeBought is on; Bought always
+ * counts every buyer of that row, so conversion shows even when buyers are hidden from the list.
+ */
+export function scannerBreakdown(rows: ScannerRow[], by: SegmentView, includeBought: boolean, names: SegmentNames): ScannerBreakdownRow[] {
+  const acc = new Map<SegKey, ScannerBreakdownRow & { progressed: number }>();
+  for (const r of rows) {
+    const counted = includeBought || !r.flags.bought;
+    for (const [key, n] of r.seg[SEG_FIELD[by]]) {
+      let a = acc.get(key);
+      if (!a) {
+        const l = labelFor(by, key, names);
+        a = { id: key, name: l.name, stockRef: l.stockRef, scans: 0, scanners: 0, madePreview: 0, leftEmail: 0, bought: 0, scanToPreview: '–', progressed: 0 };
+        acc.set(key, a);
+      }
+      if (r.flags.bought) a.bought++;
+      if (!counted) continue;
+      a.scans += n;
+      a.scanners++;
+      if (r.flags.madePreview) a.madePreview++;
+      if (r.flags.leftEmail) a.leftEmail++;
+      if (r.stage !== 'Scanned only') a.progressed++;
+    }
+  }
+  return sortBreakdown(Array.from(acc.values()).map(({ progressed, ...a }) => ({ ...a, scanToPreview: pctLabel(progressed, a.scanners) })), 'scans');
+}
+
+/** Same idea for people who asked for a preview by email. Bought ignores the include-bought toggle. */
+export function previewerBreakdown(rows: PreviewerRow[], by: SegmentView, includeBought: boolean, names: SegmentNames): PreviewerBreakdownRow[] {
+  const acc = new Map<SegKey, PreviewerBreakdownRow>();
+  for (const r of rows) {
+    const counted = includeBought || !r.hasBought;
+    for (const [key] of r.seg[SEG_FIELD[by]]) {
+      let a = acc.get(key);
+      if (!a) {
+        const l = labelFor(by, key, names);
+        a = { id: key, name: l.name, stockRef: l.stockRef, people: 0, opened: 0, subscribed: 0, bought: 0 };
+        acc.set(key, a);
+      }
+      if (r.hasBought) a.bought++;
+      if (!counted) continue;
+      a.people++;
+      if (r.opened) a.opened++;
+      if (r.marketing === 'subscribed') a.subscribed++;
+    }
+  }
+  return sortBreakdown(Array.from(acc.values()), 'people');
+}
+
+/** Rows without the internal segment lists, for the JSON response */
+export const withoutSeg = <T extends Segmented>(rows: T[]): Omit<T, 'seg'>[] => rows.map(({ seg, ...rest }) => rest);
+
+export function summariseScanners(rows: ScannerRow[], truncated: boolean): Summary {
+  const count = (s: ScannerStage) => rows.filter(r => r.stage === s).length;
+  return { total: rows.length, subscribed: 0, truncated, bought: count('Bought'), leftEmail: count('Left an email'), madePreview: count('Made a preview'), scannedOnly: count('Scanned only') };
+}
+export const summarisePreviewers = (rows: PreviewerRow[], truncated: boolean): Summary =>
+  ({ total: rows.length, subscribed: rows.filter(r => r.marketing === 'subscribed').length, truncated });
+
+// ---------------------------------------------------------------------------------------------
 // Database
 
 /** Page through a query 1000 rows at a time, up to ROW_CAP rows */
@@ -328,6 +557,33 @@ async function loadLocations(supabase: SupabaseClient): Promise<Map<string, stri
 export async function listLocations(supabase: SupabaseClient): Promise<{ id: string; name: string }[]> {
   const m = await loadLocations(supabase);
   return Array.from(m, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+
+/** Catalogue designs (with breed and coat ids) for these image ids, then the names of every breed and coat involved. No per-row queries. */
+export async function loadSegmentNames(supabase: SupabaseClient, imageIds: string[], extraBreedIds: string[] = [], extraCoatIds: string[] = []): Promise<SegmentNames> {
+  const names = emptyNames();
+  for (const chunk of chunks(Array.from(new Set(imageIds)))) {
+    const { data, error } = await supabase.from('image_catalog').select('id, description, stock_ref, breed_id, coat_id, public_url').in('id', chunk);
+    if (error) throw new Error(error.message);
+    for (const c of data ?? []) {
+      const r = c as any;
+      names.designs.set(r.id, { id: r.id, title: designTitle(r.description), stockRef: r.stock_ref ?? null, breedId: r.breed_id ?? null, coatId: r.coat_id ?? null, thumb: r.public_url ?? null });
+    }
+  }
+  const designs = Array.from(names.designs.values());
+  const fill = async (table: 'breeds' | 'coats', ids: string[], into: Map<string, string>) => {
+    for (const chunk of chunks(Array.from(new Set(ids)))) {
+      const { data, error } = await supabase.from(table).select('id, name').in('id', chunk);
+      if (error) throw new Error(error.message);
+      for (const b of data ?? []) into.set((b as any).id, (b as any).name);
+    }
+  };
+  await Promise.all([
+    fill('breeds', [...extraBreedIds, ...designs.map(d => d.breedId).filter((x): x is string => !!x)], names.breeds),
+    fill('coats', [...extraCoatIds, ...designs.map(d => d.coatId).filter((x): x is string => !!x)], names.coats),
+  ]);
+  return names;
 }
 
 const ORDER_COLS = 'id, status, customer_email, shipping_first_name, shipping_last_name, shipping_postcode, shipping_country, total_amount, created_at, pos_location_id, qr_scan_id, guest_session_id';
@@ -366,7 +622,7 @@ export async function loadBuyers(supabase: SupabaseClient, filters: AudienceFilt
   };
 }
 
-export async function loadPreviewEmailers(supabase: SupabaseClient, filters: AudienceFilters = {}): Promise<LoadResult<PreviewerRow>> {
+export async function loadPreviewEmailers(supabase: SupabaseClient, filters: AudienceFilters = {}): Promise<SegmentLoad<PreviewerRow>> {
   const { fromTs, toTs } = dateBounds(filters.from, filters.to);
   const [locNames, paid, reqs] = await Promise.all([
     loadLocations(supabase),
@@ -387,40 +643,43 @@ export async function loadPreviewEmailers(supabase: SupabaseClient, filters: Aud
   const latestByEmail = new Map<string, PreviewRequestRow>();
   for (const r of reqs.rows) { const e = lower(r.email); const cur = latestByEmail.get(e); if (!cur || r.created_at > cur.created_at) latestByEmail.set(e, r); }
   const imageIds = Array.from(new Set(Array.from(latestByEmail.values()).map(r => r.custom_image_id)));
-  const customs = new Map<string, { catalog_image_id: string | null; generated_image_url: string | null }>();
+  const customs = new Map<string, { catalog_image_id: string | null; generated_image_url: string | null; pet_breed_id: string | null; pet_coat_id: string | null }>();
   for (const chunk of chunks(imageIds)) {
-    const { data } = await supabase.from('customer_custom_images').select('id, catalog_image_id, generated_image_url').in('id', chunk);
+    const { data } = await supabase.from('customer_custom_images').select('id, catalog_image_id, generated_image_url, pet_breed_id, pet_coat_id').in('id', chunk);
     for (const c of data ?? []) customs.set((c as any).id, c as any);
   }
-  const catalogIds = Array.from(new Set(Array.from(customs.values()).map(c => c.catalog_image_id).filter((x): x is string => !!x)));
-  const catalog = new Map<string, { description: string | null; stock_ref: number | null }>();
-  for (const chunk of chunks(catalogIds)) {
-    const { data } = await supabase.from('image_catalog').select('id, description, stock_ref').in('id', chunk);
-    for (const c of data ?? []) catalog.set((c as any).id, c as any);
-  }
+  const customList = Array.from(customs.values());
+  const catalogIds = Array.from(new Set(customList.map(c => c.catalog_image_id).filter((x): x is string => !!x)));
+  const names = await loadSegmentNames(
+    supabase, catalogIds,
+    customList.map(c => c.pet_breed_id).filter((x): x is string => !!x),
+    customList.map(c => c.pet_coat_id).filter((x): x is string => !!x),
+  );
   const designs = new Map<string, DesignInfo>();
+  const meta = new Map<string, PreviewMeta>();
   for (const id of imageIds) {
     const c = customs.get(id);
     if (!c) continue;
-    const cat = c.catalog_image_id ? catalog.get(c.catalog_image_id) : undefined;
-    designs.set(id, { title: cat ? designTitle(cat.description) : 'Own design', stockRef: cat?.stock_ref ?? null, thumb: c.generated_image_url ?? null });
+    const cat = c.catalog_image_id ? names.designs.get(c.catalog_image_id) : undefined;
+    designs.set(id, { title: cat ? cat.title : 'Own design', stockRef: cat?.stockRef ?? null, thumb: c.generated_image_url ?? null });
+    meta.set(id, { catalogImageId: c.catalog_image_id ?? null, petBreedId: c.pet_breed_id ?? null, petCoatId: c.pet_coat_id ?? null });
   }
 
   const marketing = mapStates(await marketingStates(supabase, Array.from(latestByEmail.keys())));
-  let rows = groupPreviewers(reqs.rows, { boughtEmails, marketing, locNames, designs });
-  if (!filters.includeBought) rows = rows.filter(r => !r.hasBought);
+  const allRows = groupPreviewers(reqs.rows, { boughtEmails, marketing, locNames, designs, meta, names });
+  const rows = filters.includeBought ? allRows : allRows.filter(r => !r.hasBought);
 
   const truncated = reqs.truncated || paid.truncated;
-  return { rows, truncated, summary: { total: rows.length, subscribed: rows.filter(r => r.marketing === 'subscribed').length, truncated } };
+  return { rows, allRows, names, truncated, summary: summarisePreviewers(rows, truncated) };
 }
 
-export async function loadScanners(supabase: SupabaseClient, filters: AudienceFilters = {}): Promise<LoadResult<ScannerRow>> {
+export async function loadScanners(supabase: SupabaseClient, filters: AudienceFilters = {}): Promise<SegmentLoad<ScannerRow>> {
   const { fromTs, toTs } = dateBounds(filters.from, filters.to);
   const [locNames, paid, scans, emailReqs, previews] = await Promise.all([
     loadLocations(supabase),
     loadPaidOrders(supabase),
     fetchAll<ScanRow>((a, b) => {
-      let q = supabase.from('qr_scans').select('id, visitor_id, stock_ref, location_id, location_code, is_repeat, order_id, created_at').eq('is_bot', false);
+      let q = supabase.from('qr_scans').select('id, visitor_id, stock_ref, image_id, location_id, location_code, is_repeat, order_id, created_at').eq('is_bot', false);
       if (fromTs) q = q.gte('created_at', fromTs);
       if (toTs) q = q.lt('created_at', toTs);
       if (filters.locationId) q = q.eq('location_id', filters.locationId);
@@ -434,23 +693,21 @@ export async function loadScanners(supabase: SupabaseClient, filters: AudienceFi
       supabase.from('customer_custom_images').select('guest_session_id').not('guest_session_id', 'is', null).order('id').range(a, b)),
   ]);
 
+  // Breed, coat and title of every design scanned: one batched read, not one per scan
+  const names = await loadSegmentNames(supabase, scans.rows.map(s => s.image_id).filter((x): x is string => !!x));
   const ctx: ScannerContext = {
-    locNames,
+    locNames, names,
     paidOrderIds: new Set(paid.rows.map(o => o.id)),
     paidOrderScanIds: new Set(paid.rows.map(o => o.qr_scan_id).filter((x): x is string => !!x)),
     paidOrderVisitors: new Set(paid.rows.map(o => o.guest_session_id).filter((x): x is string => !!x)),
     emailVisitors: new Set(emailReqs.rows.map(r => r.guest_session_id)),
     previewVisitors: new Set(previews.rows.map(r => r.guest_session_id)),
   };
-  let rows = groupScanners(scans.rows, ctx);
-  if (!filters.includeBought) rows = rows.filter(r => r.stage !== 'Bought');
+  const allRows = groupScanners(scans.rows, ctx);
+  const rows = filters.includeBought ? allRows : allRows.filter(r => r.stage !== 'Bought');
 
   const truncated = scans.truncated || paid.truncated || emailReqs.truncated || previews.truncated;
-  const count = (s: ScannerStage) => rows.filter(r => r.stage === s).length;
-  return {
-    rows, truncated,
-    summary: { total: rows.length, subscribed: 0, truncated, bought: count('Bought'), leftEmail: count('Left an email'), madePreview: count('Made a preview'), scannedOnly: count('Scanned only') },
-  };
+  return { rows, allRows, names, truncated, summary: summariseScanners(rows, truncated) };
 }
 
 export { normaliseEmail };
