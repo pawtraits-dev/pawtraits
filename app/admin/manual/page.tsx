@@ -10,7 +10,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { BookOpen, Check, ChevronDown, ChevronRight, Printer } from 'lucide-react';
 import {
-  COMING_SOON, GLOSSARY, GUIDES, ROUTINES, TROUBLESHOOTING,
+  GLOSSARY, GUIDES, ROUTINES, TROUBLESHOOTING,
   type Guide, type Routine, type RoutineId, type Task, type TickPeriod, type TroubleEntry, type Venue,
 } from '@/lib/admin/manual/content';
 import {
@@ -454,13 +454,6 @@ function GuidesView({ filter, setFilter, printing }: { filter: string; setFilter
           </section>
         );
       })}
-
-      <section aria-labelledby="coming-soon" className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
-        <h3 id="coming-soon" className="font-semibold text-gray-900">Coming soon (not yet available)</h3>
-        <ul className="mt-2 space-y-2 text-sm text-gray-800">
-          {COMING_SOON.map(c => <li key={c.title}><strong className="font-semibold">{c.title}.</strong> {c.note}</li>)}
-        </ul>
-      </section>
     </div>
   );
 }

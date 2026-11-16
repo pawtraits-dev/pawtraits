@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  COMING_SOON, GLOSSARY, GUIDES, REFERENCED_PAGES, ROUTINES, TROUBLESHOOTING,
+  GLOSSARY, GUIDES, REFERENCED_PAGES, ROUTINES, TROUBLESHOOTING,
 } from '../lib/admin/manual/content';
 
 const ROOT = path.resolve(__dirname, '..');
@@ -63,7 +63,6 @@ TROUBLESHOOTING.forEach(t => {
   texts.push(t.problem, ...t.fix, t.who);
   if (t.link) links.push({ where: `troubleshooting ${t.problem}`, ...t.link });
 });
-COMING_SOON.forEach(c => texts.push(c.title, c.note));
 
 // ---- links
 links.forEach(l => {
@@ -102,7 +101,6 @@ GUIDES.forEach(g => {
   slugs.add(g.slug);
   ok(g.sections.length > 0, `guide ${g.slug} has no sections`);
 });
-ok(COMING_SOON.length === 1 && COMING_SOON[0].note.toLowerCase().includes('not yet available'), 'one clearly labelled Coming soon entry');
 
 // ---- no prices, no partner programme, no delivery promises
 texts.forEach(t => {

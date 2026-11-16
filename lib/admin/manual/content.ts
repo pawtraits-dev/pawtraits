@@ -86,6 +86,7 @@ export const PAGES = {
   customers: { label: 'Customers', href: '/admin/customers' },
   audiences: { label: 'Audiences', href: '/admin/audiences' },
   popularity: { label: 'Popularity', href: '/admin/popularity' },
+  offers: { label: 'Offers', href: '/admin/offers' },
   social: { label: 'Social', href: '/admin/social' },
   templates: { label: 'Message Templates', href: '/admin/messaging' },
   queue: { label: 'Message Queue', href: '/admin/messaging/queue' },
@@ -218,6 +219,22 @@ export const ROUTINES: Routine[] = [
         link: P.queue,
         minutes: 3,
         role: 'anyone',
+      },
+      {
+        key: 'daily-approve-offers',
+        title: 'Approve the offers waiting',
+        why: 'Offers are new pictures painted from a photo a customer kept. Each one waits for a person to look at it before it is emailed. Skip this task while Offers is switched off.',
+        steps: [
+          'Open **Offers**. If the **Offers on** switch is off, nothing is being painted or sent: tick this off.',
+          'Open the **Waiting for approval** tab. If it says "Nothing is waiting for approval.", tick this off.',
+          'For each card, look at every picture. The Offers guide lists what to check ("What to look for before you approve").',
+          'Press **Drop this picture** or **Paint a different one** on any picture that looks wrong. At least two good pictures must stay.',
+          'When the pictures are right, press **Approve and send** and confirm. The customer is emailed straight away.',
+          'Not sure about one? Leave it waiting, or press **Skip this person**. Never approve a picture you doubt.',
+        ],
+        link: P.offers,
+        minutes: 10,
+        role: 'owner',
       },
     ],
   },
@@ -521,12 +538,29 @@ export const ROUTINES: Routine[] = [
         steps: [
           'Open **Popularity**.',
           'Set **Period** to the last 7 days (or 30 days).',
-          'Read **Most popular original designs**: scans, previews and orders.',
-          'Read **Breeds and coats of pets customers uploaded** and note breeds we have no designs for.',
+          'On the **Prints** tab, read **Most popular original designs**: scans, previews and orders. Change **Sort by** to see the top designs by prints sold, scans, previews made or revenue.',
+          'On the **Breeds** tab, read **Breeds and coats of pets customers uploaded** and note breeds we have no designs for.',
         ],
         link: P.popularity,
         minutes: 10,
         role: 'anyone',
+        dueDay: 5,
+      },
+      {
+        key: 'weekly-review-offers',
+        title: 'Review offers: sent, clicked, bought, failed',
+        why: 'It shows whether offers are reaching people and being clicked, and catches failed ones before they pile up. Skip it while Offers is switched off.',
+        steps: [
+          'Open **Offers** and read the line under **Run now**: **Painted in the last 24 hours** and the counts of each kind of offer.',
+          'Open the **Sent** tab. Read **Clicked** and **Bought since** for the week.',
+          'Open **Skipped and failed**. Read the **Why** column. For a failed one, press **Try again** if the reason looks like a one-off (see "An offer shows as failed" in Troubleshooting).',
+          'Open **AI Costs** and check the spend on "Offer previews" is steady.',
+          'In **Automatic campaigns**, read "Due in the next 30 days" on each card, and decide whether the caps (**People painted per run** and **People painted per day**) still suit.',
+          'Write down anything odd for yourself. Switching offers on or off, and sending automatically, are your decisions.',
+        ],
+        link: P.offers,
+        minutes: 15,
+        role: 'owner',
         dueDay: 5,
       },
     ],
@@ -587,6 +621,7 @@ export const ROUTINES: Routine[] = [
         steps: [
           'Open **Audiences**.',
           'Choose the group (for example **Buyers**).',
+          'On **Preview emails**, the **Breed**, **Coat** and **Design** filters narrow the list, and the download follows them. Check the count on the button before you press it.',
           'Press **Download list for Meta** and upload it to Meta Ads Manager.',
           'The list only includes people who agreed to hear from us.',
         ],
@@ -607,6 +642,24 @@ export const ROUTINES: Routine[] = [
         link: P.collections,
         minutes: 10,
         role: 'anyone',
+      },
+      {
+        key: 'monthly-offer-campaigns',
+        title: 'Plan campaigns for the season ahead',
+        why: 'An offer campaign paints a pet into designs for an occasion such as Christmas or Mother\'s Day. It needs designs ready, so do it after "Check the seasons ahead" has shown which occasions are ready.',
+        steps: [
+          'Start from the occasions found in "Check the seasons ahead". Only plan one that has designs.',
+          'Open **Offers** and the **Campaigns** tab. If a draft for that occasion is already there, use it.',
+          'Under **New campaign**, type a **Name** such as "Christmas 2026".',
+          'Choose the designs: pick a collection under **and/or a collection**, or paste design ids or customise links. The campaign needs at least three designs.',
+          'Choose **Who gets it**, then press **Save campaign**. It is saved as a draft and nothing happens yet.',
+          'Press **Count who is eligible** on the draft to see how many people it would reach.',
+          'Press **Start** only when you are ready to approve the pictures that follow, so they can be emailed in time for the occasion. See the Offers guide ("Campaigns you start by hand").',
+          'While you are here, glance at the **Birthday** and star-sign switches in **Automatic campaigns**. Change them only if you mean to.',
+        ],
+        link: P.offers,
+        minutes: 20,
+        role: 'owner',
       },
       {
         key: 'monthly-test-emails',
@@ -1116,6 +1169,7 @@ export const GUIDES: Guide[] = [
           'Open **Audiences**. The tabs show **Buyers**, people who asked for a preview by email, and stall QR scanners.',
           'Filter by stall, date range, breed, coat or design. Tick **Include people who have bought** if you want them too.',
           'Press **Download list for Meta** for a file of subscribed people. Uploading it to Meta is the owner\'s job.',
+          'The download follows the filters you have set. On **Preview emails**, the **Breed**, **Coat** and **Design** filters narrow the file as well as the table, and the button shows how many people will be in it. **Buyers** has the stall and date filters only.',
         ],
         links: [P.audiences],
       },
@@ -1123,6 +1177,7 @@ export const GUIDES: Guide[] = [
         heading: 'Popularity',
         body: [
           'Open **Popularity** to see which designs get scans, previews and sales, and which breeds and coats customers upload.',
+          'The **Prints** tab ranks original designs. Every breed and coat version counts towards its original, and **Sort by** changes the ranking. The **Breeds** tab shows the breeds and coats of the pets customers uploaded. **Download CSV** saves the tab you are on.',
           'Use it to decide what to make and print next.',
         ],
         links: [P.popularity],
@@ -1132,6 +1187,146 @@ export const GUIDES: Guide[] = [
         body: [
           'Only the owner sends marketing. If a customer asks to stop hearing from us, tell the owner.',
         ],
+      },
+    ],
+  },
+
+  {
+    slug: 'offers',
+    title: 'Offers: painting from a kept photo',
+    summary: 'New pictures painted from a photo a customer already gave us, approved by you and then emailed.',
+    sections: [
+      {
+        heading: 'What Offers is and who gets one',
+        body: [
+          'When someone asks for a preview by email, we keep their pet\'s photo. Offers lets Pawcasso paint that pet into a few more designs (three, and at least two good ones are needed) and email them. Every picture waits on **Offers** until you approve it, unless **Send automatically** is switched on.',
+          'Previewers are people who asked for a preview by email after the site began saying that we keep the photo. They must also have opened the link in the preview email. Requests made before that wording was added are never used.',
+          'Buyers are people with a paid order that was not cancelled or refunded. A buyer is only offered something after they have been shown the same photo wording. That happens on the preview card, at checkout, or through the one-off "Tell past buyers" email. Then a grace period has to pass first (the **Buyers: days after they are shown the photo wording** setting).',
+          'Everyone must also be subscribed to offers. Nobody gets more than one offer email a week, of any kind.',
+          'Round 1 goes to a previewer a set number of days after they opened the preview email. Round 2 goes a set number of days after round 1 was sent. A previewer who buys after asking for the preview gets no more offers. Birthday, star-sign and hand-started campaigns are covered below.',
+        ],
+        links: [P.offers],
+      },
+      {
+        heading: 'The switches and numbers',
+        body: [
+          'Open **Offers**. The **Settings** box at the top holds everything. Press the **Save** button next to a number to keep it.',
+          '**Offers on** is the master switch. While it is off, nothing is queued, painted or sent, and **Run now**, **Start** and the buttons in **Tell past buyers** are greyed out. It starts off.',
+          '**Send automatically** is off by default. Off means every offer waits for your approval. On means finished offers are emailed without anyone looking. Leave it off unless the owner has decided otherwise.',
+          '**Round 1: days after they open the preview email** and **Round 2: days after round 1 is sent** set the timings.',
+          '**People painted per run** and **People painted per day** are the caps. The line under them, **Painted in the last 24 hours**, shows how close you are. The caps count one for each person painted, plus one for each picture you replace by hand, and they limit what is spent (see "Costs").',
+          '**Birthday: days before their birthday** and **Zodiac: days before their sign starts** set how early those campaigns begin. Both must be at least 5. **Buyers: days after they are shown the photo wording** is the grace period for buyers.',
+          'Pictures are painted and sent once an hour on their own. **Run now** does one pass straight away: it queues anyone who is due, paints up to the caps, and sends offers you have already approved. A message tells you how many were queued, painted and sent.',
+        ],
+      },
+      {
+        heading: 'Birthday and star-sign campaigns',
+        body: [
+          'The **Automatic campaigns** box has a card for birthdays and one for star signs. Each has its own switch, off until you turn it on, and asks you to confirm with **Switch on**. **Offers on** must be on too, and every offer still waits for approval unless **Send automatically** is on.',
+          'Each card has **Who gets it** (**Previewers**, **Buyers** or **Both**), a days-before number, **Email subject (optional)**, **One line of email copy (optional)** and **Save wording**. The days-before number is the same setting as in the **Settings** box.',
+          'A birthday offer is made from that many days before the birthday, up to five days before it. A pet whose birthday we learn later than that waits until next year. A star-sign offer is made from that many days before their sign starts. The sign comes from the birthday, or from the zodiac quiz if there is no birthday. If both are due in the same week, the birthday goes first.',
+          'The star-sign offer puts a framed card for their sign first, with two other designs. A star-sign offer is only made when the pet is known to be a dog or a cat, and a birthday offer only when there are at least two birthday designs to paint into.',
+          'The birthday comes from the saved pet, from what the visitor told us on the preview card, or from a small "When\'s their birthday?" link in an offer email. Each card shows how many people have a known birthday or sign, and how many are due in the next 30 days. Fewer known means fewer offers.',
+          'An offer is not emailed once the day it is for has passed.',
+          'Both cards need the second migration (see "First time switching it on").',
+        ],
+      },
+      {
+        heading: 'The approval queue',
+        body: [
+          'Open the **Waiting for approval** tab. Each card shows their photo, their email with part hidden, the pet\'s name and breed, and one line: Previewer or Buyer, what the offer is (Round 1, Round 2, Birthday, a star sign, or the campaign\'s name) and when it was made. A previewer shows the design they first previewed. A buyer shows when and where they were shown the photo wording. A birthday or star-sign offer shows the day it is for.',
+          'Under each picture are its design name and a short line saying why it was chosen.',
+          '**Drop this picture** leaves one out of the email. You cannot drop one when only two remain.',
+          '**Paint a different one** paints another design in its place. It costs AI money and counts towards the daily cap.',
+          '**Approve and send** asks you to confirm, then emails the customer straight away with the pictures that are left. The checks are made again at that moment. If the person has since unsubscribed, bought, or said no, nothing is sent, the offer moves to **Skipped and failed**, and the message says why.',
+          '**Skip this person** sends nothing for this round.',
+          '**Stop offers for this person** gives them no more offers at all, and their photo is no longer used for them. Use it when you know they do not want them.',
+        ],
+      },
+      {
+        heading: 'What to look for before you approve',
+        body: [
+          'The pet looks like the photo: the same colouring, markings and shape. If you would not know it was them, do not send it.',
+          'Nothing odd in the picture: no extra legs or heads, no strange objects, no people, no stray words, no smudged or broken areas.',
+          'It is the right animal. A cat must not be painted as a dog, or the other way round.',
+          'For a star-sign offer, the framed card shows the right sign for this pet and the pet\'s name is spelled correctly. The offer\'s label and date show which sign it is for.',
+          'At least two good pictures remain. Drop or repaint the bad ones. If none are good, or you are unsure, press **Skip this person** or leave it waiting.',
+        ],
+      },
+      {
+        heading: 'Queued, sent, skipped and failed',
+        body: [
+          'The **Queued** tab lists offers waiting to be painted or being painted, with when each is due. There is nothing to press there.',
+          'The **Sent** tab lists what has been emailed, when it was sent, whether they clicked, and whether they have bought since.',
+          'The **Skipped and failed** tab lists offers that did not go out, with the reason under **Why**. A skipped offer is final: the reason is one of the safety checks, such as "No longer subscribed to offers" or "They have bought since asking for the preview". Do not try to get round it.',
+          'A failed offer shows **Try again**. It puts the offer back in the queue and the pictures are painted again from scratch on the next run (or press **Run now**), which costs AI money again.',
+          'If an offer was approved but the send failed, the message says it will be tried again on the next run. Until then it appears in no tab, only in the counts beside **Run now**.',
+        ],
+      },
+      {
+        heading: 'Campaigns you start by hand',
+        body: [
+          'Use these for Christmas, Valentine\'s, Mother\'s Day and the like. Open the **Campaigns** tab.',
+          'Under **New campaign**, type a **Name**. **Email subject (optional)** and **One line of email copy (optional)** replace the standard wording.',
+          'Choose the designs: paste design ids or customise links into **Designs: paste design ids or customise links, one per line**, or pick a collection under **and/or a collection**, or both. The campaign needs at least three designs to draw from.',
+          'Choose **Who gets it**: **Previewers**, **Buyers** or **Both**. Buyers need the second migration; until it is run, campaigns go to previewers only.',
+          'Press **Save campaign**. It is saved as a draft and nothing is sent.',
+          'Press **Count who is eligible** on the draft. It shows how many people could be offered it now, split into previewers and buyers, and how many designs it can draw from.',
+          'Press **Start** and confirm. One offer is queued for everyone eligible at that moment. The pictures are painted within the daily cap, then wait for your approval before anything is emailed. A campaign can only be started once. **Start** is greyed out while **Offers on** is off.',
+          'Each person is offered a given campaign once, and not within a week of any other offer email.',
+        ],
+      },
+      {
+        heading: 'Tell past buyers',
+        body: [
+          '**Tell past buyers** is a one-off email to people who have bought. It says we have kept the photo they sent, that from time to time Pawcasso will paint their pet into something new (a birthday surprise, their star sign, the odd seasonal treat) and email it to them, and that they need do nothing if that sounds fun. It carries one-click links to unsubscribe, to change their preferences and to say "Please don\'t reuse my photo".',
+          'It goes only to subscribed buyers with a photo we can use who have not yet been shown the photo wording. The box shows how many that is. It needs **Offers on** and the second migration.',
+          'It is never sent automatically. It goes only when someone presses the button.',
+          'Press **Send me a test** first. It sends the notice to your own sign-in address and nobody else, and records nothing. Check it looks right.',
+          'Then press the button that says **Send to** and a number, and confirm. It cannot be undone and nobody is emailed twice. One press sends to at most 500 people. If the count is still above zero afterwards, press again.',
+          'Once a buyer has been told, and the grace period has passed, they can be offered things.',
+        ],
+      },
+      {
+        heading: 'How people say no',
+        body: [
+          'Every offer email has the usual unsubscribe link, which stops all marketing email.',
+          'Every offer email, and the notice to past buyers, also has a "Please don\'t reuse my photo" link. One click and it is done. It stops photo offers and leaves their other emails alone.',
+          'The email preferences page, which opens from the link in any marketing email, has a switch called "Paint my pet into new designs from the photo I sent". It shows for people who are subscribed. They can turn it off, and back on.',
+          'On a waiting card you can press **Stop offers for this person**. That stops every future offer and records the same photo opt-out.',
+        ],
+      },
+      {
+        heading: 'What stops offers automatically',
+        body: [
+          'An offer is not painted or sent if the person has unsubscribed from offers, has said "Please don\'t reuse my photo", or has had offers stopped by you.',
+          'A previewer who has bought since asking for the preview gets nothing. A buyer needs to have been shown the photo wording first.',
+          'Nothing is made if the preview or the photo is no longer there, or after the birthday or star-sign day the offer was for.',
+          'These checks are made when the offer is queued, again before it is painted, and again at the moment of sending. A person who is stopped moves to **Skipped and failed** with the reason.',
+        ],
+      },
+      {
+        heading: 'Costs',
+        body: [
+          'Each picture is an AI painting that costs money, even if it is dropped or the offer is never sent. They show on **AI Costs** under "Offer previews".',
+          '**Paint a different one** and **Try again** cost more. **People painted per run** and **People painted per day** limit the spend, and **Run now** respects them.',
+          'The emails show the same watermarked pictures as a normal preview. Prices come from Pricing Management and are never typed into offers.',
+        ],
+        links: [P.aiCosts],
+      },
+      {
+        heading: 'First time switching it on',
+        body: [
+          'The owner runs db/migrations/2026-11-16-preview-offers.sql in the Supabase SQL editor. Until then **Offers** only says to run it. Never run SQL yourself.',
+          'The owner also runs db/migrations/2026-11-16-offers-campaigns.sql. This is needed for buyers, birthdays, star signs and **Tell past buyers**. Reload **Offers** afterwards.',
+          'Check **Send automatically** is off, and that **People painted per run** and **People painted per day** are small.',
+          'Switch **Offers on** and press **Run now**. Offers only appear once people are due, so there may be nothing to see at first.',
+          'Open **Waiting for approval** and approve the first few by hand, checking each one carefully.',
+          'The page cannot send an offer to an address you choose, so there is no way to test one on yourself. Approving emails the real customer. Check the first sent ones on the **Sent** tab, and use **Send me a test** to see what the past-buyers email looks like.',
+          'Leave the birthday and star-sign switches off until you are happy. Then switch one on at a time and watch what arrives in the queue.',
+          'Press **Send to** in **Tell past buyers** only when the owner says so, after the test.',
+        ],
+        links: [P.offers],
       },
     ],
   },
@@ -1323,6 +1518,13 @@ export const GLOSSARY: GlossaryEntry[] = [
   { term: 'Subscribed / soft opt-in', meaning: 'Subscribed means agreed to hear from us. A buyer is subscribed unless they choose "No thanks"; that is the soft opt-in. Unsubscribed people are never re-subscribed by buying.' },
   { term: 'On hold', meaning: 'An order paused because the amount paid looked wrong. The owner checks it in Stripe first.' },
   { term: 'Message queue', meaning: 'The waiting list of emails to send. Messages leave it as they are processed.' },
+  { term: 'Offer', meaning: 'A few new pictures of a customer\'s pet, painted by Pawcasso from a photo we kept and emailed to them after the owner approves them.' },
+  { term: 'Round 1 / Round 2', meaning: 'The two standard offers to a previewer. Round 1 comes a set number of days after they open the preview email. Round 2 comes a set number of days after round 1 was sent.' },
+  { term: 'Campaign', meaning: 'An offer built around an occasion or a date. Christmas or Mother\'s Day are started by hand. Birthday and star-sign campaigns run by themselves once switched on.' },
+  { term: 'Previewer', meaning: 'Someone who asked for a preview to be emailed to them, after the site began saying that we keep the photo.' },
+  { term: 'Buyer (for offers)', meaning: 'Someone with a paid order that was not cancelled or refunded. They can be offered things only after they have been shown the photo wording and the grace period has passed.' },
+  { term: 'Shown the wording', meaning: 'The person has seen the words that say we keep their pet\'s photo and may paint it again. It happens on the preview card, at checkout, or through the "Tell past buyers" email.' },
+  { term: 'Auto-send', meaning: 'The Send automatically switch on Offers. Off, every offer waits for approval. On, finished offers are emailed without anyone looking.' },
   { term: 'CSP', meaning: 'Content security policy: a set of rules the browser follows about what a page may load. It is on trial in report-only mode.' },
 ];
 
@@ -1447,6 +1649,46 @@ export const TROUBLESHOOTING: TroubleEntry[] = [
     link: P.social,
   },
   {
+    problem: 'An offer shows as failed',
+    fix: [
+      'Open **Offers** and the **Skipped and failed** tab. Read the reason under **Why**.',
+      'Press **Try again**. The offer goes back in the queue and its pictures are painted again on the next run, or press **Run now**. This costs AI money again.',
+      'If it fails a second time, leave it and note the reason.',
+    ],
+    who: 'The owner, if the same offer fails twice or many fail together.',
+    link: P.offers,
+  },
+  {
+    problem: 'An offer was skipped',
+    fix: [
+      'Open **Offers** and the **Skipped and failed** tab. Read the reason under **Why**.',
+      'A skipped offer is final. It means a safety check stopped it: the person unsubscribed, bought, said not to reuse their photo, had offers stopped, or the day the offer was for has passed.',
+      'Do nothing to get round it. If the reason surprises you, tell the owner.',
+    ],
+    who: 'The owner, if the reason looks wrong.',
+    link: P.offers,
+  },
+  {
+    problem: 'A customer asks not to have their photo reused',
+    fix: [
+      'Tell them every offer email has a "Please don\'t reuse my photo" link. One click and they are done. The email preferences page also has a switch called "Paint my pet into new designs from the photo I sent".',
+      'If an offer for them is waiting in **Offers**, press **Stop offers for this person** on its card. They get no more offers.',
+      'If they want no marketing email at all, find them in **Customers** and press **Unsubscribe**, but only because they asked.',
+    ],
+    who: 'Tell the owner. Deleting a photo is the owner\'s job.',
+    link: P.offers,
+  },
+  {
+    problem: 'A picture in the offers queue looks wrong',
+    fix: [
+      'Open **Offers** and the **Waiting for approval** tab.',
+      'Press **Drop this picture** on the bad one, or **Paint a different one** to replace it. Two good pictures must be left.',
+      'If none look right, press **Skip this person**. Do not approve it.',
+    ],
+    who: 'Tell the owner if the same fault keeps coming up.',
+    link: P.offers,
+  },
+  {
     problem: 'A customer is upset or asks for a refund',
     fix: [
       `Reply kindly from ${SUPPORT_EMAIL}. Say you are looking into it.`,
@@ -1471,20 +1713,6 @@ export const TROUBLESHOOTING: TroubleEntry[] = [
       'If it still fails, ask the owner to check your account.',
     ],
     who: 'The owner.',
-  },
-];
-
-// ---------------------------------------------------------------------------------------------
-// COMING SOON
-// ---------------------------------------------------------------------------------------------
-
-export interface ComingSoon { title: string; note: string }
-
-/** Not available yet. Do not add steps until the feature exists. */
-export const COMING_SOON: ComingSoon[] = [
-  {
-    title: 'Offers',
-    note: "Not yet available. Offers will let us paint a picture from a photo a customer kept, and email it to them after the owner approves it. Steps will be added here when it is built.",
   },
 ];
 
