@@ -535,7 +535,7 @@ export const summarisePreviewers = (rows: PreviewerRow[], truncated: boolean): S
 // Database
 
 /** Page through a query 1000 rows at a time, up to ROW_CAP rows */
-async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: any[] | null; error: { message: string } | null }>): Promise<{ rows: T[]; truncated: boolean }> {
+export async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: any[] | null; error: { message: string } | null }>): Promise<{ rows: T[]; truncated: boolean }> {
   const rows: T[] = [];
   for (let from = 0; from < ROW_CAP; from += PAGE) {
     const { data, error } = await build(from, from + PAGE - 1);
@@ -546,7 +546,7 @@ async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ da
   return { rows, truncated: true };
 }
 
-const chunks = <T,>(list: T[], n = CHUNK): T[][] => Array.from({ length: Math.ceil(list.length / n) }, (_, i) => list.slice(i * n, i * n + n));
+export const chunks = <T,>(list: T[], n = CHUNK): T[][] => Array.from({ length: Math.ceil(list.length / n) }, (_, i) => list.slice(i * n, i * n + n));
 
 async function loadLocations(supabase: SupabaseClient): Promise<Map<string, string>> {
   const { data, error } = await supabase.from('stock_locations').select('id, name');
@@ -588,7 +588,7 @@ export async function loadSegmentNames(supabase: SupabaseClient, imageIds: strin
 
 const ORDER_COLS = 'id, status, customer_email, shipping_first_name, shipping_last_name, shipping_postcode, shipping_country, total_amount, created_at, pos_location_id, qr_scan_id, guest_session_id';
 
-const NOT_A_SALE = new Set(['cancelled', 'canceled', 'refunded', 'failed']);
+export const NOT_A_SALE = new Set(['cancelled', 'canceled', 'refunded', 'failed']);
 
 /** Every paid order (not date filtered: "has this person ever bought" must not depend on the filters) */
 async function loadPaidOrders(supabase: SupabaseClient) {
