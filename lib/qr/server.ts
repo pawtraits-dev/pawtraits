@@ -36,3 +36,27 @@ export async function requireAdmin(): Promise<NextResponse | null> {
     return NextResponse.json({ error: 'Authentication failed' }, { status: 401 });
   }
 }
+
+/**
+ * Who is signed in, for routes that have already passed requireAdmin(): the auth user id and the
+ * first name on their profile (null when there is none). Does not check the role itself, so always
+ * call requireAdmin() first. Returns null when nobody is signed in.
+ */
+export async function getAdminIdentity(): Promise<{ id: string; firstName: string | null } | null> {
+  try {
+    const cookieStore = await cookies();
+    const auth = createRouteHandlerClient({ cookies: () => cookieStore } as any);
+    const { data: { user } } = await auth.auth.getUser();
+    if (!user) return null;
+    const { data: profile } = await serviceClient()
+      .from('user_profiles')
+      .select('first_name')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    const first = typeof profile?.first_name === 'string' ? profile.first_name.trim() : '';
+    return { id: user.id, firstName: first || null };
+  } catch (e) {
+    console.error('getAdminIdentity failed:', e);
+    return null;
+  }
+}
