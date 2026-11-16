@@ -34,6 +34,18 @@ export const SETTING_DEFAULTS = {
   team_switch_hourly_limit: 6,
   /** Royal Mail labels (lib/shipping/royal-mail/): Click & Drop service codes per destination
    *  ('' = Click & Drop's own shipping rules choose) and the parcel weight estimate */
+  /** Offers (Admin → Offers, lib/offers/): new Pawtraits painted from a photo we already have. Off until switched on: nothing is queued or generated. */
+  offers_enabled: false,
+  /** Offers: send generated offers without waiting for approval (off = they wait in the approval queue) */
+  offers_auto_send: false,
+  /** Offers: days after the preview email was opened before round 1 */
+  offers_round1_days: 3,
+  /** Offers: days after round 1 was sent before round 2 */
+  offers_round2_days: 14,
+  /** Offers: most people generated in one cron run */
+  offers_per_run: 5,
+  /** Offers: most people generated in one day */
+  offers_per_day: 30,
   royal_mail: { service_uk: '', service_europe: '', service_world: '', packaging_grams: 120, print_grams_per_100cm2: 25, large_letter_max_prints: 2 } as RoyalMailSettings,
 };
 export interface RoyalMailSettings {
@@ -96,6 +108,15 @@ export function validateSetting(key: string, value: unknown): string | null {
       return value === '' || (typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value)) ? null : 'Must be a social item id or empty';
     case 'return_address':
       return typeof value === 'string' && value.length <= 160 ? null : 'Must be text, 160 characters max';
+    case 'offers_round1_days':
+    case 'offers_round2_days':
+      return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 365 ? null : 'Must be a whole number of days, 1–365';
+    case 'offers_per_run':
+      return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 50 ? null : 'Must be a whole number 0–50';
+    case 'offers_per_day':
+      return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 1000 ? null : 'Must be a whole number 0–1000';
+    case 'offers_enabled':
+    case 'offers_auto_send':
     case 'welcome_gift_enabled':
     case 'social_feed_enabled':
     case 'social_instagram_enabled':

@@ -19,3 +19,12 @@ export function onlyOriginals<Q extends { is: any; or: any }>(query: Q): Q {
 export function onlyVersions<Q extends { or: any }>(query: Q): Q {
   return query.or(['variation_of.not.is.null', `tags.ov.${VERSION_TAGS}`, ...VERSION_FOLDERS.map(f => `cloudinary_public_id.like.${f}*`)].join(','));
 }
+
+/** The same rule as onlyOriginals(), for a row already loaded (needs variation_of, tags and cloudinary_public_id) */
+export function isOriginalRow(row: { variation_of?: string | null; tags?: string[] | null; cloudinary_public_id?: string | null }): boolean {
+  if (row.variation_of) return false;
+  const tags = row.tags ?? [];
+  if (VERSION_TAGS.slice(1, -1).split(',').some(t => tags.includes(t))) return false;
+  const id = row.cloudinary_public_id ?? '';
+  return !VERSION_FOLDERS.some(f => id.startsWith(f));
+}

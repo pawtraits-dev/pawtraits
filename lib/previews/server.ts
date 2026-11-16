@@ -9,7 +9,7 @@ import { sendMessageImmediate } from '@/lib/messaging/message-service';
 import { renderEmailFile } from '@/lib/messaging/render-file';
 import { decodeAttribution, hashIp, type QrAttribution } from '@/lib/qr/attribution';
 import { getPreferences, maskEmail, normaliseEmail, subscribe } from '@/lib/marketing/preferences';
-import { PREVIEW_COPY, PREVIEW_EMAIL } from './copy';
+import { PHOTO_WORDS_VERSION, PREVIEW_CONSENT_VERSION_V1, PREVIEW_COPY, PREVIEW_EMAIL, PREVIEW_LINE_V1 } from './copy';
 import { appendSend, limitProblem, marketingStep, previewFirstName, previewUrl, sendsInLastDay, type LimitProblem } from './email-link';
 
 const MISSING = /preview_email_requests/;
@@ -24,6 +24,8 @@ export interface RequestInput {
   /** the visitor's own typed address (guests); ignored for signed-in customers, whose account address is used */
   email: string | null;
   marketingTicked: boolean;
+  /** The card showed the words that say we keep the photo (guests only; the card sends PHOTO_WORDS_VERSION) */
+  photoWordsShown?: boolean;
   user: { id: string; email?: string | null } | null;
   guestId: string | null;
   qrCookie: string | null;
@@ -63,16 +65,21 @@ export async function requestPreviewEmail(supabase: SupabaseClient, input: Reque
     // Stall attribution at the time of asking (only a valid signed cookie)
     const qr = decodeAttribution(input.qrCookie);
     const customerId = input.user ? ((await supabase.from('customers').select('id').eq('user_id', input.user.id).maybeSingle()).data as any)?.id ?? null : null;
-    const { data: existing } = await supabase.from('preview_email_requests').select('id, send_count, sends, marketing_ticked').eq('custom_image_id', input.imageId).eq('email', email).maybeSingle();
+    const { data: existing } = await supabase.from('preview_email_requests').select('*').eq('custom_image_id', input.imageId).eq('email', email).maybeSingle();
     // A tick stays once given (the address may be asked for again without it); nothing is stored as pending when unticked
     const ticked = input.marketingTicked || !!(existing as any)?.marketing_ticked;
+    // Photo offers: only when this person was told we keep the photo (a guest, under the new words). Once true it stays true.
+    const photoOk = (input.marketingTicked && !input.user && input.photoWordsShown === true) || !!(existing as any)?.photo_offers_ok;
     const fields = {
       custom_image_id: input.imageId, email, guest_session_id: input.guestId, customer_id: customerId, marketing_ticked: ticked,
       ...(qr ? { qr_scan_id: qr.scanId, pos_location_id: qr.locationId, qr_attribution: qr } : {}), ip_hash: hashIp(input.ip),
     };
-    const { data: row, error } = existing
-      ? await supabase.from('preview_email_requests').update(fields).eq('id', (existing as any).id).select('id, send_count, sends, marketing_ticked').single()
-      : await supabase.from('preview_email_requests').insert(fields).select('id, send_count, sends, marketing_ticked').single();
+    const save = (f: Record<string, unknown>) => (existing
+      ? supabase.from('preview_email_requests').update(f).eq('id', (existing as any).id).select('*').single()
+      : supabase.from('preview_email_requests').insert(f).select('*').single());
+    let { data: row, error } = await save({ ...fields, photo_offers_ok: photoOk });
+    // Before db/migrations/2026-11-16-preview-offers.sql has been run there is no such column: carry on without it
+    if (error && /photo_offers_ok/.test(error.message ?? '')) ({ data: row, error } = await save(fields));
     if (error || !row) { console.error('preview email: could not store the request', error?.message); return { ok: false, status: MISSING.test(error?.message ?? '') ? 503 : 500, code: MISSING.test(error?.message ?? '') ? 'unavailable' : 'other' }; }
 
     const firstName = previewFirstName((img as any).pet_name);
@@ -81,7 +88,7 @@ export async function requestPreviewEmail(supabase: SupabaseClient, input: Reque
       body_line: PREVIEW_EMAIL.body(firstName),
       picture_url: cloudinaryService.getPublicVariantUrl((img as any).generated_cloudinary_id, 'catalog_watermarked', { width: 640, format: 'jpg' }),
       preview_url: previewUrl(input.baseUrl, (row as any).id, now),
-      marketing_line: (row as any).marketing_ticked ? PREVIEW_EMAIL.marketingLine : null,
+      marketing_line: (row as any).marketing_ticked ? ((row as any).photo_offers_ok ? PREVIEW_EMAIL.marketingLine : PREVIEW_EMAIL.marketingLineV1) : null,
     });
     const sent = await sendMessageImmediate({ channel: 'email', recipientEmail: email, subject: PREVIEW_EMAIL.subject(firstName), body: html });
     if (!sent.success) { console.error('preview email: send failed', sent.error); return { ok: false, status: 502, code: 'other' }; }
@@ -124,7 +131,15 @@ export async function openPreviewLink(supabase: SupabaseClient, requestId: strin
   try {
     const step = marketingStep(r, (await getPreferences(supabase, r.email))?.status ?? null);
     if (step === 'subscribe') {
-      await subscribe(supabase, { email: r.email, source: 'preview_email', customerId: r.customer_id, basis: 'consent', wording: PREVIEW_COPY.line });
+      // The words this person actually saw: the photo wording only for a request made under it
+      const photo = r.photo_offers_ok === true;
+      await subscribe(supabase, {
+        email: r.email, source: 'preview_email', customerId: r.customer_id, basis: 'consent',
+        wording: photo ? PREVIEW_COPY.line : PREVIEW_LINE_V1, version: photo ? PHOTO_WORDS_VERSION : PREVIEW_CONSENT_VERSION_V1,
+      });
+      await supabase.from('preview_email_requests').update({ marketing_confirmed_at: new Date(now).toISOString() }).eq('id', requestId);
+    } else if (step === 'already') {
+      // Already subscribed: nothing to change, but opening the link still proves the address is theirs (offers count their days from here)
       await supabase.from('preview_email_requests').update({ marketing_confirmed_at: new Date(now).toISOString() }).eq('id', requestId);
     }
   } catch (e) {

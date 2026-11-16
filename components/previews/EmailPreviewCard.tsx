@@ -6,7 +6,7 @@
  * signed-in customers get a one-tap button. Wording: lib/previews/copy.ts and lib/marketing/consent-copy.ts.
  */
 import { useEffect, useState } from 'react';
-import { PREVIEW_COPY } from '@/lib/previews/copy';
+import { PHOTO_WORDS_VERSION, PREVIEW_COPY } from '@/lib/previews/copy';
 import { track } from '@/lib/tracking/events';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -30,7 +30,7 @@ export default function EmailPreviewCard({ imageId, signedIn }: { imageId: strin
     try {
       const r = await fetch('/api/public/previews/email', {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageId, ...(isIn ? {} : { email: email.trim() }), website: trap }),
+        body: JSON.stringify({ imageId, ...(isIn ? {} : { email: email.trim(), wording: PHOTO_WORDS_VERSION }), website: trap }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setError(d.error || PREVIEW_COPY.errOther); setState(masked ? 'sent' : 'idle'); return; }

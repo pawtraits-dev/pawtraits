@@ -364,6 +364,8 @@ export async function sendMessageImmediate(params: {
   recipientPhone?: string;
   subject?: string;
   body: string;
+  /** extra email headers (marketing email: List-Unsubscribe, from marketingEmailExtras) */
+  headers?: Record<string, string>;
 }): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     if (params.channel === 'email' && params.recipientEmail) {
@@ -371,6 +373,7 @@ export async function sendMessageImmediate(params: {
         to: params.recipientEmail,
         subject: params.subject || 'Message from Pawtraits',
         html: params.body,
+        ...(params.headers ? { headers: params.headers } : {}),
       });
     } else if (params.channel === 'sms' && params.recipientPhone) {
       return await sendSMS({

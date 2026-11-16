@@ -3,7 +3,7 @@ import { LINK_DAYS, PREVIEW_LIMITS, appendSend, attributionToRestore, limitProbl
 import { openPreviewLink } from '../lib/previews/server';
 import { getPreferences, subscribe, unsubscribe, maskEmail } from '../lib/marketing/preferences';
 import { ATTRIBUTION_MAX_AGE_S, decodeAttribution, encodeAttribution } from '../lib/qr/attribution';
-import { PREVIEW_COPY, PREVIEW_EMAIL } from '../lib/previews/copy';
+import { PHOTO_WORDS_VERSION, PREVIEW_COPY, PREVIEW_CONSENT_VERSION_V1, PREVIEW_EMAIL, PREVIEW_LINE_V1 } from '../lib/previews/copy';
 
 let pass = 0, fail = 0;
 const ok = (name: string, cond: boolean, extra?: unknown) => { if (cond) pass++; else { fail++; console.log('FAIL', name, extra ?? ''); } };
@@ -113,6 +113,21 @@ const id = '0b6f1c2e-3d4a-4e5f-8a9b-1c2d3e4f5a6b';
 
   ({ db, tables } = mk());
   ok('unknown request id: not ok', !(await openPreviewLink(db, '1b6f1c2e-3d4a-4e5f-8a9b-1c2d3e4f5a6b', { guestId: 'x' })).ok);
+
+  // Which words were recorded: the photo wording only for a request made under it
+  ({ db, tables } = mk({ req: { photo_offers_ok: true } }));
+  await openPreviewLink(db, id, { guestId: 'laptop' });
+  let pref: any = await getPreferences(db, 'owner@x.co');
+  ok('new-wording request: the words and version shown (we keep the photo) are what is recorded', pref?.consent_wording === PREVIEW_COPY.line && pref?.consent_version === PHOTO_WORDS_VERSION && /keep your pet's photo/.test(pref.consent_wording));
+  ({ db, tables } = mk());
+  await openPreviewLink(db, id, { guestId: 'laptop' });
+  pref = await getPreferences(db, 'owner@x.co');
+  ok('old-wording request: the old words and the old version are recorded', pref?.consent_wording === PREVIEW_LINE_V1 && pref?.consent_version === '2026-11' && !/photo/.test(pref.consent_wording));
+  ok('the two versions differ', String(PHOTO_WORDS_VERSION) !== PREVIEW_CONSENT_VERSION_V1);
+
+  ({ db, tables } = mk({ prefs: [{ id: 'p1', email: 'owner@x.co', status: 'subscribed', topics: { new_designs: true, pet_days: true, offers: true } }] }));
+  await openPreviewLink(db, id, { guestId: 'laptop' });
+  ok('already subscribed: nothing re-subscribed, but opening the link still confirms the address (offers count their days from here)', tables.email_preference_events.length === 0 && !!tables.preview_email_requests[0].marketing_confirmed_at);
 
   console.log(fail ? `${fail} failed, ${pass} passed` : `${pass} passed`);
   process.exit(fail ? 1 : 0);

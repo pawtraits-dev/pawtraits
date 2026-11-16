@@ -142,6 +142,9 @@ export default function PrivacyPage() {
             <li className="relative pl-8 my-3 text-gray-600 text-base leading-relaxed before:content-['•'] before:absolute before:left-2 before:text-purple-600 before:font-bold before:text-xl">
               <strong>Featuring Pawtraits:</strong> When you create or buy a customised Pawtrait, we may show it with your original pet photo on our website and Instagram, with only your pet&apos;s first name and your town or city and country (taken from your billing or delivery address, or the market stall you bought from). We check photos automatically and leave out any showing people or personal details. You can opt out at any time with the link in your order email or by emailing support@pawtraits.pics, and we will remove anything already published
             </li>
+            <li className="relative pl-8 my-3 text-gray-600 text-base leading-relaxed before:content-['•'] before:absolute before:left-2 before:text-purple-600 before:font-bold before:text-xl">
+              <strong>Emailing you a preview:</strong> When you ask us to email you a preview, we keep your pet&apos;s photo and may use it to paint your pet into other designs and email those to you. You can stop this at any time with the unsubscribe link in any of our emails or by emailing support@pawtraits.pics, and we will then stop and no longer use your photo for offers
+            </li>
           </ul>
         </div>
 
