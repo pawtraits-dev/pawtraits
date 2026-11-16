@@ -311,7 +311,7 @@ export function customFrameCard(meta: any): (FrameCard & { petName: string | nul
 }
 
 /**
- * The message to refuse a basket or order with, or null: framed designs are prints only. Checks
+ * The message to refuse a basket or order with, or null: framed designs are sold as prints or downloads, never mugs or phone cases. Checks
  * each line's product and whether its image (catalogue design or customer portrait) is framed.
  */
 export async function framedLineProblem(supabase: SupabaseClient, lines: { imageId?: string | null; productId?: string | null; product?: any }[]): Promise<string | null> {
@@ -352,7 +352,7 @@ export type SwitchResult =
  *   off → the displayed picture becomes the painting without the frame; the card is kept as metadata.frame_off
  *   on  → the card (from the design, worded for the pet, with `petName` on the banner) is drawn on the painting
  * Refused (with a short message) for a portrait that has been ordered, and for switching on while a
- * download, mug or case of it is in the signed-in basket. Prints in the basket follow the state at ordering.
+ * mug or phone case of it is in the signed-in basket. Prints in the basket follow the state at ordering.
  */
 export async function switchCustomFrame(supabase: SupabaseClient, imageId: string, to: FrameChoice, petNameRaw?: unknown): Promise<SwitchResult> {
   const { data: row, error } = await supabase.from('customer_custom_images').select('id, catalog_image_id, status, generated_cloudinary_id, generation_metadata, metadata, pet_name').eq('id', imageId).maybeSingle();
@@ -367,7 +367,7 @@ export async function switchCustomFrame(supabase: SupabaseClient, imageId: strin
   if (to === 'off' && !cur) return { ok: true, state: 'off', petName: keepName, generatedImageUrl: '', changed: false };
   if (to === 'on' && cur && keepName === (meta.frame?.pet_name ?? null)) return { ok: true, state: 'on', petName: keepName, generatedImageUrl: '', changed: false };
 
-  // Order lines keep what was bought, so an ordered picture is left alone; a basket with a download, mug or case blocks "with frame"
+  // Order lines keep what was bought, so an ordered picture is left alone; a basket with a mug or phone case blocks "with frame"
   const { data: ordered, error: oErr } = await supabase.from('order_items').select('id').eq('image_id', imageId).limit(1);
   if (oErr) return { ok: false, status: 500, error: 'Could not check your orders just now. Please try again.' };
   const { data: basket } = await supabase.from('cart_items').select('product_data').eq('image_id', imageId).limit(50);

@@ -31,7 +31,7 @@ export async function phoneCaseCatalogue(db: SupabaseClient, designId?: string) 
     db.from('phone_models').select('id, brand, name, layout_group, case_w_mm, case_h_mm, display_order, product:products(id, sku, name, is_active, gelato_sku, pricing:product_pricing(sale_price, is_current, country_code))').eq('is_active', true).order('display_order'),
     db.from('phone_layout_groups').select('id, label, camera'),
   ]);
-  // Framed cards are prints only: no phone cases
+  // Framed cards are never phone cases
   const framed = await framedIds(db, (designs.data ?? []).map((d: any) => d.id));
   const out: PublicCaseDesign[] = (designs.data ?? []).filter((d: any) => !framed.has(d.id)).map((d: any) => ({ id: d.id, title: title(d.description), thumb: plainUrl(d.cloudinary_public_id), art: approvedArt(d.case_art) }))
     .filter(d => Object.keys(d.art).length > 0);

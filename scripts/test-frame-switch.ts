@@ -12,7 +12,7 @@ const framed = { theme: 'Leo', clean_cloudinary_id: 'clean1', clean_url: 'https:
 ok('framed: state on, isFramed', frameState(framed) === 'on' && isFramed({ generation_metadata: framed }));
 const off = metaWithoutFrame(framed)!;
 ok('switching off: no frame key, card kept as frame_off', !('frame' in off) && off.frame_off.title === 'DAISY · LEO' && off.frame_off.pet_name === 'Daisy' && off.frame_off.base_cloudinary_id === 'base1');
-ok('unframed: state off, isFramed is false (prints-only rule does not apply)', frameState(off) === 'off' && !isFramed({ generation_metadata: off }));
+ok('unframed: state off, isFramed is false (the framed-card rule does not apply)', frameState(off) === 'off' && !isFramed({ generation_metadata: off }));
 ok('other metadata is kept', off.theme === 'Leo' && off.clean_cloudinary_id === 'clean1' && off.timings.a === 1);
 ok('nothing to set aside when not framed', metaWithoutFrame(off) === null && metaWithoutFrame({}) === null);
 ok('base id: from the frame, the frame_off, else the displayed picture', unframedBaseId(framed, 'baked') === 'base1' && unframedBaseId(off, 'base1') === 'base1' && unframedBaseId({}, 'shown') === 'shown' && unframedBaseId({}, null) === null);
@@ -30,8 +30,11 @@ ok('a frame with no title is not a frame', frameState({ frame: { title: '' } }) 
 const print = { product_type: 'print', name: 'A3 print' }, mug = { product_type: 'merchandise', name: 'Mug 11oz' }, dl = { product_type: 'digital_download', name: 'Digital' };
 ok('ordered: refused both ways', switchBlocked('on', { ordered: true, basketProducts: [] }, framedProductAllowed) === FRAME_ORDERED && switchBlocked('off', { ordered: true, basketProducts: [] }, framedProductAllowed) === FRAME_ORDERED);
 ok('prints in the basket: fine either way', switchBlocked('on', { ordered: false, basketProducts: [print] }, framedProductAllowed) === null && switchBlocked('off', { ordered: false, basketProducts: [print] }, framedProductAllowed) === null);
-ok('mug or download in the basket: no framing', switchBlocked('on', { ordered: false, basketProducts: [print, mug] }, framedProductAllowed) === FRAME_IN_BASKET && switchBlocked('on', { ordered: false, basketProducts: [dl] }, framedProductAllowed) === FRAME_IN_BASKET);
-ok('unframing is never blocked by the basket', switchBlocked('off', { ordered: false, basketProducts: [mug, dl] }, framedProductAllowed) === null);
+const phoneCase = { product_type: 'physical_print', name: 'iPhone 15 Phone Case' };
+ok('mug or phone case in the basket: no framing', switchBlocked('on', { ordered: false, basketProducts: [print, mug] }, framedProductAllowed) === FRAME_IN_BASKET && switchBlocked('on', { ordered: false, basketProducts: [phoneCase] }, framedProductAllowed) === FRAME_IN_BASKET);
+ok('a download in the basket does not block framing', switchBlocked('on', { ordered: false, basketProducts: [dl] }, framedProductAllowed) === null && switchBlocked('on', { ordered: false, basketProducts: [print, dl] }, framedProductAllowed) === null);
+ok('the basket message names a mug or phone case only', /mug or phone case/.test(FRAME_IN_BASKET) && !/download/.test(FRAME_IN_BASKET));
+ok('unframing is never blocked by the basket', switchBlocked('off', { ordered: false, basketProducts: [mug, phoneCase, dl] }, framedProductAllowed) === null);
 
 // Which designs the frame never touches
 ok('customer and quiz pictures are exempt', frameExempt({ is_customer_generated: true }) && frameExempt({ tags: ['x', 'quiz-generated'] }) && !frameExempt({ tags: ['x'] }) && !frameExempt({}));

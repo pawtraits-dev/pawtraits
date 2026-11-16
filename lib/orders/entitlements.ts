@@ -9,7 +9,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { getSetting } from '@/lib/app-settings';
-import { isFramed } from '@/lib/frames/rules';
 
 const productTypeOf = (item: any): string | undefined => {
   const pd = typeof item.product_data === 'string' ? (() => { try { return JSON.parse(item.product_data); } catch { return {}; } })() : item.product_data;
@@ -61,16 +60,10 @@ export async function grantEntitlementsForOrder(
 
 async function row(supabase: SupabaseClient, order: any, customerId: string | null, imageId: string, source: string, status: string, unlockedAt: string | null) {
   // Is this a custom portrait or a catalogue design?
-  const { data: custom } = await supabase.from('customer_custom_images').select('id, generation_metadata').eq('id', imageId).maybeSingle();
-  // Framed cards can't be bought as a download on its own, but a print still comes with its bonus
-  // digital copy (the framed 2:3 picture). `gift` = the copy that comes with a print.
-  const gift = source === 'welcome_gift';
-  if (custom && isFramed(custom as any) && !gift) return null;
+  const { data: custom } = await supabase.from('customer_custom_images').select('id').eq('id', imageId).maybeSingle();
   if (!custom) {
     const { data: cat } = await supabase.from('image_catalog').select('id').eq('id', imageId).maybeSingle();
     if (!cat) return null;
-    const { data: fr, error: frErr } = await supabase.from('image_catalog').select('frame_overlay').eq('id', imageId).maybeSingle();
-    if (!frErr && isFramed(fr as any) && !gift) return null;
   }
   return {
     customer_id: customerId,

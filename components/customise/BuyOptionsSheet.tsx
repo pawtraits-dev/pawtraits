@@ -31,7 +31,7 @@ export interface BuyTarget {
   themeName?: string | null;
   /** Physical products only (e.g. a mug wrap is sold as a mug, not as a download) */
   physicalOnly?: boolean;
-  /** A framed card: prints only, and each size shows the frame fitted to its shape (watermarked thumbnails from the server) */
+  /** A framed card: a print, a download or both (not a mug or phone case); each print size shows the frame fitted to its shape (watermarked thumbnails from the server) */
   frame?: { thumbs: Partial<Record<'2:3' | '3:4', string>> | null } | null;
 }
 
@@ -94,7 +94,7 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
     fetch(`/api/public/format-products?formatId=${target.formatId}&country=GB`)
       .then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Could not load prices'); return d.products as ProductRow[]; })
       .then(all => {
-        // Framed cards are prints only (lib/frames/rules.ts)
+        // A framed card is a print or a download, never a mug or phone case (lib/frames/rules.ts)
         const rows = target.frame ? all.filter(framedProductAllowed) : target.physicalOnly ? all.filter(p => p.product_type !== 'digital_download') : all;
         setProducts(rows);
         // sensible default: the print in their hand, else the download for a custom portrait
@@ -288,7 +288,8 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
                     title={anyPrintSelected ? 'Digital download — included free' : 'Digital download only'}
                     subtitle={anyPrintSelected ? 'Comes free with the print you’ve chosen' : 'High-resolution Pawtrait · instant · perfect for phones and socials'}
                     price={anyPrintSelected ? 'Free' : gbp(pence(p.pricing))}
-                    wasPrice={anyPrintSelected ? gbp(pence(p.pricing)) : undefined} />
+                    wasPrice={anyPrintSelected ? gbp(pence(p.pricing)) : undefined}
+                    thumb={target.frame ? <ShapeThumb src={target.frame.thumbs?.['2:3'] || target.imageUrl} widthMm={200} heightMm={300} fitted={!!target.frame.thumbs?.['2:3']} /> : undefined} />
                 ))}
               </div>
             </section>

@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Framed cards are prints only
+    // Framed cards are prints or downloads, never mugs or phone cases
     const framedProblem = await framedLineProblem(serviceRoleSupabase as any, [{ imageId, productId, product }]);
     if (framedProblem) return NextResponse.json({ error: framedProblem, code: 'FRAMED_PRINTS_ONLY' }, { status: 400 });
 

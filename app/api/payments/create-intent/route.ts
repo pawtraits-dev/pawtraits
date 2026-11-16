@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'There is a problem with your basket. Please go back to your basket and try again.', code: 'INVALID_BASKET', details: badLine }, { status: 400 });
     }
 
-    // Framed cards are prints only (no downloads, mugs or phone cases), whatever the browser's basket says
+    // Framed cards are prints or downloads (no mugs or phone cases), whatever the browser's basket says
     const framedProblem = await framedLineProblem(serviceClient() as any, body.cartItems.map(i => ({ imageId: i.imageId, productId: i.productId, product: (i as any).product })));
     if (framedProblem) {
       return NextResponse.json({ error: `${framedProblem} Please remove it from your basket to continue.`, code: 'FRAMED_PRINTS_ONLY' }, { status: 400 });
