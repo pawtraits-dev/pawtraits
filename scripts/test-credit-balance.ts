@@ -1,9 +1,9 @@
 /** npx tsx scripts/test-credit-balance.ts */
 import assert from 'node:assert/strict';
-import { balanceAfterRedemption } from '../lib/commissions/credit-balance';
+import { balanceAfterRedemption, redemptionToRecord } from '../lib/commissions/credit-balance';
 let n = 0; const t = (a: unknown, b: unknown) => { assert.equal(a, b); n++; };
 
-t(balanceAfterRedemption(1000, 500), 500);     // £10 held, £5 spent, £5 left (the bug left 995)
+t(balanceAfterRedemption(1000, 500), 500);     // £10 held, £5 spent, £5 left
 t(balanceAfterRedemption(550, 550), 0);        // spend it all
 t(balanceAfterRedemption(1234, 235), 999);     // odd pence stay whole numbers (the column is an integer)
 t(balanceAfterRedemption(300, 500), 0);        // never below zero
@@ -13,4 +13,22 @@ t(balanceAfterRedemption(1000, null), 1000);
 t(balanceAfterRedemption(1000, NaN), 1000);    // malformed amount takes nothing
 t(balanceAfterRedemption(1000, -200), 1000);   // a negative amount can never add credit
 t(Number.isInteger(balanceAfterRedemption(1000.4, 499.6)), true);
+
+// What is recorded against a payment: the smaller of the claim and what the server confirmed
+t(redemptionToRecord(500, { status: 'ok', rewardsAllowed: 500 }), 500);        // honest claim
+t(redemptionToRecord(10_000_000, { status: 'ok', rewardsAllowed: 0 }), 0);     // made-up claim at full price: nothing recorded
+t(redemptionToRecord(2000, { status: 'low', rewardsAllowed: 700 }), 700);      // claims more than held: only what is held
+t(redemptionToRecord(500, { status: 'suspicious', rewardsAllowed: 500 }), 500);
+t(redemptionToRecord(500, { status: 'unchecked', rewardsAllowed: 0 }), 500);   // check could not run: keep the claim (as before)
+t(redemptionToRecord(0, { status: 'ok', rewardsAllowed: 500 }), 0);
+t(redemptionToRecord(null, { status: 'ok', rewardsAllowed: 500 }), 0);
+t(redemptionToRecord(-50, { status: 'ok', rewardsAllowed: 500 }), 0);
+t(redemptionToRecord(500, { status: 'ok' }), 0);                               // guest or not the signed-in customer: nothing confirmed
+
+// One payment, one deduction: the webhook must contain exactly one write of the reduced balance
+import { readFileSync } from 'node:fs';
+const hook = readFileSync('app/api/webhooks/stripe/route.ts', 'utf8');
+t((hook.match(/balanceAfterRedemption\(/g) || []).length, 1);
+t(/rewardAmountPounds/.test(hook), false);
+t((hook.match(/await handleCreditRedemption\(/g) || []).length, 1);
 console.log(`credit-balance: ${n} passed`);

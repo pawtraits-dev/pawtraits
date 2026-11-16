@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { redemptionToRecord } from '@/lib/commissions/credit-balance';
 import { createPaymentIntent } from '@/lib/stripe-server';
 import { getSupabaseClient } from '@/lib/supabase-client';
 import { checkoutValidation } from '@/lib/checkout-validation';
@@ -300,6 +301,13 @@ export async function POST(request: NextRequest) {
     });
     const enforcePriceCheck = process.env.PRICE_CHECK_MODE !== 'log';
     metadata.priceCheck = priceCheck.status;
+    // Record only the credit the server confirmed this customer holds, not what the browser claimed
+    // (lib/commissions/credit-balance.ts). The amount charged is not changed here.
+    if (metadata.rewardRedemption) {
+      const confirmed = redemptionToRecord(body.rewardRedemption, priceCheck);
+      if (confirmed > 0) metadata.rewardRedemption = confirmed.toString();
+      else delete metadata.rewardRedemption;
+    }
     if (priceCheck.status !== 'ok') {
       console.warn('💷 Price check', priceCheck.status, {
         amount: body.amount, required: priceCheck.required, floor: priceCheck.floor, shipping: priceCheck.shipping,

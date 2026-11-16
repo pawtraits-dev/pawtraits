@@ -767,38 +767,9 @@ async function handleSimplifiedCommissions(
       rewardRedemption: metadata.rewardRedemption
     });
 
-    // Handle reward redemption if present (deduct from customer's credit balance)
-    if (metadata.rewardRedemption && parseInt(metadata.rewardRedemption) > 0) {
-      const rewardAmountPence = parseInt(metadata.rewardRedemption);
-      const rewardAmountPounds = rewardAmountPence / 100;
-
-      console.log(`💰 Processing reward redemption: £${rewardAmountPounds} (${rewardAmountPence} pence) for ${customerEmail}`);
-
-      // Get customer to deduct from their credit balance
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .select('id, current_credit_balance')
-        .eq('email', customerEmail.toLowerCase())
-        .single();
-
-      if (!customerError && customer) {
-        // The balance is held in pence, so take off pence (this used to take off pounds: a £5 redemption removed 5p)
-        const newBalance = balanceAfterRedemption(customer.current_credit_balance, rewardAmountPence);
-
-        const { error: updateError } = await supabase
-          .from('customers')
-          .update({ current_credit_balance: newBalance })
-          .eq('id', customer.id);
-
-        if (updateError) {
-          console.error('Failed to deduct reward redemption:', updateError);
-        } else {
-          console.log(`✅ Reward redeemed: Deducted £${rewardAmountPounds} from customer balance. New balance: £${(newBalance / 100).toFixed(2)}`);
-        }
-      } else {
-        console.error('Failed to find customer for reward redemption:', customerError);
-      }
-    }
+    // Credit a customer spends is taken off their balance once, by handleCreditRedemption (called just before
+    // this function). A second deduction used to live here; it subtracted pounds from the pence balance, so a
+    // partial redemption cost the customer an extra 1% of the amount, and it also wiped any negative balance.
 
     // Case 1: Partner Orders - No commission, they get 20% discount (handled at checkout)
     if (orderingUserProfile?.user_type === 'partner') {
@@ -1669,15 +1640,14 @@ async function handleCreditRedemption(
     });
 
     // Deduct credit from customer balance
-    const newBalance = (customer.current_credit_balance || 0) - creditAmount;
+    // Pence off pence, never below zero (lib/commissions/credit-balance.ts)
+    const newBalance = balanceAfterRedemption(customer.current_credit_balance, creditAmount);
 
-    if (newBalance < 0) {
-      console.warn('⚠️  Credit redemption would result in negative balance:', {
+    if ((customer.current_credit_balance || 0) < creditAmount) {
+      console.warn('⚠️  More credit redeemed than was held; balance set to zero:', {
         currentBalance: customer.current_credit_balance,
         creditAmount,
-        newBalance
       });
-      // Still proceed but log the warning
     }
 
     const { error: updateError } = await supabase
