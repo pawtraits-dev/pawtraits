@@ -163,7 +163,7 @@ async function logEvent(supabase: SupabaseClient, e: { email: string; action: 's
  * Say yes. Allowed even if the address is unsubscribed, because it is only ever called from a
  * deliberate tick or the preferences page. Records the wording shown and the version.
  */
-export async function subscribe(supabase: SupabaseClient, input: { email: string; source: ConsentSource; customerId?: string | null; topics?: Partial<EmailTopics>; wording?: string; basis?: ConsentBasis }): Promise<PreferenceRow> {
+export async function subscribe(supabase: SupabaseClient, input: { email: string; source: ConsentSource; customerId?: string | null; topics?: Partial<EmailTopics>; wording?: string; basis?: ConsentBasis; /** consent_version to record when this flow's words have their own version (default CONSENT_VERSION) */ version?: string }): Promise<PreferenceRow> {
   const email = normaliseEmail(input.email);
   if (!email) throw new Error('Not an email address');
   const topics = input.topics ? normaliseTopics(input.topics, false) : ALL_TOPICS_ON;
@@ -173,7 +173,7 @@ export async function subscribe(supabase: SupabaseClient, input: { email: string
   const customerId = input.customerId ?? (await customerIdFor(supabase, email));
   const { data, error } = await supabase.from('email_preferences').upsert({
     email, ...(customerId ? { customer_id: customerId } : {}), status: 'subscribed', topics, basis: input.basis ?? 'consent',
-    consent_source: input.source, consent_wording: wording, consent_version: CONSENT_VERSION, consented_at: now,
+    consent_source: input.source, consent_wording: wording, consent_version: input.version ?? CONSENT_VERSION, consented_at: now,
     unsubscribed_at: null, unsubscribe_source: null, updated_at: now,
   }, { onConflict: 'email' }).select('*').single();
   if (error) throw new Error(error.message);

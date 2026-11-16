@@ -3,7 +3,7 @@ export const PREVIEW_COPY = {
   heading: 'Not ready to decide?',
   // Asking for the preview is the sign-up (decided 14 November 2026): no separate tick. These are the
   // words recorded as what the person agreed to.
-  line: 'Send me this design, and the occasional special treat. Say \'Stop it\' at any time and we will be very obedient.',
+  line: 'Send me this design, and the occasional special treat. We\'ll keep your pet\'s photo so Pawcasso can paint them into a few more. Say \'Stop it\' at any time and we will be very obedient.',
   // Signed-in customers already have their own email choices; for them it is just the preview
   lineSignedIn: 'We\'ll email you this preview so you can pick it up later, on any device.',
   fieldLabel: 'Your email',
@@ -21,12 +21,25 @@ export const PREVIEW_COPY = {
   errUnavailable: 'Emailing previews isn\'t available just yet. Please try again soon.',
 } as const;
 
+/**
+ * Which words the card showed, recorded with each request and each subscription. PHOTO_WORDS_VERSION is the
+ * wording that tells people we keep the photo (16 November 2026); only requests made under it can be used for
+ * offers (preview_email_requests.photo_offers_ok). The card sends this version with the request so a page that was
+ * already open under the old words (before a deploy) is not counted as having been told.
+ */
+export const PHOTO_WORDS_VERSION = '2026-11-16-photo';
+export const PREVIEW_CONSENT_VERSION_V1 = '2026-11';
+/** The words before 16 November 2026 (requests made then keep these as their recorded wording) */
+export const PREVIEW_LINE_V1 = 'Send me this design, and the occasional special treat. Say \'Stop it\' at any time and we will be very obedient.';
+
 /** The email itself */
 export const PREVIEW_EMAIL = {
   heading: 'Here\'s your preview',
   preheader: 'Pick up where you left off, on any device.',
   button: 'See my preview',
-  marketingLine: 'Opening your preview also signs you up for the occasional special treat. Say \'Stop it\' at any time and we will be very obedient. If you didn\'t ask for this, do nothing and you won\'t hear from us again.',
+  marketingLine: 'Opening your preview also signs you up for the occasional special treat, and we\'ll keep your pet\'s photo so Pawcasso can paint them into a few more. Say \'Stop it\' at any time and we will be very obedient. If you didn\'t ask for this, do nothing and you won\'t hear from us again.',
+  /** For a request made before the photo wording (a page left open across the change): no mention of the photo */
+  marketingLineV1: 'Opening your preview also signs you up for the occasional special treat. Say \'Stop it\' at any time and we will be very obedient. If you didn\'t ask for this, do nothing and you won\'t hear from us again.',
   footerNote: 'You\'re getting this because someone asked for this preview to be sent here from pawtraits.pics. If that wasn\'t you, you can ignore it.',
   subject: (firstName: string | null) => (firstName ? `${firstName}'s Pawtrait preview is ready` : 'Your Pawtrait preview is ready'),
   body: (firstName: string | null) => `Pawcasso has painted ${firstName ?? 'your pet'} in. Have another look, pick a size, and it's yours.`,

@@ -27,3 +27,8 @@ export function looksLikeVersion(row: { variation_of?: string | null; tags?: str
     || (row.tags ?? []).some(t => VERSION_TAG_LIST.includes(t))
     || VERSION_FOLDERS.some(f => (row.cloudinary_public_id ?? '').startsWith(f));
 }
+
+/** The same rule as onlyOriginals(), for a row already loaded (needs variation_of, tags and cloudinary_public_id) */
+export function isOriginalRow(row: { variation_of?: string | null; tags?: string[] | null; cloudinary_public_id?: string | null }): boolean {
+  return !looksLikeVersion(row);
+}

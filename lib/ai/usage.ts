@@ -15,6 +15,7 @@ import { costOf, PRICES_AS_OF, priceFor, type TokenCounts } from '@/lib/ai/price
 
 export type AiFeature =
   | 'customer-painting'     // customer custom image (customise page)
+  | 'offer-preview'         // Offers: a customer's kept photo painted into another design (lib/offers/)
   | 'customer-variation'    // customer breed/coat/outfit variation
   | 'public-variation'      // public try-it variation
   | 'admin-variation'       // admin catalogue variations

@@ -1,0 +1,16 @@
+{{#> layout title=heading preheader=preheader footer_note=why_line}}
+<tr><td class="pt-pad" style="padding:4px 32px 0;font-family:Arial,Helvetica,sans-serif;">
+  {{> heading text=heading}}
+  <p style="margin:0;font-size:16px;line-height:1.55;color:#374151;">{{intro_line}}</p>
+</td></tr>
+{{#each pictures}}
+{{> portrait src=src alt=alt}}
+<tr><td class="pt-pad" style="padding:4px 32px 10px;font-family:Arial,Helvetica,sans-serif;" align="center">
+  <p style="margin:6px 0 0;font-size:15px;font-weight:bold;line-height:1.4;color:#1f2937;">{{title}}</p>
+  {{> button url=url label="See it bigger" margin="12px 0 8px"}}
+</td></tr>
+{{/each}}
+{{#if price_line}}<tr><td class="pt-pad" style="padding:4px 32px 26px;font-family:Arial,Helvetica,sans-serif;">
+  <p style="margin:0;font-size:14px;line-height:1.5;color:#6b7280;">{{price_line}}</p>
+</td></tr>{{/if}}
+{{/layout}}

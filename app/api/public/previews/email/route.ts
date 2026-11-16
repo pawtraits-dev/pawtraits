@@ -19,7 +19,7 @@ import { canAccessCustomImage, clientIp, getRequester } from '@/lib/guest/access
 import { QR_ATTRIBUTION_COOKIE } from '@/lib/qr/attribution';
 import { maskEmail, normaliseEmail } from '@/lib/marketing/preferences';
 import { requestPreviewEmail } from '@/lib/previews/server';
-import { PREVIEW_COPY } from '@/lib/previews/copy';
+import { PHOTO_WORDS_VERSION, PREVIEW_COPY } from '@/lib/previews/copy';
 
 export const dynamic = 'force-dynamic';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
 
   const r = await requestPreviewEmail(supabase, {
     imageId, email: typed, marketingTicked: !requester.user,   // not signed in: asking for the preview is the sign-up (confirmed when the link is opened)
+    photoWordsShown: body?.wording === PHOTO_WORDS_VERSION,    // the card sends the version of the words it showed (we keep the photo)
     user: requester.user ? { id: requester.user.id, email: requester.user.email } : null,
     guestId: requester.guestId, qrCookie: req.cookies.get(QR_ATTRIBUTION_COOKIE)?.value ?? null, ip: clientIp(req),
     baseUrl: (process.env.NEXT_PUBLIC_BASE_URL || req.nextUrl.origin).replace(/\/$/, ''),

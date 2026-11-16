@@ -34,6 +34,18 @@
     "app/api/cron/royal-mail-tracking/route.ts": {
       "maxDuration": 300
     },
+    "app/api/cron/offers/route.ts": {
+      "maxDuration": 300,
+      "memory": 1769
+    },
+    "app/api/admin/offers/run/route.ts": {
+      "maxDuration": 300,
+      "memory": 1769
+    },
+    "app/api/admin/offers/route.ts": {
+      "maxDuration": 300,
+      "memory": 1769
+    },
     "app/api/admin/quizzes/breed-batch/tick/route.ts": {
       "maxDuration": 300,
       "memory": 1769
@@ -55,6 +67,10 @@
     {
       "path": "/api/cron/royal-mail-tracking",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/offers",
+      "schedule": "17 * * * *"
     }
   ],
   "regions": [

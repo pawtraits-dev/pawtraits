@@ -1,6 +1,7 @@
 /** Labels and number formats for Admin > AI costs */
 export const FEATURES: Record<string, string> = {
   'customer-painting': 'Customer paintings',
+  'offer-preview': 'Offer previews',
   'customer-variation': 'Customer variations',
   'public-variation': 'Try-it variations',
   'admin-variation': 'Admin variations',
