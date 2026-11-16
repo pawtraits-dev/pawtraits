@@ -47,6 +47,7 @@ import {
   ChevronRight,
   Award,
   Smartphone,
+  BookOpen,
 } from 'lucide-react';
 import Image from 'next/image';
 import { SupabaseService } from '@/lib/supabase';
@@ -64,6 +65,7 @@ interface AdminLayoutProps {
 // Grouped by job: making designs, the settings they're made from, what customers make, selling,
 // stalls, people, marketing, numbers. Each group folds away (the one with the current page opens).
 const overviewItem = { name: 'Overview', href: '/admin', icon: Home };
+const manualItem = { name: 'Operating manual', href: '/admin/manual', icon: BookOpen };
 const navigationSections = [
   {
     title: 'Catalogue',
@@ -306,6 +308,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           >
             <Home className="w-4 h-4 mr-3" />
             {overviewItem.name}
+          </Link>
+          <Link
+            href={manualItem.href}
+            onClick={() => setSidebarOpen(false)}
+            aria-current={matches(pathname || '', manualItem.href) ? 'page' : undefined}
+            className={`mb-2 flex items-center px-3 py-2 text-sm rounded-md transition-colors duration-200 ${
+              matches(pathname || '', manualItem.href) ? 'bg-purple-100 text-purple-700 font-medium' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+            }`}
+          >
+            <BookOpen className="w-4 h-4 mr-3" />
+            {manualItem.name}
           </Link>
           {navigationSections.map((section) => {
             const open = openGroups.includes(section.title);

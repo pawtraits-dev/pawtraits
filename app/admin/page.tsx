@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, ChevronRight, Coins, Image as ImageIcon,
-  Layers, Loader2, MapPin, Printer, QrCode, RefreshCw, ShoppingBag, Sparkles, Wand2,
+  BookOpen, Layers, Loader2, MapPin, Printer, QrCode, RefreshCw, ShoppingBag, Sparkles, Wand2,
 } from 'lucide-react';
 import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
@@ -99,6 +99,12 @@ export default function AdminDashboard() {
           </button>
         </div>
       </div>
+
+      <Link href="/admin/manual" className="flex items-center gap-3 rounded-xl border border-purple-200 bg-purple-50/60 px-4 py-3 text-sm hover:border-purple-400">
+        <BookOpen className="h-5 w-5 shrink-0 text-purple-700" aria-hidden />
+        <span className="flex-1"><span className="font-semibold text-gray-900">Today&apos;s checklist</span> <span className="text-gray-700">- what to do today, and how, in the Operating manual.</span></span>
+        <ChevronRight className="h-4 w-4 text-gray-400" aria-hidden />
+      </Link>
 
       {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
       {!data && loading && <p className="text-sm text-gray-500">Loading…</p>}
