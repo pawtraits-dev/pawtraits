@@ -276,8 +276,8 @@ function BreedCoverage({ data, onDone }: { data: Analytics; onDone: () => void }
         if (!res.ok) throw new Error(d.error || 'Failed');
         done += d.tried; matched += d.matched;
         setRemaining(d.remaining);
-        setProgress(`${done} checked, ${matched} matched to a breed`);
-        if (!d.tried || !d.remaining) break;
+        setProgress(`${done} checked, ${matched} matched to a breed or coat`);
+        if (!d.tried || !d.remaining || d.failed === d.tried) break; // nothing left, or this batch all failed
       }
     } catch (e: any) { setProgress(`Stopped: ${e.message}`); }
     setRunning(false);
@@ -292,7 +292,7 @@ function BreedCoverage({ data, onDone }: { data: Analytics; onDone: () => void }
       {remaining !== null && remaining > 0 && (
         <button onClick={run} disabled={running} className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-1 font-medium text-purple-800 hover:bg-purple-100 disabled:opacity-60">
           <ScanSearch className={`h-3.5 w-3.5 ${running ? 'animate-pulse' : ''}`} />
-          {running ? 'Detecting…' : `Detect breeds for ${int(remaining)} older customisations (about $${(remaining * 0.004).toFixed(2)})`}
+          {running ? 'Detecting…' : `Detect breeds and coats for ${int(remaining)} customisations (about $${(remaining * 0.004).toFixed(2)})`}
         </button>
       )}
       {progress && <span>{progress}</span>}
