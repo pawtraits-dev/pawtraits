@@ -168,13 +168,15 @@ Audiences lists buyers, preview emailers and stall scanners (with a Meta custome
 
 ## Referrals
 Customers and partners share a personal code and a friend landing link, with credit or commission on first orders.
-- **Pages:** `app/referrals/page.tsx`, `app/referrals/create/page.tsx`, `app/c/[code]/page.tsx` (friend landing link `/c/CODE`), `app/r/[code]/page.tsx`, `app/r/customer/[code]/page.tsx`, `app/r/partner/[code]/page.tsx`, `app/admin/referrals/page.tsx`
+- **Pages:** `app/referrals/page.tsx`, `app/referrals/create/page.tsx`, `app/c/[code]/page.tsx` (friend landing link `/c/CODE`), `app/r/[code]/page.tsx`, `app/r/customer/[code]/page.tsx`, `app/r/partner/[code]/page.tsx`, `app/admin/referrals/page.tsx`, `app/admin/customer-referrals/page.tsx` (admin report: code use, sales, descendants)
 - **API:** `app/api/c/[code]/route.ts`, `app/api/referrals/route.ts`, `app/api/referrals/mine/route.ts`, `app/api/referrals/validate/route.ts`, `app/api/referrals/customer/route.ts`, `app/api/customers/referral-code/route.ts`, `app/api/customer-referrals/verify/[code]/route.ts`
-- **Logic:** `lib/referrals/share.ts` (a customer's code, link and QR), `lib/referrals/text.ts` (wording and link building, pure), `lib/referrals/code.ts` (unique code), `lib/commissions/customer-credit.ts` (credit earned)
+- **Logic:** `lib/referrals/share.ts` (a customer's code, link and QR), `lib/referrals/text.ts` (wording and link building, pure), `lib/referrals/code.ts` (unique code), `lib/commissions/customer-credit.ts` (credit earned), `lib/referrals/admin-report.ts` (the admin report: referral graph, descendants, pure functions)
 - **Components:** `components/referrals/`
 - **Tables:** `customer_referrals`, `referrals`, `customers`, `partners`, `commissions`, `pre_registration_codes`
-- **Tests:** `scripts/test-referral-share.ts`
+- **Tests:** `scripts/test-referral-share.ts`, `scripts/test-referral-report.ts`
 - **Watch out:** a code is only returned for a registered customer; the share link is `<site>/c/<CODE>` with optional `?d=<design id>` (`lib/referrals/text.ts`). Checkout takes 10% off a first order with a valid code, checked server-side in `lib/checkout/price-check.ts`.
+- **How it is really recorded (read 16 Nov 2026, by code not by running):** the code a friend used is on `orders.referral_code` (set only when a discount was applied); the buyer is `orders.customer_email` (no customer id on orders). A referrer's credit is a `commissions` row with `commission_type = 'customer_credit'` and `recipient_id` = the referrer's `customers.id`, written by `handleCustomerCredit` in `app/api/webhooks/stripe/route.ts`, and only when the friend's `customers` row has `referral_type = 'CUSTOMER'` and `referrer_id` (set at signup by `app/api/referrals/verify/[code]/route.ts`). Link opens are `customer_referrals.qr_scans_count` (one row per code), written only by the older `/r/…` pages, not by `/c/CODE`. Nothing reliable writes `customers.referred_by_customer_id`, `total_referrals`, `successful_referrals`, `rewards_earned`, `referral_scans_count`, or the status and order columns of `customer_referrals`.
+- **Known problems, not yet fixed (owner to decide):** reward redemption in the Stripe webhook subtracts pounds from `current_credit_balance`, which is pence; a guest who uses a share link gets the discount but the referrer gets no credit; when linked, the referrer is credited on every order the friend places.
 
 ## Messaging and email templates
 Order, account and marketing emails: HTML templates, a queue processed every minute, and instant sends.

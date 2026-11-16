@@ -26,7 +26,8 @@ most like this one ("copy the pattern in `app/admin/audiences/page.tsx`"). Say "
 **4. Build.** Numbered parts. For each: the file to create or change, the function or route and its
 inputs and outputs, the rules, and the edge cases. State rules as rules ("a person who is both counts
 once, as a buyer"), not as hopes ("handle duplicates"). Give exact customer-facing wording in quotes.
-Say what must NOT change ("do not change payment logic"; "the Buyers tab is unchanged").
+Say what must NOT change ("do not change payment logic"; "the Buyers tab is unchanged"), and for a
+read-only or additive task list the folders that must not be edited at all.
 
 **5. Safety.** What can send email, spend AI money, take payment or change customer data, and the guard
 for each. New features of that kind ship switched off and must do nothing before their migration is run.
@@ -38,7 +39,8 @@ behaviours including the awkward ones (zero, missing, duplicate, boundary dates,
 this area named. Include "no sibling dynamic route folders with differing param names" when adding routes.
 
 **8. Report back.** Ask for: files changed; every name relied on and where it was confirmed; deviations
-from the brief and why; what could not be verified; check results with numbers; the commit hash.
+from the brief and why; what could not be verified; anything that looked wrong in code it read but was told not to change;
+check results with numbers; the commit hash.
 
 ## Rules that make briefs work
 

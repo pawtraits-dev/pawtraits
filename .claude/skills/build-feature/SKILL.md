@@ -28,6 +28,14 @@ consent weight, prices, anything irreversible. Otherwise choose a sensible defau
 Read the feature's entry in `docs/claude/map.md`. Send `scout` for anything you would otherwise guess:
 exact columns, the existing pattern to copy, a label's exact text. Several scout questions can run at once.
 
+Give `scout` numbered, specific questions and the files to start from ("when a friend orders with a code,
+which tables and columns are written? Start at the Stripe webhook"). Ask it to trace what the code really
+writes, not what the column names suggest: half the columns in an old table may be written by nothing.
+
+If a scout or builder reports something that looks like a bug, **read that code yourself before telling
+the owner**. Cheap models are good at spotting oddities and less reliable at judging them. Report what you
+confirmed, say it was confirmed by reading and not by running, and do not fix it inside an unrelated task.
+
 ## 3. Brief
 
 Write the brief with the `write-brief` skill (or have `planner` write it). One brief per independently

@@ -25,4 +25,5 @@ How you work:
 
 Your report, in this order: what you built (files added and changed); every name you relied on and where
 you confirmed it; anything you did differently from the brief and why; everything you could not verify;
-check results with the numbers; the commit hash.
+anything that looked wrong in code you read but were told not to change (`path:line`, one sentence, not
+fixed); check results with the numbers; the commit hash.

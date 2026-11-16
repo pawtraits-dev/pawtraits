@@ -107,6 +107,15 @@ and make the calls that are yours (wording, money, who gets contacted).
   it down.
 - Keep `CLAUDE.md` short. Anything long belongs in `docs/claude/` or a skill, where it is only read when needed.
 
+## First run (16 November 2026)
+
+The Customer Referrals admin page was built through this process on the day it was written: Haiku traced
+the data, Sonnet built from the brief, Haiku ran the checks, and the page merged first time. Two things
+were learned and are now in the instructions. First, the Haiku scout, asked to trace what the code really
+writes, turned up three faults in the referral scheme that nobody had asked about; so scouts are now told
+to list what looks wrong, and the lead to confirm it by reading before reporting. Second, a table can look
+complete in the schema while nothing writes half its columns; briefs must say which columns to trust.
+
 ## Limits of this setup
 
 - It was written from Claude Code's documentation as of November 2026 and has not yet been run for a
