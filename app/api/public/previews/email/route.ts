@@ -20,6 +20,7 @@ import { QR_ATTRIBUTION_COOKIE } from '@/lib/qr/attribution';
 import { maskEmail, normaliseEmail } from '@/lib/marketing/preferences';
 import { requestPreviewEmail } from '@/lib/previews/server';
 import { cleanBirthday } from '@/lib/offers/dates';
+import { linkBaseUrl } from '@/lib/site-url';
 import { PHOTO_WORDS_VERSION, PREVIEW_COPY } from '@/lib/previews/copy';
 
 export const dynamic = 'force-dynamic';
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
     photoWordsShown: body?.wording === PHOTO_WORDS_VERSION,    // the card sends the version of the words it showed (we keep the photo)
     user: requester.user ? { id: requester.user.id, email: requester.user.email } : null,
     guestId: requester.guestId, qrCookie: req.cookies.get(QR_ATTRIBUTION_COOKIE)?.value ?? null, ip: clientIp(req),
-    baseUrl: (process.env.NEXT_PUBLIC_BASE_URL || req.nextUrl.origin).replace(/\/$/, ''),
+    baseUrl: linkBaseUrl(req.nextUrl.origin),   // a preview deployment links back to itself (lib/site-url.ts)
   });
   if (r.ok) {
     // Meta "Lead" (server side), only with marketing cookies. The event id is a fresh random one, not the
