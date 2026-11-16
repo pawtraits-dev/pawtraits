@@ -11,17 +11,17 @@ export const SITE_URL = 'https://pawtraits.pics';
 
 export const REFERRAL_COPY = {
   heading: 'Give 10%, get 10%',
-  line: 'Your friend gets 10% off their first Pawtrait. You get 10% of their order as credit.',
+  line: 'Your friend gets 10% off their first Pawtrait. You get 10% of their first order as credit.',
   shareButton: 'Share with a friend',
   copyButton: 'Copy link',
   copiedButton: 'Copied',
   whatsapp: 'Share on WhatsApp',
   creditLink: 'See my credit',
   qrCaption: 'Or show a friend this code',
-  emailLine: 'Know someone whose pet deserves a Pawtrait? Send them your link: they get 10% off their first, you get 10% of their order as credit.',
+  emailLine: 'Know someone whose pet deserves a Pawtrait? Send them your link: they get 10% off their first, you get 10% of that order as credit.',
   emailButton: 'Share my link',
   emailKeepGoing: 'Keep it going',
-  slipLine: 'Show a friend this code. They get 10% off their first Pawtrait, you get 10% of their order as credit.',
+  slipLine: 'Show a friend this code. They get 10% off their first Pawtrait, you get 10% of that order as credit.',
   bannerSub: 'It comes off at checkout. Pick a design and add your pet\'s photo.',
 } as const;
 

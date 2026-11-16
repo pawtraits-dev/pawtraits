@@ -1099,7 +1099,7 @@ export default function CustomerDetailPage() {
                   <CardHeader>
                     <CardTitle>Earned Credits</CardTitle>
                     <CardDescription>
-                      Credits earned from customer referrals (10% of referred customer orders)
+                      Credits earned from customer referrals (10% of each referred customer's first order)
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

@@ -1,6 +1,6 @@
 /** npx tsx scripts/test-credit-balance.ts */
 import assert from 'node:assert/strict';
-import { balanceAfterRedemption, redemptionToRecord, isFriendsFirstOrder } from '../lib/commissions/credit-balance';
+import { balanceAfterRedemption, redemptionToRecord, isFriendsFirstOrder, referrerEarnsCredit } from '../lib/commissions/credit-balance';
 let n = 0; const t = (a: unknown, b: unknown) => { assert.equal(a, b); n++; };
 
 t(balanceAfterRedemption(1000, 500), 500);     // £10 held, £5 spent, £5 left
@@ -43,7 +43,17 @@ t(isFriendsFirstOrder([{ payment_status: 'pending', status: 'confirmed' }]), tru
 t(isFriendsFirstOrder([{ payment_status: 'paid', status: 'refunded' }]), true);                   // a refunded order does not count
 t(isFriendsFirstOrder([{ payment_status: 'paid', status: 'Cancelled' }]), true);
 t(isFriendsFirstOrder([{ payment_status: 'failed', status: 'confirmed' }, { payment_status: 'PAID', status: 'shipped' }]), false);
-t(/isFriendsFirstOrder\(otherOrders\)/.test(hook), true);
+t(isFriendsFirstOrder([{ payment_status: 'paid', status: 'canceled' }]), true);                   // American spelling
+t(isFriendsFirstOrder([{ payment_status: 'paid', status: 'on_hold' }]), false);                   // a held order is still a sale
+t(referrerEarnsCredit([], false), true);
+t(referrerEarnsCredit([], true), false);                                                          // first order was cancelled after earning credit: no second credit
+t(referrerEarnsCredit([{ payment_status: 'paid', status: 'cancelled' }], true), false);
+t(referrerEarnsCredit([{ payment_status: 'paid', status: 'confirmed' }], false), false);
+t(/referrerEarnsCredit\(others\.data/.test(hook), true);
+t(/\.neq\('id', order\.id\)/.test(hook), true);                                                   // the order being processed is excluded
+t(/\.ilike\('customer_email', emailPattern\)/.test(hook), true);                                  // capitals in the email cannot hide an earlier order
+t(/metadata->>customer_id/.test(hook), true);
+t(/customer\.referral_type === 'PARTNER' && customer\.referrer_id\) \{\s*await handlePartnerCommission\(/.test(hook), true);   // partners unchanged
 t((hook.match(/await handleCustomerCredit\(/g) || []).length, 1);
 
 // Odd input never throws (a throw used to skip the whole price check)

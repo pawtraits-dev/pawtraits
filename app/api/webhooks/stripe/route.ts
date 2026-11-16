@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server';
-import { balanceAfterRedemption, isFriendsFirstOrder } from '@/lib/commissions/credit-balance';
+import { balanceAfterRedemption, referrerEarnsCredit } from '@/lib/commissions/credit-balance';
 import { headers } from 'next/headers';
 import { constructWebhookEvent } from '@/lib/stripe-server';
 import { createClient } from '@supabase/supabase-js';
@@ -855,22 +855,24 @@ async function handleSimplifiedCommissions(
     // Case 4: Customer Referred Customer - 10% credit to referring customer, on the friend's FIRST order only
     // (decided 16 Nov 2026; it used to be every order). Partners above still earn on every order.
     if (customer.referral_type === 'CUSTOMER' && customer.referrer_id) {
-      const emails = Array.from(new Set([customerEmail, customerEmail.toLowerCase().trim()]));
-      const { data: otherOrders, error: otherOrdersError } = await supabase
-        .from('orders')
-        .select('id, payment_status, status')
-        .in('customer_email', emails)
-        .neq('id', order.id)
-        .limit(200);
-      if (otherOrdersError) {
+      // Two checks, both must pass:
+      //  1. the friend has no other paid order that still stands (email matched whatever its capitals; % and _ escaped);
+      //  2. this friend has never earned their referrer a credit before. Without it, a first order that is later
+      //     cancelled would let the next order earn credit again, as nothing takes credit back on cancellation.
+      const emailPattern = customerEmail.trim().replace(/[\\%_]/g, (c: string) => '\\' + c);
+      const [others, credited] = await Promise.all([
+        supabase.from('orders').select('id, payment_status, status').ilike('customer_email', emailPattern).neq('id', order.id).limit(200),
+        supabase.from('commissions').select('id').eq('commission_type', 'customer_credit').eq('metadata->>customer_id', customer.id).limit(1),
+      ]);
+      if (others.error || credited.error) {
         // Cannot tell whether this is the first order: do not risk crediting twice. The admin Customer Referrals
         // page lists referred sales that gave no credit, so a missed one can be put right by hand.
-        console.error('❌ Could not check for earlier orders; referral credit not given for order', order.id, otherOrdersError.message);
-      } else if (isFriendsFirstOrder(otherOrders)) {
+        console.error('❌ Could not check for earlier orders or credit; referral credit not given for order', order.id, others.error?.message || credited.error?.message);
+      } else if (referrerEarnsCredit(others.data, (credited.data || []).length > 0)) {
         await handleCustomerCredit(supabase, order, customer, subtotalAmount);
         commissionCreated = true;
       } else {
-        console.log('ℹ️ Not the referred customer\'s first order - no referral credit');
+        console.log('ℹ️ Not the referred customer\'s first order, or already credited - no referral credit');
       }
     }
 

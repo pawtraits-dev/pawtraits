@@ -33,11 +33,20 @@ export function redemptionToRecord(claimedPence: number | null | undefined, chec
 const NOT_A_SALE = new Set(['cancelled', 'canceled', 'refunded', 'failed']);
 
 /**
- * A referrer earns credit on the FIRST order their friend places, and only that one (the friend's own
- * discount is first-order only too). Given the friend's OTHER orders (not the one being processed),
- * true when none of them is a paid order that still stands.
+ * A referrer earns credit on the FIRST order their friend places, and only that one.
+ * Given the friend's OTHER orders (not the one being processed), true when none of them is a paid order
+ * that still stands.
  */
 export function isFriendsFirstOrder(otherOrders: { payment_status?: string | null; status?: string | null }[] | null | undefined): boolean {
   return !(otherOrders || []).some(o =>
     String(o.payment_status ?? '').toLowerCase() === 'paid' && !NOT_A_SALE.has(String(o.status ?? '').toLowerCase()));
+}
+
+/**
+ * The whole rule: credit only on the friend's first order, and only once per friend ever. The second half
+ * matters because nothing takes credit back when an order is cancelled or refunded: without it a cancelled
+ * first order would let the friend's next order earn their referrer a second credit.
+ */
+export function referrerEarnsCredit(otherOrders: Parameters<typeof isFriendsFirstOrder>[0], alreadyCreditedForThisFriend: boolean): boolean {
+  return !alreadyCreditedForThisFriend && isFriendsFirstOrder(otherOrders);
 }
