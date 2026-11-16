@@ -765,8 +765,9 @@ export class CloudinaryImageService {
   /**
    * Get download URL with brand overlay (after purchase verification)
    * URLs expire after 7 days for security (customer can request new URL)
+   * `opts.transformation` (optional) is a raw transformation drawn before the quality / attachment steps.
    */
-  async getDownloadUrl(publicId: string, userId: string, orderId: string): Promise<string> {
+  async getDownloadUrl(publicId: string, userId: string, orderId: string, opts: { transformation?: string } = {}): Promise<string> {
     try {
       ensureCloudinaryConfig();
       console.log(`🔄 Generating download URL for user: ${userId}, order: ${orderId}`);
@@ -775,7 +776,8 @@ export class CloudinaryImageService {
       // Cloudinary refuse the whole file). Saved as pawtrait-<order>.png.
       const expiresAt = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 days
       const signedUrl = cloudinary.url(publicId, {
-        transformation: [{ quality: 100, flags: `attachment:pawtrait-${String(orderId).slice(0, 8)}` }],
+        // `opts.transformation`: a raw transformation applied first (a framed card's frame, drawn at download size)
+        transformation: [...(opts.transformation ? [{ raw_transformation: opts.transformation }] : []), { quality: 100, flags: `attachment:pawtrait-${String(orderId).slice(0, 8)}` }],
         format: 'png',
         sign_url: true,
         expires_at: expiresAt,
