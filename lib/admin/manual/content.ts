@@ -1087,7 +1087,7 @@ export const GUIDES: Guide[] = [
         heading: 'One design at a time',
         body: [
           'Open a design in **Image Catalog**. For a Pawsonality design the **Caption plate** panel puts the plate on or takes it off. **Take it off** removes it.',
-          'For a zodiac or tarot design, the **Framed card** panel draws the frame. **Remove the frame** takes it away.',
+          'For a zodiac or tarot design, the **Framed card** panel draws the frame. **Remove the frame** takes it away. A framed design is sold as a print or a digital download, and is left out of the mug and phone case ranges.',
           '**Words on the picture** is a separate panel for adding words to a design.',
         ],
         links: [P.imageCatalog],
@@ -1498,7 +1498,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   { term: 'Variation batch', meaning: 'A saved set of breed, coat and outfit combinations that is run on chosen designs through Gemini Batch. The results wait for review.' },
   { term: 'Collection', meaning: 'A way customers browse besides breed: Occasions, Sports, 16 Pawsonalities, Zodiac signs and Tarot cards.' },
   { term: 'Pawsonality', meaning: 'One of 16 pet personality types from the quiz. Each has its own designs.' },
-  { term: 'Framed card', meaning: 'A zodiac or tarot design with an ornate frame, title and tagline drawn on it.' },
+  { term: 'Framed card', meaning: 'A zodiac or tarot design with an ornate frame, title and tagline drawn on it. Customers can buy it as a print (with a bonus digital copy) or as a digital download, but not as a mug or phone case.' },
   { term: 'Plate (caption)', meaning: 'The translucent gold name plate on a Pawsonality design, with its title and tagline.' },
   { term: 'Stock ref', meaning: 'A number such as 1123 given to every design. It is printed on stickers and can be typed in to find a design.' },
   { term: 'Sticker QR', meaning: 'The QR code on the back of a stall print. It opens that design on the website.' },

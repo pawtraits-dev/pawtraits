@@ -120,11 +120,12 @@ ok('print: AI upscale happens before the frame', fu.indexOf('e_upscale') > 0 && 
 const fb = framedPrintTransformation(smallPlan, null, card, '3:4', { bleedOutputPx: smallBleed.outputPx }).split('/');
 ok('self-print: same framed image, padded last with the blurred edge', fb.slice(0, -1).join('/') === fp && fb[fb.length - 1] === `c_pad,w_${smallBleed.outputPx.width},h_${smallBleed.outputPx.height},${BLEED_BACKGROUND}`);
 ok('bleed is larger than the trim, frame stays at the trim size', smallBleed.outputPx.width > smallPlan.outputPx.width && fb.some(p => p === `c_scale,w_${smallPlan.outputPx.width},h_${smallPlan.outputPx.height},q_100`));
-// Prints-only rule
+// Selling rule: prints and downloads, never mugs or phone cases
 ok('prints allowed', framedProductAllowed({ product_type: 'physical_print', media_name: 'Foamex', name: 'Small' }) && framedProductAllowed(null));
-ok('downloads, mugs and phone cases refused', !framedProductAllowed({ product_type: 'digital_download' }) && !framedProductAllowed({ product_type: 'physical_print', media_name: 'Ceramic mug' }) && !framedProductAllowed({ product_type: 'physical_print', name: 'iPhone 15 Phone Case' }) && !framedProductAllowed({ sku: 'DIGITAL' }));
+ok('digital downloads allowed', framedProductAllowed({ product_type: 'digital_download' }) && framedProductAllowed({ sku: 'DIGITAL' }) && framedProductAllowed({ shape_family: 'any', product_type: 'digital_download', fulfillment_method: 'download', medium: { slug: 'digital' } }));
+ok('mugs and phone cases refused', !framedProductAllowed({ product_type: 'physical_print', media_name: 'Ceramic mug' }) && !framedProductAllowed({ product_type: 'physical_print', name: 'iPhone 15 Phone Case' }));
 ok('isFramed: catalogue and customer images', isFramed({ frame_overlay: { clean_public_id: 'a', applied: { title: 'T', medallion: null, at: '' } } }) && isFramed({ generation_metadata: { frame: { title: 'ARIES' } } }) && !isFramed({ frame_overlay: { clean_public_id: 'a', applied: null } }) && !isFramed({ generation_metadata: {} }) && !isFramed(null));
-ok('prints-only message', /sold as prints/.test(FRAMED_PRINTS_ONLY) && /bonus digital copy/.test(FRAMED_PRINTS_ONLY));
+ok('selling-rule message', /sold as prints/.test(FRAMED_PRINTS_ONLY) && /bonus digital copy/.test(FRAMED_PRINTS_ONLY) && /digital download/.test(FRAMED_PRINTS_ONLY) && /mug or a phone case/.test(FRAMED_PRINTS_ONLY) && !/not available as a download/.test(FRAMED_PRINTS_ONLY));
 if (process.env.SHOW) { console.log(fp); console.log(fb.join('/')); }
 
 console.log(fail ? `${fail} failed, ${pass} passed` : `${pass} passed`);

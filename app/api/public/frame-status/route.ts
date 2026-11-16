@@ -1,7 +1,7 @@
 /**
  * GET /api/public/frame-status?ids=a,b,c → { framed: { [id]: true } }
- * Which catalogue designs show a frame (framed cards are sold as prints only, so the download
- * button hides). Public, ids only; at most 60 per call.
+ * Which catalogue designs show a frame. No longer used to hide the download button (framed cards
+ * can be bought as downloads); kept for any client that wants to know. Public, ids only; at most 60 per call.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient } from '@/lib/qr/server';

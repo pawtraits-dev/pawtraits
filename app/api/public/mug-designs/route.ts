@@ -28,7 +28,7 @@ export async function GET() {
       .order('is_featured', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false })
       .limit(60);
     if (error) throw error;
-    // Framed cards are prints only: no mugs
+    // Framed cards are never mugs
     const framed = await framedIds(supabase, (rows ?? []).map(r => r.id));
     for (let i = (rows ?? []).length - 1; i >= 0; i--) if (framed.has(rows![i].id)) rows!.splice(i, 1);
     const ids = (rows ?? []).map(r => r.id);

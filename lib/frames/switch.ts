@@ -2,7 +2,7 @@
  * Framed ↔ unframed for a customer's portrait (client-safe, pure). The clean painting is always
  * stored, and the frame is only layers, so the customer can have either look without a new AI
  * generation. The state lives in generation_metadata:
- *   framed    generation_metadata.frame     (isFramed() is true: prints only)
+ *   framed    generation_metadata.frame     (isFramed() is true: print or download, no mug or case)
  *   unframed  generation_metadata.frame_off the same card kept aside so it can be switched back
  *             (isFramed() is false: an ordinary portrait)
  *   neither   a portrait of a design that has no frame, or one made "without frame" (the card comes from the design)
@@ -13,7 +13,7 @@ import { DEFAULT_FRAME_STYLE, type FrameCard, type FrameStyleId } from './frame'
 export type FrameChoice = 'on' | 'off';
 
 export const FRAME_ORDERED = 'This picture has already been ordered, so its card can no longer be changed. Make a new picture to try the other look.';
-export const FRAME_IN_BASKET = 'This picture is in your basket as a download, mug or phone case, which framed cards cannot be. Take that out of your basket first.';
+export const FRAME_IN_BASKET = 'This picture is in your basket as a mug or phone case, which framed cards cannot be. Take that out of your basket first.';
 
 /** 'on' when the portrait shows the frame, 'off' when it was framed and is switched off, else null */
 export function frameState(meta: any): FrameChoice | null {
@@ -58,8 +58,8 @@ export function unframedBaseId(meta: any, displayedId: string | null | undefined
 
 /**
  * Why this portrait can't be switched now, or null. Order lines keep what was bought, so a portrait
- * that has been ordered stays as it is; a basket with a download, mug or case blocks switching the
- * frame on (those can't be framed cards). Prints are fine either way.
+ * that has been ordered stays as it is; a basket with a mug or phone case blocks switching the
+ * frame on (those can't be framed cards). Prints and downloads are fine either way.
  */
 export function switchBlocked(to: FrameChoice, ctx: { ordered: boolean; basketProducts: any[] }, productAllowed: (p: any) => boolean): string | null {
   if (ctx.ordered) return FRAME_ORDERED;

@@ -493,7 +493,7 @@ export default function CustomiseClient({ initialData = null, initialQuery = {},
         imageUrl: customImage.generated_image_url || catalogImage.imageUrl,
         title: customPortraitTitle(customImage.pet_name, catalogImage.theme?.displayName || catalogImage.theme?.name),
         formatId: catalogImage.format?.id, themeName: catalogImage.theme?.name,
-        // The portrait's own state decides (framed cards are prints only); before it is known, a framed design counts as framed
+        // The portrait's own state decides (a framed card is not a mug or phone case); before it is known, a framed design counts as framed
         frame: customImage.frameChoice ? (customImage.frameChoice.state === 'on' ? { thumbs: customImage.frame?.thumbs ?? null } : null) : (customImage.frame ?? (catalogImage.frame?.dog || catalogImage.frame?.cat ? { thumbs: null } : null)),
       }
     : {
@@ -612,7 +612,7 @@ export default function CustomiseClient({ initialData = null, initialQuery = {},
             {catalogImage.frame && (
               <div className="mt-3">
                 <FrameToggle value={withFrame ? 'on' : 'off'} onChange={v => setWithFrame(v === 'on')} />
-                <p className="mt-1 text-xs text-gray-500">{withFrame ? 'Framed cards are sold as prints, with a bonus digital copy.' : 'Without the frame it is an ordinary picture: your own painting, as a print, download, mug or phone case.'}</p>
+                <p className="mt-1 text-xs text-gray-500">{withFrame ? 'Framed cards come as a print with a bonus digital copy, or as a digital download.' : 'Without the frame it is an ordinary picture: your own painting, as a print, download, mug or phone case.'}</p>
               </div>
             )}
 
