@@ -1,6 +1,6 @@
 /** npx tsx scripts/test-credit-balance.ts */
 import assert from 'node:assert/strict';
-import { balanceAfterRedemption, redemptionToRecord } from '../lib/commissions/credit-balance';
+import { balanceAfterRedemption, redemptionToRecord, isFriendsFirstOrder } from '../lib/commissions/credit-balance';
 let n = 0; const t = (a: unknown, b: unknown) => { assert.equal(a, b); n++; };
 
 t(balanceAfterRedemption(1000, 500), 500);     // £10 held, £5 spent, £5 left
@@ -34,6 +34,17 @@ const hook = readFileSync(path.join(ROOT, 'app/api/webhooks/stripe/route.ts'), '
 t((hook.match(/balanceAfterRedemption\(/g) || []).length, 1);
 t(/rewardAmountPounds/.test(hook), false);
 t((hook.match(/await handleCreditRedemption\(/g) || []).length, 1);
+
+// Referral credit on the friend's first order only
+t(isFriendsFirstOrder([]), true);
+t(isFriendsFirstOrder(null), true);
+t(isFriendsFirstOrder([{ payment_status: 'paid', status: 'confirmed' }]), false);                 // they have bought before
+t(isFriendsFirstOrder([{ payment_status: 'pending', status: 'confirmed' }]), true);               // an unpaid attempt is not an order
+t(isFriendsFirstOrder([{ payment_status: 'paid', status: 'refunded' }]), true);                   // a refunded order does not count
+t(isFriendsFirstOrder([{ payment_status: 'paid', status: 'Cancelled' }]), true);
+t(isFriendsFirstOrder([{ payment_status: 'failed', status: 'confirmed' }, { payment_status: 'PAID', status: 'shipped' }]), false);
+t(/isFriendsFirstOrder\(otherOrders\)/.test(hook), true);
+t((hook.match(/await handleCustomerCredit\(/g) || []).length, 1);
 
 // Odd input never throws (a throw used to skip the whole price check)
 import { shippingZoneFor } from '../lib/shipping/rates';

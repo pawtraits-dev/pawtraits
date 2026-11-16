@@ -28,3 +28,16 @@ export function redemptionToRecord(claimedPence: number | null | undefined, chec
   const allowed = Number.isFinite(check.rewardsAllowed as number) ? Math.max(0, Math.round(check.rewardsAllowed as number)) : 0;
   return Math.min(claimed, allowed);
 }
+
+/** Order statuses that mean the order was not, in the end, a sale (same set as the admin reports use) */
+const NOT_A_SALE = new Set(['cancelled', 'canceled', 'refunded', 'failed']);
+
+/**
+ * A referrer earns credit on the FIRST order their friend places, and only that one (the friend's own
+ * discount is first-order only too). Given the friend's OTHER orders (not the one being processed),
+ * true when none of them is a paid order that still stands.
+ */
+export function isFriendsFirstOrder(otherOrders: { payment_status?: string | null; status?: string | null }[] | null | undefined): boolean {
+  return !(otherOrders || []).some(o =>
+    String(o.payment_status ?? '').toLowerCase() === 'paid' && !NOT_A_SALE.has(String(o.status ?? '').toLowerCase()));
+}

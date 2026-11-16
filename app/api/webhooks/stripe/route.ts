@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server';
-import { balanceAfterRedemption } from '@/lib/commissions/credit-balance';
+import { balanceAfterRedemption, isFriendsFirstOrder } from '@/lib/commissions/credit-balance';
 import { headers } from 'next/headers';
 import { constructWebhookEvent } from '@/lib/stripe-server';
 import { createClient } from '@supabase/supabase-js';
@@ -852,10 +852,26 @@ async function handleSimplifiedCommissions(
       commissionCreated = true;
     }
 
-    // Case 4: Customer Referred Customer - 10% credit to referring customer
+    // Case 4: Customer Referred Customer - 10% credit to referring customer, on the friend's FIRST order only
+    // (decided 16 Nov 2026; it used to be every order). Partners above still earn on every order.
     if (customer.referral_type === 'CUSTOMER' && customer.referrer_id) {
-      await handleCustomerCredit(supabase, order, customer, subtotalAmount);
-      commissionCreated = true;
+      const emails = Array.from(new Set([customerEmail, customerEmail.toLowerCase().trim()]));
+      const { data: otherOrders, error: otherOrdersError } = await supabase
+        .from('orders')
+        .select('id, payment_status, status')
+        .in('customer_email', emails)
+        .neq('id', order.id)
+        .limit(200);
+      if (otherOrdersError) {
+        // Cannot tell whether this is the first order: do not risk crediting twice. The admin Customer Referrals
+        // page lists referred sales that gave no credit, so a missed one can be put right by hand.
+        console.error('❌ Could not check for earlier orders; referral credit not given for order', order.id, otherOrdersError.message);
+      } else if (isFriendsFirstOrder(otherOrders)) {
+        await handleCustomerCredit(supabase, order, customer, subtotalAmount);
+        commissionCreated = true;
+      } else {
+        console.log('ℹ️ Not the referred customer\'s first order - no referral credit');
+      }
     }
 
     // Commission tracking is now handled by the new commissions table
