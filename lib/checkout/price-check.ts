@@ -104,6 +104,7 @@ async function sessionUser(): Promise<{ id: string; email: string | null } | nul
 
 /** Same rules as POST /api/referrals/validate: the code exists, is not expired, is not the customer's own, and it is their first discounted order. */
 export async function referralEligible(code: string, customerEmail: string): Promise<boolean> {
+  if (typeof code !== 'string' || typeof customerEmail !== 'string') return false;   // never throw on odd input: a throw skips the whole price check
   const db = serviceClient();
   const upper = code.toUpperCase();
   const { data: referral } = await db.from('referrals').select('id, expires_at').eq('referral_code', upper).maybeSingle();

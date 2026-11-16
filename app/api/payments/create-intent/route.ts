@@ -190,6 +190,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // A referral code must be text. Anything else is dropped here: a number or boolean used to make the
+    // server price check throw, which skipped the check altogether.
+    if (body.referralCode != null && typeof body.referralCode !== 'string') body.referralCode = undefined;
+
     // Add referral code if provided (customer orders only)
     if (body.referralCode && orderType === 'customer') {
       metadata.referralCode = body.referralCode;
@@ -322,6 +326,18 @@ export async function POST(request: NextRequest) {
     }
     if (priceCheck.status === 'suspicious' || (enforcePriceCheck && priceCheck.status === 'low')) {
       metadata.priceHold = 'true';
+    }
+    // 'unchecked' = the server could not check this payment at all (a database error, or input that broke the check).
+    // Credit cannot be confirmed, so a payment that spends credit is refused and the customer asked to try again;
+    // any other unchecked payment is taken but held for a look before anything is printed, like a 'low' one.
+    if (priceCheck.status === 'unchecked') {
+      if (body.rewardRedemption && body.rewardRedemption > 0) {
+        return NextResponse.json(
+          { error: 'We could not check your credit just now. Please try again in a moment.', code: 'PRICE_CHECK_UNAVAILABLE' },
+          { status: 503 }
+        );
+      }
+      if (enforcePriceCheck) metadata.priceHold = 'true';
     }
 
     // Create PaymentIntent

@@ -18,13 +18,13 @@ export function balanceAfterRedemption(balancePence: number | null | undefined, 
  * deduction). The browser CLAIMS an amount; the server price check works out how much the signed-in customer
  * really holds (`rewardsAllowed`). Record the smaller of the two, so a made-up claim can neither be deducted
  * nor inflate the pre-discount order value that referral credit and partner commission are worked out from.
- * If the check could not run at all ('unchecked'), keep the claim: that is the behaviour before this rule
- * existed, and dropping it would let a genuine redemption go undeducted.
+ * If the check could not run at all ('unchecked'), nothing is confirmed, so nothing is recorded; create-intent
+ * refuses such a payment before it is taken, so a genuine redemption is never left undeducted.
  */
 export function redemptionToRecord(claimedPence: number | null | undefined, check: { status: string; rewardsAllowed?: number | null }): number {
   const claimed = Number.isFinite(claimedPence as number) ? Math.max(0, Math.round(claimedPence as number)) : 0;
   if (!claimed) return 0;
-  if (check.status === 'unchecked') return claimed;
+  if (check.status === 'unchecked') return 0;
   const allowed = Number.isFinite(check.rewardsAllowed as number) ? Math.max(0, Math.round(check.rewardsAllowed as number)) : 0;
   return Math.min(claimed, allowed);
 }

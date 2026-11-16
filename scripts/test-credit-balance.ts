@@ -19,7 +19,8 @@ t(redemptionToRecord(500, { status: 'ok', rewardsAllowed: 500 }), 500);        /
 t(redemptionToRecord(10_000_000, { status: 'ok', rewardsAllowed: 0 }), 0);     // made-up claim at full price: nothing recorded
 t(redemptionToRecord(2000, { status: 'low', rewardsAllowed: 700 }), 700);      // claims more than held: only what is held
 t(redemptionToRecord(500, { status: 'suspicious', rewardsAllowed: 500 }), 500);
-t(redemptionToRecord(500, { status: 'unchecked', rewardsAllowed: 0 }), 500);   // check could not run: keep the claim (as before)
+t(redemptionToRecord(500, { status: 'unchecked', rewardsAllowed: 0 }), 0);     // check could not run: nothing confirmed (the payment is refused)
+t(redemptionToRecord(10_000_000, { status: 'unchecked' }), 0);
 t(redemptionToRecord(0, { status: 'ok', rewardsAllowed: 500 }), 0);
 t(redemptionToRecord(null, { status: 'ok', rewardsAllowed: 500 }), 0);
 t(redemptionToRecord(-50, { status: 'ok', rewardsAllowed: 500 }), 0);
@@ -27,8 +28,18 @@ t(redemptionToRecord(500, { status: 'ok' }), 0);                               /
 
 // One payment, one deduction: the webhook must contain exactly one write of the reduced balance
 import { readFileSync } from 'node:fs';
-const hook = readFileSync('app/api/webhooks/stripe/route.ts', 'utf8');
+import path from 'node:path';
+const ROOT = path.resolve(__dirname, '..');
+const hook = readFileSync(path.join(ROOT, 'app/api/webhooks/stripe/route.ts'), 'utf8');
 t((hook.match(/balanceAfterRedemption\(/g) || []).length, 1);
 t(/rewardAmountPounds/.test(hook), false);
 t((hook.match(/await handleCreditRedemption\(/g) || []).length, 1);
+
+// Odd input never throws (a throw used to skip the whole price check)
+import { shippingZoneFor } from '../lib/shipping/rates';
+t(shippingZoneFor(123 as any), null);
+t(shippingZoneFor(' gb '), 'GB');
+const intent = readFileSync(path.join(ROOT, 'app/api/payments/create-intent/route.ts'), 'utf8');
+t(/typeof body\.referralCode !== 'string'/.test(intent), true);
+t(/PRICE_CHECK_UNAVAILABLE/.test(intent), true);
 console.log(`credit-balance: ${n} passed`);

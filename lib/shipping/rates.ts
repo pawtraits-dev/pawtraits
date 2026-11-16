@@ -18,7 +18,7 @@ export const EUROPE_COUNTRIES = ['IE', 'FR', 'DE', 'ES', 'IT', 'NL', 'BE', 'LU',
 export const DELIVERY_COUNTRIES = ['GB', ...EUROPE_COUNTRIES, 'US'];
 
 export function shippingZoneFor(country?: string | null): ShippingZone | null {
-  const c = (country || '').trim().toUpperCase();
+  const c = (typeof country === 'string' ? country : '').trim().toUpperCase();   // odd input is "no country", never a throw
   if (c === 'GB' || c === 'UK') return 'GB';
   if (c === 'US') return 'US';
   if (EUROPE_COUNTRIES.includes(c)) return 'EUROPE';
