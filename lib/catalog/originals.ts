@@ -5,8 +5,9 @@
  * are recognised by their tags and Cloudinary folders.
  * Used by Admin → Catalogue ("Uploads only" / "Variations only") and the variation batch picker.
  */
-const VERSION_TAGS = '{variation,team-variant,batch-generated,quiz-generated}';
-const VERSION_FOLDERS = ['pawtraits/variations/', 'pawtraits/team-versions/', 'pawtraits/variation-previews/'];
+export const VERSION_TAG_LIST = ['variation', 'team-variant', 'batch-generated', 'quiz-generated'];
+const VERSION_TAGS = `{${VERSION_TAG_LIST.join(',')}}`;
+export const VERSION_FOLDERS = ['pawtraits/variations/', 'pawtraits/team-versions/', 'pawtraits/variation-previews/'];
 
 /** Only original designs (uploads and pictures generated from a prompt, not from another design) */
 export function onlyOriginals<Q extends { is: any; or: any }>(query: Q): Q {
@@ -18,4 +19,11 @@ export function onlyOriginals<Q extends { is: any; or: any }>(query: Q): Q {
 /** Only versions made from another design */
 export function onlyVersions<Q extends { or: any }>(query: Q): Q {
   return query.or(['variation_of.not.is.null', `tags.ov.${VERSION_TAGS}`, ...VERSION_FOLDERS.map(f => `cloudinary_public_id.like.${f}*`)].join(','));
+}
+
+/** The same rule as onlyVersions, for one row in memory: linked, or recognised by its tags or Cloudinary folder */
+export function looksLikeVersion(row: { variation_of?: string | null; tags?: string[] | null; cloudinary_public_id?: string | null }): boolean {
+  return !!row.variation_of
+    || (row.tags ?? []).some(t => VERSION_TAG_LIST.includes(t))
+    || VERSION_FOLDERS.some(f => (row.cloudinary_public_id ?? '').startsWith(f));
 }
