@@ -173,6 +173,13 @@ export const UPSCALE_BELOW_DPI = DPI_OK;
 /** Below this effective dpi from the preview, a custom portrait gets a 4K print master re-render. */
 export const PRINT_MASTER_BELOW_DPI = 200;
 
+/**
+ * What a 4K print master measures for a 2:3 portrait (Gemini's "4K" size, GEMINI_IMAGE_SIZES.print):
+ * 3392 × 5056. The masters themselves are stored at whatever Gemini returns; this is the figure a
+ * 2:3 download is brought up to when its source is smaller, so a framed download matches an unframed 4K one.
+ */
+export const MASTER_4K_PX = { width: 3392, height: 5056 } as const;
+
 export interface UpscaleStep {
   /** Size the crop is scaled to before the AI upscale (≤ 4.1 MP, ≤ the crop itself) */
   pre: { width: number; height: number };
@@ -184,7 +191,7 @@ export interface UpscaleStep {
  * Whether (and how) to AI-upscale for this print. `maxIntermediateMp` is the largest image the
  * Cloudinary plan will transform (25 MP on Free; paid plans allow more) — the 4× output must fit.
  */
-export function planUpscale(plan: PrintPlan, maxIntermediateMp = 25): UpscaleStep | null {
+export function planUpscale(plan: { crop: { width: number; height: number }; effectiveDpi: number }, maxIntermediateMp = 25): UpscaleStep | null {
   if (plan.effectiveDpi >= UPSCALE_BELOW_DPI) return null;
   const cw = plan.crop.width, ch = plan.crop.height;
   const f = Math.min(

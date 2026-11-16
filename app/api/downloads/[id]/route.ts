@@ -41,8 +41,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!img) return NextResponse.json({ error: 'Image not found' }, { status: 404 });
   // A small (1K/2K) preview with no 4K master yet (normally made when the order was paid):
   // make it now so the download is full resolution
-  // (A framed card's download is its framed picture, which needs no 4K master)
-  if (img.kind === 'custom' && !img.printMasterPublicId && !img.frame) {
+  // (A framed card's download is drawn on this master too; with no master it falls back to the clean picture, upscaled)
+  if (img.kind === 'custom' && !img.printMasterPublicId) {
     const { customPreviewIsSmall, ensurePrintMaster } = await import('@/lib/print/print-master');
     if (await customPreviewIsSmall(supabase, img.id)) {
       const r = await ensurePrintMaster(supabase, img.id);

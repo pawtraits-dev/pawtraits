@@ -183,13 +183,38 @@ export async function buildPrintFiles(img: ResolvedOrderImage, productData: any,
   return { printUrl, selfPrintUrl: null, meta: { version: 1, uncropped: true, reason: !widthCm || !heightCm ? 'product has no size' : 'source dimensions unavailable' } };
 }
 
-/** Customer download: full quality, small brand mark, signed 7-day URL. */
-export async function getCustomerDownloadUrl(img: ResolvedOrderImage, customerRef: string, orderRef: string): Promise<string> {
-  // A customised portrait's 4K master when there is one; otherwise its preview. A framed card's
-  // master has no frame on it (print files draw the frame per size), so its download is the framed
-  // 2:3 picture the customer saw.
-  const source = img.frame ? img.cloudinaryPublicId : (img.printMasterPublicId || img.cloudinaryPublicId);
-  if (!source) throw new Error(`No download source for ${img.kind} image ${img.id}`);
+/** What getCustomerDownloadUrl needs from the outside (replaced in tests, so no network is used) */
+export interface DownloadDeps {
+  dimensions?: (publicId: string) => Promise<{ width: number; height: number } | null>;
+  ensureFrameAssets?: () => Promise<void>;
+  warm?: (url: string) => Promise<unknown>;
+}
+
+/**
+ * Customer download: full quality, signed 7-day URL (no logo or watermark, as bought).
+ *  - Unframed: the 4K master when there is one, else the stored picture, at its own size.
+ *  - Framed card: the frame, symbol or numeral and lettering drawn now, at download size, onto the
+ *    best clean picture: the custom portrait's 4K master, else the clean source (img.frame.sourceId).
+ *    2:3 portrait; a master keeps its own size, a smaller source is brought up to 4K with the same
+ *    AI upscale prints use (lib/frames/print.ts planFramedDownload). The stored baked 2:3 copy is
+ *    only the on-site picture. If the master is missing the clean source is used (upscaled).
+ */
+export async function getCustomerDownloadUrl(img: ResolvedOrderImage, customerRef: string, orderRef: string, deps: DownloadDeps = {}): Promise<string> {
   const { cloudinaryService } = await import('@/lib/cloudinary');
-  return cloudinaryService.getDownloadUrl(source, customerRef, orderRef);
+  if (!img.frame) {
+    const source = img.printMasterPublicId || img.cloudinaryPublicId;
+    if (!source) throw new Error(`No download source for ${img.kind} image ${img.id}`);
+    return cloudinaryService.getDownloadUrl(source, customerRef, orderRef);
+  }
+  const source = img.printMasterPublicId || img.frame.sourceId;
+  if (!source) throw new Error(`No download source for framed ${img.kind} image ${img.id}`);
+  const { planFramedDownload, framedDownloadTransformation } = await import('@/lib/frames/print');
+  const ensureAssets = deps.ensureFrameAssets ?? (async () => { await (await import('@/lib/frames/server')).ensureFrameAssets(); });
+  await ensureAssets();
+  const dims = await (deps.dimensions ?? ((id: string) => cloudinaryService.getSourceDimensions(id)))(source).catch(() => null);
+  const plan = planFramedDownload(dims, !!img.printMasterPublicId, Number(process.env.CLOUDINARY_MAX_TRANSFORM_MP) || 25);
+  const url = await cloudinaryService.getDownloadUrl(source, customerRef, orderRef, { transformation: framedDownloadTransformation(plan, img.frame.card, img.frame.style) });
+  // An AI upscale is made on first request (Cloudinary answers 423 meanwhile): have it ready before the customer is sent there
+  if (plan.upscale) await (deps.warm ?? ((u: string) => cloudinaryService.warmDerived(u, 60_000)))(url);
+  return url;
 }
