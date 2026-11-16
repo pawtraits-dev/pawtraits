@@ -3,16 +3,18 @@
  *   a signed link  ?p=<preference id>&t=<signature>   (from our marketing emails; the address is never in the link)
  *   a signed-in customer  ?me=1                        (their own address, from the account area)
  * GET   → { status: 'subscribed' | 'unsubscribed' | 'none', topics, maskedEmail }
- * POST  { p?, t?, me?, action: 'save', topics } | { action: 'stop' } | { action: 'subscribe' }
+ * POST  { p?, t?, me?, action: 'save', topics } | { action: 'stop' } | { action: 'subscribe' } | { action: 'photo', allowed }
  *   save       the three switches (all off = unsubscribe; something on = they have chosen to hear from us)
  *   stop       stop all emails
  *   subscribe  "Yes please": all three on (a deliberate opt-in; signed-in customers with no row yet)
+ *   photo      the switch "Paint my pet into new designs from the photo I sent": allowed false = "Please don't reuse my photo" (photo offers stop,
+ *              other emails stay as they are). GET also returns photoOffers (true = allowed).
  * Bad link: 400, with nothing revealed about whether an address exists.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient } from '@/lib/qr/server';
 import { getRequester } from '@/lib/guest/access';
-import { ALL_TOPICS_ON, getPreferences, getPreferencesById, maskEmail, normaliseEmail, setTopics, subscribe, unsubscribe, verifyPreferenceToken, type PreferenceRow } from '@/lib/marketing/preferences';
+import { ALL_TOPICS_ON, getPreferences, getPreferencesById, maskEmail, normaliseEmail, setPhotoOptOut, setTopics, subscribe, unsubscribe, verifyPreferenceToken, type PreferenceRow } from '@/lib/marketing/preferences';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -33,6 +35,7 @@ async function resolve(req: NextRequest, input: { p?: unknown; t?: unknown; me?:
 const view = (email: string, row: PreferenceRow | null) => ({
   status: row ? row.status : 'none',
   topics: row && row.status === 'subscribed' ? row.topics : { new_designs: false, pet_days: false, offers: false },
+  photoOffers: !row?.photo_offers_opt_out_at,
   maskedEmail: maskEmail(email),
 });
 
@@ -53,6 +56,7 @@ export async function POST(req: NextRequest) {
   try {
     if (body.action === 'stop') await unsubscribe(supabase, { email: who.email, source });
     else if (body.action === 'save') await setTopics(supabase, { email: who.email, topics: body.topics, source });
+    else if (body.action === 'photo' && typeof body.allowed === 'boolean') { if (!(await setPhotoOptOut(supabase, who.email, !body.allowed, source))) return NextResponse.json({ error: 'Nothing to change' }, { status: 400, headers: NO_STORE }); }
     else if (body.action === 'subscribe') await subscribe(supabase, { email: who.email, source, topics: ALL_TOPICS_ON });
     else return NextResponse.json({ error: 'Nothing to change' }, { status: 400, headers: NO_STORE });
     return NextResponse.json({ ok: true, ...view(who.email, await getPreferences(supabase, who.email)) }, { headers: NO_STORE });

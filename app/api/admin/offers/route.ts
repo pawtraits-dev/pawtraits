@@ -5,7 +5,7 @@
  *   drop      remove one picture (imageId); at least 2 must be left to send
  *   replace   paint a different design in place of one picture (imageId); counts towards the daily cap
  *   skip      skip this person's offer
- *   stop      stop offers for this person (offers_stopped_at on all their requests) and skip this offer
+ *   stop      stop offers for this person (offers_stopped_at on all their requests, and their photo opt-out) and skip this offer
  *   retry     try a failed offer again (back to the queue)
  */
 import { NextRequest, NextResponse } from 'next/server';
@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
   try {
     switch (action) {
       case 'approve': {
+        if (!(await loadOfferSettings()).enabled) return fail('Offers are switched off, so nothing is sent');
         if (offer.status !== 'ready') return fail('Only an offer waiting for approval can be approved');
         if ((offer.custom_image_ids ?? []).length < MIN_PICTURES) return fail('It needs at least 2 pictures');
         const { data: moved } = await supabase.from('preview_offers').update({ status: 'approved', approved_at: new Date().toISOString(), approved_by: 'admin' }).eq('id', id).eq('status', 'ready').select('id');
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
       }
       case 'replace': {
         const settings = await loadOfferSettings();
+        if (!settings.enabled) return fail('Offers are switched off, so nothing is painted');
         if (await offersDayUsage(supabase, Date.now()) >= settings.perDay) return fail(`Today's limit of ${settings.perDay} has been reached`, 429);
         const r = await replacePicture(supabase, id, imageId ?? '');
         return r.ok ? NextResponse.json({ ok: true }) : fail(r.error);
@@ -76,6 +78,8 @@ export async function POST(request: NextRequest) {
       }
       case 'stop': {
         await supabase.from('preview_email_requests').update({ offers_stopped_at: new Date().toISOString() }).eq('email', offer.email);
+        // A buyer may have no preview request at all: their photo opt-out stops photo offers too (needs the second migration; without it buyers cannot be offered anything)
+        await supabase.from('email_preferences').update({ photo_offers_opt_out_at: new Date().toISOString() }).eq('email', offer.email).is('photo_offers_opt_out_at', null);
         if (['queued', 'ready', 'approved', 'failed'].includes(offer.status)) await supabase.from('preview_offers').update({ status: 'skipped', error: 'Offers stopped for this person' }).eq('id', id).eq('status', offer.status);
         return NextResponse.json({ ok: true });
       }

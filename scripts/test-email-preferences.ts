@@ -1,10 +1,10 @@
 // Run: npx tsx scripts/test-email-preferences.ts   (no network, no database: a small in-memory fake)
 import {
   ALL_TOPICS_ON, allTopicsOff, canEmail, getPreferences, listUnsubscribeHeaders, marketingEmailExtras, maskEmail, normaliseEmail, normaliseTopics,
-  preferencesUrl, purchaseOutcome, recordTick, setTopics, signPreference, statusForTopics, subscribe, subscribeFromPurchase, tickIsStale, unsubscribe, unsubscribeUrl, verifyPreferenceToken,
+  checkoutWords, signPhotoOptOut, verifyPhotoOptOutToken, preferencesUrl, purchaseOutcome, recordTick, setPhotoOptOut, setTopics, signPreference, statusForTopics, subscribe, subscribeFromPurchase, tickIsStale, unsubscribe, unsubscribeUrl, verifyPreferenceToken,
 } from '../lib/marketing/preferences';
 import { marketingState } from '../lib/marketing/admin';
-import { BASIS_WORDS, CHECKOUT_LINE, CHECKOUT_OPT_OUT_LABEL, CHECKOUT_WORDING, CONSENT_LABEL, CONSENT_VERSION, EMAIL_TOPICS } from '../lib/marketing/consent-copy';
+import { BASIS_WORDS, CHECKOUT_CONSENT_VERSION, CHECKOUT_CONSENT_VERSION_V1, CHECKOUT_LINE, CHECKOUT_LINE_V1, CHECKOUT_OPT_OUT_LABEL, CHECKOUT_WORDING, CHECKOUT_WORDING_V1, CONSENT_LABEL, CONSENT_VERSION, EMAIL_TOPICS } from '../lib/marketing/consent-copy';
 import { badLinkPage, confirmPage, donePage, escapeHtml } from '../lib/marketing/pages';
 
 let pass = 0, fail = 0;
@@ -28,6 +28,7 @@ function fakeDb(customers: any[] = []) {
       in: (c: string, v: any[]) => { filters.push(r => v.includes(r[c])); return chain; },
       ilike: (c: string, v: string) => { const re = new RegExp('^' + v.replace(/\\(.)/g, '$1').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i'); filters.push(r => re.test(String(r[c]))); return chain; },
       limit: () => chain,
+      is: (c: string, v: any) => { filters.push(r => (v === null ? (r[c] ?? null) === null : r[c] === v)); return chain; },
       update: (p: any) => { op = 'update'; patch = p; return chain; },
       insert: (o: any) => { rows.push({ id: `id${++n}`, created_at: new Date().toISOString(), ...o }); return Promise.resolve({ error: null }); },
       upsert: (o: any, opts: any) => {
@@ -68,7 +69,8 @@ const events = (t: any, action?: string) => t.email_preference_events.filter((e:
 
   // Wording lives in one place
   ok('wording: exact strings', CONSENT_LABEL === 'Yes please: send me new designs, a birthday treat for my pet and the odd offer. Stop any time.'
-    && CHECKOUT_LINE === 'We\'ll send you new designs, a birthday treat for your pet and the odd offer. Stop any time.'
+    && CHECKOUT_LINE === 'We\'ll send you new designs, a birthday treat for your pet and the odd offer, and keep your pet\'s photo so Pawcasso can paint them into a few more. Stop any time.'
+    && CHECKOUT_LINE_V1 === 'We\'ll send you new designs, a birthday treat for your pet and the odd offer. Stop any time.' && (CHECKOUT_CONSENT_VERSION as string) !== CHECKOUT_CONSENT_VERSION_V1
     && CHECKOUT_OPT_OUT_LABEL === 'No thanks, just my order emails' && CHECKOUT_WORDING.includes(CHECKOUT_LINE) && CHECKOUT_WORDING.includes(CHECKOUT_OPT_OUT_LABEL)
     && EMAIL_TOPICS.map(x => x.title).join('|') === 'Fresh off the easel|Birthday and star-sign treats|Offers and news');
   ok('no exclamation marks in the copy', ![CONSENT_LABEL, CHECKOUT_LINE, CHECKOUT_OPT_OUT_LABEL, ...EMAIL_TOPICS.map(x => x.description)].some(s => s.includes('!')));
@@ -110,7 +112,7 @@ const events = (t: any, action?: string) => t.email_preference_events.filter((e:
   ({ db, tables } = fakeDb([{ id: 'c1', email: 'Buyer@Shop.co', marketing_consent: false }]));
   ok('a buyer who did not say no is subscribed (soft opt-in, all topics)', (await subscribeFromPurchase(db, { email: 'buyer@shop.co', optedOut: false })) === 'subscribed' && (await canEmail(db, 'buyer@shop.co', 'pet_days')));
   const br = await getPreferences(db, 'buyer@shop.co');
-  ok('basis soft_opt_in, source checkout, wording is the line plus the box label, linked to the customer', br?.basis === 'soft_opt_in' && br.consent_source === 'checkout' && br.consent_wording === CHECKOUT_WORDING && br.customer_id === 'c1');
+  ok('basis soft_opt_in, source checkout, wording is the line plus the box label (the OLD words: this page sent no version), linked to the customer', br?.basis === 'soft_opt_in' && br.consent_source === 'checkout' && br.consent_wording === CHECKOUT_WORDING_V1 && br.consent_version === CHECKOUT_CONSENT_VERSION_V1 && !br.photo_words_shown_at && br.customer_id === 'c1');
   ok('the event records the basis', events(tables, 'subscribed')[0].basis === 'soft_opt_in');
   ok('customers.marketing_consent kept in step', tables.customers[0].marketing_consent === true);
   await setTopics(db, { email: 'buyer@shop.co', topics: { new_designs: false, pet_days: true, offers: false }, source: 'account' });
@@ -160,6 +162,38 @@ const events = (t: any, action?: string) => t.email_preference_events.filter((e:
   ok('done page words', donePage('https://x.co/p').includes('Done. We&#39;ll sit and stay quiet.') && donePage('https://x.co/p').includes('Changed your mind? Pick what you&#39;d like instead'));
   ok('bad link page', badLinkPage().includes('This link has gone walkies') && badLinkPage().includes('support@pawtraits.pics'));
   ok('html is escaped', escapeHtml('<a href="x">&\'') === '&lt;a href=&quot;x&quot;&gt;&amp;&#39;' && !confirmPage('https://x.co/?a="><script>', 'x').includes('"><script>'));
+
+  // Checkout wording version and "has been shown the photo words"
+  ok('checkoutWords: only the current version counts as having shown the photo words', checkoutWords(CHECKOUT_CONSENT_VERSION).photoShown === true && checkoutWords(CHECKOUT_CONSENT_VERSION).wording === CHECKOUT_WORDING
+    && checkoutWords(undefined).photoShown === false && checkoutWords('2026-11').photoShown === false && checkoutWords('rubbish').photoShown === false && checkoutWords(null).wording === CHECKOUT_WORDING_V1);
+  ({ db, tables } = fakeDb());
+  await subscribeFromPurchase(db, { email: 'new@shop.co', optedOut: false, wordsVersion: CHECKOUT_CONSENT_VERSION });
+  let nr: any = await getPreferences(db, 'new@shop.co');
+  ok('new buyer under the new wording: subscribed with the new words and version, shown the photo words at checkout', nr.consent_wording === CHECKOUT_WORDING && nr.consent_version === CHECKOUT_CONSENT_VERSION && !!nr.photo_words_shown_at && nr.photo_words_source === 'checkout');
+  ({ db, tables } = fakeDb());
+  await subscribeFromPurchase(db, { email: 'stale@shop.co', optedOut: false, wordsVersion: undefined });
+  nr = await getPreferences(db, 'stale@shop.co');
+  ok('STALE checkout page (no version): old words recorded, NOT marked as shown', nr.consent_wording === CHECKOUT_WORDING_V1 && !nr.photo_words_shown_at);
+  await subscribeFromPurchase(db, { email: 'stale@shop.co', optedOut: false, wordsVersion: '2026-11' });
+  ok('an old version is not marked either', !(await getPreferences(db, 'stale@shop.co') as any).photo_words_shown_at);
+  await subscribeFromPurchase(db, { email: 'stale@shop.co', optedOut: false, wordsVersion: CHECKOUT_CONSENT_VERSION });
+  nr = await getPreferences(db, 'stale@shop.co');
+  ok('already subscribed, buys again under the new wording and does not say no: marked as shown (first time)', !!nr.photo_words_shown_at && nr.photo_words_source === 'checkout' && nr.consent_wording === CHECKOUT_WORDING_V1);
+  const firstAt = nr.photo_words_shown_at;
+  await subscribeFromPurchase(db, { email: 'stale@shop.co', optedOut: false, wordsVersion: CHECKOUT_CONSENT_VERSION });
+  ok('the first time is kept', (await getPreferences(db, 'stale@shop.co') as any).photo_words_shown_at === firstAt);
+  ({ db, tables } = fakeDb());
+  await subscribeFromPurchase(db, { email: 'no@shop.co', optedOut: true, wordsVersion: CHECKOUT_CONSENT_VERSION });
+  ok('"No thanks": not subscribed, no row, nothing marked', tables.email_preferences.length === 0 && events(tables, 'declined')[0].wording === CHECKOUT_WORDING);
+  await unsubscribe(db, { email: 'gone@shop.co', source: 'email_link' });
+  await subscribeFromPurchase(db, { email: 'gone@shop.co', optedOut: false, wordsVersion: CHECKOUT_CONSENT_VERSION });
+  ok('unsubscribed buyer: stays unsubscribed and is not marked as shown', (await getPreferences(db, 'gone@shop.co'))?.status === 'unsubscribed' && !(await getPreferences(db, 'gone@shop.co') as any).photo_words_shown_at);
+  // the photo switch
+  ({ db, tables } = fakeDb());
+  await subscribe(db, { email: 'sw@x.co', source: 'preferences_page' });
+  ok('photo switch: off sets the opt-out, other topics and status untouched', (await setPhotoOptOut(db, 'sw@x.co', true, 'preferences_page')) && !!(await getPreferences(db, 'sw@x.co') as any).photo_offers_opt_out_at && await canEmail(db, 'sw@x.co', 'offers') && (await getPreferences(db, 'sw@x.co'))?.status === 'subscribed');
+  ok('photo switch: back on clears it; no row = false', (await setPhotoOptOut(db, 'sw@x.co', false, 'preferences_page')) && !(await getPreferences(db, 'sw@x.co') as any).photo_offers_opt_out_at && !(await setPhotoOptOut(db, 'none@x.co', true, 'preferences_page')));
+  ok('photo opt-out link signature is not the unsubscribe signature', signPhotoOptOut(id) !== signPreference(id) && verifyPhotoOptOutToken(id, signPhotoOptOut(id)) && !verifyPhotoOptOutToken(id, signPreference(id)) && !verifyPreferenceToken(id, signPhotoOptOut(id)));
 
   console.log(fail ? `${fail} failed, ${pass} passed` : `${pass} passed`);
   process.exit(fail ? 1 : 0);

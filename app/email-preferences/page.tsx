@@ -9,11 +9,11 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
 import { CountryProvider } from '@/lib/country-context';
-import { EMAIL_TOPICS, PREFS_COPY, type EmailTopics } from '@/lib/marketing/consent-copy';
+import { EMAIL_TOPICS, PHOTO_SWITCH, PREFS_COPY, type EmailTopics } from '@/lib/marketing/consent-copy';
 
 const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' };
 const OFF: EmailTopics = { new_designs: false, pet_days: false, offers: false };
-type View = { status: 'subscribed' | 'unsubscribed' | 'none'; topics: EmailTopics; maskedEmail: string };
+type View = { status: 'subscribed' | 'unsubscribed' | 'none'; topics: EmailTopics; maskedEmail: string; photoOffers?: boolean };
 
 export default function EmailPreferencesPage() {
   const [key, setKey] = useState<{ p?: string; t?: string; me?: boolean } | null>(null);
@@ -94,6 +94,14 @@ export default function EmailPreferencesPage() {
                 ))}
               </fieldset>
               <p className="mt-3 text-sm text-gray-600">{PREFS_COPY.note}</p>
+
+              {subscribed && (
+                <label className="mt-5 flex min-h-[56px] cursor-pointer items-start gap-3 rounded-xl border border-purple-200 bg-purple-50/40 p-3">
+                  <input type="checkbox" role="switch" checked={view.photoOffers !== false} disabled={busy}
+                    onChange={e => send({ action: 'photo', allowed: e.target.checked }, PHOTO_SWITCH.saved)} className="mt-1 h-6 w-6 shrink-0 accent-purple-600" />
+                  <span><span className="block font-semibold text-gray-900">{PHOTO_SWITCH.title}</span><span className="block text-sm text-gray-600">{PHOTO_SWITCH.description}</span></span>
+                </label>
+              )}
 
               {message && <p role={message.ok ? 'status' : 'alert'} className={`mt-4 rounded-lg px-3 py-2 text-sm ${message.ok ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'}`}>{message.text}</p>}
 

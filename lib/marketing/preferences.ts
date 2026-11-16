@@ -19,7 +19,7 @@
  */
 import { createHmac, timingSafeEqual } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { CHECKOUT_WORDING, CONSENT_LABEL, CONSENT_VERSION, EMAIL_TOPICS, TOPIC_KEYS, type ConsentBasis, type ConsentSource, type EmailTopic, type EmailTopics, type UnsubscribeSource } from './consent-copy';
+import { CHECKOUT_CONSENT_VERSION, CHECKOUT_CONSENT_VERSION_V1, CHECKOUT_WORDING, CHECKOUT_WORDING_V1, CONSENT_LABEL, CONSENT_VERSION, EMAIL_TOPICS, TOPIC_KEYS, type ConsentBasis, type ConsentSource, type EmailTopic, type EmailTopics, type UnsubscribeSource } from './consent-copy';
 
 export type PrefStatus = 'subscribed' | 'unsubscribed';
 
@@ -36,6 +36,11 @@ export interface PreferenceRow {
   consented_at: string | null;
   unsubscribed_at: string | null;
   unsubscribe_source: string | null;
+  /** when the address was shown the words that say we keep the pet's photo, and where ('preview_card' | 'checkout' | 'notice_email'); null until then (or until the offers-campaigns migration is run) */
+  photo_words_shown_at?: string | null;
+  photo_words_source?: 'preview_card' | 'checkout' | 'notice_email' | null;
+  /** "Please don't reuse my photo": stops photo offers and nothing else */
+  photo_offers_opt_out_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -88,6 +93,17 @@ export function verifyPreferenceToken(preferenceId: unknown, token: unknown): pr
   const a = Buffer.from(signPreference(preferenceId)), b = Buffer.from(token);
   return a.length === b.length && timingSafeEqual(a, b);
 }
+
+/** The "Please don't reuse my photo" link is signed with its own prefix, so an unsubscribe signature cannot be used for it (or the other way round) */
+export function signPhotoOptOut(preferenceId: string): string {
+  return createHmac('sha256', secret()).update(`photo-optout:${preferenceId}`).digest('base64url').slice(0, 32);
+}
+export function verifyPhotoOptOutToken(preferenceId: unknown, token: unknown): preferenceId is string {
+  if (typeof preferenceId !== 'string' || typeof token !== 'string' || !UUID_RE.test(preferenceId)) return false;
+  const a = Buffer.from(signPhotoOptOut(preferenceId)), b = Buffer.from(token);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+export const photoOptOutUrl = (baseUrl: string, preferenceId: string) => `${baseUrl.replace(/\/$/, '')}/api/public/email-preferences/photo-optout?p=${preferenceId}&t=${signPhotoOptOut(preferenceId)}`;
 
 const root = (baseUrl: string) => baseUrl.replace(/\/$/, '');
 /** The preferences page link: the row id and a signature, never the address */
@@ -237,19 +253,59 @@ export function purchaseOutcome(row: Pick<PreferenceRow, 'status'> | null, opted
 }
 
 /**
+ * Pure: which checkout words a payment was made under. Only a page that sent the CURRENT version showed the words that say we keep the photo;
+ * no version (a page loaded before this change) or any other value is the old wording, recorded as the old wording and never counted as shown.
+ */
+export function checkoutWords(wordsVersion: unknown): { photoShown: boolean; wording: string; version: string } {
+  return wordsVersion === CHECKOUT_CONSENT_VERSION
+    ? { photoShown: true, wording: CHECKOUT_WORDING, version: CHECKOUT_CONSENT_VERSION }
+    : { photoShown: false, wording: CHECKOUT_WORDING_V1, version: CHECKOUT_CONSENT_VERSION_V1 };
+}
+
+/**
+ * Record that this address was shown the words that say we keep the pet's photo (first time only: an earlier time and source are never overwritten).
+ * Best-effort: before db/migrations/2026-11-16-offers-campaigns.sql there is no such column and nothing happens.
+ */
+export async function markPhotoWordsShown(supabase: SupabaseClient, email: string, source: 'preview_card' | 'checkout' | 'notice_email', now = Date.now()): Promise<boolean> {
+  const e = normaliseEmail(email);
+  if (!e) return false;
+  const { data, error } = await supabase.from('email_preferences').update({ photo_words_shown_at: new Date(now).toISOString(), photo_words_source: source })
+    .eq('email', e).is('photo_words_shown_at', null).select('id');
+  if (error) { console.warn('email preferences: photo wording not recorded', error.message); return false; }
+  return (data ?? []).length > 0;
+}
+
+/** Switch photo offers off (or back on) for an address, leaving every other email alone. False when there is no row for the address. */
+export async function setPhotoOptOut(supabase: SupabaseClient, email: string, optedOut: boolean, source: 'email_link' | 'preferences_page' | 'account'): Promise<boolean> {
+  const e = normaliseEmail(email);
+  if (!e) return false;
+  const now = new Date().toISOString();
+  const { data, error } = await supabase.from('email_preferences').update({ photo_offers_opt_out_at: optedOut ? now : null, updated_at: now }).eq('email', e).select('id');
+  if (error) throw new Error(error.message);
+  if (!(data ?? []).length) return false;
+  await logEvent(supabase, { email: e, action: 'topics_changed', source, wording: optedOut ? 'Photo offers: off' : 'Photo offers: on' });
+  return true;
+}
+
+/**
  * A paid order (called from the Stripe webhook, never before payment). The buyer is subscribed
  * (basis 'soft_opt_in', all three topics) unless they ticked "No thanks, just my order emails".
  *   - never re-subscribes an unsubscribed address: only subscribe() from a deliberate tick, or the
  *     preferences page, can do that
  *   - ticking "No thanks" never unsubscribes anyone already subscribed; it only records an event ('declined')
  *   - already subscribed: nothing changes (their topics stay as they chose)
+ * `wordsVersion` is the checkout wording the page showed (see checkoutWords). A buyer who is subscribed (now, or already) and did not say "No thanks"
+ * under the wording that says we keep the photo is marked as shown it (photo_words_shown_at, source 'checkout'). An old page is recorded with its
+ * own old words and never marked.
  */
-export async function subscribeFromPurchase(supabase: SupabaseClient, input: { email: string | null | undefined; optedOut: boolean; customerId?: string | null }): Promise<PurchaseOutcome | null> {
+export async function subscribeFromPurchase(supabase: SupabaseClient, input: { email: string | null | undefined; optedOut: boolean; customerId?: string | null; wordsVersion?: string | null }): Promise<PurchaseOutcome | null> {
   const email = normaliseEmail(input.email);
   if (!email) return null;
+  const words = checkoutWords(input.wordsVersion);
   const outcome = purchaseOutcome(await getPreferences(supabase, email), input.optedOut);
-  if (outcome === 'declined') await logEvent(supabase, { email, action: 'declined', source: 'checkout', wording: CHECKOUT_WORDING });
-  else if (outcome === 'subscribed') await subscribe(supabase, { email, source: 'checkout', customerId: input.customerId, basis: 'soft_opt_in', wording: CHECKOUT_WORDING });
+  if (outcome === 'declined') await logEvent(supabase, { email, action: 'declined', source: 'checkout', wording: words.wording });
+  else if (outcome === 'subscribed') await subscribe(supabase, { email, source: 'checkout', customerId: input.customerId, basis: 'soft_opt_in', wording: words.wording, version: words.version });
+  if (words.photoShown && (outcome === 'subscribed' || outcome === 'already_subscribed')) await markPhotoWordsShown(supabase, email, 'checkout');
   return outcome;
 }
 
@@ -259,9 +315,9 @@ export async function subscribeFromPurchase(supabase: SupabaseClient, input: { e
  * Pass unsubscribe_url / preferences_url to the template, and headers as metadata.email_headers on
  * the queued message (the queue passes them to the email provider).
  */
-export async function marketingEmailExtras(supabase: SupabaseClient, baseUrl: string, email: string): Promise<{ unsubscribe_url: string; preferences_url: string; headers: Record<string, string> } | null> {
+export async function marketingEmailExtras(supabase: SupabaseClient, baseUrl: string, email: string): Promise<{ unsubscribe_url: string; preferences_url: string; headers: Record<string, string>; preference_id: string } | null> {
   const row = await getPreferences(supabase, email);
   if (!row) return null;
   const unsub = unsubscribeUrl(baseUrl, row.id);
-  return { unsubscribe_url: unsub, preferences_url: preferencesUrl(baseUrl, row.id), headers: listUnsubscribeHeaders(unsub) };
+  return { unsubscribe_url: unsub, preferences_url: preferencesUrl(baseUrl, row.id), headers: listUnsubscribeHeaders(unsub), preference_id: row.id };
 }

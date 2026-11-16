@@ -46,6 +46,12 @@ export const SETTING_DEFAULTS = {
   offers_per_run: 5,
   /** Offers: most people generated in one day */
   offers_per_day: 30,
+  /** Offers: the zodiac campaign's offer is due this many days before the start of the pet's sign */
+  offers_zodiac_days_before: 14,
+  /** Offers: the birthday campaign's offer is due this many days before the pet's next birthday */
+  offers_birthday_days_before: 21,
+  /** Offers: days after a buyer was shown the photo wording before they can be offered anything */
+  offers_notice_grace_days: 2,
   royal_mail: { service_uk: '', service_europe: '', service_world: '', packaging_grams: 120, print_grams_per_100cm2: 25, large_letter_max_prints: 2 } as RoyalMailSettings,
 };
 export interface RoyalMailSettings {
@@ -111,6 +117,11 @@ export function validateSetting(key: string, value: unknown): string | null {
     case 'offers_round1_days':
     case 'offers_round2_days':
       return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 365 ? null : 'Must be a whole number of days, 1–365';
+    case 'offers_zodiac_days_before':
+    case 'offers_birthday_days_before':
+      return Number.isInteger(value) && (value as number) >= 5 && (value as number) <= 120 ? null : 'Must be a whole number of days, 5–120';
+    case 'offers_notice_grace_days':
+      return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 30 ? null : 'Must be a whole number of days, 0–30';
     case 'offers_per_run':
       return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 50 ? null : 'Must be a whole number 0–50';
     case 'offers_per_day':

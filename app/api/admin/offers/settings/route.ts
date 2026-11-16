@@ -4,7 +4,7 @@ import { requireAdmin } from '@/lib/qr/server';
 import { setSetting, validateSetting, type SettingKey } from '@/lib/app-settings';
 
 export const dynamic = 'force-dynamic';
-const KEYS = ['offers_enabled', 'offers_auto_send', 'offers_round1_days', 'offers_round2_days', 'offers_per_run', 'offers_per_day'];
+const KEYS = ['offers_enabled', 'offers_auto_send', 'offers_round1_days', 'offers_round2_days', 'offers_per_run', 'offers_per_day', 'offers_zodiac_days_before', 'offers_birthday_days_before', 'offers_notice_grace_days'];
 
 export async function POST(request: NextRequest) {
   const denied = await requireAdmin(); if (denied) return denied;

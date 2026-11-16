@@ -1,6 +1,7 @@
 "use client"
 
 import MarketingOptOut from '@/components/marketing/MarketingOptOut'
+import { CHECKOUT_CONSENT_VERSION } from '@/lib/marketing/consent-copy'
 import type React from "react"
 
 import { useState, useEffect } from "react"
@@ -569,6 +570,7 @@ function CheckoutPageContent() {
         postcode: payer.address?.postcode || '',
         country: payer.address?.country || shippingData.country,
       },
+      marketingWords: showMarketingTick ? CHECKOUT_CONSENT_VERSION : undefined,   // the wording this page showed (only when it showed the box; a stale page sends none, or the old one)
       marketingOptOut: showMarketingTick ? marketingOptOut : false,   // sent always, so an in-flight payment from before this change is told apart; the server acts on it only once the order is paid
       digitalOnly: payer.digitalOnly || undefined,
       shippingOption: option,

@@ -8,7 +8,8 @@ import { cloudinaryService } from '@/lib/cloudinary';
 import { sendMessageImmediate } from '@/lib/messaging/message-service';
 import { renderEmailFile } from '@/lib/messaging/render-file';
 import { decodeAttribution, hashIp, type QrAttribution } from '@/lib/qr/attribution';
-import { getPreferences, maskEmail, normaliseEmail, subscribe } from '@/lib/marketing/preferences';
+import { getPreferences, markPhotoWordsShown, maskEmail, normaliseEmail, subscribe } from '@/lib/marketing/preferences';
+import type { Birthday } from '@/lib/offers/dates';
 import { PHOTO_WORDS_VERSION, PREVIEW_CONSENT_VERSION_V1, PREVIEW_COPY, PREVIEW_EMAIL, PREVIEW_LINE_V1 } from './copy';
 import { appendSend, limitProblem, marketingStep, previewFirstName, previewUrl, sendsInLastDay, type LimitProblem } from './email-link';
 
@@ -26,6 +27,8 @@ export interface RequestInput {
   marketingTicked: boolean;
   /** The card showed the words that say we keep the photo (guests only; the card sends PHOTO_WORDS_VERSION) */
   photoWordsShown?: boolean;
+  /** the pet's birthday, when the visitor gave one (already checked: cleanBirthday) */
+  birthday?: Birthday | null;
   user: { id: string; email?: string | null } | null;
   guestId: string | null;
   qrCookie: string | null;
@@ -77,8 +80,10 @@ export async function requestPreviewEmail(supabase: SupabaseClient, input: Reque
     const save = (f: Record<string, unknown>) => (existing
       ? supabase.from('preview_email_requests').update(f).eq('id', (existing as any).id).select('*').single()
       : supabase.from('preview_email_requests').insert(f).select('*').single());
-    let { data: row, error } = await save({ ...fields, photo_offers_ok: photoOk });
-    // Before db/migrations/2026-11-16-preview-offers.sql has been run there is no such column: carry on without it
+    const birth = input.birthday ? { pet_birth_month: input.birthday.month, pet_birth_day: input.birthday.day, pet_birth_year: input.birthday.year ?? null } : {};
+    let { data: row, error } = await save({ ...fields, photo_offers_ok: photoOk, ...birth });
+    // Before db/migrations/2026-11-16-offers-campaigns.sql there are no birthday columns, and before 2026-11-16-preview-offers.sql no photo_offers_ok: carry on without them
+    if (error && /pet_birth_/.test(error.message ?? '')) ({ data: row, error } = await save({ ...fields, photo_offers_ok: photoOk }));
     if (error && /photo_offers_ok/.test(error.message ?? '')) ({ data: row, error } = await save(fields));
     if (error || !row) { console.error('preview email: could not store the request', error?.message); return { ok: false, status: MISSING.test(error?.message ?? '') ? 503 : 500, code: MISSING.test(error?.message ?? '') ? 'unavailable' : 'other' }; }
 
@@ -138,9 +143,12 @@ export async function openPreviewLink(supabase: SupabaseClient, requestId: strin
         wording: photo ? PREVIEW_COPY.line : PREVIEW_LINE_V1, version: photo ? PHOTO_WORDS_VERSION : PREVIEW_CONSENT_VERSION_V1,
       });
       await supabase.from('preview_email_requests').update({ marketing_confirmed_at: new Date(now).toISOString() }).eq('id', requestId);
+      // They confirmed under the words that say we keep the photo: this address has been shown them (first time only)
+      if (photo) await markPhotoWordsShown(supabase, r.email, 'preview_card', now);
     } else if (step === 'already') {
       // Already subscribed: nothing to change, but opening the link still proves the address is theirs (offers count their days from here)
       await supabase.from('preview_email_requests').update({ marketing_confirmed_at: new Date(now).toISOString() }).eq('id', requestId);
+      if (r.photo_offers_ok === true) await markPhotoWordsShown(supabase, r.email, 'preview_card', now);
     }
   } catch (e) {
     console.error('preview email: marketing tick not confirmed', e);

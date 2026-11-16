@@ -411,7 +411,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
         const { recordTick, subscribeFromPurchase } = await import('@/lib/marketing/preferences');
         const customerId = guestAccount?.customerId ?? orderingUserProfile?.customer_id ?? null;
         if (metadata.marketingOptIn === 'true') await recordTick(supabase, { ticked: true, email: customerEmail, source: 'checkout', customerId, at: (order as any).created_at ?? null });
-        else await subscribeFromPurchase(supabase, { email: customerEmail, optedOut: metadata.marketingOptOut === 'true', customerId });
+        else await subscribeFromPurchase(supabase, { email: customerEmail, optedOut: metadata.marketingOptOut === 'true', customerId, wordsVersion: metadata.marketingWords });
       } catch (prefError) {
         console.error('Marketing choice not recorded (order is fine):', prefError);
       }

@@ -8,11 +8,20 @@ export const CONSENT_VERSION = '2026-11';
 /** The tick-box label (never pre-ticked) */
 export const CONSENT_LABEL = 'Yes please: send me new designs, a birthday treat for my pet and the odd offer. Stop any time.';
 
-/** Checkout (people buying from us): a line of text and an UNTICKED opt-out box. Not ticking = subscribed once the order is paid. */
-export const CHECKOUT_LINE = 'We\'ll send you new designs, a birthday treat for your pet and the odd offer. Stop any time.';
+/**
+ * Checkout (people buying from us): a line of text and an UNTICKED opt-out box. Not ticking = subscribed once the order is paid.
+ * From 16 November 2026 the line also says we keep the pet's photo (so Pawcasso can paint them again): that wording has its own version, which the
+ * checkout page sends with the payment so a page left open under the old words is never counted as having shown the new ones.
+ */
+export const CHECKOUT_LINE_V1 = 'We\'ll send you new designs, a birthday treat for your pet and the odd offer. Stop any time.';
+export const CHECKOUT_LINE = 'We\'ll send you new designs, a birthday treat for your pet and the odd offer, and keep your pet\'s photo so Pawcasso can paint them into a few more. Stop any time.';
 export const CHECKOUT_OPT_OUT_LABEL = 'No thanks, just my order emails';
 /** What is stored as the wording for a checkout subscription: both strings the buyer saw */
+export const CHECKOUT_WORDING_V1 = `${CHECKOUT_LINE_V1} [ ] ${CHECKOUT_OPT_OUT_LABEL}`;
 export const CHECKOUT_WORDING = `${CHECKOUT_LINE} [ ] ${CHECKOUT_OPT_OUT_LABEL}`;
+/** consent_version for a checkout subscription: the words before, and the words that tell people we keep the photo */
+export const CHECKOUT_CONSENT_VERSION_V1 = '2026-11';
+export const CHECKOUT_CONSENT_VERSION = '2026-11-16-checkout-photo';
 
 /** 'soft_opt_in': bought from us and did not say no. 'consent': ticked yes / said yes on the preferences page. */
 export type ConsentBasis = 'soft_opt_in' | 'consent';
@@ -53,4 +62,22 @@ export const PREFS_COPY = {
   pickAndChoose: 'I\'d rather pick and choose',
   badHeading: 'This link has gone walkies',
   badBody: 'It may be old or incomplete. Open the link in any of our emails, or drop us a line at support@pawtraits.pics.',
+} as const;
+
+/** The "Please don't reuse my photo" pages (lib/marketing/pages.ts) */
+export const PHOTO_PAGE = {
+  confirmHeading: 'Stop painting from your pet\'s photo?',
+  confirmBody: 'Pawcasso will stop using the photo you sent. Everything else we email you stays as it is.',
+  confirmButton: 'Yes, please don\'t reuse my photo',
+  pickAndChoose: 'I\'d rather pick and choose',
+  done: 'Done. The photo stays put.',
+  doneBody: 'We won\'t paint from it again. Your other emails carry on as they were.',
+  changedMind: 'Changed your mind? Open your email preferences',
+} as const;
+
+/** The switch on the email preferences page (on = allowed) */
+export const PHOTO_SWITCH = {
+  title: 'Paint my pet into new designs from the photo I sent',
+  description: 'Pawcasso may use the photo you sent us for a birthday surprise or the odd new design. Switch it off and the photo stays put.',
+  saved: 'Saved. The photo is yours to keep.',
 } as const;

@@ -76,6 +76,7 @@ const id = '0b6f1c2e-3d4a-4e5f-8a9b-1c2d3e4f5a6b';
       const chain: any = {
         select: () => chain, eq: (c: string, v: any) => { filters.push(r => r[c] === v); return chain; }, in: (c: string, v: any[]) => { filters.push(r => v.includes(r[c])); return chain; },
         ilike: (c: string, v: string) => { filters.push(r => String(r[c]).toLowerCase() === v.toLowerCase()); return chain; }, limit: () => chain,
+        is: (c: string, v: any) => { filters.push(r => (v === null ? (r[c] ?? null) === null : r[c] === v)); return chain; },
         update: (p: any) => { op = 'update'; patch = p; return chain; }, insert: (o: any) => { rows.push({ id: `e${rows.length}`, ...o }); return Promise.resolve({ error: null }); },
         upsert: (o: any, opts: any) => { const k = opts?.onConflict ?? 'id'; const ex = rows.find(r => r[k] === o[k]); if (ex) Object.assign(ex, o); else rows.push({ id: `p${rows.length}`, ...o }); filters = [r => r[k] === o[k]]; op = 'select'; return chain; },
         single: () => { single = true; return chain; },
@@ -119,10 +120,16 @@ const id = '0b6f1c2e-3d4a-4e5f-8a9b-1c2d3e4f5a6b';
   await openPreviewLink(db, id, { guestId: 'laptop' });
   let pref: any = await getPreferences(db, 'owner@x.co');
   ok('new-wording request: the words and version shown (we keep the photo) are what is recorded', pref?.consent_wording === PREVIEW_COPY.line && pref?.consent_version === PHOTO_WORDS_VERSION && /keep your pet's photo/.test(pref.consent_wording));
+  // photo_words_shown_at: set when they confirm under the photo wording (source 'preview_card'), never for the old wording, and never overwritten
+  ok('photo wording confirmed: this address has been shown the words (preview_card)', !!tables.email_preferences[0].photo_words_shown_at && tables.email_preferences[0].photo_words_source === 'preview_card');
+  const firstShown = tables.email_preferences[0].photo_words_shown_at;
+  await openPreviewLink(db, id, { guestId: 'laptop' }, Date.now() + DAY);
+  ok('the first time is kept', tables.email_preferences[0].photo_words_shown_at === firstShown);
   ({ db, tables } = mk());
   await openPreviewLink(db, id, { guestId: 'laptop' });
   pref = await getPreferences(db, 'owner@x.co');
   ok('old-wording request: the old words and the old version are recorded', pref?.consent_wording === PREVIEW_LINE_V1 && pref?.consent_version === '2026-11' && !/photo/.test(pref.consent_wording));
+  ok('old-wording request: NOT marked as shown the photo words', !tables.email_preferences[0].photo_words_shown_at);
   ok('the two versions differ', String(PHOTO_WORDS_VERSION) !== PREVIEW_CONSENT_VERSION_V1);
 
   ({ db, tables } = mk({ prefs: [{ id: 'p1', email: 'owner@x.co', status: 'subscribed', topics: { new_designs: true, pet_days: true, offers: true } }] }));

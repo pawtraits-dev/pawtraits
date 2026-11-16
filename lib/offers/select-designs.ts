@@ -63,7 +63,7 @@ export interface RankInput extends Dataset {
   campaignDesignIds?: string[] | null;
 }
 
-export interface Pick { id: string; reason: string }
+export interface Pick { id: string; reason: string; /** the sign's framed zodiac card (the one framed design an offer may hold) */ card?: boolean }
 
 /** The original a design comes from (itself when it is one, or when the chain is broken) */
 export function rootOf(id: string, byId: Map<string, DesignRow>): string {
@@ -130,6 +130,55 @@ export function rankDesigns(input: RankInput): Pick[] {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Birthday and zodiac campaigns (pure)
+
+/**
+ * Is this design the kind of framed zodiac card we may paint? It must be a design in the sign's collection (the caller passes the ids), shown
+ * publicly, a plain single-pet picture (no caption plate, words, kit or mug shape). The zodiac card is the ONE framed design an offer may contain.
+ */
+export function cardCandidate(d: DesignRow): boolean {
+  return d.isPublic && d.listed && d.hasPicture && !d.customerMade && !d.caption && !d.words && !d.kit && !d.multiPet && !d.wraparound;
+}
+
+/**
+ * That sign's card for the pet's animal: from the sign's collection, the design that shows that animal (a design with no known animal if there is no
+ * other, never the other animal), one the person has not seen, framed ones first, then the best seller. Null when there is none.
+ */
+export function pickZodiacCard(input: { designs: DesignRow[]; sales: SaleLine[]; signDesignIds: string[]; animal: Animal; excludeDesignIds: string[] }): Pick | null {
+  const byId = new Map(input.designs.map(d => [d.id, d] as const));
+  const seen = new Set(input.excludeDesignIds.map(id => rootOf(id, byId)));
+  const sold = new Map<string, number>();
+  for (const s of input.sales) if (byId.has(s.designId)) { const r = rootOf(s.designId, byId); sold.set(r, (sold.get(r) ?? 0) + s.qty); }
+  const pool = input.signDesignIds.map(id => byId.get(id)).filter((d): d is DesignRow => !!d && cardCandidate(d) && !seen.has(rootOf(d.id, byId)))
+    .filter(d => d.animal === input.animal || d.animal === null);
+  pool.sort((a, b) =>
+    Number(b.animal === input.animal) - Number(a.animal === input.animal) || Number(b.framed) - Number(a.framed) || Number(b.isOriginal) - Number(a.isOriginal)
+    || (sold.get(rootOf(b.id, byId)) ?? 0) - (sold.get(rootOf(a.id, byId)) ?? 0) || a.id.localeCompare(b.id));
+  const card = pool[0];
+  return card ? { id: card.id, reason: 'Their star sign, as a framed card', card: true } : null;
+}
+
+/** Zodiac offer: the sign's framed card first, then the standard best-seller choice (which never includes a framed design). Empty when there is no card. */
+export function zodiacOfferPicks(input: RankInput & { signDesignIds: string[]; animal: Animal; count?: number }): Pick[] {
+  const card = pickZodiacCard({ designs: input.designs, sales: input.sales, signDesignIds: input.signDesignIds, animal: input.animal, excludeDesignIds: input.excludeDesignIds });
+  if (!card) return [];
+  const byId = new Map(input.designs.map(d => [d.id, d] as const));
+  const cardRoot = rootOf(card.id, byId);
+  const rest = rankDesigns({ ...input, petAnimal: input.animal, campaignDesignIds: null, excludeDesignIds: [...input.excludeDesignIds, card.id] })
+    .filter(p => !byId.get(p.id)?.framed && rootOf(p.id, byId) !== cardRoot);
+  return [card, ...rest].slice(0, input.count ?? OFFER_PICTURES);
+}
+
+/** How many designs of a set could go in an offer for a pet of this animal (the birthday campaign needs at least 2) */
+export function suitableCount(designs: DesignRow[], ids: string[], animal: Animal | null): number {
+  const byId = new Map(designs.map(d => [d.id, d] as const));
+  const roots = new Set<string>();
+  for (const id of ids) { const d = byId.get(id); if (d && plainPortrait(d) && (!animal || !d.animal || d.animal === animal)) roots.add(rootOf(id, byId)); }
+  return roots.size;
+}
+export const MIN_BIRTHDAY_DESIGNS = 2;
+
+// ---------------------------------------------------------------------------------------------
 // Database side
 
 const PAGE = 1000;
@@ -150,10 +199,19 @@ const aspectOf = (f: any) => (Array.isArray(f) ? f[0] : f)?.aspect_ratio as stri
 const animalOf = (b: any): Animal | null => { const a = (Array.isArray(b) ? b[0] : b)?.animal_type; return a === 'dog' || a === 'cat' ? a : null; };
 
 /** Every catalogue design reduced to a DesignRow (paged; the catalogue is a few thousand rows) */
-export async function loadDesigns(supabase: SupabaseClient): Promise<DesignRow[]> {
-  const rows = await fetchPages<any>((a, b) => supabase.from('image_catalog')
-    .select('id, description, variation_of, tags, cloudinary_public_id, is_public, is_customer_generated, is_multi_subject, subjects, frame_overlay, caption_overlay, text_overlay, kit_personalisation, breeds(animal_type), formats(aspect_ratio)')
-    .order('id').range(a, b));
+export async function loadDesigns(supabase: SupabaseClient, onlyIds?: string[]): Promise<DesignRow[]> {
+  const cols = 'id, description, variation_of, tags, cloudinary_public_id, is_public, is_customer_generated, is_multi_subject, subjects, frame_overlay, caption_overlay, text_overlay, kit_personalisation, breeds(animal_type), formats(aspect_ratio)';
+  let rows: any[];
+  if (onlyIds) {
+    rows = [];
+    for (const c of chunks(Array.from(new Set(onlyIds)))) {
+      const { data, error } = await supabase.from('image_catalog').select(cols).in('id', c);
+      if (error) throw new Error(error.message);
+      rows.push(...((data ?? []) as any[]));
+    }
+  } else {
+    rows = await fetchPages<any>((a, b) => supabase.from('image_catalog').select(cols).order('id').range(a, b));
+  }
   return rows.map(r => {
     const ratio = aspectOf(r.formats);
     const [w, h] = (ratio ?? '').split(':').map(Number);
@@ -235,12 +293,20 @@ export interface PickContext {
   petAnimal: Animal | null;
   excludeDesignIds: string[];
   campaign?: { design_ids: string[] | null; collection_path: string | null } | null;
+  /** zodiac: this sign's card goes first (its collection's design ids are looked up by the caller) */
+  zodiac?: { signDesignIds: string[]; animal: Animal } | null;
   /** how many (default 3) */
   count?: number;
 }
 
 /** THE replaceable choice: up to `count` designs, each with the reason it was chosen */
 export async function pickOfferDesigns(ctx: PickContext): Promise<Pick[]> {
+  if (ctx.zodiac) {
+    return zodiacOfferPicks({
+      ...ctx.dataset, petBreedId: ctx.petBreedId, petBreedName: ctx.petBreedName, petAnimal: ctx.zodiac.animal, excludeDesignIds: ctx.excludeDesignIds,
+      signDesignIds: ctx.zodiac.signDesignIds, animal: ctx.zodiac.animal, count: ctx.count,
+    });
+  }
   const campaignDesignIdsList = ctx.campaign ? await campaignDesignIds(ctx.supabase, ctx.campaign) : null;
   return rankDesigns({
     ...ctx.dataset, petBreedId: ctx.petBreedId, petBreedName: ctx.petBreedName, petAnimal: ctx.petAnimal,
