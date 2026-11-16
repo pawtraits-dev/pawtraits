@@ -1,6 +1,13 @@
 // Run: NEXT_PUBLIC_SUPABASE_URL=https://x.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=x SUPABASE_SERVICE_ROLE_KEY=x CLOUDINARY_CLOUD_NAME=x CLOUDINARY_API_KEY=x CLOUDINARY_API_SECRET=x NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=x npx tsx scripts/test-offers.ts   (no network, no database)
-import { campaignDue, dueNow, hasEnoughPictures, round1Due, round2Due, stillAllowed, type PersonFacts, type RequestFacts } from '../lib/offers/eligibility';
-import { plainPortrait, rankDesigns, rootOf, type DesignRow, type RankInput } from '../lib/offers/select-designs';
+import { audienceOf, buildAudience, buyerReady, campaignAudience, campaignDue, dueFor, dueNow, hasEnoughPictures, noticeAudience, round1Due, round2Due, stillAllowed, stillAllowedBuyer, type PersonFacts, type RequestFacts } from '../lib/offers/eligibility';
+import { pickZodiacCard, plainPortrait, rankDesigns, rootOf, suitableCount, zodiacOfferPicks, type DesignRow, type RankInput } from '../lib/offers/select-designs';
+import { MIN_BIRTHDAY_LEAD_DAYS, birthdayDue, birthdayFromDate, birthdayIn, cleanBirthday, eventPassed, nextBirthday, offerLabel, nextSignStart, pickAutomatic, signOfBirthday, signOfRound, utcDay, zodiacDue } from '../lib/offers/dates';
+import { chooseBuyerPhoto, cloudinaryIdFromUrl } from '../lib/offers/photo';
+import { birthdayAskUrl, birthdayFromForm, signBirthdayToken, verifyBirthdayToken } from '../lib/offers/birthday';
+import { CAMPAIGN_EMAIL, NOTICE_EMAIL } from '../lib/offers/copy';
+import { offerWords } from '../lib/offers/send';
+import { checkoutWords } from '../lib/marketing/preferences';
+import { CHECKOUT_CONSENT_VERSION } from '../lib/marketing/consent-copy';
 import { signOfferToken, verifyOfferToken, offerUrl } from '../lib/offers/link';
 import { signPreviewToken } from '../lib/previews/email-link';
 import { OFFER_EMAIL } from '../lib/offers/copy';
@@ -152,6 +159,165 @@ ok('day usage: generating counts, older than a day does not, a replacement adds 
   { status: 'ready', generated_at: ago(5), designs: [] },
 ], now) === 4);
 ok('pasted design ids and links', parseDesignIds(`https://pawtraits.pics/customise/${offerId}?src=x\n${imgId.toUpperCase()}\n${offerId}`).join() === [offerId, imgId].join());
+
+// =============================================================================================
+// Birthday and zodiac campaigns, and buyers
+
+const day = (y: number, m: number, d: number) => Date.UTC(y, m - 1, d, 13, 30);   // a time of day that must not matter
+// ---- birthdays: the window
+let bd = birthdayDue({ month: 3, day: 20 }, day(2027, 2, 27), 21);
+ok('birthday: due 21 days before (27 Feb for 20 Mar)', bd?.round === 'birthday:2027' && bd.daysUntil === 21 && bd.eventDate === '2027-03-20', bd);
+ok('birthday: 22 days before is not due yet; 6 days before is due', birthdayDue({ month: 3, day: 20 }, day(2027, 2, 26), 21) === null && birthdayDue({ month: 3, day: 20 }, day(2027, 3, 14), 21)?.daysUntil === 6);
+ok('birthday: learned too late (fewer than 5 days to go) is skipped this year; exactly 5 is still due', MIN_BIRTHDAY_LEAD_DAYS === 5 && birthdayDue({ month: 3, day: 20 }, day(2027, 3, 16), 21) === null && birthdayDue({ month: 3, day: 20 }, day(2027, 3, 15), 21)?.daysUntil === 5 && birthdayDue({ month: 3, day: 20 }, day(2027, 3, 20), 21) === null);
+ok('birthday: the day after it, the next one is a year off (no offer)', birthdayDue({ month: 3, day: 20 }, day(2027, 3, 21), 21) === null && nextBirthday({ month: 3, day: 20 }, day(2027, 3, 21)).year === 2028);
+ok('birthday: year roll-over: 5 Jan, seen on 20 Dec, is the January of NEXT year', (() => { const b = birthdayDue({ month: 1, day: 5 }, day(2026, 12, 20), 21); return b?.round === 'birthday:2027' && b.eventDate === '2027-01-05' && b.daysUntil === 16; })());
+ok('birthday: seen in January after the day has passed, the round is that same year only for the next one', birthdayDue({ month: 1, day: 5 }, day(2027, 1, 6), 21) === null);
+ok('birthday: 1 Jan seen on 12 Dec is round birthday:2027', birthdayDue({ month: 1, day: 1 }, day(2026, 12, 12), 21)?.round === 'birthday:2027');
+ok('29 Feb: in a leap year it is 29 Feb, otherwise 28 Feb', new Date(birthdayIn({ month: 2, day: 29 }, 2028)).toISOString().slice(0, 10) === '2028-02-29' && new Date(birthdayIn({ month: 2, day: 29 }, 2027)).toISOString().slice(0, 10) === '2027-02-28');
+ok('29 Feb: due 21 days before 28 Feb in 2027 (7 Feb), and before 29 Feb in 2028', birthdayDue({ month: 2, day: 29 }, day(2027, 2, 7), 21)?.eventDate === '2027-02-28' && birthdayDue({ month: 2, day: 29 }, day(2027, 2, 6), 21) === null
+  && birthdayDue({ month: 2, day: 29 }, day(2028, 2, 8), 21)?.eventDate === '2028-02-29' && birthdayDue({ month: 2, day: 29 }, day(2028, 2, 7), 21) === null);
+ok('29 Feb: on 1 Mar 2027 the next one is in 2028', nextBirthday({ month: 2, day: 29 }, day(2027, 3, 1)).year === 2028);
+ok('birthday: the days-before setting is honoured', birthdayDue({ month: 3, day: 20 }, day(2027, 3, 1), 10) === null && birthdayDue({ month: 3, day: 20 }, day(2027, 3, 10), 10)?.daysUntil === 10 && birthdayDue(null, now, 21) === null);
+ok('birthday: UTC calendar days, whatever the time of day', birthdayDue({ month: 3, day: 20 }, Date.UTC(2027, 1, 27, 0, 0, 1), 21)?.daysUntil === 21 && birthdayDue({ month: 3, day: 20 }, Date.UTC(2027, 1, 27, 23, 59, 59), 21)?.daysUntil === 21);
+
+// ---- impossible birthdays are ignored
+ok('cleanBirthday: 30 Feb, month 13, day 0, nothing: ignored', cleanBirthday({ month: 2, day: 30 }) === null && cleanBirthday({ month: 13, day: 1 }) === null && cleanBirthday({ month: 4, day: 31 }) === null && cleanBirthday({ month: 1, day: 0 }) === null && cleanBirthday({}) === null && cleanBirthday(null) === null && cleanBirthday({ month: '', day: '' }) === null);
+ok('cleanBirthday: real dates kept, numbers as text too; 29 Feb needs no year; 29 Feb of a year that had none is ignored', JSON.stringify(cleanBirthday({ month: '3', day: '20' })) === JSON.stringify({ month: 3, day: 20, year: null })
+  && cleanBirthday({ month: 2, day: 29 })?.day === 29 && cleanBirthday({ month: 2, day: 29, year: 2020 })?.year === 2020 && cleanBirthday({ month: 2, day: 29, year: 2021 }) === null);
+ok('cleanBirthday: a silly year is dropped, the day and month kept', cleanBirthday({ month: 3, day: 20, year: 1850 })?.year === null && cleanBirthday({ month: 3, day: 20, year: 'abc' })?.month === 3);
+ok('birthdayFromDate reads pets.birthday as written', JSON.stringify(birthdayFromDate('2019-01-20')) === JSON.stringify({ month: 1, day: 20, year: 2019 }) && birthdayFromDate(null) === null && birthdayFromDate('nonsense') === null);
+ok('the form: day, month, optional year; an impossible date is null', (() => { const f = (o: any) => ({ get: (k: string) => o[k] }); return birthdayFromForm(f({ day: '14', month: '2' }))?.day === 14 && birthdayFromForm(f({ day: '30', month: '2' })) === null && birthdayFromForm(f({ day: '14' })) === null; })());
+ok('the sign comes from the birthday (day and month are enough), 20 Jan is Aquarius, 19 Jan Capricorn', signOfBirthday({ month: 1, day: 20 }) === 'aquarius' && signOfBirthday({ month: 1, day: 19 }) === 'capricorn' && signOfBirthday({ month: 7, day: 23 }) === 'leo' && signOfBirthday(null) === null);
+
+// ---- zodiac: the window and round keys
+let zd = zodiacDue('leo', day(2027, 7, 9), 14);
+ok('zodiac: Leo starts 23 Jul, due 14 days before (9 Jul), round zodiac:leo:2027', zd?.round === 'zodiac:leo:2027' && zd.eventDate === '2027-07-23' && zd.daysUntil === 14, zd);
+ok('zodiac: 15 days before is too early; the day it starts is still due; the day after it is not', zodiacDue('leo', day(2027, 7, 8), 14) === null && zodiacDue('leo', day(2027, 7, 23), 14)?.daysUntil === 0 && zodiacDue('leo', day(2027, 7, 24), 14) === null);
+ok('zodiac: Capricorn starts 22 Dec: due from 8 Dec, round zodiac:capricorn:<that year>', zodiacDue('capricorn', day(2026, 12, 8), 14)?.round === 'zodiac:capricorn:2026' && zodiacDue('capricorn', day(2026, 12, 7), 14) === null && zodiacDue('capricorn', day(2026, 12, 22), 14)?.eventDate === '2026-12-22');
+ok('zodiac: Capricorn in January (the season is on) looks ahead to the next December, not due', zodiacDue('capricorn', day(2027, 1, 5), 14) === null && nextSignStart('capricorn', day(2027, 1, 5))?.year === 2027 && zodiacDue('capricorn', day(2027, 1, 5), 14) === null);
+ok('zodiac: Aquarius (20 Jan) is due from 6 Jan, across the new year for a big setting (30 days: 21 Dec), round names the year it starts', zodiacDue('aquarius', day(2027, 1, 6), 14)?.round === 'zodiac:aquarius:2027' && zodiacDue('aquarius', day(2026, 12, 21), 30)?.round === 'zodiac:aquarius:2027' && zodiacDue('aquarius', day(2026, 12, 20), 30) === null);
+ok('zodiac: no sign or an unknown sign: nothing', zodiacDue(null, now, 14) === null && nextSignStart('nope' as any, now) === null && signOfRound('zodiac:leo:2027') === 'leo' && signOfRound('birthday:2027') === null);
+
+// ---- birthday beats zodiac in the same week
+const cfg = { birthdayOn: true, zodiacOn: true, birthdayDays: 21, zodiacDays: 14 };
+const noRounds = () => false;
+// Leo starts 23 Jul (window opens 9 Jul); a 20 Jul birthday window opens 29 Jun and is open on 9 Jul
+ok('both due: the birthday wins', pickAutomatic({ birthday: { month: 7, day: 20 }, sign: 'leo' }, day(2027, 7, 9) - 0, cfg, noRounds)?.kind === 'birthday');
+ok('both due the same week: the birthday wins, the zodiac waits (nothing for the zodiac while the birthday is pending)', (() => {
+  const p = { birthday: { month: 7, day: 29 } as any, sign: 'leo' as const };
+  const t = day(2027, 7, 9);   // zodiac window open; the birthday (29 Jul) window opens 8 Jul: already open too
+  const a = pickAutomatic(p, t, cfg, noRounds);
+  return a?.kind === 'birthday';
+})());
+ok('the birthday window opens within a week: the zodiac waits for it', (() => {
+  const p = { birthday: { month: 8, day: 2 } as any, sign: 'leo' as const };   // window opens 12 Jul; on 9 Jul the zodiac is open, the birthday opens in 3 days
+  return pickAutomatic(p, day(2027, 7, 9), cfg, noRounds) === null && pickAutomatic(p, day(2027, 7, 12), cfg, noRounds)?.kind === 'birthday';
+})());
+ok('birthday already queued/sent this year (or its campaign off): the zodiac goes', pickAutomatic({ birthday: { month: 7, day: 29 }, sign: 'leo' }, day(2027, 7, 9), cfg, r => r === 'birthday:2027')?.kind === 'zodiac'
+  && pickAutomatic({ birthday: { month: 7, day: 29 }, sign: 'leo' }, day(2027, 7, 9), { ...cfg, birthdayOn: false }, noRounds)?.kind === 'zodiac');
+ok('birthday window past its last useful day: the zodiac goes (no waiting for something that cannot happen)', pickAutomatic({ birthday: { month: 7, day: 12 }, sign: 'leo' }, day(2027, 7, 9), cfg, noRounds)?.kind === 'zodiac');
+ok('zodiac off: only the birthday; both off: nothing; zodiac already done this year: nothing', pickAutomatic({ birthday: null, sign: 'leo' }, day(2027, 7, 9), { ...cfg, zodiacOn: false }, noRounds) === null
+  && pickAutomatic({ birthday: null, sign: 'leo' }, day(2027, 7, 9), { ...cfg, birthdayOn: false, zodiacOn: false }, noRounds) === null && pickAutomatic({ birthday: null, sign: 'leo' }, day(2027, 7, 9), cfg, r => r === 'zodiac:leo:2027') === null
+  && pickAutomatic({ birthday: null, sign: 'leo' }, day(2027, 7, 9), cfg, noRounds)?.round === 'zodiac:leo:2027');
+ok('an automatic offer is not sent after its day', eventPassed('2027-07-23', day(2027, 7, 23)) === false && eventPassed('2027-07-23', day(2027, 7, 24)) === true && eventPassed(null, now) === false && utcDay(day(2027, 7, 23)) === Date.UTC(2027, 6, 23));
+
+// ---- buyers
+const GRACE = 2;
+const buyerOf = (over: Partial<PersonFacts> = {}): PersonFacts => ({
+  email: 'buyer@b.co', requests: [], canEmail: true, paidOrders: [now - 40 * DAY_MS], offers: [], isBuyer: true,
+  buyer: { photo: { customImageId: 'imgB', petId: null, source: 'bought' }, pet: { name: 'Biscuit', animal: 'dog', breedId: 'lab', coatId: null, birthday: null, quizSign: null } },
+  photoWordsShownAt: now - 3 * DAY_MS, photoWordsSource: 'checkout', photoOptOutAt: null, prefBirthday: null, ...over,
+});
+ok('buyer: shown the words more than the grace days ago: in', buyerReady(buyerOf(), now, GRACE) && audienceOf(buyerOf(), now, GRACE) === 'buyer');
+ok('buyer: not shown the words: out', !buyerReady(buyerOf({ photoWordsShownAt: null }), now, GRACE) && !buyerReady(buyerOf({ photoWordsShownAt: undefined }), now, GRACE));
+ok('buyer: shown but inside the grace days: out; exactly the grace days: in', !buyerReady(buyerOf({ photoWordsShownAt: now - 1 * DAY_MS }), now, GRACE) && !buyerReady(buyerOf({ photoWordsShownAt: now - 2 * DAY_MS + 1000 }), now, GRACE) && buyerReady(buyerOf({ photoWordsShownAt: now - 2 * DAY_MS }), now, GRACE));
+ok('buyer: opted out of photo offers: out', !buyerReady(buyerOf({ photoOptOutAt: now - DAY_MS }), now, GRACE));
+ok('buyer: unsubscribed (cannot be emailed about offers): out', !buyerReady(buyerOf({ canEmail: false }), now, GRACE));
+ok('buyer: no usable photo: out', !buyerReady(buyerOf({ buyer: null }), now, GRACE));
+ok('buyer: no paid order: not a buyer', !buyerReady(buyerOf({ isBuyer: false }), now, GRACE));
+ok('buyer: offers stopped for them by the owner: out', !buyerReady(buyerOf({ requests: [req({ offersStoppedAt: now - DAY_MS })] }), now, GRACE));
+ok('buyers are NOT skipped for having bought (previewers are)', buyerReady(buyerOf({ paidOrders: [now - DAY_MS] }), now, GRACE) && campaignAudience([buyerOf({ paidOrders: [now - DAY_MS] })], now, 'c1', { graceDays: GRACE }).length === 1
+  && audienceOf(person({ paidOrders: [now - 2 * DAY_MS] }), now, GRACE) === null);
+// both a previewer and a buyer: once, as a buyer
+const both = buyerOf({ requests: [req()], paidOrders: [now - 2 * DAY_MS] });
+const bothAud = buildAudience([both], now, { graceDays: GRACE });
+ok('previewer who is also a buyer counts once, as a buyer, with the buyer photo', bothAud.length === 1 && bothAud[0].audience === 'buyer' && bothAud[0].photo.customImageId === 'imgB' && bothAud[0].requestId === null && bothAud[0].petName === 'Biscuit');
+ok('a previewer who bought since and is not (yet) a buyer is out (phase-1 rule)', buildAudience([person({ paidOrders: [now - 2 * DAY_MS] })], now, { graceDays: GRACE }).length === 0);
+ok('narrowed by the campaign audience: previewers-only skips buyers; buyers-only skips previewers', buildAudience([buyerOf()], now, { graceDays: GRACE, audience: 'previewers' }).length === 0
+  && buildAudience([person()], now, { graceDays: GRACE, audience: 'buyers' }).length === 0 && buildAudience([person()], now, { graceDays: GRACE, audience: 'previewers' })[0].audience === 'previewer'
+  && buildAudience([buyerOf()], now, { graceDays: GRACE, audience: 'buyers' })[0].audience === 'buyer');
+// the previewer part is exactly phase 1
+const pv = buildAudience([person()], now, { graceDays: GRACE })[0];
+ok('previewer audience person: request, source preview, no buyer fields', pv.audience === 'previewer' && pv.requestId === 'r1' && pv.photo.customImageId === 'img1' && pv.photo.source === 'preview');
+ok('previewers: opted out of photo offers, stopped, unsubscribed, old wording are all out (rounds and campaigns)', [person({ photoOptOutAt: now }), person({ requests: [req({ offersStoppedAt: now })] }), person({ canEmail: false }), person({ requests: [req({ photoOffersOk: false })] })]
+  .every(p => audienceOf(p, now, GRACE) === null && dueNow(p, now, S) === null && campaignDue(p, now, 'c1') === null));
+ok('previewer rounds 1 and 2 are unchanged by all this', dueNow(person(), now, S)?.round === '1' && dueNow(sent1(14), now, S)?.round === '2' && dueNow(person({ paidOrders: [now - DAY_MS] }), now, S) === null && dueNow(buyerOf({ photoWordsShownAt: now - 5 * DAY_MS }), now, S) === null);
+ok('the re-check refuses an opted-out previewer, and for a buyer needs the words shown', !stillAllowed(person({ photoOptOutAt: now }), 'r1').ok && stillAllowedBuyer(buyerOf(), now, true).ok && !stillAllowedBuyer(buyerOf({ photoWordsShownAt: null }), now).ok
+  && !stillAllowedBuyer(buyerOf({ photoOptOutAt: now }), now).ok && !stillAllowedBuyer(buyerOf({ canEmail: false }), now).ok && !stillAllowedBuyer(buyerOf({ buyer: null }), now, true).ok);
+// campaigns: the 7-day gap and once per campaign still apply to buyers
+ok('campaign audience: the 7-day gap and once per campaign apply to buyers too', campaignAudience([buyerOf({ offers: [{ round: '1', status: 'sent', requestId: null, sentAt: now - 3 * DAY_MS }] })], now, 'c1', { graceDays: GRACE }).length === 0
+  && campaignAudience([buyerOf({ offers: [{ round: 'campaign:c1', status: 'sent', requestId: null, sentAt: now - 30 * DAY_MS }] })], now, 'c1', { graceDays: GRACE }).length === 0
+  && campaignAudience([buyerOf({ offers: [{ round: 'birthday:2026', status: 'sent', requestId: null, sentAt: now - 30 * DAY_MS }] })], now, 'c1', { graceDays: GRACE }).length === 1);
+const qd = dueFor(buildAudience([buyerOf()], now, { graceDays: GRACE })[0], 'birthday:2027', now, '2027-03-20');
+ok('the queue entry of a buyer: no request, the photo, the audience and the day', qd.requestId === null && qd.sourceImageId === 'imgB' && qd.audience === 'buyer' && qd.eventDate === '2027-03-20' && qd.sourcePetId === null);
+const petBuyer = buyerOf({ buyer: { photo: { customImageId: null, petId: 'pet1', source: 'saved_pet' }, pet: { name: 'Luna', animal: 'cat', breedId: null, coatId: null, birthday: { month: 1, day: 20, year: 2020 }, quizSign: 'leo' } } });
+const pq = buildAudience([petBuyer], now, { graceDays: GRACE })[0];
+ok('a saved pet: its id is the source, its birthday wins and the sign comes from it (not the quiz)', dueFor(pq, 'zodiac:aquarius:2027', now).sourcePetId === 'pet1' && dueFor(pq, 'x', now).sourceImageId === null && pq.sign === 'aquarius' && pq.animal === 'cat');
+ok('no birthday: the quiz sign is used; where the birthday is known from elsewhere (link in an email, preview card) it is found', buildAudience([buyerOf({ buyer: { ...buyerOf().buyer!, pet: { ...buyerOf().buyer!.pet, quizSign: 'virgo' } } })], now, { graceDays: GRACE })[0].sign === 'virgo'
+  && buildAudience([buyerOf({ prefBirthday: { month: 5, day: 5 } })], now, { graceDays: GRACE })[0].sign === 'taurus'
+  && buildAudience([person({ requests: [req({ birthday: { month: 12, day: 25 } })] })], now, { graceDays: GRACE })[0].birthday?.day === 25);
+
+// ---- which photo for a buyer
+const im = (id: string, over: any = {}) => ({ id, status: 'complete', pet_image_url: `https://x/${id}.jpg`, pet_cloudinary_id: id, created_at: new Date(now - DAY_MS).toISOString(), ...over });
+ok('photo: the most recent customisation they BOUGHT first, even when a newer one was only made', chooseBuyerPhoto({ boughtInOrder: [im('b1'), im('b2')], byEmail: [im('m1', { created_at: new Date(now).toISOString() })], pets: [] })?.customImageId === 'b1');
+ok('photo: skips a bought one that is not usable (failed, no photo)', chooseBuyerPhoto({ boughtInOrder: [im('b1', { status: 'failed' }), im('b2', { pet_cloudinary_id: null })], byEmail: [], pets: [] }) === null
+  && chooseBuyerPhoto({ boughtInOrder: [im('b1', { status: 'failed' }), im('b2')], byEmail: [], pets: [] })?.customImageId === 'b2');
+ok('photo: nothing bought: their most recent customisation', (() => { const r = chooseBuyerPhoto({ boughtInOrder: [], byEmail: [im('m1', { created_at: '2026-01-01T00:00:00Z' }), im('m2', { created_at: '2026-06-01T00:00:00Z' }), im('m3', { status: 'generating', created_at: '2026-09-01T00:00:00Z' })], pets: [] }); return r?.customImageId === 'm2' && r.source === 'customisation'; })());
+ok('photo: else a saved pet with a photo (most recently updated), never an inactive one or one without a photo', (() => { const r = chooseBuyerPhoto({ boughtInOrder: [], byEmail: [], pets: [{ id: 'p0', primary_photo_url: null }, { id: 'p1', primary_photo_url: 'https://x/p1.jpg', updated_at: '2026-01-01' }, { id: 'p2', primary_photo_url: 'https://x/p2.jpg', updated_at: '2026-05-01' }, { id: 'p3', primary_photo_url: 'https://x/p3.jpg', is_active: false, updated_at: '2026-09-01' }] }); return r?.petId === 'p2' && r.customImageId === null && r.source === 'saved_pet'; })());
+ok('photo: none usable = null (the person is not in the audience)', chooseBuyerPhoto({ boughtInOrder: [], byEmail: [], pets: [] }) === null);
+ok('a saved pet photo URL: the Cloudinary id is worked out, otherwise a placeholder (as the customise route)', cloudinaryIdFromUrl('https://res.cloudinary.com/demo/image/upload/v123/pets/abc.jpg') === 'pets/abc' && cloudinaryIdFromUrl('https://elsewhere.co/a.jpg') === 'non-cloudinary' && cloudinaryIdFromUrl(null) === 'non-cloudinary');
+
+// ---- the notice audience
+const withNotice = (over: Partial<PersonFacts> = {}) => buyerOf({ photoWordsShownAt: null, photoWordsSource: null, ...over });
+ok('notice: subscribed buyers with a photo who have not been shown the words', noticeAudience([withNotice()]).length === 1);
+ok('notice: not those already shown (checkout, preview card, or an earlier notice), nor the unsubscribed, opted out, photo-less, stopped or non-buyers', noticeAudience([
+  buyerOf(), buyerOf({ photoWordsSource: 'notice_email' }), withNotice({ canEmail: false }), withNotice({ photoOptOutAt: now }), withNotice({ buyer: null }), withNotice({ isBuyer: false }), withNotice({ requests: [req({ offersStoppedAt: now })] }),
+]).length === 0);
+ok('notice: a mixed list keeps exactly the right people', noticeAudience([withNotice({ email: 'a@x.co' }), buyerOf({ email: 'b@x.co' }), withNotice({ email: 'c@x.co', canEmail: false }), withNotice({ email: 'd@x.co' })]).map(p => p.email).join() === 'a@x.co,d@x.co');
+ok('a stale checkout page (old version or none) is never marked as having shown the photo words; only the current version is', !checkoutWords(undefined).photoShown && !checkoutWords('2026-11').photoShown && checkoutWords(CHECKOUT_CONSENT_VERSION).photoShown);
+
+// ---- designs: birthday and zodiac
+const dd = (id: string, over: Partial<DesignRow> = {}) => D(id, over);
+const zrows = [dd('z-dog', { framed: true, animal: 'dog' }), dd('z-cat', { framed: true, animal: 'cat' }), dd('z-nope', { framed: true, animal: 'dog', isPublic: false }), dd('a'), dd('b'), dd('c'), dd('f2', { framed: true, animal: 'dog' })];
+const zin = { ...input({ designs: zrows, sales: [{ designId: 'a', breedId: null, qty: 5 }, { designId: 'b', breedId: null, qty: 4 }, { designId: 'c', breedId: null, qty: 3 }, { designId: 'f2', breedId: null, qty: 99 }, { designId: 'z-dog', breedId: null, qty: 1 }] }), signDesignIds: ['z-dog', 'z-cat', 'z-nope'], animal: 'dog' as const };
+let zp = zodiacOfferPicks(zin);
+ok('zodiac: the sign\'s framed card for the pet\'s animal is FIRST, then 2 best sellers', zp.length === 3 && zp[0].id === 'z-dog' && zp[0].card === true && zp.slice(1).map(p => p.id).join() === 'a,b', zp);
+ok('zodiac: never another framed design (even a big seller), and the card is the only one marked', zp.slice(1).every(p => !zrows.find(r => r.id === p.id)!.framed && !p.card) && !zp.some(p => p.id === 'f2'));
+ok('zodiac: a cat gets the cat card; the other animal\'s card is never used', zodiacOfferPicks({ ...zin, animal: 'cat', petAnimal: 'cat' })[0].id === 'z-cat' && pickZodiacCard({ designs: zrows, sales: [], signDesignIds: ['z-dog'], animal: 'cat', excludeDesignIds: [] }) === null);
+ok('zodiac: a card already seen is not offered; hidden cards are not offered; no card = no offer', pickZodiacCard({ designs: zrows, sales: [], signDesignIds: ['z-dog'], animal: 'dog', excludeDesignIds: ['z-dog'] }) === null
+  && pickZodiacCard({ designs: zrows, sales: [], signDesignIds: ['z-nope'], animal: 'dog', excludeDesignIds: [] }) === null && zodiacOfferPicks({ ...zin, signDesignIds: [] }).length === 0);
+ok('birthday designs: a campaign pool of the birthday collection, the standard exclusions, the animal matched', ids(rankDesigns(input({ designs: [dd('p1'), dd('p2'), dd('p3', { animal: 'cat' }), dd('p4', { framed: true }), dd('p5', { caption: true })], campaignDesignIds: ['p1', 'p2', 'p3', 'p4', 'p5'] }))) === 'p1,p2'
+  && suitableCount([dd('p1'), dd('p2'), dd('p3', { animal: 'cat' }), dd('p4', { framed: true })], ['p1', 'p2', 'p3', 'p4'], 'dog') === 2 && suitableCount([dd('p1')], ['p1'], 'dog') === 1 && suitableCount([dd('p1'), dd('p2', { animal: 'cat' })], ['p1', 'p2'], null) === 2);
+
+// ---- the birthday link
+const bt = signBirthdayToken(offerId, now);
+ok('birthday token verifies, carries the offer and no address, 30 days', JSON.stringify(verifyBirthdayToken(bt, now + 1000)) === JSON.stringify({ ok: true, offerId }) && !/@/.test(bt) && verifyBirthdayToken(bt, now + 29 * DAY_MS).ok && (verifyBirthdayToken(bt, now + 31 * DAY_MS) as any).reason === 'expired');
+ok('birthday token: tampered or another kind of token is bad (an offer token, a preview token)', (verifyBirthdayToken(bt + 'x', now) as any).reason === 'bad' && (verifyBirthdayToken('rubbish', now) as any).reason === 'bad' && (verifyBirthdayToken(t, now) as any).reason === 'bad' && (verifyBirthdayToken(signPreviewToken(offerId, now), now) as any).reason === 'bad' && (verifyOfferToken(bt, now) as any).reason === 'bad');
+ok('birthday link shape: /po/<token>/birthday', birthdayAskUrl('https://pawtraits.pics/', offerId, now) === `https://pawtraits.pics/po/${bt}/birthday`);
+
+// ---- wording
+ok('subjects: birthday', offerSubject('Biscuit', 3, null, 'birthday:2027') === "Biscuit's birthday is coming: Pawcasso got in early" && offerSubject(null, 3, null, 'birthday:2027') === 'A birthday Pawtrait, painted early');
+ok('subjects: zodiac', offerSubject('Biscuit', 3, null, 'zodiac:leo:2027') === 'Leo season is coming, and Biscuit is ready' && offerSubject(null, 3, null, 'zodiac:leo:2027') === 'Leo season is coming');
+ok('subjects: a campaign subject overrides; rounds 1/2/campaigns unchanged', offerSubject('Biscuit', 3, 'Happy birthday', 'birthday:2027') === 'Happy birthday' && offerSubject('Biscuit', 3, null, '1') === "Pawcasso couldn't resist: 3 more of Biscuit" && offerSubject('Biscuit', 3, null, 'campaign:x') === OFFER_EMAIL.subject('Biscuit', 3));
+ok('intro lines: one sentence each, a campaign intro wins, the zodiac never mentions Dr Katrina Warren', (() => {
+  const w1 = offerWords('birthday:2027', 'Biscuit'), w2 = offerWords('zodiac:leo:2027', 'Biscuit'), w3 = offerWords('zodiac:leo:2027', null, 'Roar.');
+  return w1.intro === "Biscuit's big day is coming up, so Pawcasso got in early with a few party-ready paintings." && /Leo/.test(w2.intro) && w3.intro === 'Roar.' && !/katrina|warren/i.test(JSON.stringify([w2, w3, CAMPAIGN_EMAIL.zodiac.subject('Biscuit', 'Leo'), CAMPAIGN_EMAIL.zodiac.heading('Biscuit', 'Leo')]))
+    && offerWords('1', 'Biscuit').intro === OFFER_EMAIL.intro('Biscuit');
+})());
+ok('the birthday ask line and the notice email subject, exactly', CAMPAIGN_EMAIL.askBirthday('Biscuit').lead === "When's Biscuit's birthday?" && `${CAMPAIGN_EMAIL.askBirthday('Biscuit').lead} ${CAMPAIGN_EMAIL.askBirthday('Biscuit').link} ${CAMPAIGN_EMAIL.askBirthday('Biscuit').tail}` === "When's Biscuit's birthday? Tell us and Pawcasso will paint something for the big day."
+  && NOTICE_EMAIL.subject('Biscuit') === 'Pawcasso would love to paint Biscuit again' && NOTICE_EMAIL.subject(null) === 'Pawcasso would love to paint your pet again');
+ok('new copy: no exclamation marks, no emoji, "pet" not "dog", no discount', ![CAMPAIGN_EMAIL.birthday.subject('Biscuit'), CAMPAIGN_EMAIL.birthday.intro('Biscuit'), CAMPAIGN_EMAIL.zodiac.intro('Biscuit', 'Leo'), CAMPAIGN_EMAIL.whyBuyer('Biscuit'), CAMPAIGN_EMAIL.whyBuyer(null), ...NOTICE_EMAIL.lines('Biscuit'), ...NOTICE_EMAIL.lines(null), NOTICE_EMAIL.heading('Biscuit'), NOTICE_EMAIL.why].some(x => /!|\bdogs?\b|discount|[\uD83C-\uDBFF][\uDC00-\uDFFF]/.test(x)));
+ok('labels on the approval queue', offerLabel('1', null) === 'Round 1' && offerLabel('2', null) === 'Round 2' && offerLabel('birthday:2027', null) === 'Birthday' && offerLabel('zodiac:leo:2027', null) === 'Zodiac: Leo' && offerLabel('campaign:x', 'Christmas 2026') === 'Christmas 2026');
 
 console.log(fail ? `${fail} failed, ${pass} passed` : `${pass} passed`);
 process.exit(fail ? 1 : 0);

@@ -1,0 +1,9 @@
+{{#> layout title=heading preheader=preheader footer_note=why_line}}
+<tr><td class="pt-pad" style="padding:4px 32px 0;font-family:Arial,Helvetica,sans-serif;">
+  {{> heading text=heading}}
+  {{#each lines}}<p style="margin:0 0 12px;font-size:16px;line-height:1.55;color:#374151;">{{this}}</p>{{/each}}
+</td></tr>
+<tr><td class="pt-pad" style="padding:8px 32px 26px;font-family:Arial,Helvetica,sans-serif;">
+  <p style="margin:0;font-size:14px;line-height:1.5;color:#6b7280;"><a href="{{photo_optout_url}}" style="color:#6b7280;">{{photo_optout_label}}</a></p>
+</td></tr>
+{{/layout}}

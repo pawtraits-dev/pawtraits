@@ -19,6 +19,7 @@ export async function openOfferLink(supabase: SupabaseClient, offerId: string, i
   if (!(img as any).customer_email) update.customer_email = o.email;
   if (Object.keys(update).length) await supabase.from('customer_custom_images').update(update).eq('id', imageId);
   if (!o.clicked_at) await supabase.from('preview_offers').update({ clicked_at: new Date(now).toISOString() }).eq('id', offerId).is('clicked_at', null);
-  const { data: req } = await supabase.from('preview_email_requests').select('qr_attribution').eq('id', o.request_id).maybeSingle();
+  // A buyer's offer has no preview email request (so no stall attribution to carry over)
+  const { data: req } = o.request_id ? await supabase.from('preview_email_requests').select('qr_attribution').eq('id', o.request_id).maybeSingle() : { data: null };
   return { ok: true, imageId, qr: ((req as any)?.qr_attribution as QrAttribution | null) ?? null };
 }

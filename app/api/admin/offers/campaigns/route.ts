@@ -1,14 +1,19 @@
 /**
  * POST /api/admin/offers/campaigns
- *   { action: 'create', name, subject?, intro?, designs?: <pasted ids or links>, collectionPath? }   a draft campaign
- *   { action: 'audience', id }    how many people could be started now (round 1 rules without the day count, plus the 7-day gap)
+ *   { action: 'create', name, subject?, intro?, audience?: 'previewers' | 'buyers' | 'both', designs?: <pasted ids or links>, collectionPath? }   a draft campaign
+ *   { action: 'audience', id }    how many people could be started now, split by previewers and buyers (the round 1 rules without the day count for
+ *                                 previewers; buyers who were shown the photo wording; plus the 7-day gap)
+ *   { action: 'auto_save', kind: 'birthday' | 'zodiac', enabled?, audience?, subject?, intro? }   the automatic campaigns' own switch, audience and wording
+ *   { action: 'auto_stats' }      how many people have a known birthday / sign and how many are due in the next 30 days
  *   { action: 'start', id }       queue one offer per eligible person (round 'campaign:<id>'); they then follow generate > approve > send and the caps
  * Starting does not generate or send anything by itself: that happens in the run (cron or "Run now"), and only while offers are switched on.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
 import { parseDesignIds } from '@/lib/offers/parse';
-import { campaignAudience, insertQueued, offersTablesExist } from '@/lib/offers/run';
+import { campaignAudience, campaignsMigrationReady, ensureAutomaticCampaigns, insertQueued, offersTablesExist } from '@/lib/offers/run';
+import { loadAutomaticStats } from '@/lib/offers/admin';
+import { CAMPAIGNS_MIGRATION_FILE } from '@/lib/offers/settings';
 import { campaignDesignIds } from '@/lib/offers/select-designs';
 import { loadOfferSettings } from '@/lib/offers/settings';
 
@@ -41,9 +46,31 @@ export async function POST(request: NextRequest) {
         const { data } = await supabase.from('collections').select('id').eq('path', path).maybeSingle();
         if (!data) return fail('That collection does not exist');
       }
-      const { data: row, error } = await supabase.from('offer_campaigns').insert({ name, subject: text(body.subject, 150), intro: text(body.intro, 240), design_ids: ids, collection_path: path }).select('id').single();
+      const audience = ['previewers', 'buyers', 'both'].includes(body.audience) ? body.audience : 'both';
+      const ready = await campaignsMigrationReady(supabase);
+      if (!ready && audience !== 'previewers') return fail(`Run ${CAMPAIGNS_MIGRATION_FILE} first to include people who have bought`, 503);
+      const { data: row, error } = await supabase.from('offer_campaigns').insert({ name, subject: text(body.subject, 150), intro: text(body.intro, 240), design_ids: ids, collection_path: path, ...(ready ? { audience } : {}) }).select('id').single();
       if (error) return fail(error.message, 500);
       return NextResponse.json({ ok: true, id: (row as any).id });
+    }
+
+    if (body.action === 'auto_stats') {
+      if (!(await campaignsMigrationReady(supabase))) return fail(`Run ${CAMPAIGNS_MIGRATION_FILE} first`, 503);
+      return NextResponse.json({ ok: true, ...(await loadAutomaticStats(supabase)) });
+    }
+    if (body.action === 'auto_save') {
+      if (!(await campaignsMigrationReady(supabase))) return fail(`Run ${CAMPAIGNS_MIGRATION_FILE} first`, 503);
+      const kind = body.kind === 'zodiac' ? 'zodiac' : body.kind === 'birthday' ? 'birthday' : null;
+      if (!kind) return fail('Unknown campaign');
+      const row = (await ensureAutomaticCampaigns(supabase)).find(c => c.kind === kind);
+      if (!row) return fail('Could not find that campaign', 500);
+      const patch: Record<string, unknown> = {};
+      if (typeof body.enabled === 'boolean') patch.enabled = body.enabled;
+      if (['previewers', 'buyers', 'both'].includes(body.audience)) patch.audience = body.audience;
+      if ('subject' in body) patch.subject = text(body.subject, 150);
+      if ('intro' in body) patch.intro = text(body.intro, 240);
+      if (Object.keys(patch).length) await supabase.from('offer_campaigns').update(patch).eq('id', row.id);
+      return NextResponse.json({ ok: true });
     }
 
     const id = String(body?.id ?? '');
@@ -51,10 +78,12 @@ export async function POST(request: NextRequest) {
     const { data: campaign } = await supabase.from('offer_campaigns').select('*').eq('id', id).maybeSingle();
     if (!campaign) return fail('Not found', 404);
     const c: any = campaign;
+    if ((c.kind ?? 'manual') !== 'manual') return fail('The automatic campaigns run by themselves: use their switch');
 
     if (body.action === 'audience') {
       const [people, designs] = await Promise.all([campaignAudience(supabase, id, Date.now()), campaignDesignIds(supabase, c)]);
-      return NextResponse.json({ ok: true, eligible: people.length, designs: designs.length });
+      const buyers = people.filter(p => p.person.audience === 'buyer').length;
+      return NextResponse.json({ ok: true, eligible: people.length, previewers: people.length - buyers, buyers, designs: designs.length });
     }
     if (body.action === 'start') {
       if (c.status !== 'draft') return fail('This campaign has already been started');

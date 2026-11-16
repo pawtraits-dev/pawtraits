@@ -15,9 +15,13 @@ import { marketingEmailExtras } from '@/lib/marketing/preferences';
 import { designTitle } from '@/lib/marketing/audiences';
 import { previewFirstName } from '@/lib/previews/email-link';
 import { computeLowestPrices, gbp } from '@/lib/pricing/lowest-prices';
+import { zodiacByKey } from '@/lib/zodiac';
+import { signPhotoOptOut } from '@/lib/marketing/preferences';
 import { offerUrl } from './link';
+import { birthdayAskUrl, birthdayKnown } from './birthday';
 import { offerStillAllowed, type OfferRow } from './allowed';
-import { OFFER_EMAIL } from './copy';
+import { CAMPAIGN_EMAIL, OFFER_EMAIL } from './copy';
+import { roundKind, signOfRound } from './dates';
 import { MIN_PICTURES, siteUrl } from './settings';
 
 export interface EmailPicture { src: string; alt: string; title: string; url: string }
@@ -38,9 +42,23 @@ export async function priceLine(supabase: SupabaseClient): Promise<string | null
 }
 
 /** Subject: the campaign's own, or the standard one */
-export function offerSubject(firstName: string | null, pictures: number, campaignSubject?: string | null): string {
+export function offerSubject(firstName: string | null, pictures: number, campaignSubject?: string | null, round?: string): string {
   const own = (campaignSubject ?? '').trim();
-  return own || OFFER_EMAIL.subject(firstName, pictures);
+  if (own) return own;
+  const kind = round ? roundKind(round) : 'other';
+  if (kind === 'birthday') return CAMPAIGN_EMAIL.birthday.subject(firstName);
+  if (kind === 'zodiac') { const sign = zodiacByKey(signOfRound(round!))?.name; if (sign) return CAMPAIGN_EMAIL.zodiac.subject(firstName, sign); }
+  return OFFER_EMAIL.subject(firstName, pictures);
+}
+
+/** Heading, preheader and intro line for an offer of this round (a campaign's own intro wins) */
+export function offerWords(round: string, firstName: string | null, campaignIntro?: string | null) {
+  const kind = roundKind(round);
+  const own = (campaignIntro ?? '').trim();
+  if (kind === 'birthday') return { heading: CAMPAIGN_EMAIL.birthday.heading(firstName), preheader: CAMPAIGN_EMAIL.birthday.preheader, intro: own || CAMPAIGN_EMAIL.birthday.intro(firstName) };
+  const sign = kind === 'zodiac' ? zodiacByKey(signOfRound(round))?.name : null;
+  if (sign) return { heading: CAMPAIGN_EMAIL.zodiac.heading(firstName, sign), preheader: CAMPAIGN_EMAIL.zodiac.preheader, intro: own || CAMPAIGN_EMAIL.zodiac.intro(firstName, sign) };
+  return { heading: OFFER_EMAIL.heading(firstName), preheader: OFFER_EMAIL.preheader, intro: own || OFFER_EMAIL.intro(firstName) };
 }
 
 export type SendOutcome = { result: 'sent' } | { result: 'skipped'; reason: string } | { result: 'not_sendable'; reason: string } | { result: 'failed'; reason: string };
@@ -64,7 +82,7 @@ export async function sendOffer(supabase: SupabaseClient, offerId: string, opts:
 
   try {
     // The checks, again, right before sending
-    const allowed = await offerStillAllowed(supabase, offer);
+    const allowed = await offerStillAllowed(supabase, offer, { now });
     if (!allowed.ok) return await skip(allowed.reason);
     const baseUrl = siteUrl();
     const extras = await marketingEmailExtras(supabase, baseUrl, offer.email);
@@ -90,14 +108,19 @@ export async function sendOffer(supabase: SupabaseClient, offerId: string, opts:
       title: titles.get(i.catalog_image_id) ?? 'A new Pawtrait',
       url: offerUrl(baseUrl, offer.id, i.id, now),
     }));
+    const words = offerWords(offer.round, firstName, campaign?.intro);
+    // When we do not know the pet's birthday, one small line asks for it (a signed link to a tiny page: only its Save button changes anything)
+    const ask = (await birthdayKnown(supabase, offer)) ? null : CAMPAIGN_EMAIL.askBirthday(firstName);
+    const prefId = extras.preference_id;
     const html = renderEmailFile('customer-offer.html', {
-      heading: OFFER_EMAIL.heading(firstName), preheader: OFFER_EMAIL.preheader,
-      intro_line: (campaign?.intro ?? '').trim() || OFFER_EMAIL.intro(firstName),
-      pictures, price_line: await priceLine(supabase), why_line: OFFER_EMAIL.why(firstName),
+      heading: words.heading, preheader: words.preheader, intro_line: words.intro,
+      pictures, price_line: await priceLine(supabase), why_line: offer.audience === 'buyer' ? CAMPAIGN_EMAIL.whyBuyer(firstName) : OFFER_EMAIL.why(firstName),
+      ...(ask ? { ask_url: birthdayAskUrl(baseUrl, offer.id, now), ask_lead: ask.lead, ask_link: ask.link, ask_tail: ask.tail } : {}),
+      ...(prefId ? { photo_optout_url: `${baseUrl}/api/public/email-preferences/photo-optout?p=${prefId}&t=${signPhotoOptOut(prefId)}`, photo_optout_label: CAMPAIGN_EMAIL.photoOptOut } : {}),
       unsubscribe_url: extras.unsubscribe_url, preferences_url: extras.preferences_url,
     });
     const sent = await sendMessageImmediate({
-      channel: 'email', recipientEmail: offer.email, subject: offerSubject(firstName, pictures.length, campaign?.subject), body: html, headers: extras.headers,
+      channel: 'email', recipientEmail: offer.email, subject: offerSubject(firstName, pictures.length, campaign?.subject, offer.round), body: html, headers: extras.headers,
     });
     if (!sent.success) { await undo({ error: `Send failed: ${sent.error ?? 'unknown'}` }); return { result: 'failed', reason: sent.error ?? 'Send failed' }; }
     return { result: 'sent' };

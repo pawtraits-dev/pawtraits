@@ -7,6 +7,13 @@ export const PREVIEW_COPY = {
   // Signed-in customers already have their own email choices; for them it is just the preview
   lineSignedIn: 'We\'ll email you this preview so you can pick it up later, on any device.',
   fieldLabel: 'Your email',
+  // Optional: the pet's birthday, for a birthday surprise (never required; an impossible date such as 30 Feb is quietly ignored)
+  birthdayLabel: 'When\'s their birthday?',
+  birthdayOptional: 'Optional',
+  birthdayHelp: 'Tell us and Pawcasso will paint something special for the big day.',
+  birthdayDay: 'Day',
+  birthdayMonth: 'Month',
+  birthdayYear: 'Year (optional)',
   placeholder: 'you@example.com',
   button: 'Email me this preview',
   sending: 'Sending…',
