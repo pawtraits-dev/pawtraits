@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server';
+import { balanceAfterRedemption } from '@/lib/commissions/credit-balance';
 import { headers } from 'next/headers';
 import { constructWebhookEvent } from '@/lib/stripe-server';
 import { createClient } from '@supabase/supabase-js';
@@ -781,7 +782,8 @@ async function handleSimplifiedCommissions(
         .single();
 
       if (!customerError && customer) {
-        const newBalance = Math.max(0, (customer.current_credit_balance || 0) - rewardAmountPounds);
+        // The balance is held in pence, so take off pence (this used to take off pounds: a £5 redemption removed 5p)
+        const newBalance = balanceAfterRedemption(customer.current_credit_balance, rewardAmountPence);
 
         const { error: updateError } = await supabase
           .from('customers')
@@ -791,7 +793,7 @@ async function handleSimplifiedCommissions(
         if (updateError) {
           console.error('Failed to deduct reward redemption:', updateError);
         } else {
-          console.log(`✅ Reward redeemed: Deducted £${rewardAmountPounds} from customer balance. New balance: £${newBalance}`);
+          console.log(`✅ Reward redeemed: Deducted £${rewardAmountPounds} from customer balance. New balance: £${(newBalance / 100).toFixed(2)}`);
         }
       } else {
         console.error('Failed to find customer for reward redemption:', customerError);
