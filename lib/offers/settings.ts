@@ -1,4 +1,5 @@
 /** Offers: settings, constants and the "migration not run yet" check (server only). See db/migrations/2026-11-16-preview-offers.sql. */
+import { linkBaseUrl } from '@/lib/site-url';
 import { getSetting } from '@/lib/app-settings';
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
@@ -38,4 +39,5 @@ export async function loadOfferSettings(): Promise<OfferSettings> {
   return { enabled: enabled === true, autoSend: autoSend === true, round1Days, round2Days, perRun, perDay, zodiacDaysBefore, birthdayDaysBefore, noticeGraceDays };
 }
 
-export const siteUrl = () => (process.env.NEXT_PUBLIC_BASE_URL || 'https://pawtraits.pics').replace(/\/$/, '');
+/** Offer emails are sent from the cron and admin actions (no visitor request): a preview deployment links back to itself (lib/site-url.ts) */
+export const siteUrl = () => linkBaseUrl();
