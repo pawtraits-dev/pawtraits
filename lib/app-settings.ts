@@ -1,4 +1,5 @@
 import { serviceClient } from '@/lib/qr/server';
+import { cleanPct } from '@/lib/referrals/rates';
 
 /**
  * Admin-controlled settings stored in public.app_settings (key → jsonb).
@@ -87,7 +88,8 @@ export async function getSetting<K extends SettingKey>(key: K): Promise<SettingV
 /** The two customer-referral percentages, read together (each falls back to its default if the read fails). */
 export async function referralRates(): Promise<{ friendPct: number; referrerPct: number }> {
   const [friendPct, referrerPct] = await Promise.all([getSetting('referral_friend_discount_pct'), getSetting('referral_referrer_credit_pct')]);
-  return { friendPct, referrerPct };
+  // Stored values can be strings or out of range: read them the same way the charge and the wording do
+  return { friendPct: cleanPct(friendPct, SETTING_DEFAULTS.referral_friend_discount_pct), referrerPct: cleanPct(referrerPct, SETTING_DEFAULTS.referral_referrer_credit_pct) };
 }
 
 export async function getAllSettings(): Promise<Record<string, { value: unknown; description: string | null; updated_at: string | null }>> {

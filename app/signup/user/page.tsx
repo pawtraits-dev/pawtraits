@@ -14,6 +14,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, ArrowLeft, ArrowRight, Heart, Upload, X } from 'lucide-react';
 import Link from 'next/link';
+import { safeReturnPath } from '@/lib/site-url';
+import { useReferralRates } from '@/lib/referrals/use-rates';
+import { formatPct } from '@/lib/referrals/rates';
 import type { Breed, Coat } from '@/lib/types';
 
 interface FormData {
@@ -43,9 +46,9 @@ function UserSignupContent() {
   const searchParams = useSearchParams();
   const referralCode = searchParams.get('ref');
   const discount = searchParams.get('discount');
-  // Where to go after signing in: a same-site path only (starts with one "/", not "//" or "/\\")
-  const nextRaw = searchParams.get('next');
-  const nextPath = nextRaw && nextRaw.startsWith('/') && !nextRaw.startsWith('//') && !nextRaw.startsWith('/\\') ? nextRaw : null;
+  // Where to go after signing in: a same-site path only (lib/site-url.ts). `returnTo` is accepted as another name for `next`.
+  const nextPath = safeReturnPath(searchParams.get('next')) ?? safeReturnPath(searchParams.get('returnTo'));
+  const rates = useReferralRates();
   
   const [currentStep, setCurrentStep] = useState(1);
   const [breeds, setBreeds] = useState<Breed[]>([]);
@@ -467,7 +470,7 @@ function UserSignupContent() {
                         className="uppercase"
                       />
                       <p className="text-xs text-gray-500">
-                        Have a referral code from a friend or partner? Enter it here to get 10% off your first order.
+                        Have a code from a friend? Enter it here to get {formatPct(rates.friendPct)} off your first order.
                       </p>
                     </div>
                   )}
@@ -736,7 +739,7 @@ function UserSignupContent() {
               <div className="text-center pt-4 border-t">
                 <p className="text-sm text-gray-600">
                   Already have an account?{' '}
-                  <Link href="/auth/login" className="text-purple-600 hover:text-purple-700 font-medium">
+                  <Link href={nextPath ? `/auth/login?returnTo=${encodeURIComponent(nextPath)}` : '/auth/login'} className="text-purple-600 hover:text-purple-700 font-medium">
                     Sign in
                   </Link>
                 </p>

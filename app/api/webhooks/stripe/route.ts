@@ -279,6 +279,8 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
         stripePaymentIntentId: paymentIntent.id,
         stripeChargeId: paymentIntent.latest_charge,
         referralCode: metadata.referralCode,
+        // A referral code the server could not check at payment time (shown to the admin on the order)
+        ...(metadata.referralUnconfirmed ? { referralUnconfirmed: metadata.referralUnconfirmed, referralUnconfirmedDiscount: metadata.referralUnconfirmedDiscount } : {}),
         paymentMethod: paymentIntent.payment_method_types[0] || 'card',
         shippingMethodUid: metadata.shippingMethodUid,
         shippingMethodName: metadata.shippingMethodName,
@@ -814,20 +816,16 @@ async function handleSimplifiedCommissions(
     }
 
     // Link at purchase: the friend got the discount because create-intent confirmed they were signed in, new,
-    // and using someone else's code. If they signed up without the link (so no referrer is recorded yet), record
-    // it now so the referrer is credited below. Never overwrites an existing referrer, and never a partner referral.
-    if (order.referral_code && (!customer.referral_type || customer.referral_type === 'ORGANIC')) {
-      const { data: owner } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('personal_referral_code', String(order.referral_code).trim().toUpperCase())
-        .maybeSingle();
-      if (owner && owner.id !== customer.id) {
-        const link = { referral_type: 'CUSTOMER', referrer_id: owner.id, referral_code_used: String(order.referral_code).trim().toUpperCase() };
-        const { error: linkError } = await supabase.from('customers').update(link).eq('id', customer.id);
-        if (linkError) console.error('❌ Could not link the buyer to the referrer for order', order.id, linkError.message);
-        else customer = { ...customer, ...link };
-      }
+    // and using someone else's code, and recorded that code's owner (metadata.referralOwnerId, set only from the
+    // server's own check). If they signed up without the link (so no referrer is recorded yet), record it now so the
+    // referrer is credited below. Never overwrites an existing referrer or a partner referral, never links to oneself,
+    // and never looks the code up again.
+    const ownerId = typeof metadata.referralOwnerId === 'string' ? metadata.referralOwnerId.trim() : '';
+    if (order.referral_code && ownerId && ownerId !== customer.id && (!customer.referral_type || customer.referral_type === 'ORGANIC')) {
+      const link = { referral_type: 'CUSTOMER', referrer_id: ownerId, referral_code_used: String(order.referral_code).trim().toUpperCase() };
+      const { error: linkError } = await supabase.from('customers').update(link).eq('id', customer.id);
+      if (linkError) console.error('❌ Could not link the buyer to the referrer for order', order.id, linkError.message);
+      else customer = { ...customer, ...link };
     }
 
     // Note: referral_order_id tracks the first order that applied the referral

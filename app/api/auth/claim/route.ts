@@ -10,6 +10,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { serviceClient } from '@/lib/qr/server';
 import { hashClaimToken } from '@/lib/guest/account';
 import { claimEntitlements } from '@/lib/orders/entitlements';
+import { safeReturnPath } from '@/lib/site-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,6 +61,6 @@ export async function POST(request: NextRequest) {
   if (claim.customer_id) unlocked = await claimEntitlements(admin, claim.customer_id, claim.email);
 
     // Sign-in links can carry where to go next (a path on this site only)
-  const safeNext = typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : null;
+  const safeNext = safeReturnPath(typeof next === 'string' ? next : null);
   return NextResponse.json({ ok: true, unlocked, redirectTo: safeNext || (claim.order_id ? '/customer/downloads?welcome=1' : '/customer') });
 }

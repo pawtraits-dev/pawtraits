@@ -28,7 +28,7 @@ interface Row {
   network: { orders: number; value: number };
   uncredited: number; lastUsed: string | null;
 }
-interface Summary { customersWithCode: number; codesUsed: number; linkOpens: number; referredOrders: number; referredValue: number; creditGiven: number; uncredited: number; deepestChain: number }
+interface Summary { customersWithCode: number; codesUsed: number; linkOpens: number; referredOrders: number; referredValue: number; creditGiven: number; uncredited: number; deepestChain: number; unconfirmedReferrals?: number }
 interface Data { rows: Row[]; total: number; summary: Summary; truncated: boolean; sourceTruncated: boolean }
 interface TreeNode { name: string; email: string; code: string | null; direct: { orders: number; value: number }; children: TreeNode[] }
 interface TreeData { root: TreeNode; truncated: boolean }
@@ -217,6 +217,11 @@ export default function CustomerReferralsPage() {
             {s.uncredited > 0 && (
               <p role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 {int(s.uncredited)} referred {s.uncredited === 1 ? 'sale' : 'sales'} used a code but gave the referrer no credit.
+              </p>
+            )}
+            {(s.unconfirmedReferrals ?? 0) > 0 && (
+              <p role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                {int(s.unconfirmedReferrals ?? 0)} {s.unconfirmedReferrals === 1 ? 'order' : 'orders'} used a referral code that could not be checked; see the order for details.
               </p>
             )}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

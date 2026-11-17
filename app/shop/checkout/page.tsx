@@ -546,7 +546,9 @@ function CheckoutPageContent() {
   // Express is always offered. A guest's referral discount needs their email checking first, so until
   // it's confirmed the wallet charges full price and we point them to the form to claim the discount.
   const showExpress = items.length > 0 && goodsTotalPence >= 50
+  // The create-account prompt is for a guest whose code is fine but who is not signed in; any other reason has its own message
   const referralDiscountPending = isGuest && !!referralCode && !(referralValidation as any)?.discount?.eligible
+  const askToCreateAccount = referralDiscountPending && (referralValidation as any)?.reason === 'not_signed_in'
   const createAccountForReferral = `/signup/user?ref=${encodeURIComponent(referralCode)}&next=${encodeURIComponent('/shop/checkout')}`
   const expressFirst = currentStep === 1 && showExpress && walletAvailable === true && !cardFormOpen
 
@@ -814,7 +816,7 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                       onSuccess={handlePaymentSuccess}
                       onAvailability={(ok, info) => { setWalletAvailable(ok); setWalletInfo(info || null) }}
                     />
-                    {referralDiscountPending && (
+                    {askToCreateAccount && (
                       <p className="text-xs text-gray-600">
                         <Link href={createAccountForReferral} className="font-medium text-purple-700 underline">Create an account to get {formatPct(rates.friendPct)} off your first order.</Link>
                       </p>
@@ -1258,12 +1260,12 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                 )}
 
                 {/* A guest with a friend's code: no discount until they have an account */}
-                {referralDiscountPending && (
+                {askToCreateAccount && (
                   <p className="text-sm text-gray-700">
                     <Link href={createAccountForReferral} className="font-medium text-purple-700 underline">Create an account to get {formatPct(rates.friendPct)} off your first order.</Link>
                   </p>
                 )}
-                {!isGuest && referralNotice && (
+                {!askToCreateAccount && referralNotice && (
                   <p role="status" className="text-sm text-gray-700">{referralNotice}</p>
                 )}
 

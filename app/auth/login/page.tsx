@@ -18,6 +18,7 @@ import Link from "next/link"
 import Image from "next/image"
 import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider } from '@/lib/country-context'
+import { safeReturnPath } from '@/lib/site-url'
 
 // Security imports temporarily disabled for debugging
 // import { SecureWrapper } from '@/components/security/SecureWrapper'
@@ -27,7 +28,7 @@ import { CountryProvider } from '@/lib/country-context'
 function LoginPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const returnTo = searchParams.get('returnTo')
+  const returnTo = safeReturnPath(searchParams.get('returnTo'))
   const [isLoading, setIsLoading] = useState(false)
   // Email sign-in link is the main way in (guest checkouts have no password); password is the alternative
   const [mode, setMode] = useState<'link' | 'password'>('link')
@@ -125,7 +126,7 @@ function LoginPageContent() {
       let redirectUrl = "/browse"; // default for customers
 
       // Use returnTo parameter if provided and valid
-      if (returnTo && returnTo.startsWith('/')) {
+      if (returnTo) {
         console.log("Login - Using returnTo redirect:", returnTo);
         redirectUrl = returnTo;
       } else if (profile) {

@@ -18,3 +18,21 @@ export function pickLinkBaseUrl(env: { VERCEL_ENV?: string; VERCEL_URL?: string;
 }
 
 export const linkBaseUrl = (requestOrigin?: string | null) => pickLinkBaseUrl(process.env as any, requestOrigin);
+
+/**
+ * A same-site path that is safe to send someone to after sign-in or sign-up, or null.
+ * Decodes once (a bad escape is refused) and refuses anything that could leave the site: not starting with a single "/",
+ * "//" or "/\\" at the start, any backslash, any control character or whitespace (tabs and newlines are ignored by
+ * browsers inside a URL), or "://". The raw text and its decoded form must both pass; the raw text is returned.
+ */
+export function safeReturnPath(raw: string | null | undefined): string | null {
+  if (typeof raw !== 'string' || !raw) return null;
+  let decoded: string;
+  try { decoded = decodeURIComponent(raw); } catch { return null; }
+  for (const v of [raw, decoded]) {
+    if (!v.startsWith('/') || v.startsWith('//') || v.startsWith('/\\')) return null;
+    if (v.includes('\\') || v.includes('://')) return null;
+    if (/[\u0000-\u0020\u007f-\u009f\s]/.test(v)) return null;
+  }
+  return raw;
+}

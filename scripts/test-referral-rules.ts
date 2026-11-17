@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { friendEligibility, eligibilityMessage, emailPattern, type FriendEligibilityInput } from '../lib/referrals/eligibility';
-import { rateFraction, formatPct } from '../lib/referrals/rates';
+import { rateFraction, formatPct, cleanPct } from '../lib/referrals/rates';
 import { referralCopy, shareText, bannerText } from '../lib/referrals/text';
 import { referralDiscountPence, evaluatePriceCheck } from '../lib/checkout/price-check';
 import { validateSetting, SETTING_DEFAULTS } from '../lib/app-settings';
@@ -32,10 +32,11 @@ t(r({ friendOrders: [{ payment_status: 'paid', status: 'cancelled' }] }), 'ok');
 t(r({ friendOrders: [{ payment_status: 'pending', status: 'pending' }, { payment_status: 'failed', status: 'failed' }] }), 'ok');   // unpaid: still new
 t(r({ friendCustomer: { referral_type: 'CUSTOMER', referrer_id: 'someone-else' } }), 'referred_by_someone_else');
 t(r({ friendCustomer: { referral_type: 'CUSTOMER', referrer_id: 'owner-1' } }), 'ok');  // already linked to THIS owner
-t(r({ friendCustomer: { referral_type: 'PARTNER', referrer_id: 'partner-1' } }), 'ok'); // a partner link does not block a customer's code
+t(r({ friendCustomer: { referral_type: 'PARTNER', referrer_id: 'partner-1' } }), 'referred_by_someone_else'); // already a partner's customer: the code's owner would get nothing
+t(r({ friendCustomer: { referral_type: 'PARTNER', referrer_id: null } }), 'ok');         // a partner type with no partner recorded does not block
 t(r({ friendCustomer: { referral_type: 'ORGANIC', referrer_id: null } }), 'ok');
 // Order of precedence
-t(r({ signedInEmail: null, ownerFound: false }), 'not_signed_in');
+t(r({ signedInEmail: null, ownerFound: false }), 'not_found');     // a guest with an unknown code is told so, not asked to sign up
 t(r({ ownerFound: false, friendOrders: [{ payment_status: 'paid', status: 'delivered' }] }), 'not_found');
 t(r({ ownerEmail: 'friend@example.com', friendOrders: [{ payment_status: 'paid', status: 'delivered' }] }), 'own_code');
 t(r({ friendOrders: [{ payment_status: 'paid', status: 'delivered' }], friendCustomer: { referral_type: 'CUSTOMER', referrer_id: 'x' } }), 'not_new');
@@ -109,12 +110,19 @@ const creditFn = webhook.slice(webhook.indexOf('async function handleCustomerCre
 t(/\* 0\.10\)/.test(creditFn.slice(0, 4000)), false);
 t(/rateFraction\(referrerPct\)/.test(creditFn), true);
 t(/commission_rate: referrerPct/.test(creditFn), true);
-t(/referral_type: 'CUSTOMER', referrer_id: owner\.id/.test(webhook), true);
+t(/referral_type: 'CUSTOMER', referrer_id: ownerId/.test(webhook), true);       // links to exactly the owner create-intent confirmed
+t(/personal_referral_code/.test(webhook.slice(webhook.indexOf('// Link at purchase'), webhook.indexOf('// Note: referral_order_id'))), false);   // and never looks the code up again
 const intent = read('app/api/payments/create-intent/route.ts');
-t(/body\.referralDiscount/.test(intent.replace(/^\s*referralDiscount\?:.*$/m, '').replace(/\/\/.*$/gm, '')), false);
-t(/priceCheck\.referral\.applied/.test(intent), true);
+// the browser's referral figure is only a ceiling (referralToRecord); it is never written to metadata directly
+t(/metadata\.referralDiscount\s*=\s*String\(body\./.test(intent), false);
+t(/referralToRecord\(body\.referralDiscount, priceCheck\.referral\)/.test(intent), true);
 t(/metadata\.referralType\s*=/.test(intent), false);
 const price = read('lib/checkout/price-check.ts');
 t(/customerReferralEligibility\(body\.referralCode, body\.customerEmail, user\?\.email/.test(price), true);
+
+// ---- cleanPct: stored settings are read the same way the charge and the wording use them -----------
+t(cleanPct('20'), 20); t(cleanPct(20), 20); t(cleanPct(null), 10); t(cleanPct(60), 50); t(cleanPct(-5), 0); t(cleanPct('abc'), 10);
+t(cleanPct(12.6), 13); t(cleanPct(undefined), 10); t(cleanPct(''), 10); t(cleanPct(NaN, 7), 7);
+t(formatPct(cleanPct('20')), '20%');
 
 console.log(`referral-rules: ${n} passed`);

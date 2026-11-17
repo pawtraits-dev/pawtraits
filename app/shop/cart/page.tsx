@@ -284,7 +284,7 @@ function ShoppingCartPageContent() {
                       <span className="font-medium">{referralCode}</span>
                     </div>
                     <div className="flex justify-between text-green-600">
-                      <span>Referral Discount ({formatPct(rates.friendPct)})</span>
+                      <span>Referral Discount ({formatPct(referralValidation?.discount?.percentage > 0 ? referralValidation.discount.percentage : rates.friendPct)})</span>
                       <span className="font-medium">-£{discount.toFixed(2)}</span>
                     </div>
                   </div>

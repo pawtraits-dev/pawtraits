@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redemptionToRecord } from '@/lib/commissions/credit-balance';
+import { redemptionToRecord, referralToRecord } from '@/lib/commissions/credit-balance';
 import { createPaymentIntent } from '@/lib/stripe-server';
 import { getSupabaseClient } from '@/lib/supabase-client';
 import { checkoutValidation } from '@/lib/checkout-validation';
@@ -297,13 +297,28 @@ export async function POST(request: NextRequest) {
     });
     const enforcePriceCheck = process.env.PRICE_CHECK_MODE !== 'log';
     metadata.priceCheck = priceCheck.status;
-    // Record only the referral the server confirmed, with the server's own discount figure. The amount charged is not changed here.
-    if (orderType === 'customer' && body.referralCode && priceCheck.referral.applied) {
-      metadata.referralCode = body.referralCode.toUpperCase();
-      metadata.referralDiscount = String(priceCheck.referral.discount);
+    // Record only a referral the server confirmed AND the browser actually applied: the server's own figure, capped
+    // at what the browser took off (lib/commissions/credit-balance.ts). The amount charged is not changed here.
+    const referralRecorded = orderType === 'customer' && body.referralCode
+      ? referralToRecord(body.referralDiscount, priceCheck.referral)
+      : 0;
+    if (referralRecorded > 0) {
+      metadata.referralCode = body.referralCode!.toUpperCase();
+      metadata.referralDiscount = String(referralRecorded);
+      // Link at purchase goes to exactly the owner the server confirmed (customer codes only)
+      if (priceCheck.referral.ownerCustomerId) metadata.referralOwnerId = priceCheck.referral.ownerCustomerId;
     } else {
       delete metadata.referralCode;
       delete metadata.referralDiscount;
+      delete metadata.referralOwnerId;
+    }
+    // The check could not run, so the claim is neither confirmed nor refused: keep it visible for the admin
+    // (stored on the order by the webhook, shown on the held order and counted on Customer Referrals).
+    delete metadata.referralUnconfirmed;
+    delete metadata.referralUnconfirmedDiscount;
+    if (priceCheck.status === 'unchecked' && orderType === 'customer' && body.referralCode && Number(body.referralDiscount) > 0) {
+      metadata.referralUnconfirmed = String(body.referralCode).toUpperCase().slice(0, 40);
+      metadata.referralUnconfirmedDiscount = String(Math.round(Number(body.referralDiscount)));
     }
     // Record only the credit the server confirmed this customer holds, not what the browser claimed
     // (lib/commissions/credit-balance.ts). The amount charged is not changed here.

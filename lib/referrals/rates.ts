@@ -16,3 +16,11 @@ export function formatPct(pct: number): string {
 
 /** The two settings keys, in the order the admin card shows them */
 export const SETTING_RATE_KEYS = ['referral_friend_discount_pct', 'referral_referrer_credit_pct'] as const;
+
+/** A stored percentage as a whole number between 0 and 50; anything that is not a finite number falls back to `fallback` */
+export function cleanPct(value: unknown, fallback: number = DEFAULT_REFERRAL_RATES.friendPct): number {
+  if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return fallback;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(50, Math.max(0, Math.round(n)));
+}
