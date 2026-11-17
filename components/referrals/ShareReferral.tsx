@@ -39,7 +39,7 @@ interface Props {
 
 export default function ShareReferral({ placement, petName, designId, imageUrl, orderId, details: given, hideCreditLink, className }: Props) {
   const rates = useReferralRates();
-  const copy = referralCopy(rates);
+  const words = referralCopy(rates);
   const [code, setCode] = useState<string | null>(given?.code ?? null);
   const [origin, setOrigin] = useState('');
   const [canNativeShare, setCanNativeShare] = useState<boolean | null>(null);
@@ -115,9 +115,9 @@ export default function ShareReferral({ placement, petName, designId, imageUrl, 
   const qrVisible = showQr || canNativeShare === false;
 
   return (
-    <section aria-label={copy.heading} className={`rounded-2xl border border-purple-100 bg-purple-50 p-4 ${className ?? ''}`}>
-      <h2 className="text-lg font-bold text-gray-900">{copy.heading}</h2>
-      <p className="mt-1 text-sm text-gray-700">{copy.line}</p>
+    <section aria-label={words.heading} className={`rounded-2xl border border-purple-100 bg-purple-50 p-4 ${className ?? ''}`}>
+      <h2 className="text-lg font-bold text-gray-900">{words.heading}</h2>
+      <p className="mt-1 text-sm text-gray-700">{words.line}</p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {canNativeShare ? (
