@@ -12,7 +12,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { canEmail, marketingEmailExtras, normaliseEmail } from '@/lib/marketing/preferences';
 import { renderQrSvg } from '@/lib/qr/render';
 import { uniqueReferralCode } from '@/lib/referrals/code';
-import { buildShareUrl, normaliseCode, safeFirstName, shortLink, sharePageUrl } from '@/lib/referrals/text';
+import { buildShareUrl, normaliseCode, safeFirstName, shortLink, sharePageUrl, referralCopy } from '@/lib/referrals/text';
+import { referralRates } from '@/lib/app-settings';
 
 export interface ReferralDetails {
   customerId: string;
@@ -129,8 +130,11 @@ export async function referralEmailVars(supabase: SupabaseClient, email: string 
     const details = await getReferralDetails(supabase, e, { baseUrl, create: true });
     if (!details) return null;
     const extras = await marketingEmailExtras(supabase, baseUrl, e);
+    const copy = referralCopy(await referralRates());
     return {
       vars: {
+        share_heading: copy.heading,
+        share_line: copy.emailLine,
         share_code: details.code,
         share_url: details.sharePageUrl,
         share_link: details.shareUrl,

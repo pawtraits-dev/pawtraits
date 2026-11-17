@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { useReferralRates } from '@/lib/referrals/use-rates';
+import { formatPct } from '@/lib/referrals/rates';
 import { Badge } from '@/components/ui/badge';
 import {
   Share2,
@@ -90,6 +92,7 @@ interface CustomerReferralData {
 
 // Referral Code Display Component
 function ReferralCodeDisplay({ code }: { code: ReferralCode | null }) {
+  const rates = useReferralRates();
   const [copied, setCopied] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const qrCodeRef = useRef<HTMLDivElement>(null);
@@ -311,8 +314,8 @@ function ReferralCodeDisplay({ code }: { code: ReferralCode | null }) {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-900 font-medium mb-2">💰 How Rewards Work:</p>
             <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-              <li>Friend signs up with your code: <strong>They get 10% off their first order</strong></li>
-              <li>Friend places their first order: <strong>You earn 10% of its value (excl. tax & shipping) as credit</strong></li>
+              <li>Friend signs up with your code: <strong>They get {formatPct(rates.friendPct)} off their first order</strong></li>
+              <li>Friend places their first order: <strong>You earn {formatPct(rates.referrerPct)} of its value (excl. tax & shipping) as credit</strong></li>
               <li>Use credits on any future order!</li>
             </ul>
           </div>
@@ -323,6 +326,7 @@ function ReferralCodeDisplay({ code }: { code: ReferralCode | null }) {
 }
 
 export default function CustomerReferralsView({ userProfile }: CustomerReferralsViewProps) {
+  const rates = useReferralRates();
   const [referralData, setReferralData] = useState<CustomerReferralData | null>(null);
   const [redemptions, setRedemptions] = useState<RedemptionRecord[]>([]);
   const [loadingReferrals, setLoadingReferrals] = useState(true);
@@ -668,7 +672,7 @@ export default function CustomerReferralsView({ userProfile }: CustomerReferrals
                               <Badge variant="outline">
                                 {reward.reward_type === 'signup' ? 'Sign-up Bonus' :
                                  reward.reward_type === 'credit_pack_bonus' ? 'Credit Pack Bonus' :
-                                 reward.reward_type === 'referral_discount' ? 'Referral Discount (10%)' :
+                                 reward.reward_type === 'referral_discount' ? `Referral Discount (${formatPct(rates.friendPct)})` :
                                  'Purchase Bonus'}
                               </Badge>
                             </td>                            <td className="px-4 py-3 text-sm">

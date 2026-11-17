@@ -194,16 +194,8 @@ export async function POST(request: NextRequest) {
     // server price check throw, which skipped the check altogether.
     if (body.referralCode != null && typeof body.referralCode !== 'string') body.referralCode = undefined;
 
-    // Add referral code if provided (customer orders only)
-    if (body.referralCode && orderType === 'customer') {
-      metadata.referralCode = body.referralCode;
-
-      // Add referral discount amount for order processing
-      if (body.referralDiscount && body.referralDiscount > 0) {
-        metadata.referralDiscount = body.referralDiscount.toString();
-        console.log(`🎯 Customer referral discount applied: ${body.referralDiscount} pence for code ${body.referralCode}`);
-      }
-    }
+    // The referral code and discount are recorded after the price check below, from what the server confirmed
+    // (a signed-in new customer, or a partner code), never from the figure the browser sent.
 
     // Sticker QR attribution (point-of-sale location) — read from the signed cookie set by /s/*
     const qrAttribution = decodeAttribution(request.cookies.get(QR_ATTRIBUTION_COOKIE)?.value);
@@ -305,6 +297,14 @@ export async function POST(request: NextRequest) {
     });
     const enforcePriceCheck = process.env.PRICE_CHECK_MODE !== 'log';
     metadata.priceCheck = priceCheck.status;
+    // Record only the referral the server confirmed, with the server's own discount figure. The amount charged is not changed here.
+    if (orderType === 'customer' && body.referralCode && priceCheck.referral.applied) {
+      metadata.referralCode = body.referralCode.toUpperCase();
+      metadata.referralDiscount = String(priceCheck.referral.discount);
+    } else {
+      delete metadata.referralCode;
+      delete metadata.referralDiscount;
+    }
     // Record only the credit the server confirmed this customer holds, not what the browser claimed
     // (lib/commissions/credit-balance.ts). The amount charged is not changed here.
     if (metadata.rewardRedemption) {

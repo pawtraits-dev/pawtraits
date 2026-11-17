@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * "Give 10%, get 10%": one compact card that makes sharing a customer's referral link one tap.
+ * "Give X, get Y" (the percentages are admin settings): one compact card that makes sharing a customer's referral link one tap.
  * Uses the customer's EXISTING referral code and the /c/<CODE> link the referrals page has always shared.
  *
  *  - Share with a friend: the phone's share sheet (Web Share API) with the text, the link and, when the
@@ -15,7 +15,8 @@ import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
 import { Share2, Copy, Check, QrCode } from 'lucide-react';
 import { track } from '@/lib/tracking/events';
-import { REFERRAL_COPY, buildShareUrl, shareText, whatsappUrl, sharePetName } from '@/lib/referrals/text';
+import { REFERRAL_COPY, buildShareUrl, shareText, whatsappUrl, sharePetName, referralCopy } from '@/lib/referrals/text';
+import { useReferralRates } from '@/lib/referrals/use-rates';
 
 export type SharePlacement = 'referrals' | 'order_confirmation' | 'order_detail' | 'custom_portrait' | 'share_page';
 
@@ -37,6 +38,8 @@ interface Props {
 }
 
 export default function ShareReferral({ placement, petName, designId, imageUrl, orderId, details: given, hideCreditLink, className }: Props) {
+  const rates = useReferralRates();
+  const copy = referralCopy(rates);
   const [code, setCode] = useState<string | null>(given?.code ?? null);
   const [origin, setOrigin] = useState('');
   const [canNativeShare, setCanNativeShare] = useState<boolean | null>(null);
@@ -95,7 +98,7 @@ export default function ShareReferral({ placement, petName, designId, imageUrl, 
   const shareNow = async () => {
     try {
       const file = fileRef.current;
-      await navigator.share({ text: shareText(pet), url, ...(file ? { files: [file] } : {}) });
+      await navigator.share({ text: shareText(pet, rates), url, ...(file ? { files: [file] } : {}) });
       record('native');
     } catch { /* closed the share sheet */ }
   };
@@ -112,9 +115,9 @@ export default function ShareReferral({ placement, petName, designId, imageUrl, 
   const qrVisible = showQr || canNativeShare === false;
 
   return (
-    <section aria-label={REFERRAL_COPY.heading} className={`rounded-2xl border border-purple-100 bg-purple-50 p-4 ${className ?? ''}`}>
-      <h2 className="text-lg font-bold text-gray-900">{REFERRAL_COPY.heading}</h2>
-      <p className="mt-1 text-sm text-gray-700">{REFERRAL_COPY.line}</p>
+    <section aria-label={copy.heading} className={`rounded-2xl border border-purple-100 bg-purple-50 p-4 ${className ?? ''}`}>
+      <h2 className="text-lg font-bold text-gray-900">{copy.heading}</h2>
+      <p className="mt-1 text-sm text-gray-700">{copy.line}</p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {canNativeShare ? (
@@ -123,7 +126,7 @@ export default function ShareReferral({ placement, petName, designId, imageUrl, 
             <Share2 className="h-4 w-4" /> {REFERRAL_COPY.shareButton}
           </button>
         ) : (
-          <a href={whatsappUrl(url, pet)} target="_blank" rel="noopener noreferrer" onClick={() => record('whatsapp')}
+          <a href={whatsappUrl(url, pet, rates)} target="_blank" rel="noopener noreferrer" onClick={() => record('whatsapp')}
             className="inline-flex h-11 items-center gap-2 rounded-xl bg-purple-600 px-4 text-sm font-semibold text-white">
             <Share2 className="h-4 w-4" /> {REFERRAL_COPY.whatsapp}
           </a>

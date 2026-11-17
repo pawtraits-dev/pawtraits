@@ -16,10 +16,13 @@ import { describeCartItem, isStallProductId, includesFreeDigital, redundantDigit
 import UserAwareNavigation from '@/components/UserAwareNavigation'
 import { CountryProvider } from '@/lib/country-context'
 import { shippingSummary } from '@/lib/shipping/rates'
+import { useReferralRates } from '@/lib/referrals/use-rates';
+import { formatPct } from '@/lib/referrals/rates';
 
 const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' }
 
 function ShoppingCartPageContent() {
+  const rates = useReferralRates()
   const { items, totalItems, totalPrice, updateQuantity, removeFromCart, isGuest, basketNotice, clearBasketNotice } = useHybridCart();
   const { continueShoppingRoute, userProfile } = useUserRouting();
   const [referralCode, setReferralCode] = useState("")
@@ -281,7 +284,7 @@ function ShoppingCartPageContent() {
                       <span className="font-medium">{referralCode}</span>
                     </div>
                     <div className="flex justify-between text-green-600">
-                      <span>Referral Discount (10%)</span>
+                      <span>Referral Discount ({formatPct(rates.friendPct)})</span>
                       <span className="font-medium">-£{discount.toFixed(2)}</span>
                     </div>
                   </div>

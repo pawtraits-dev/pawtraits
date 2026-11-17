@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useReferralRates } from '@/lib/referrals/use-rates';
+import { formatPct } from '@/lib/referrals/rates';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -54,6 +56,7 @@ interface CustomerActivity {
 }
 
 export default function CustomerDetailPage() {
+  const rates = useReferralRates();
   const params = useParams();
   const router = useRouter();
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -1099,7 +1102,7 @@ export default function CustomerDetailPage() {
                   <CardHeader>
                     <CardTitle>Earned Credits</CardTitle>
                     <CardDescription>
-                      Credits earned from customer referrals (10% of each referred customer's first order)
+                      Credits earned from customer referrals ({formatPct(rates.referrerPct)} of each referred customer's first order)
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

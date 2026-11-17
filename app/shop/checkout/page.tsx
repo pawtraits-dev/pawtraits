@@ -30,6 +30,8 @@ import { checkoutValidation } from '@/lib/checkout-validation'
 import { extractDescriptionTitle } from '@/lib/utils'
 // Countries we deliver to (card form dropdown and Apple Pay / Google Pay address sheet)
 import { DELIVERY_COUNTRIES, shippingSummary, shippingQuoteFor } from '@/lib/shipping/rates'
+import { useReferralRates } from '@/lib/referrals/use-rates'
+import { formatPct } from '@/lib/referrals/rates'
 
 const countryName = (code: string) => {
   try { return new Intl.DisplayNames(['en-GB'], { type: 'region' }).of(code) || code } catch { return code }
@@ -61,6 +63,9 @@ function CheckoutPageContent() {
   const [referralCode, setReferralCode] = useState("")
   const [referralValidation, setReferralValidation] = useState<any>(null)
   const [validatingReferral, setValidatingReferral] = useState(false)
+  // Why a signed-in customer's code gave no discount (from the validate route), shown under the order summary
+  const [referralNotice, setReferralNotice] = useState<string | null>(null)
+  const rates = useReferralRates()
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [shippingOptions, setShippingOptions] = useState<any[]>([])
   const [selectedShippingOption, setSelectedShippingOption] = useState<any>(null)
@@ -239,17 +244,18 @@ function CheckoutPageContent() {
       hasReferralCode: !!referralCode,
       referralCode: referralCode,
       hasEmail: !!shippingData.email,
-      email: shippingData.email,
       totalPrice: totalPrice,
       willValidate: !!(referralCode && shippingData.email && totalPrice > 0)
     });
 
+    // A guest gets no discount from a friend's code (the route answers not_signed_in): they are asked to create an account
     if (referralCode && shippingData.email && totalPrice > 0) {
       console.log('[CHECKOUT] Triggering referral validation...');
       validateReferralCode()
     } else {
       console.log('[CHECKOUT] Not validating referral - missing requirements');
       setReferralValidation(null)
+      setReferralNotice(null)
     }
   }, [referralCode, shippingData.email, totalPrice])
 
@@ -278,6 +284,7 @@ function CheckoutPageContent() {
         referralType: data.referral?.type
       });
       setReferralValidation(data)
+      setReferralNotice(!data.discount?.eligible && typeof data.message === 'string' ? data.message : null)
 
       if (!data.valid) {
         // Don't show error for invalid referral codes, just clear the validation
@@ -285,7 +292,7 @@ function CheckoutPageContent() {
         setErrors(prev => ({ ...prev, referral: '' }))
 
         // If the error is about using own code, clear the referral code and localStorage
-        if (data.error === 'You cannot use your own referral code') {
+        if (data.reason === 'own_code') {
           setReferralCode('')
           localStorage.removeItem('referralCode')
         }
@@ -315,9 +322,9 @@ function CheckoutPageContent() {
     discount = subtotal * 0.20;
     discountType = 'Partner discount (20%)';
   } else if (referralValidation?.valid && referralValidation?.discount?.eligible) {
-    // Customer using referral code gets 10% discount (first order only)
+    // A signed-in new customer using a friend's code gets the "Friend's discount" (first order only; the server checks again at payment)
     discount = referralValidation.discount.amount / 100;
-    discountType = 'First Order Discount (10%)';
+    discountType = `First Order Discount (${formatPct(referralValidation.discount.percentage ?? rates.friendPct)})`;
     console.log('✅ Referral discount applied:', { discount, discountType, referralCode });
   } else if (referralCode && referralValidation?.valid && !referralValidation?.discount?.eligible) {
     console.log('⚠️ Referral code valid but discount not eligible:', {
@@ -540,6 +547,7 @@ function CheckoutPageContent() {
   // it's confirmed the wallet charges full price and we point them to the form to claim the discount.
   const showExpress = items.length > 0 && goodsTotalPence >= 50
   const referralDiscountPending = isGuest && !!referralCode && !(referralValidation as any)?.discount?.eligible
+  const createAccountForReferral = `/signup/user?ref=${encodeURIComponent(referralCode)}&next=${encodeURIComponent('/shop/checkout')}`
   const expressFirst = currentStep === 1 && showExpress && walletAvailable === true && !cardFormOpen
 
   // Shared by the card form and Apple Pay / Google Pay / Link
@@ -808,10 +816,7 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                     />
                     {referralDiscountPending && (
                       <p className="text-xs text-gray-600">
-                        Have a referral discount?{' '}
-                        {expressFirst
-                          ? <button type="button" onClick={() => setCardFormOpen(true)} className="font-medium text-purple-700 underline">Enter your email to apply it</button>
-                          : 'Enter your email in the form below to apply it before paying.'}
+                        <Link href={createAccountForReferral} className="font-medium text-purple-700 underline">Create an account to get {formatPct(rates.friendPct)} off your first order.</Link>
                       </p>
                     )}
                     {showMarketingTick && <MarketingOptOut checked={marketingOptOut} onChange={setMarketingOptOut} />}
@@ -1250,6 +1255,16 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                       <span className="font-medium">-£{discount.toFixed(2)}</span>
                     </div>
                   </div>
+                )}
+
+                {/* A guest with a friend's code: no discount until they have an account */}
+                {referralDiscountPending && (
+                  <p className="text-sm text-gray-700">
+                    <Link href={createAccountForReferral} className="font-medium text-purple-700 underline">Create an account to get {formatPct(rates.friendPct)} off your first order.</Link>
+                  </p>
+                )}
+                {!isGuest && referralNotice && (
+                  <p role="status" className="text-sm text-gray-700">{referralNotice}</p>
                 )}
 
                 {/* Any other discount that reduces the total (guests with an eligible referral code, admins) */}

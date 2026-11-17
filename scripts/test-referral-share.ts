@@ -1,7 +1,7 @@
 // Run: npx tsx scripts/test-referral-share.ts   (no network, no database)
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import {
-  REFERRAL_COPY, bannerText, buildShareUrl, normaliseCode, safeFirstName, shareMessage, sharePageUrl, sharePetName, shareText, shortLink, whatsappUrl, REFERRAL_STORAGE_KEY,
+  REFERRAL_COPY, referralCopy, bannerText, buildShareUrl, normaliseCode, safeFirstName, shareMessage, sharePageUrl, sharePetName, shareText, shortLink, whatsappUrl, REFERRAL_STORAGE_KEY,
 } from '../lib/referrals/text';
 import { generatePackingSlips, referralPanelLine, wrapText } from '../lib/fulfillment/packing-slips';
 import { qrMatrix } from '../lib/qr/render';
@@ -41,8 +41,9 @@ ok('banner no name', bannerText(null).headline === 'A friend gave you 10% off yo
 ok('banner sub', bannerText('Sarah').sub === "It comes off at checkout. Pick a design and add your pet's photo.");
 
 // Wording rules: no exclamation marks in our referral copy
-ok('no exclamation marks', !Object.values(REFERRAL_COPY).some(v => v.includes('!')));
-ok('exact card copy', REFERRAL_COPY.heading === 'Give 10%, get 10%' && REFERRAL_COPY.line === 'Your friend gets 10% off their first Pawtrait. You get 10% of their first order as credit.' && REFERRAL_COPY.shareButton === 'Share with a friend' && REFERRAL_COPY.creditLink === 'See my credit');
+ok('no exclamation marks', !Object.values(REFERRAL_COPY).some(v => v.includes('!')) && !Object.values(referralCopy()).some(v => v.includes('!')));
+ok('card copy at 20/20', referralCopy({ friendPct: 20, referrerPct: 20 }).heading === 'Give 20%, get 20%' && referralCopy({ friendPct: 20, referrerPct: 20 }).line === 'Your friend gets 20% off their first Pawtrait. You get 20% of their first order as credit.');
+ok('exact card copy', referralCopy().heading === 'Give 10%, get 10%' && referralCopy().line === 'Your friend gets 10% off their first Pawtrait. You get 10% of their first order as credit.' && REFERRAL_COPY.shareButton === 'Share with a friend' && REFERRAL_COPY.creditLink === 'See my credit');
 
 // Wrapping for the slip
 const m = (t: string) => t.length * 4;
@@ -81,8 +82,10 @@ const partial = fs.readFileSync(path.join('lib/messaging/templates/partials/refe
 import Handlebars from 'handlebars';
 Handlebars.registerPartial('button', fs.readFileSync('lib/messaging/templates/partials/button.html', 'utf8'));
 const block = Handlebars.compile(partial);
-const html = block({ share_code: 'SARA7K3MQ2XP', share_url: 'https://pawtraits.pics/share/referral/SARA7K3MQ2XP', share_link: 'https://pawtraits.pics/c/SARA7K3MQ2XP', share_short: 'pawtraits.pics/c/SARA7K3MQ2XP' });
+const html = block({ share_heading: referralCopy().heading, share_line: referralCopy().emailLine, share_code: 'SARA7K3MQ2XP', share_url: 'https://pawtraits.pics/share/referral/SARA7K3MQ2XP', share_link: 'https://pawtraits.pics/c/SARA7K3MQ2XP', share_short: 'pawtraits.pics/c/SARA7K3MQ2XP' });
 ok('email block copy', html.includes('Give 10%, get 10%') && html.includes('Know someone whose pet deserves a Pawtrait? Send them your link: they get 10% off their first, you get 10% of that order as credit.') && html.includes('Share my link') && html.includes('SARA7K3MQ2XP'));
+const html20 = block({ share_heading: referralCopy({ friendPct: 20, referrerPct: 20 }).heading, share_line: referralCopy({ friendPct: 20, referrerPct: 20 }).emailLine, share_code: 'SARA7K3MQ2XP', share_url: 'https://x/s', share_link: 'https://x/c', share_short: 'x/c' });
+ok('email block copy at 20/20', html20.includes('Give 20%, get 20%') && html20.includes('they get 20% off their first, you get 20% of that order as credit.') && !html20.includes('10%'));
 ok('email block absent without code', block({}).trim() === '');
 void renderTemplate;
 

@@ -1,3 +1,5 @@
+// NOT USED by the Stripe webhook any more (it credits a referrer in handleCustomerCredit, once, on the friend's FIRST
+// order, at the "Referrer's bonus" setting). Do not wire this back in without that first-order rule and the setting.
 import { serviceClient } from '@/lib/qr/server';
 
 export interface CustomerCreditInput {

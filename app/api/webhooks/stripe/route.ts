@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { balanceAfterRedemption, referrerEarnsCredit } from '@/lib/commissions/credit-balance';
+import { referralRates } from '@/lib/app-settings';
+import { rateFraction } from '@/lib/referrals/rates';
 import { headers } from 'next/headers';
 import { constructWebhookEvent } from '@/lib/stripe-server';
 import { createClient } from '@supabase/supabase-js';
@@ -16,7 +18,6 @@ import { markQuizPurchase, quizEmailUrl } from '@/lib/quiz/ways-in';
 import { captureSocialItems } from '@/lib/social/capture';
 import { optOutUrl } from '@/lib/social/opt-out';
 import { countryName, deliveryFor, emailItems, heroImage, petPossessive } from '@/lib/messaging/order-email';
-import { createCustomerCredit } from '@/lib/commissions/customer-credit';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -777,25 +778,10 @@ async function handleSimplifiedCommissions(
       return;
     }
 
-    // Check if there's a referral code in the payment metadata (from checkout)
-    if (metadata.referralCode && metadata.referralType) {
-      console.log('🎯 Processing referral from payment metadata:', {
-        referralCode: metadata.referralCode,
-        referralType: metadata.referralType
-      });
-
-      if (metadata.referralType === 'partner') {
-        console.log('⚠️ Metadata-based referrals no longer supported. Use customer table referral_type and referrer_id instead.');
-      } else if (metadata.referralType === 'customer') {
-        await handleCustomerCreditFromMetadata(supabase, order, customerEmail, subtotalAmount, metadata);
-      }
-      return;
-    }
-
-    // Fallback: Check referral status in customers table (main flow for customer-based referrals)
+    // The referral link lives on the customers table (referral_type, referrer_id); the payment metadata is not used to credit anyone.
     console.log('🔍 Looking up customer referral status for:', customerEmail.toLowerCase());
 
-    const { data: customer, error: customerError } = await supabase
+    let { data: customer, error: customerError } = await supabase
       .from('customers')
       .select(`
         id,
@@ -825,6 +811,23 @@ async function handleSimplifiedCommissions(
     if (customerError || !customer) {
       console.log('ℹ️ Customer not found or organic order - no commission processing');
       return;
+    }
+
+    // Link at purchase: the friend got the discount because create-intent confirmed they were signed in, new,
+    // and using someone else's code. If they signed up without the link (so no referrer is recorded yet), record
+    // it now so the referrer is credited below. Never overwrites an existing referrer, and never a partner referral.
+    if (order.referral_code && (!customer.referral_type || customer.referral_type === 'ORGANIC')) {
+      const { data: owner } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('personal_referral_code', String(order.referral_code).trim().toUpperCase())
+        .maybeSingle();
+      if (owner && owner.id !== customer.id) {
+        const link = { referral_type: 'CUSTOMER', referrer_id: owner.id, referral_code_used: String(order.referral_code).trim().toUpperCase() };
+        const { error: linkError } = await supabase.from('customers').update(link).eq('id', customer.id);
+        if (linkError) console.error('❌ Could not link the buyer to the referrer for order', order.id, linkError.message);
+        else customer = { ...customer, ...link };
+      }
     }
 
     // Note: referral_order_id tracks the first order that applied the referral
@@ -1276,73 +1279,6 @@ async function createGelatoOrder(order: any, paymentIntent: any, supabase: any, 
 // Handle partner commission using metadata from checkout
 // Legacy function removed - partner commissions now handled via customer table referral_type and referrer_id
 
-// Handle customer credit using metadata from checkout
-async function handleCustomerCreditFromMetadata(
-  supabase: any,
-  order: any,
-  customerEmail: string,
-  subtotalAmount: number,
-  metadata: any
-) {
-  try {
-    console.log('🎯 Creating customer credit from metadata (10%):', {
-      orderId: order.id,
-      referralCode: metadata.referralCode,
-      customerEmail,
-      subtotalAmount
-    });
-
-    // Find the referring customer using the referral code
-    const { data: referringCustomer, error: customerError } = await supabase
-      .from('customers')
-      .select('id, first_name, last_name, email, personal_referral_code')
-      .eq('personal_referral_code', metadata.referralCode.toUpperCase())
-      .single();
-
-    if (customerError || !referringCustomer) {
-      console.error('❌ Failed to find referring customer for code:', metadata.referralCode, customerError);
-      return;
-    }
-
-    // Prepare referred customer data object
-    const referredCustomer = {
-      id: null, // Customer ID not available in metadata flow
-      email: customerEmail,
-      referral_code_used: metadata.referralCode,
-      referral_type: 'customer'
-    };
-
-    // Create the customer credit directly (was an HTTP call to /api/commissions/customer)
-    let credit: any = null;
-    let creditFailure: string | null = null;
-    try {
-      credit = await createCustomerCredit({
-        orderId: order.id,
-        orderAmount: subtotalAmount,
-        referredCustomer,
-        referringCustomerId: referringCustomer.id,
-        referringCustomerEmail: referringCustomer.email
-      });
-    } catch (creditError) {
-      creditFailure = creditError instanceof Error ? creditError.message : String(creditError);
-    }
-
-    if (creditFailure === null) {
-      console.log('✅ Customer credit created from metadata using API:', {
-        creditId: credit.id,
-        referringCustomerId: referringCustomer.id,
-        referringCustomerEmail: referringCustomer.email,
-        creditAmount: credit.commission_amount / 100
-      });
-    } else {
-      console.error('❌ Failed to create customer credit via API:', creditFailure);
-    }
-
-  } catch (error) {
-    console.error('💥 Error handling customer credit from metadata:', error);
-  }
-}
-
 // Handle 10% commission for partner-referred customers (legacy support)
 async function handlePartnerCommission(
   supabase: any,
@@ -1488,7 +1424,7 @@ async function handleCustomerCredit(
   subtotalAmount: number
 ) {
   try {
-    console.log('🎯 Creating customer credit (10%):', {
+    console.log('🎯 Creating customer credit:', {
       orderId: order.id,
       referrerId: customer.referrer_id,
       customerEmail: customer.email,
@@ -1527,8 +1463,9 @@ async function handleCustomerCredit(
     }
 
     // Create customer credit directly in database using service role client
-    // Customer credits are always 10% of subtotal
-    const creditAmount = Math.round(subtotalAmount * 0.10);
+    // The credit is the "Referrer's bonus" setting (default 10%) of the friend's first order
+    const { referrerPct } = await referralRates();
+    const creditAmount = Math.round(subtotalAmount * rateFraction(referrerPct));
 
     const creditData = {
       order_id: order.id,
@@ -1540,7 +1477,7 @@ async function handleCustomerCredit(
       referrer_id: referringCustomer.id,
       referral_code: customer.referral_code_used || null,
       commission_type: 'customer_credit',
-      commission_rate: 10.00,
+      commission_rate: referrerPct,
       commission_amount: creditAmount,
       status: 'approved', // Customer credits are auto-approved
       metadata: {

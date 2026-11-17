@@ -43,6 +43,9 @@ function UserSignupContent() {
   const searchParams = useSearchParams();
   const referralCode = searchParams.get('ref');
   const discount = searchParams.get('discount');
+  // Where to go after signing in: a same-site path only (starts with one "/", not "//" or "/\\")
+  const nextRaw = searchParams.get('next');
+  const nextPath = nextRaw && nextRaw.startsWith('/') && !nextRaw.startsWith('//') && !nextRaw.startsWith('/\\') ? nextRaw : null;
   
   const [currentStep, setCurrentStep] = useState(1);
   const [breeds, setBreeds] = useState<Breed[]>([]);
@@ -315,11 +318,11 @@ function UserSignupContent() {
   useEffect(() => {
     if (success) {
       const timer = setTimeout(() => {
-        router.push('/auth/login');
+        router.push(nextPath ? `/auth/login?returnTo=${encodeURIComponent(nextPath)}` : '/auth/login');
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [success, router]);
+  }, [success, router, nextPath]);
 
   if (success) {
     return (

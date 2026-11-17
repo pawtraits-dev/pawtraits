@@ -3,7 +3,10 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { AdminSupabaseService } from '@/lib/admin-supabase';
+import { SETTING_RATE_KEYS } from '@/lib/referrals/rates';
 
 type Period = '30' | '90' | '365' | 'all';
 type Sort = 'network' | 'direct' | 'descendants' | 'opens' | 'credit';
@@ -56,6 +59,55 @@ function TreeLines({ node, level }: { node: TreeNode; level: number }) {
       </li>
       {node.children.map((c, i) => <TreeLines key={`${c.email}-${i}`} node={c} level={level + 1} />)}
     </>
+  );
+}
+
+/** The two referral percentages (settings), edited here: saved one at a time through the admin settings route */
+function RatesCard() {
+  const [service] = useState(() => new AdminSupabaseService());
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  const load = useCallback(async () => {
+    const result = await service.getAppSettings();
+    if (!result.ok) { setMsg({ type: 'err', text: result.error }); return; }
+    setDraft(Object.fromEntries(SETTING_RATE_KEYS.map(k => [k, String(result.data[k]?.value ?? '')])));
+  }, [service]);
+  useEffect(() => { load(); }, [load]);
+
+  async function save(key: string) {
+    setSaving(key); setMsg(null);
+    const raw = (draft[key] ?? '').trim();
+    const result = await service.updateAppSetting(key, /^\d+$/.test(raw) ? Number(raw) : raw);
+    setSaving(null);
+    if (!result.ok) { setMsg({ type: 'err', text: result.error }); return; }
+    setMsg({ type: 'ok', text: 'Saved.' });
+    load();
+  }
+
+  const fields = [
+    { key: 'referral_friend_discount_pct', label: "Friend's discount (%)", help: "Off a new customer's first order, when they have an account and use a friend's code." },
+    { key: 'referral_referrer_credit_pct', label: "Referrer's bonus (%)", help: "Store credit for the customer whose code was used, worth this share of their friend's first order." },
+  ];
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-lg">Referral rates</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
+        {fields.map(f => (
+          <div key={f.key} className="flex items-end gap-3">
+            <div className="flex-1">
+              <label htmlFor={f.key} className="block text-sm font-medium text-gray-700">{f.label}</label>
+              <p id={`${f.key}-help`} className="text-xs text-gray-600">{f.help}</p>
+              <Input id={f.key} type="number" min={0} max={50} step={1} aria-describedby={`${f.key}-help`} value={draft[f.key] ?? ''} onChange={e => setDraft({ ...draft, [f.key]: e.target.value })} />
+            </div>
+            <Button type="button" disabled={saving === f.key} onClick={() => save(f.key)}>{saving === f.key ? 'Saving…' : 'Save'}</Button>
+          </div>
+        ))}
+        <p className="text-sm text-gray-600">Changes apply to orders from now on. Credit already earned keeps its old rate. It can take a minute to reach every page.</p>
+        {msg && <p role={msg.type === 'err' ? 'alert' : 'status'} className={`text-sm ${msg.type === 'ok' ? 'text-green-800' : 'text-red-700'}`}>{msg.text}</p>}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -130,6 +182,8 @@ export default function CustomerReferralsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Customer Referrals</h1>
         <p className="text-sm text-gray-600">How often each customer&apos;s referral code is used, and the sales that came from it and from the people they referred.</p>
       </div>
+
+      <RatesCard />
 
       <Card>
         <CardContent className="flex flex-wrap items-end gap-4 pt-6">
