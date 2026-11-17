@@ -29,6 +29,19 @@ export function redemptionToRecord(claimedPence: number | null | undefined, chec
   return Math.min(claimed, allowed);
 }
 
+/**
+ * The referral discount to RECORD on the order (pence): what the server confirmed, but never more than the browser
+ * says it actually took off (the browser's figure is only a ceiling). A code the server did not confirm, or a
+ * browser that applied nothing (wallet pressed before the code check finished, check failed, rates changed while
+ * the page was open) records 0, so the order never shows a discount the customer did not get.
+ */
+export function referralToRecord(claimedPence: number | null | undefined, referral: { applied: boolean; discount: number } | null | undefined): number {
+  if (!referral || !referral.applied) return 0;
+  const claimed = Number.isFinite(claimedPence as number) ? Math.max(0, Math.round(claimedPence as number)) : 0;
+  const server = Number.isFinite(referral.discount) ? Math.max(0, Math.round(referral.discount)) : 0;
+  return Math.min(server, claimed);
+}
+
 /** Order statuses that mean the order was not, in the end, a sale (same set as the admin reports use) */
 const NOT_A_SALE = new Set(['cancelled', 'canceled', 'refunded', 'failed']);
 

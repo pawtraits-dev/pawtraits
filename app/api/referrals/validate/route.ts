@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getRequester } from '@/lib/guest/access';
+import { referralRates } from '@/lib/app-settings';
+import { rateFraction, formatPct } from '@/lib/referrals/rates';
+import { customerReferralEligibility, eligibilityMessage } from '@/lib/referrals/eligibility';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -34,42 +38,42 @@ export async function POST(request: NextRequest) {
       .eq('referral_code', referralCode.toUpperCase())
       .single();
 
-    // If not found as partner referral, try as customer referral
-    let customerReferral = null;
+    // Not a partner code: a customer's personal code. One shared rule (lib/referrals/eligibility.ts): the friend
+    // must be signed in as this email, new to Pawtraits, and not using their own code. The rate is an admin setting.
     if (referralError || !referral) {
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .select('id, first_name, last_name, email, personal_referral_code')
-        .eq('personal_referral_code', referralCode.toUpperCase())
-        .single();
-
-      if (customer && !customerError) {
-        // Check if customer is trying to use their own referral code
-        if (customer.email.toLowerCase() === customerEmail.toLowerCase()) {
-          console.log('[REFERRAL] Customer attempting to use their own referral code:', customerEmail);
-          return NextResponse.json(
-            {
-              valid: false,
-              error: 'You cannot use your own referral code',
-              discount: null
-            },
-            { status: 200 }
-          );
-        }
-        customerReferral = customer;
+      const { user } = await getRequester(request);
+      const rates = await referralRates();
+      const pct = formatPct(rates.friendPct);
+      const check = await customerReferralEligibility(referralCode, customerEmail, user?.email?.toLowerCase() ?? null);
+      const message = eligibilityMessage(check.reason, pct);
+      if (check.reason === 'not_found' || check.reason === 'own_code') {
+        return NextResponse.json({ valid: false, eligible: false, reason: check.reason, message, error: message, discount: null }, { status: 200 });
       }
-    }
-
-    if ((referralError || !referral) && !customerReferral) {
-      console.log('[REFERRAL] Referral code not found:', referralCode, 'Errors:', referralError?.message);
-      return NextResponse.json(
-        {
-          valid: false,
-          error: 'Referral code not found',
-          discount: null
+      if (!check.eligible) {
+        return NextResponse.json({
+          valid: true, eligible: false, reason: check.reason, message,
+          referral: { type: 'customer', code: String(referralCode).toUpperCase() },
+          customer: { email: customerEmail, isEligibleForDiscount: false, hasCompletedReferralOrder: check.reason === 'not_new' },
+          discount: { eligible: false, percentage: 0, amount: 0, type: '', description: message },
+          commission: { rate: 0, amount: 0 }
+        });
+      }
+      const { data: owner } = await supabase.from('customers').select('id, first_name, last_name, email, personal_referral_code').eq('id', check.ownerCustomerId!).maybeSingle();
+      // orderTotal is the subtotal in pounds (before delivery); the amount is in pence
+      const amount = Math.round(orderTotal * rateFraction(rates.friendPct) * 100);
+      return NextResponse.json({
+        valid: true, eligible: true, reason: 'ok', message: `${pct} off your first order.`,
+        referral: {
+          id: owner?.id ?? check.ownerCustomerId,
+          code: owner?.personal_referral_code ?? String(referralCode).toUpperCase(),
+          type: 'customer',
+          customerName: `${owner?.first_name || ''} ${owner?.last_name || ''}`.trim(),
+          customerEmail: owner?.email
         },
-        { status: 200 } // Change to 200 to avoid console errors
-      );
+        customer: { email: customerEmail, isEligibleForDiscount: true, hasCompletedReferralOrder: false },
+        discount: { eligible: true, percentage: rates.friendPct, amount, type: 'customer', description: `${pct} off your first order.` },
+        commission: { rate: 0, amount: 0 }
+      });
     }
 
     // Check if expired (only for partner referrals, customer referrals don't expire)
@@ -92,9 +96,7 @@ export async function POST(request: NextRequest) {
       .eq('customer_email', customerEmail);
 
     console.log('[REFERRAL VALIDATION] Customer orders check:', {
-      customerEmail,
       existingOrdersCount: existingOrders?.length || 0,
-      existingOrders: existingOrders,
       ordersError: ordersError?.message
     });
 
@@ -115,11 +117,10 @@ export async function POST(request: NextRequest) {
       ordersWithDiscount: existingOrders?.filter(o => o.discount_amount && o.discount_amount > 0).length || 0
     });
 
-    // Determine referral type and calculate discount
-    const isPartnerReferral = !!referral;
-    const isCustomerReferral = !!customerReferral;
+    // From here on the code is a PARTNER code (customer codes returned above): behaviour unchanged
+    const isPartnerReferral = true;
 
-    // Calculate potential discount (10% for eligible customers per simplified commission rules)
+    // Calculate potential discount (10% for partner codes per simplified commission rules)
     let discountAmount = 0;
     let discountPercentage = 0;
     let referralType = '';
@@ -128,29 +129,20 @@ export async function POST(request: NextRequest) {
       const subtotal = orderTotal; // Assuming orderTotal is the subtotal (no shipping)
       discountPercentage = 10;
       discountAmount = Math.round(subtotal * 0.10 * 100); // Convert to pence
-      referralType = isPartnerReferral ? 'partner' : 'customer';
+      referralType = 'partner';
     }
 
     // Calculate commission for partner info (10% per simplified commission rules)
     const commissionRate = isEligibleForDiscount && isPartnerReferral ? 10.00 : 0.00;
     const commissionAmount = Math.round(orderTotal * (commissionRate / 100));
 
-    // Prepare referral data based on type
-    const referralData = isPartnerReferral
-      ? {
-          id: referral.id,
-          code: referral.referral_code,
-          type: 'partner',
-          clientName: `${referral.client_first_name || ''} ${referral.client_last_name || ''}`.trim(),
-          partner: referral.partners
-        }
-      : {
-          id: customerReferral.id,
-          code: customerReferral.personal_referral_code,
-          type: 'customer',
-          customerName: `${customerReferral.first_name || ''} ${customerReferral.last_name || ''}`.trim(),
-          customerEmail: customerReferral.email
-        };
+    const referralData = {
+      id: referral.id,
+      code: referral.referral_code,
+      type: 'partner',
+      clientName: `${referral.client_first_name || ''} ${referral.client_last_name || ''}`.trim(),
+      partner: referral.partners
+    };
 
     const response = {
       valid: true,

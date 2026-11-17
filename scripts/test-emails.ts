@@ -126,7 +126,7 @@ common('on-instagram', html, ['Biscuit’s on Instagram!', 'See the post', 'inst
 
 
 // ---- Referral block ("Give 10%, get 10%"): present when the sender found details and canEmail said yes; absent otherwise ----
-const REF = { share_code: 'SARA7K3MQ2XP', share_url: 'https://pawtraits.pics/share/referral/SARA7K3MQ2XP', share_link: 'https://pawtraits.pics/c/SARA7K3MQ2XP', share_short: 'pawtraits.pics/c/SARA7K3MQ2XP', unsubscribe_url: 'https://pawtraits.pics/api/public/email-preferences/unsubscribe?p=1&t=2', preferences_url: 'https://pawtraits.pics/email-preferences?p=1&t=2' };
+const REF = { share_heading: 'Give 10%, get 10%', share_line: 'Know someone whose pet deserves a Pawtrait? Send them your link: they get 10% off their first, you get 10% of that order as credit.', share_code: 'SARA7K3MQ2XP', share_url: 'https://pawtraits.pics/share/referral/SARA7K3MQ2XP', share_link: 'https://pawtraits.pics/c/SARA7K3MQ2XP', share_short: 'pawtraits.pics/c/SARA7K3MQ2XP', unsubscribe_url: 'https://pawtraits.pics/api/public/email-preferences/unsubscribe?p=1&t=2', preferences_url: 'https://pawtraits.pics/email-preferences?p=1&t=2' };
 const BLOCK = ['Give 10%, get 10%', 'Know someone whose pet deserves a Pawtrait? Send them your link: they get 10% off their first, you get 10% of that order as credit.', 'Share my link', 'SARA7K3MQ2XP', 'pawtraits.pics/c/SARA7K3MQ2XP', '/share/referral/SARA7K3MQ2XP'];
 const cases: [string, string, Record<string, any>][] = [
   ['order-print', 'customer-order-confirmation.html', orderVars([printItem], { show_delivery: true, gift_locked: true })],
@@ -149,6 +149,11 @@ for (const [name, file, vars] of cases) {
 }
 ok('credit-earned: Keep it going lead-in', renderTemplate(T('customer-credit-earned.html'), { ...cases[6][2], ...REF }).includes('Keep it going'));
 ok('only credit-earned has the lead-in', !renderTemplate(T('customer-order-shipped.html'), { ...cases[5][2], ...REF }).includes('Keep it going'));
+{
+  // The block's wording comes from the settings: 20/20 changes it, nothing else
+  const at20 = renderTemplate(T('customer-order-shipped.html'), { ...cases[5][2], ...REF, share_heading: 'Give 20%, get 20%', share_line: 'Know someone whose pet deserves a Pawtrait? Send them your link: they get 20% off their first, you get 20% of that order as credit.' });
+  ok('referral block follows the rates (20/20)', at20.includes('Give 20%, get 20%') && at20.includes('they get 20% off their first, you get 20% of that order as credit.') && !at20.includes('Give 10%, get 10%'));
+}
 ok('friend code on the receipt does not trigger the block', !renderTemplate(T('customer-order-confirmation.html'), cases[3][2]).includes('Give 10%, get 10%') && renderTemplate(T('customer-order-confirmation.html'), cases[3][2]).includes('FRIEND99'));
 {
   // Escaping: names and codes with markup never come out raw

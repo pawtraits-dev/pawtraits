@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { referralRates } from '@/lib/app-settings';
+import { rateFraction } from '@/lib/referrals/rates';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function GET(request: NextRequest) {
   try {
+    const { referrerPct } = await referralRates();
     const { searchParams } = new URL(request.url);
     const customerEmail = searchParams.get('email');
 
@@ -188,9 +191,9 @@ export async function GET(request: NextRequest) {
           .limit(1);
 
         if (customerOrders && customerOrders.length > 0) {
-          // Calculate 10% reward from subtotal (excluding tax and shipping)
+          // Estimate the reward (the Referrer's bonus setting) from subtotal (excluding tax and shipping)
           const orderSubtotal = customerOrders[0].subtotal_amount || 0;
-          const rewardAmount = (orderSubtotal * 0.1) / 100; // Convert pence to pounds with 10%
+          const rewardAmount = (orderSubtotal * rateFraction(referrerPct)) / 100; // Convert pence to pounds
 
           recentActivity.push({
             id: `purchase-${refCustomer.id}`,

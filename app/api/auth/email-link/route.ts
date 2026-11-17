@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serviceClient } from '@/lib/qr/server';
 import { createClaimToken } from '@/lib/guest/account';
+import { safeReturnPath } from '@/lib/site-url';
 import { sendMessageImmediate } from '@/lib/messaging/message-service';
 import { renderEmailFile } from '@/lib/messaging/render-file';
 
@@ -18,7 +19,7 @@ const OK = { ok: true, message: 'If there’s an account for that email, a sign-
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const email = String(body?.email || '').trim().toLowerCase();
-  const returnTo = typeof body?.returnTo === 'string' && body.returnTo.startsWith('/') && !body.returnTo.startsWith('//') ? body.returnTo : '';
+  const returnTo = safeReturnPath(typeof body?.returnTo === 'string' ? body.returnTo : null) ?? '';
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
 
   const admin = serviceClient();

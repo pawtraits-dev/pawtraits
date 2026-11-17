@@ -3,6 +3,9 @@ import { cookies } from 'next/headers';
 import { serviceClient } from '@/lib/qr/server';
 import { isStallProductId, itemNeedsShipping } from '@/lib/cart/items';
 import { shippingQuoteFor } from '@/lib/shipping/rates';
+import { referralRates } from '@/lib/app-settings';
+import { rateFraction } from '@/lib/referrals/rates';
+import { customerReferralEligibility } from '@/lib/referrals/eligibility';
 
 /**
  * Server-side check of what the browser asks to pay.
@@ -11,7 +14,8 @@ import { shippingQuoteFor } from '@/lib/shipping/rates';
  * current catalogue prices (plus verified stall prices and delivery), less only the
  * discounts the server can confirm for itself:
  *   - partner discount (20%): the signed-in user is a partner
- *   - referral discount (10%, first order): the code exists and the customer is eligible
+ *   - referral discount: a partner code is 10% (code exists, not expired, first discounted order); a customer's code is
+ *     the "Friend's discount" setting, and only for a signed-in NEW customer (lib/referrals/eligibility.ts)
  *   - reward credit: the signed-in customer's own balance
  * Discount figures sent by the browser are never trusted.
  *
@@ -23,7 +27,8 @@ import { shippingQuoteFor } from '@/lib/shipping/rates';
 export type PriceCheckStatus = 'ok' | 'low' | 'suspicious' | 'unchecked';
 
 export const PARTNER_DISCOUNT_RATE = 0.20;
-export const REFERRAL_DISCOUNT_RATE = 0.10;
+/** Partner referral codes (the partner programme is on hold): a fixed 10%. Customer codes use the admin setting. */
+export const PARTNER_REFERRAL_DISCOUNT_RATE = 0.10;
 
 export interface PriceCheckFigures {
   /** What the browser asks to charge, in pence */
@@ -32,7 +37,7 @@ export interface PriceCheckFigures {
   goodsFloor: number;
   /** Delivery that must be included, in pence */
   shipping: number;
-  /** Verified percentage discount on goods: 0, 0.10 or 0.20 */
+  /** Verified percentage discount on goods: 0, a referral rate (0.10 for a partner code, the setting for a customer code) or 0.20 */
   discountRate: number;
   /** Verified reward credit that may be redeemed, in pence */
   rewardsAllowed: number;
@@ -77,6 +82,16 @@ export interface PriceCheckResult {
   rewardsAllowed: number;
   shipping: number;
   reason?: string;
+  /** What the server confirmed about the referral code: always present. `discount` is pence off the goods, the server's own figure. */
+  referral: ReferralOutcome;
+}
+
+export interface ReferralOutcome { applied: boolean; discount: number; ownerCustomerId: string | null; reason: string }
+const NO_REFERRAL: ReferralOutcome = { applied: false, discount: 0, ownerCustomerId: null, reason: 'no code' };
+
+/** Pence off the goods for a referral rate: the same base and rounding as evaluatePriceCheck uses for the amount required. */
+export function referralDiscountPence(goodsFloor: number, discountRate: number): number {
+  return Math.max(0, Math.round(goodsFloor * discountRate));
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -102,19 +117,18 @@ async function sessionUser(): Promise<{ id: string; email: string | null } | nul
   }
 }
 
-/** Same rules as POST /api/referrals/validate: the code exists, is not expired, is not the customer's own, and it is their first discounted order. */
+/**
+ * PARTNER codes only (the `referrals` table): the code exists, is not expired, and it is the customer's first discounted order.
+ * A customer's personal code is decided by customerReferralEligibility (lib/referrals/eligibility.ts), which needs the signed-in user.
+ * Returns false for a code that is not a partner code.
+ */
 export async function referralEligible(code: string, customerEmail: string): Promise<boolean> {
   if (typeof code !== 'string' || typeof customerEmail !== 'string') return false;   // never throw on odd input: a throw skips the whole price check
   const db = serviceClient();
   const upper = code.toUpperCase();
   const { data: referral } = await db.from('referrals').select('id, expires_at').eq('referral_code', upper).maybeSingle();
-  if (referral) {
-    if (new Date(referral.expires_at) < new Date()) return false;
-  } else {
-    const { data: owner } = await db.from('customers').select('id, email').eq('personal_referral_code', upper).maybeSingle();
-    if (!owner) return false;
-    if ((owner.email || '').toLowerCase() === customerEmail.toLowerCase()) return false;
-  }
+  if (!referral) return false;
+  if (new Date(referral.expires_at) < new Date()) return false;
   const { data: orders } = await db.from('orders').select('referral_code, discount_amount, status').eq('customer_email', customerEmail);
   const used = (orders || []).some(o =>
     (o.referral_code || (o.discount_amount && o.discount_amount > 0)) &&
@@ -122,8 +136,14 @@ export async function referralEligible(code: string, customerEmail: string): Pro
   return !used;
 }
 
+/** Is this code a partner's (the `referrals` table)? */
+async function isPartnerCode(code: string): Promise<boolean> {
+  const { data } = await serviceClient().from('referrals').select('id').eq('referral_code', code.toUpperCase()).maybeSingle();
+  return !!data;
+}
+
 export async function runPriceCheck(body: PriceCheckRequest): Promise<PriceCheckResult> {
-  const base = { required: 0, floor: 0, paidForGoods: 0, discountRate: 0, rewardsAllowed: 0, shipping: 0 };
+  const base = { required: 0, floor: 0, paidForGoods: 0, discountRate: 0, rewardsAllowed: 0, shipping: 0, referral: NO_REFERRAL };
   try {
     const db = serviceClient();
     const items = body.cartItems || [];
@@ -177,9 +197,26 @@ export async function runPriceCheck(body: PriceCheckRequest): Promise<PriceCheck
       const { data: profile } = await db.from('user_profiles').select('user_type').eq('user_id', user.id).maybeSingle();
       if (profile?.user_type === 'partner') discountRate = PARTNER_DISCOUNT_RATE;
     }
+    let referral: ReferralOutcome = NO_REFERRAL;
     if (!discountRate && body.referralCode && body.customerEmail) {
-      if (await referralEligible(body.referralCode, body.customerEmail)) discountRate = REFERRAL_DISCOUNT_RATE;
+      if (await isPartnerCode(body.referralCode)) {
+        // Partner code: unchanged (fixed 10%, first discounted order)
+        if (await referralEligible(body.referralCode, body.customerEmail)) {
+          discountRate = PARTNER_REFERRAL_DISCOUNT_RATE;
+          referral = { applied: true, discount: 0, ownerCustomerId: null, reason: 'ok' };
+        } else referral = { ...NO_REFERRAL, reason: 'partner code not eligible' };
+      } else {
+        // Customer code: signed in, new customer, someone else's code; the rate is the admin setting
+        const e = await customerReferralEligibility(body.referralCode, body.customerEmail, user?.email ?? null);
+        if (e.eligible) {
+          discountRate = rateFraction((await referralRates()).friendPct);
+          referral = { applied: discountRate > 0, discount: 0, ownerCustomerId: e.ownerCustomerId, reason: discountRate > 0 ? 'ok' : 'rate is 0' };
+        } else referral = { ...NO_REFERRAL, reason: e.reason };
+      }
+    } else if (discountRate && body.referralCode) {
+      referral = { ...NO_REFERRAL, reason: 'partner discount applies' };
     }
+    if (referral.applied) referral = { ...referral, discount: referralDiscountPence(floor, discountRate) };
 
     let rewardsAllowed = 0;
     const claimed = body.rewardRedemption && body.rewardRedemption > 0 ? body.rewardRedemption : 0;
@@ -189,7 +226,7 @@ export async function runPriceCheck(body: PriceCheckRequest): Promise<PriceCheck
     }
 
     const verdict = evaluatePriceCheck({ amount: body.amount, goodsFloor: floor, shipping, discountRate, rewardsAllowed });
-    const result: PriceCheckResult = { ...verdict, floor, discountRate, rewardsAllowed, shipping };
+    const result: PriceCheckResult = { ...verdict, floor, discountRate, rewardsAllowed, shipping, referral };
 
     // A product with no current price in this currency cannot be priced by the server:
     // never better than "low", so the order is looked at before anything is printed.

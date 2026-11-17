@@ -8,7 +8,8 @@
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage, PDFImage } from 'pdf-lib';
 import { postedItems, describeOrderItem, itemTitle, itemRef } from './shared';
 import { qrMatrix } from '@/lib/qr/render';
-import { REFERRAL_COPY } from '@/lib/referrals/text';
+import { referralCopy } from '@/lib/referrals/text';
+import { DEFAULT_REFERRAL_RATES, type ReferralRates } from '@/lib/referrals/rates';
 
 export { describeOrderItem, itemTitle, itemRef };
 
@@ -100,7 +101,7 @@ function checkbox(page: PDFPage, x: number, y: number, size = mm(4)) {
   page.drawRectangle({ x, y, width: size, height: size, borderColor: BLACK, borderWidth: 0.8 });
 }
 
-/** What the "Give 10%, get 10%" panel on a slip needs for one order's customer */
+/** What the "Give X, get Y" panel on a slip needs for one order's customer */
 export interface SlipReferral { code: string; shareUrl: string; shortLink: string }
 
 export interface PackingSlipOptions {
@@ -108,6 +109,8 @@ export interface PackingSlipOptions {
   returnAddress?: string | null;
   /** Referral panel per order id; an order with no entry gets the slip as before */
   referrals?: Map<string, SlipReferral> | null;
+  /** The referral percentages for the panel's wording (admin settings); the defaults when omitted */
+  referralRates?: ReferralRates | null;
 }
 
 /** Break text into lines no wider than maxWidth (words are never split; an over-long word gets its own line) */
@@ -123,8 +126,8 @@ export function wrapText(measure: (text: string) => number, text: string, maxWid
 }
 
 /** The panel's explanatory line, or null when it would need more than two lines (then QR + heading + code only) */
-export function referralPanelLine(measure: (text: string) => number, maxWidth: number): string[] | null {
-  const lines = wrapText(measure, REFERRAL_COPY.slipLine, maxWidth);
+export function referralPanelLine(measure: (text: string) => number, maxWidth: number, rates: ReferralRates = DEFAULT_REFERRAL_RATES): string[] | null {
+  const lines = wrapText(measure, referralCopy(rates).slipLine, maxWidth);
   return lines.length <= 2 ? lines : null;
 }
 
@@ -132,7 +135,7 @@ export function referralPanelLine(measure: (text: string) => number, maxWidth: n
 export const REFERRAL_PANEL_TOP_MM = 40;
 export const REFERRAL_QR_BOX_MM = 31;
 
-function drawReferralPanel(page: PDFPage, ref: SlipReferral, regular: PDFFont, bold: PDFFont, left: number, right: number) {
+function drawReferralPanel(page: PDFPage, ref: SlipReferral, regular: PDFFont, bold: PDFFont, left: number, right: number, rates: ReferralRates) {
   const bottom = mm(REFERRAL_PANEL_TOP_MM - REFERRAL_QR_BOX_MM);
   const box = mm(REFERRAL_QR_BOX_MM);
   // QR: black on white, drawn as vector squares, with the 4-module quiet zone inside the white box
@@ -152,9 +155,9 @@ function drawReferralPanel(page: PDFPage, ref: SlipReferral, regular: PDFFont, b
   const tx = left + box + mm(6);
   const tw = right - tx;
   let ty = mm(REFERRAL_PANEL_TOP_MM) - mm(5);
-  page.drawText(REFERRAL_COPY.heading, { x: tx, y: ty, size: 12, font: bold, color: BLACK });
+  page.drawText(referralCopy(rates).heading, { x: tx, y: ty, size: 12, font: bold, color: BLACK });
   ty -= mm(5.5);
-  const lines = referralPanelLine(t => regular.widthOfTextAtSize(safe(t), 9), tw);
+  const lines = referralPanelLine(t => regular.widthOfTextAtSize(safe(t), 9), tw, rates);
   if (lines) {
     for (const l of lines) { page.drawText(safe(l), { x: tx, y: ty, size: 9, font: regular, color: BLACK }); ty -= mm(4.2); }
     ty -= mm(2);
@@ -340,8 +343,8 @@ function drawSlip(pdf: PDFDocument, order: any, regular: PDFFont, bold: PDFFont,
   page.drawText('Printed and packed by hand in London. Your free digital copy is waiting in your Pawtraits account.', { x: left, y: fy - mm(3), size: 9, font: regular, color: BLACK });
   page.drawText('Questions? support@pawtraits.pics  -  Share your pet\'s portrait and tag us!', { x: left, y: fy - mm(8), size: 9, font: regular, color: GREY });
 
-  // --- Give 10%, get 10%: the customer's own referral QR, at the very bottom ----
-  if (referral) drawReferralPanel(page, referral, regular, bold, left, right);
+  // --- Give X, get Y: the customer's own referral QR, at the very bottom ----
+  if (referral) drawReferralPanel(page, referral, regular, bold, left, right, opts.referralRates ?? DEFAULT_REFERRAL_RATES);
 }
 
 // ----------------------------------------------------------------------------------

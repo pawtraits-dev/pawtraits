@@ -20,6 +20,18 @@ Expect `Type errors: N (baseline M)` with N ≤ M. The repository has known old 
 change adds none. Never edit `.tsc-baseline` to make this pass. Always remove `.next` first: stale
 generated types inflate the count by a dozen or more.
 
+The count alone is not enough: a change that removes two old errors and adds one new one still passes, and
+some new errors break the production build. Compare by file and message against the base branch:
+
+```bash
+base=main   # or the branch this one is stacked on
+npx tsc --noEmit -p . 2>&1 | grep -E "^(app|lib|components)/" | sed -E 's/\([0-9]+,[0-9]+\)//' | sort > /tmp/tsc-new.txt
+git stash -q; git checkout -q $base; rm -rf .next
+npx tsc --noEmit -p . 2>&1 | grep -E "^(app|lib|components)/" | sed -E 's/\([0-9]+,[0-9]+\)//' | sort > /tmp/tsc-old.txt
+git checkout -q -; git stash pop -q
+comm -13 /tmp/tsc-old.txt /tmp/tsc-new.txt   # errors this change adds; must be empty (a type union printed in a different order is not new)
+```
+
 If N > M, list the new ones: `npx tsc --noEmit 2>&1 | grep -E "^(app|lib|components|scripts)/" | grep "<your file>"`.
 A common cause is `for...of` directly over a `Map` or `Set`; use `Array.from(...)`.
 

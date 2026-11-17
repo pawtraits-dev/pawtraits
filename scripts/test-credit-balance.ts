@@ -1,6 +1,6 @@
 /** npx tsx scripts/test-credit-balance.ts */
 import assert from 'node:assert/strict';
-import { balanceAfterRedemption, redemptionToRecord, isFriendsFirstOrder, referrerEarnsCredit } from '../lib/commissions/credit-balance';
+import { balanceAfterRedemption, redemptionToRecord, referralToRecord, isFriendsFirstOrder, referrerEarnsCredit } from '../lib/commissions/credit-balance';
 let n = 0; const t = (a: unknown, b: unknown) => { assert.equal(a, b); n++; };
 
 t(balanceAfterRedemption(1000, 500), 500);     // £10 held, £5 spent, £5 left
@@ -63,4 +63,19 @@ t(shippingZoneFor(' gb '), 'GB');
 const intent = readFileSync(path.join(ROOT, 'app/api/payments/create-intent/route.ts'), 'utf8');
 t(/typeof body\.referralCode !== 'string'/.test(intent), true);
 t(/PRICE_CHECK_UNAVAILABLE/.test(intent), true);
+// referralToRecord: the server's figure, capped at what the browser really took off; never a discount nobody got
+const ok = { applied: true, discount: 500 };
+t(referralToRecord(500, ok), 500);
+t(referralToRecord(300, ok), 300);               // browser took less off (rate changed while the page was open)
+t(referralToRecord(900, ok), 500);               // browser claims more: the server's figure
+t(referralToRecord(0, ok), 0);                   // wallet pressed before the code check finished
+t(referralToRecord(undefined, ok), 0);
+t(referralToRecord(null, ok), 0);
+t(referralToRecord(NaN, ok), 0);
+t(referralToRecord(Infinity, ok), 0);
+t(referralToRecord(-100, ok), 0);
+t(referralToRecord(499.6, ok), 500);
+t(referralToRecord(500, { applied: false, discount: 500 }), 0);   // not confirmed
+t(referralToRecord(500, { applied: true, discount: 0 }), 0);
+t(referralToRecord(500, null), 0);
 console.log(`credit-balance: ${n} passed`);

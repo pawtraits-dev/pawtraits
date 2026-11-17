@@ -29,6 +29,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { productDescriptionService } from '@/lib/product-utils';
+import { unconfirmedReferral, unconfirmedReferralNote } from '@/lib/referrals/unconfirmed';
 import OrderFulfilmentPanel from '@/components/admin/orders/OrderFulfilmentPanel';
 
 interface OrderItem {
@@ -337,6 +338,10 @@ export default function AdminOrderDetailPage() {
                       )}
                     </div>
                   </div>
+                )}
+
+                {unconfirmedReferral(order.metadata) && (
+                  <p className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">{unconfirmedReferralNote(unconfirmedReferral(order.metadata)!.code)}</p>
                 )}
 
                 {order.error_message && (

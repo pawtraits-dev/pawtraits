@@ -61,6 +61,8 @@ Rules for delegating:
 ## Traps that have cost time
 
 - A stale `.next/` inflates the type-error count. Always `rm -rf .next` first.
+- The type-error COUNT can hide a new error when the same change removes others (a duplicate `const` broke the
+  Vercel build on 17 Nov 2026 while the count fell). Compare errors by message for the files changed (`run-checks`).
 - The TypeScript target does not allow `for...of` directly over a `Map` or `Set`. Use `Array.from(...)`.
 - Two sibling dynamic folders with different names (`app/p/[code]` and `app/p/[token]`) break the
   production build although everything passes locally. Check siblings before adding one.

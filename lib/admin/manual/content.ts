@@ -447,6 +447,7 @@ export const ROUTINES: Routine[] = [
           'Open **Sales** and choose **Last 7 Days**.',
           'Open **AI Costs** and check the spend per day is steady.',
           'Open **Customer Referrals** and look at the note about referred sales with no credit.',
+          "The referral percentages are set at the top of **Customer Referrals**, in **Friend's discount (%)** and **Referrer's bonus (%)**. A new rate applies to orders from then on, credit already earned keeps its old rate, and the wording customers see changes with it. Only change them on purpose.",
           'Write down anything that looks odd and decide whether it needs action.',
         ],
         link: P.sales,

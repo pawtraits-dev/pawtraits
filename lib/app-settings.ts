@@ -1,4 +1,5 @@
 import { serviceClient } from '@/lib/qr/server';
+import { cleanPct } from '@/lib/referrals/rates';
 
 /**
  * Admin-controlled settings stored in public.app_settings (key → jsonb).
@@ -52,6 +53,10 @@ export const SETTING_DEFAULTS = {
   offers_birthday_days_before: 21,
   /** Offers: days after a buyer was shown the photo wording before they can be offered anything */
   offers_notice_grace_days: 2,
+  /** Customer referrals: % off a new customer's first order when they use a friend's code (Admin → Customer Referrals) */
+  referral_friend_discount_pct: 10,
+  /** Customer referrals: store credit for the referrer, as a % of their friend's first order */
+  referral_referrer_credit_pct: 10,
   royal_mail: { service_uk: '', service_europe: '', service_world: '', packaging_grams: 120, print_grams_per_100cm2: 25, large_letter_max_prints: 2 } as RoyalMailSettings,
 };
 export interface RoyalMailSettings {
@@ -78,6 +83,13 @@ export async function getSetting<K extends SettingKey>(key: K): Promise<SettingV
     console.warn(`app_settings read failed for ${key}, using default`, e);
     return SETTING_DEFAULTS[key];
   }
+}
+
+/** The two customer-referral percentages, read together (each falls back to its default if the read fails). */
+export async function referralRates(): Promise<{ friendPct: number; referrerPct: number }> {
+  const [friendPct, referrerPct] = await Promise.all([getSetting('referral_friend_discount_pct'), getSetting('referral_referrer_credit_pct')]);
+  // Stored values can be strings or out of range: read them the same way the charge and the wording do
+  return { friendPct: cleanPct(friendPct, SETTING_DEFAULTS.referral_friend_discount_pct), referrerPct: cleanPct(referrerPct, SETTING_DEFAULTS.referral_referrer_credit_pct) };
 }
 
 export async function getAllSettings(): Promise<Record<string, { value: unknown; description: string | null; updated_at: string | null }>> {
@@ -126,6 +138,9 @@ export function validateSetting(key: string, value: unknown): string | null {
       return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 50 ? null : 'Must be a whole number 0–50';
     case 'offers_per_day':
       return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 1000 ? null : 'Must be a whole number 0–1000';
+    case 'referral_friend_discount_pct':
+    case 'referral_referrer_credit_pct':
+      return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 50 ? null : 'Must be a whole number from 0 to 50';
     case 'offers_enabled':
     case 'offers_auto_send':
     case 'welcome_gift_enabled':

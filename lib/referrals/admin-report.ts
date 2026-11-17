@@ -18,6 +18,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { csvField, fetchAll, NOT_A_SALE } from '../marketing/audiences';
 import { maskEmail } from '../marketing/preferences';
+import { unconfirmedReferral } from './unconfirmed';
 
 export type Period = '30' | '90' | '365' | 'all';
 export type Sort = 'network' | 'direct' | 'descendants' | 'opens' | 'credit';
@@ -71,7 +72,12 @@ export interface CreditRow {
 }
 export interface ProfileRow { id: string; customer_id: string | null }
 
+/** A held order that may carry metadata.referralUnconfirmed (lib/referrals/unconfirmed.ts) */
+export interface HeldOrderRow { id: string; metadata?: unknown; created_at?: string | null }
+
 export interface ReportInput {
+  /** Orders held for review (status on_hold); optional */
+  heldOrders?: HeldOrderRow[];
   customers: CustomerRow[];
   orders: SaleRow[];
   links: LinkRow[];
@@ -107,6 +113,8 @@ export interface Summary {
   creditGiven: number;
   uncredited: number;
   deepestChain: number;
+  /** Held orders in the period whose referral code could not be checked at the time */
+  unconfirmedReferrals: number;
 }
 export interface TreeNode {
   name: string;
@@ -308,6 +316,7 @@ export function buildReport(input: ReportInput, opts: { period?: Period; now?: n
     creditGiven: rows.reduce((a, r) => a + r.credit.earned, 0),
     uncredited: rows.reduce((a, r) => a + r.uncredited, 0),
     deepestChain: rows.reduce((a, r) => Math.max(a, r.descendants.depth), 0),
+    unconfirmedReferrals: (input.heldOrders ?? []).filter(o => inPeriod(o.created_at) && unconfirmedReferral(o.metadata)).length,
   };
 
   const networkValue = (key: string) => rowByKey.get(key)?.network.value ?? 0;
@@ -390,7 +399,7 @@ export function referralsCsv(rows: PersonRow[]): string {
 // Database
 
 export async function loadReferralReport(supabase: SupabaseClient, opts: { period: Period }): Promise<{ report: Report; truncated: boolean }> {
-  const [customers, orders, links, commissions, profiles] = await Promise.all([
+  const [customers, orders, links, commissions, profiles, held] = await Promise.all([
     fetchAll<CustomerRow>((a, b) => supabase.from('customers')
       .select('id, email, first_name, last_name, personal_referral_code, referral_type, referrer_id, referral_code_used, current_credit_balance, created_at')
       .order('created_at', { ascending: true }).order('id').range(a, b)),
@@ -408,9 +417,13 @@ export async function loadReferralReport(supabase: SupabaseClient, opts: { perio
     fetchAll<ProfileRow>((a, b) => supabase.from('user_profiles')
       .select('id, customer_id').not('customer_id', 'is', null)
       .order('id').range(a, b)),
+    // metadata is jsonb holding a JSON string, so it is read and checked here rather than filtered in the database
+    fetchAll<HeldOrderRow>((a, b) => supabase.from('orders')
+      .select('id, metadata, created_at').eq('status', 'on_hold')
+      .order('created_at', { ascending: true }).order('id').range(a, b)),
   ]);
   const report = buildReport({
-    customers: customers.rows, orders: orders.rows, links: links.rows, commissions: commissions.rows, profiles: profiles.rows,
+    customers: customers.rows, orders: orders.rows, links: links.rows, commissions: commissions.rows, profiles: profiles.rows, heldOrders: held.rows,
   }, { period: opts.period });
-  return { report, truncated: [customers, orders, links, commissions, profiles].some(r => r.truncated) };
+  return { report, truncated: [customers, orders, links, commissions, profiles, held].some(r => r.truncated) };
 }

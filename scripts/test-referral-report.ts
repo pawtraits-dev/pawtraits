@@ -4,6 +4,7 @@ import {
   buildReport, referralsCsv, selectRows, pounds, TREE_NODE_CAP,
   type CustomerRow, type SaleRow, type CreditRow, type ReportInput,
 } from '../lib/referrals/admin-report';
+import { unconfirmedReferral } from '../lib/referrals/unconfirmed';
 
 let passed = 0;
 const t = (name: string, fn: () => void) => { fn(); passed++; console.log('ok  ', name); };
@@ -212,6 +213,25 @@ t('CSV is in pounds and emails are masked everywhere', () => {
   assert.ok(!/(alice|bob|carol)@example\.com/.test(everything), 'a full email leaked');
   assert.ok(!/alice@|bob@|carol@/.test(everything));
   assert.ok(csv.includes('•••@'));
+});
+
+t('held orders with an unchecked referral code are counted, within the period', () => {
+  const meta = (code: string) => JSON.stringify({ referralUnconfirmed: code, referralUnconfirmedDiscount: '500' });
+  const r = buildReport(input({
+    customers: [cust('a', 'AAAAAAAA')],
+    heldOrders: [
+      { id: 'h1', metadata: meta('AAAAAAAA'), created_at: daysAgo(2) },          // JSON string, as the webhook stores it
+      { id: 'h2', metadata: { referralUnconfirmed: 'bbbbbbbb' }, created_at: daysAgo(3) },   // already an object
+      { id: 'h3', metadata: JSON.stringify({ referralCode: 'AAAAAAAA' }), created_at: daysAgo(2) },   // a confirmed code: not counted
+      { id: 'h4', metadata: 'not json', created_at: daysAgo(2) },
+      { id: 'h5', metadata: null, created_at: daysAgo(2) },
+      { id: 'h6', metadata: meta('CCCCCCCC'), created_at: daysAgo(200) },        // outside a 30 day period
+    ],
+  }), { now: NOW, period: '30' });
+  assert.equal(r.summary.unconfirmedReferrals, 2);
+  assert.equal(buildReport(input({ heldOrders: [{ id: 'h6', metadata: meta('CCCCCCCC'), created_at: daysAgo(200) }] }), { now: NOW }).summary.unconfirmedReferrals, 1);
+  assert.equal(buildReport(input({}), { now: NOW }).summary.unconfirmedReferrals, 0);
+  assert.deepEqual(unconfirmedReferral(meta('abc')), { code: 'ABC', discountPence: 500 });
 });
 
 console.log(`referral-report: ${passed} passed`);

@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
 import { generatePackingSlips } from '@/lib/fulfillment/packing-slips';
 import { needsPosting } from '@/lib/fulfillment/order-fulfilment';
-import { getSetting } from '@/lib/app-settings';
+import { getSetting, referralRates } from '@/lib/app-settings';
 import { getReferralDetailsForEmails, siteBaseUrl } from '@/lib/referrals/share';
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     if (d) referrals.set(o.id, { code: d.code, shareUrl: d.shareUrl, shortLink: d.shortLink });
   }
 
-  const bytes = await generatePackingSlips(orders, { returnAddress: await getSetting('return_address'), referrals });
+  const bytes = await generatePackingSlips(orders, { returnAddress: await getSetting('return_address'), referrals, referralRates: await referralRates() });
   const name = orders.length === 1 ? `packing-slip-${orders[0].order_number}.pdf` : `packing-slips-${new Date().toISOString().slice(0, 10)}-${orders.length}.pdf`;
   return new NextResponse(Buffer.from(bytes), {
     headers: {
