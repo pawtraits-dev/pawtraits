@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "test:price-check": "npx tsx scripts/test-price-check.ts",
+    "test:credit-balance": "npx tsx scripts/test-credit-balance.ts",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "validate:schema": "npx tsx scripts/validate-schema.ts",

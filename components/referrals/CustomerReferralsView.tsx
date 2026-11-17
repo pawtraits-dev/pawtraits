@@ -312,7 +312,7 @@ function ReferralCodeDisplay({ code }: { code: ReferralCode | null }) {
             <p className="text-sm text-blue-900 font-medium mb-2">💰 How Rewards Work:</p>
             <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
               <li>Friend signs up with your code: <strong>They get 10% off their first order</strong></li>
-              <li>Friend makes a purchase: <strong>You earn 10% of their order value (excl. tax & shipping) as credit</strong></li>
+              <li>Friend places their first order: <strong>You earn 10% of its value (excl. tax & shipping) as credit</strong></li>
               <li>Use credits on any future order!</li>
             </ul>
           </div>

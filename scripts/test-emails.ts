@@ -100,7 +100,7 @@ ok('posted-untracked no tracking', !html.includes('Tracking number'));
   ok('preview-link: no sign-up line for a signed-in customer', !html.includes('also signs you up'));
   ok('preview-link: not marketing, so no unsubscribe link', !html.includes('Unsubscribe from these emails'));
   html = pv(null, true);
-  common('preview-link-no-name', html, ['Pawcasso has painted your pet in.', 'Opening your preview also signs you up for the occasional special treat. Say \'Stop it\' at any time and we will be very obedient. If you didn\'t ask for this, do nothing and you won\'t hear from us again.']);
+  common('preview-link-no-name', html, ['Pawcasso has painted your pet in.', PREVIEW_EMAIL.marketingLine]);   // the exact words live in lib/previews/copy.ts
   ok('preview subject with and without a name', PREVIEW_EMAIL.subject('Biscuit') === 'Biscuit\'s Pawtrait preview is ready' && PREVIEW_EMAIL.subject(null) === 'Your Pawtrait preview is ready');
   ok('preview first name is sanitised (first word, letters only)', previewFirstName('<b>Rex</b> & Luna') === 'BRexb' && previewFirstName('biscuit & luna') === 'Biscuit' && previewFirstName('  ') === null && previewFirstName('123') === null);
   html = pv(previewFirstName('<img src=x onerror=1>'), false);
@@ -127,7 +127,7 @@ common('on-instagram', html, ['Biscuit’s on Instagram!', 'See the post', 'inst
 
 // ---- Referral block ("Give 10%, get 10%"): present when the sender found details and canEmail said yes; absent otherwise ----
 const REF = { share_code: 'SARA7K3MQ2XP', share_url: 'https://pawtraits.pics/share/referral/SARA7K3MQ2XP', share_link: 'https://pawtraits.pics/c/SARA7K3MQ2XP', share_short: 'pawtraits.pics/c/SARA7K3MQ2XP', unsubscribe_url: 'https://pawtraits.pics/api/public/email-preferences/unsubscribe?p=1&t=2', preferences_url: 'https://pawtraits.pics/email-preferences?p=1&t=2' };
-const BLOCK = ['Give 10%, get 10%', 'Know someone whose pet deserves a Pawtrait? Send them your link: they get 10% off their first, you get 10% of their order as credit.', 'Share my link', 'SARA7K3MQ2XP', 'pawtraits.pics/c/SARA7K3MQ2XP', '/share/referral/SARA7K3MQ2XP'];
+const BLOCK = ['Give 10%, get 10%', 'Know someone whose pet deserves a Pawtrait? Send them your link: they get 10% off their first, you get 10% of that order as credit.', 'Share my link', 'SARA7K3MQ2XP', 'pawtraits.pics/c/SARA7K3MQ2XP', '/share/referral/SARA7K3MQ2XP'];
 const cases: [string, string, Record<string, any>][] = [
   ['order-print', 'customer-order-confirmation.html', orderVars([printItem], { show_delivery: true, gift_locked: true })],
   ['order-stall', 'customer-order-confirmation.html', orderVars([stallItem], { is_collected: true, stall_name: 'Old Spitalfields Market', show_delivery: false, gift_available: true })],

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server';
+import { balanceAfterRedemption, referrerEarnsCredit } from '@/lib/commissions/credit-balance';
 import { headers } from 'next/headers';
 import { constructWebhookEvent } from '@/lib/stripe-server';
 import { createClient } from '@supabase/supabase-js';
@@ -766,37 +767,9 @@ async function handleSimplifiedCommissions(
       rewardRedemption: metadata.rewardRedemption
     });
 
-    // Handle reward redemption if present (deduct from customer's credit balance)
-    if (metadata.rewardRedemption && parseInt(metadata.rewardRedemption) > 0) {
-      const rewardAmountPence = parseInt(metadata.rewardRedemption);
-      const rewardAmountPounds = rewardAmountPence / 100;
-
-      console.log(`💰 Processing reward redemption: £${rewardAmountPounds} (${rewardAmountPence} pence) for ${customerEmail}`);
-
-      // Get customer to deduct from their credit balance
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .select('id, current_credit_balance')
-        .eq('email', customerEmail.toLowerCase())
-        .single();
-
-      if (!customerError && customer) {
-        const newBalance = Math.max(0, (customer.current_credit_balance || 0) - rewardAmountPounds);
-
-        const { error: updateError } = await supabase
-          .from('customers')
-          .update({ current_credit_balance: newBalance })
-          .eq('id', customer.id);
-
-        if (updateError) {
-          console.error('Failed to deduct reward redemption:', updateError);
-        } else {
-          console.log(`✅ Reward redeemed: Deducted £${rewardAmountPounds} from customer balance. New balance: £${newBalance}`);
-        }
-      } else {
-        console.error('Failed to find customer for reward redemption:', customerError);
-      }
-    }
+    // Credit a customer spends is taken off their balance once, by handleCreditRedemption (called just before
+    // this function). A second deduction used to live here; it subtracted pounds from the pence balance, so a
+    // partial redemption cost the customer an extra 1% of the amount, and it also wiped any negative balance.
 
     // Case 1: Partner Orders - No commission, they get 20% discount (handled at checkout)
     if (orderingUserProfile?.user_type === 'partner') {
@@ -879,10 +852,28 @@ async function handleSimplifiedCommissions(
       commissionCreated = true;
     }
 
-    // Case 4: Customer Referred Customer - 10% credit to referring customer
+    // Case 4: Customer Referred Customer - 10% credit to referring customer, on the friend's FIRST order only
+    // (decided 16 Nov 2026; it used to be every order). Partners above still earn on every order.
     if (customer.referral_type === 'CUSTOMER' && customer.referrer_id) {
-      await handleCustomerCredit(supabase, order, customer, subtotalAmount);
-      commissionCreated = true;
+      // Two checks, both must pass:
+      //  1. the friend has no other paid order that still stands (email matched whatever its capitals; % and _ escaped);
+      //  2. this friend has never earned their referrer a credit before. Without it, a first order that is later
+      //     cancelled would let the next order earn credit again, as nothing takes credit back on cancellation.
+      const emailPattern = customerEmail.trim().replace(/[\\%_]/g, (c: string) => '\\' + c);
+      const [others, credited] = await Promise.all([
+        supabase.from('orders').select('id, payment_status, status').ilike('customer_email', emailPattern).neq('id', order.id).limit(200),
+        supabase.from('commissions').select('id').eq('commission_type', 'customer_credit').eq('metadata->>customer_id', customer.id).limit(1),
+      ]);
+      if (others.error || credited.error) {
+        // Cannot tell whether this is the first order: do not risk crediting twice. The admin Customer Referrals
+        // page lists referred sales that gave no credit, so a missed one can be put right by hand.
+        console.error('❌ Could not check for earlier orders or credit; referral credit not given for order', order.id, others.error?.message || credited.error?.message);
+      } else if (referrerEarnsCredit(others.data, (credited.data || []).length > 0)) {
+        await handleCustomerCredit(supabase, order, customer, subtotalAmount);
+        commissionCreated = true;
+      } else {
+        console.log('ℹ️ Not the referred customer\'s first order, or already credited - no referral credit');
+      }
     }
 
     // Commission tracking is now handled by the new commissions table
@@ -1667,15 +1658,14 @@ async function handleCreditRedemption(
     });
 
     // Deduct credit from customer balance
-    const newBalance = (customer.current_credit_balance || 0) - creditAmount;
+    // Pence off pence, never below zero (lib/commissions/credit-balance.ts)
+    const newBalance = balanceAfterRedemption(customer.current_credit_balance, creditAmount);
 
-    if (newBalance < 0) {
-      console.warn('⚠️  Credit redemption would result in negative balance:', {
+    if ((customer.current_credit_balance || 0) < creditAmount) {
+      console.warn('⚠️  More credit redeemed than was held; balance set to zero:', {
         currentBalance: customer.current_credit_balance,
         creditAmount,
-        newBalance
       });
-      // Still proceed but log the warning
     }
 
     const { error: updateError } = await supabase

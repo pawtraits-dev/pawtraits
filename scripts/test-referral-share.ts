@@ -42,7 +42,7 @@ ok('banner sub', bannerText('Sarah').sub === "It comes off at checkout. Pick a d
 
 // Wording rules: no exclamation marks in our referral copy
 ok('no exclamation marks', !Object.values(REFERRAL_COPY).some(v => v.includes('!')));
-ok('exact card copy', REFERRAL_COPY.heading === 'Give 10%, get 10%' && REFERRAL_COPY.line === 'Your friend gets 10% off their first Pawtrait. You get 10% of their order as credit.' && REFERRAL_COPY.shareButton === 'Share with a friend' && REFERRAL_COPY.creditLink === 'See my credit');
+ok('exact card copy', REFERRAL_COPY.heading === 'Give 10%, get 10%' && REFERRAL_COPY.line === 'Your friend gets 10% off their first Pawtrait. You get 10% of their first order as credit.' && REFERRAL_COPY.shareButton === 'Share with a friend' && REFERRAL_COPY.creditLink === 'See my credit');
 
 // Wrapping for the slip
 const m = (t: string) => t.length * 4;
@@ -82,7 +82,7 @@ import Handlebars from 'handlebars';
 Handlebars.registerPartial('button', fs.readFileSync('lib/messaging/templates/partials/button.html', 'utf8'));
 const block = Handlebars.compile(partial);
 const html = block({ share_code: 'SARA7K3MQ2XP', share_url: 'https://pawtraits.pics/share/referral/SARA7K3MQ2XP', share_link: 'https://pawtraits.pics/c/SARA7K3MQ2XP', share_short: 'pawtraits.pics/c/SARA7K3MQ2XP' });
-ok('email block copy', html.includes('Give 10%, get 10%') && html.includes('Know someone whose pet deserves a Pawtrait? Send them your link: they get 10% off their first, you get 10% of their order as credit.') && html.includes('Share my link') && html.includes('SARA7K3MQ2XP'));
+ok('email block copy', html.includes('Give 10%, get 10%') && html.includes('Know someone whose pet deserves a Pawtrait? Send them your link: they get 10% off their first, you get 10% of that order as credit.') && html.includes('Share my link') && html.includes('SARA7K3MQ2XP'));
 ok('email block absent without code', block({}).trim() === '');
 void renderTemplate;
 
