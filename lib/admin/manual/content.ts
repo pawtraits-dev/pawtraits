@@ -156,6 +156,7 @@ export const ROUTINES: Routine[] = [
           'Tick the orders you are packing now (or **Select all**).',
           'Press **Packing slips**. A PDF opens in a new tab. With several orders it starts with a pick list.',
           'Print the PDF, pack each order with its slip, and read any amber "Note:" on the order.',
+          'Press **Rear labels** to print a small label for the back of each Pawtrait on a sheet of 21 stickers. Use **Start at** to carry on with a part-used sheet.',
           'Press **Mark packed** (or **Packed** on a single order).',
         ],
         link: P.orders,

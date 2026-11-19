@@ -841,6 +841,11 @@ export class AdminSupabaseService {
     return `/api/admin/orders/fulfilment/packing-slips?ids=${orderIds.map(encodeURIComponent).join(',')}`;
   }
 
+  /** URL of the rear labels PDF (A4, 21 per sheet; `start` is the first label position, 1–21, to finish a part-used sheet). */
+  getRearLabelsUrl(orderIds: string[], start = 1): string {
+    return `/api/admin/orders/fulfilment/rear-labels?ids=${orderIds.map(encodeURIComponent).join(',')}&start=${Math.min(21, Math.max(1, Math.floor(start) || 1))}`;
+  }
+
   /** URL of the Royal Mail Click & Drop import CSV. */
   getClickAndDropCsvUrl(orderIds: string[]): string {
     return `/api/admin/orders/fulfilment/click-and-drop?ids=${orderIds.map(encodeURIComponent).join(',')}`;
