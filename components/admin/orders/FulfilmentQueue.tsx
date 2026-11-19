@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, FileText, Download, Printer, Package, RefreshCw, AlertTriangle, ExternalLink, Truck } from 'lucide-react';
+import { Loader2, FileText, Download, Printer, Package, RefreshCw, AlertTriangle, ExternalLink, Truck, Tag } from 'lucide-react';
 import RoyalMailLabelsDialog from './RoyalMailLabelsDialog';
 import { STAGE_TEXT, type TrackingStage } from '@/lib/shipping/royal-mail/status';
 import { useToast } from '@/components/ui/use-toast';
@@ -56,6 +56,7 @@ export default function FulfilmentQueue() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
+  const [rearStart, setRearStart] = useState(1);
   const [checking, setChecking] = useState<string | null>(null);
   const checkTracking = async (id: string) => {
     setChecking(id);
@@ -189,6 +190,17 @@ export default function FulfilmentQueue() {
                   <input type="checkbox" className="h-4 w-4 accent-purple-600" checked={allSelected}
                     onChange={() => setSelected(allSelected ? new Set() : new Set(visible.map(o => o.id)))} />
                   {selectedIds.length ? `${selectedIds.length} selected` : 'Select all'}
+                </label>
+                <Button size="sm" variant="outline" disabled={!selectedIds.length}
+                  onClick={() => window.open(adminService.getRearLabelsUrl(selectedIds, rearStart), '_blank')}>
+                  <Tag className="w-4 h-4 mr-1.5" />Rear labels
+                </Button>
+                <label className="flex items-center gap-1 text-xs text-gray-600">
+                  Start at
+                  <select className="h-8 rounded-md border border-gray-300 bg-white px-1 text-sm" value={rearStart}
+                    onChange={e => setRearStart(Number(e.target.value))} aria-label="Start at label position">
+                    {Array.from({ length: 21 }, (_, n) => n + 1).map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
                 </label>
                 <Button size="sm" variant="outline" disabled={!selectedIds.length}
                   onClick={() => window.open(adminService.getPackingSlipsUrl(selectedIds), '_blank')}>

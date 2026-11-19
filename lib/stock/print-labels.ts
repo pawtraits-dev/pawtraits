@@ -52,10 +52,13 @@ export const CL2163: LabelSheetLayout = {
 
 export interface PrintLabel {
   title: string;
-  sizeCode: string;        // S / M / L / XL
+  sizeCode: string;        // S / M / L / XL; empty = no size pill, the size text starts at the column's left
   sizeText: string;        // "20×30 cm"
   qrUrl: string;
   thumbnailKey?: string | null;
+  kicker?: string;         // replaces the "PAWTRAITS" brand line (e.g. "MADE FOR BISCUIT")
+  ref?: string;            // small reference under the QR (e.g. "PW-1234-1")
+  cta?: string;            // this label's call to action; overrides the sheet-wide one
 }
 
 export interface LabelOptions {
@@ -114,7 +117,7 @@ export async function generatePrintLabels(labels: PrintLabel[], opts: LabelOptio
     const x = layout.marginLeftMm + col * (layout.labelWidthMm + layout.gapXMm);
     const yTop = layout.marginTopMm + row * (layout.labelHeightMm + layout.gapYMm);
     drawLabel(page, label, { x, yTop, w: layout.labelWidthMm, h: layout.labelHeightMm, pageH: layout.pageHeightMm, r: layout.cornerRadiusMm },
-      { titleFont, bold, semi, cta, guides: !!opts.showGuides, thumb: label.thumbnailKey ? thumbs.get(label.thumbnailKey) ?? null : null });
+      { titleFont, bold, semi, cta: label.cta ?? cta, guides: !!opts.showGuides, thumb: label.thumbnailKey ? thumbs.get(label.thumbnailKey) ?? null : null });
   });
   if (!labels.length) pdf.addPage([mm(layout.pageWidthMm), mm(layout.pageHeightMm)]);
   return pdf.save();
@@ -163,18 +166,24 @@ function drawLabel(page: PDFPage, label: PrintLabel, b: Box, f: { titleFont: PDF
   // Brand line
   // Brand line, cap tops level with the top of the thumbnail and QR
   const capMm = (f.bold.heightAtSize(6, { descender: false }) / MM) * 0.82;
-  page.drawText('PAWTRAITS', { x: mm(textX), y: Y(top + capMm), size: 6, font: f.bold, color: LIGHT });
+  page.drawText(fit((label.kicker ?? 'PAWTRAITS').toUpperCase(), f.bold, 6, mm(tw)), { x: mm(textX), y: Y(top + capMm), size: 6, font: f.bold, color: LIGHT });
 
   // Size tag: light purple pill with the size code, then the dimensions
   const tagTop = top + 4.6;
   const code = label.sizeCode;
   const codeSize = 8.5;
-  const codeW = f.bold.widthOfTextAtSize(code, codeSize) / MM + 2.4;
-  page.drawRectangle({ x: mm(textX), y: Y(tagTop + 4.4), width: mm(codeW), height: mm(4.4), color: LIGHT });
-  page.drawText(code, { x: mm(textX + 1.2), y: Y(tagTop + 3.35), size: codeSize, font: f.bold, color: DEEP });
-  const dimW = Math.max(4, tw - codeW - 1.2);
+  const hasCode = code.length > 0;
+  const codeW = hasCode ? f.bold.widthOfTextAtSize(code, codeSize) / MM + 2.4 : 0;
+  if (hasCode) {
+    page.drawRectangle({ x: mm(textX), y: Y(tagTop + 4.4), width: mm(codeW), height: mm(4.4), color: LIGHT });
+    page.drawText(code, { x: mm(textX + 1.2), y: Y(tagTop + 3.35), size: codeSize, font: f.bold, color: DEEP });
+  }
+  const dimX = hasCode ? textX + codeW + 1.2 : textX;
+  const dimW = Math.max(4, tw - (dimX - textX));
   const dimSize = f.bold.widthOfTextAtSize(label.sizeText, 8.5) <= mm(dimW) ? 8.5 : 7.3;   // 40×60 cm next to XL
-  page.drawText(fit(label.sizeText, f.bold, dimSize, mm(dimW)), { x: mm(textX + codeW + 1.2), y: Y(tagTop + 3.35), size: dimSize, font: f.bold, color: DEEP });
+  const dimText = fit(label.sizeText, f.bold, dimSize, mm(dimW));
+  page.drawText(dimText, { x: mm(dimX), y: Y(tagTop + 3.35), size: dimSize, font: f.bold, color: DEEP });
+  const dimEnd = dimX + f.bold.widthOfTextAtSize(dimText, dimSize) / MM;
 
   // Call to action across the bottom, centred; its lowest descender sits on the safe area
   const fullW = b.w - 2 * inset;
@@ -190,6 +199,25 @@ function drawLabel(page: PDFPage, label: PrintLabel, b: Box, f: { titleFont: PDF
     const w = f.semi.widthOfTextAtSize(line, ctaSize) / MM;
     page.drawText(line, { x: mm(b.x + (b.w - w) / 2), y: Y(ctaBase - (ctaLines.length - 1 - i) * ctaLead), size: ctaSize, font: f.semi, color: MID });
   });
+
+  // Reference, centred under the QR in the gap above the call to action; if the gap is too small,
+  // after the size text in the size row instead
+  if (label.ref) {
+    const refSize = 6;
+    const refCap = (f.semi.heightAtSize(refSize, { descender: false }) / MM) * 0.82;
+    const refDescent = Math.abs(f.semi.heightAtSize(refSize, { descender: true }) - f.semi.heightAtSize(refSize, { descender: false })) / MM;
+    const refTop = qrTop + qrSide + 0.8;
+    const refBase = refTop + refCap;
+    if (refBase + refDescent <= ctaTop - 0.4) {
+      const text = fit(label.ref, f.semi, refSize, mm(qrSide + 4));
+      const w = f.semi.widthOfTextAtSize(text, refSize) / MM;
+      page.drawText(text, { x: mm(qrX + (qrSide - w) / 2), y: Y(refBase), size: refSize, font: f.semi, color: MID });
+    } else {
+      const rx = dimEnd + 2;
+      const room = textX + tw - rx;
+      if (room > 4) page.drawText(fit(label.ref, f.semi, refSize, mm(room)), { x: mm(rx), y: Y(tagTop + 3.35), size: refSize, font: f.semi, color: MID });
+    }
+  }
 
   // Title under the thumbnail row, column width, up to 2 lines: as big as fits between the
   // thumbnail row and the call to action (12 pt, else 10, else 9)
