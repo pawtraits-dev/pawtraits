@@ -6,7 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
-import { designInfo, linePrint, sourcePx, isTradeSize } from '@/lib/stock/trade-prints';
+import { designInfo, linePrint, sourcePx, isTradeSize, sortTradeLines } from '@/lib/stock/trade-prints';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -23,12 +23,12 @@ export async function GET(_r: NextRequest, { params }: { params: Promise<{ id: s
   if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const { data: lines } = await supabase.from('trade_print_order_lines').select('*').eq('order_id', id).order('created_at');
   const info = await designInfo(supabase, (lines ?? []).map(l => l.image_id));
-  const out = await Promise.all((lines ?? []).map(async l => {
+  const out = await Promise.all(sortTradeLines(lines ?? [], info).map(async l => {
     const d = info.get(l.image_id);
     const dims = d?.publicId && isTradeSize(l.size) ? await sourcePx(supabase, l, d.publicId) : null;
     const p = dims && d?.publicId && isTradeSize(l.size) ? linePrint(d.publicId, dims, l.size) : null;
     return {
-      ...l, title: d?.title ?? 'Missing design', thumb: d?.thumb ?? null,
+      ...l, title: d?.title ?? 'Missing design', thumb: d?.thumb ?? null, breed: d?.breed ?? null, animal: d?.animal ?? null,
       print: p ? { widthMm: p.widthMm, heightMm: p.heightMm, finalDpi: p.finalDpi, effectiveDpi: p.effectiveDpi, quality: p.quality, cropNote: p.cropNote, upscaled: p.upscaled } : null,
     };
   }));

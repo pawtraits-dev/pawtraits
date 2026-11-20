@@ -1,6 +1,7 @@
 /**
  * Trade print orders (server only): foamex stall stock ordered by hand from the UK trade printer.
  * Gelato handles everything online; this is only stall stock (see the 2026-10-22 migration).
+ * Lines are always listed by size, then dogs before cats, then breed (sortTradeLines).
  *
  *   stallSales()   what sold at the stalls in a period (stall_print_<size> order lines), to replace
  *   linePrint()    the print-ready file for a line: the design centre-cropped to the size, exact
@@ -49,20 +50,64 @@ export async function stallSales(supabase: SupabaseClient, from: string, to: str
 }
 
 /** Title and thumbnail of each design */
-export async function designInfo(supabase: SupabaseClient, ids: string[]): Promise<Map<string, { title: string; thumb: string | null; publicId: string | null }>> {
-  const out = new Map<string, { title: string; thumb: string | null; publicId: string | null }>();
+export interface DesignInfo { title: string; thumb: string | null; publicId: string | null; breed: string | null; animal: string | null }
+
+export async function designInfo(supabase: SupabaseClient, ids: string[]): Promise<Map<string, DesignInfo>> {
+  const out = new Map<string, DesignInfo>();
+  const breedIds = new Map<string, string>();
   const cloud = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   for (const part of chunks(Array.from(new Set(ids)))) {
-    const { data } = await supabase.from('image_catalog').select('id, description, cloudinary_public_id, public_url').in('id', part);
+    const { data } = await supabase.from('image_catalog').select('id, description, cloudinary_public_id, public_url, breed_id').in('id', part);
     for (const d of data ?? []) {
       out.set(d.id, {
         title: (d.description || '').match(/\*\*(.+?)\*\*/)?.[1]?.trim() || 'Untitled design',
         thumb: d.cloudinary_public_id && cloud ? `https://res.cloudinary.com/${cloud}/image/upload/c_fill,w_120,h_160,g_auto/f_auto,q_auto/${d.cloudinary_public_id}` : d.public_url,
         publicId: d.cloudinary_public_id,
+        breed: null,
+        animal: null,
       });
+      if (d.breed_id) breedIds.set(d.id, d.breed_id);
     }
   }
+  // Breed names and dog/cat, for sorting order lines (size, then dogs before cats, then breed)
+  const distinct = Array.from(new Set(Array.from(breedIds.values())));
+  const names = new Map<string, { name: string; animal: string | null }>();
+  for (const part of chunks(distinct)) {
+    const { data } = await supabase.from('breeds').select('id, name, animal_type').in('id', part);
+    for (const b of data ?? []) names.set(b.id, { name: b.name, animal: b.animal_type ?? null });
+  }
+  for (const [imageId, breedId] of Array.from(breedIds.entries())) {
+    const d = out.get(imageId);
+    const b = names.get(breedId);
+    if (d && b) { d.breed = b.name; d.animal = b.animal; }
+  }
   return out;
+}
+
+const SIZE_RANK: Record<string, number> = { S: 0, M: 1, L: 2, XL: 3 };
+const ANIMAL_RANK: Record<string, number> = { dog: 0, cat: 1 };   // anything else, or unknown, after cats
+
+/**
+ * Order lines as the printer gets them: by size (S, M, L, XL), then dogs before cats (others and
+ * unknown after), then breed A–Z (designs with no breed last), then design title, then the order they were added. Used for the order page, the print files
+ * (their numbering) and the labels, so all three match.
+ */
+export function sortTradeLines<T extends { image_id: string; size: string; created_at?: string | null }>(lines: T[], info: Map<string, { title: string; breed?: string | null; animal?: string | null }>): T[] {
+  const key = (l: T) => info.get(l.image_id);
+  return lines.slice().sort((a, b) =>
+    (SIZE_RANK[a.size] ?? 9) - (SIZE_RANK[b.size] ?? 9)
+    || (ANIMAL_RANK[key(a)?.animal ?? ''] ?? 9) - (ANIMAL_RANK[key(b)?.animal ?? ''] ?? 9)
+    || cmpLast(key(a)?.breed ?? null, key(b)?.breed ?? null)
+    || (key(a)?.title ?? '').localeCompare(key(b)?.title ?? '', 'en', { sensitivity: 'base' })
+    || String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')));
+}
+
+/** A–Z ignoring case; empty values after everything else */
+function cmpLast(a: string | null, b: string | null): number {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return a.localeCompare(b, 'en', { sensitivity: 'base' });
 }
 
 /** Pixel size of a design (cached on the line once read from Cloudinary) */

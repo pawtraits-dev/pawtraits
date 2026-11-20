@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
-import { designInfo, fileStem, isTradeSize, linePrint, sourcePx } from '@/lib/stock/trade-prints';
+import { designInfo, fileStem, isTradeSize, linePrint, sortTradeLines, sourcePx } from '@/lib/stock/trade-prints';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -19,9 +19,10 @@ export async function POST(_r: NextRequest, { params }: { params: Promise<{ id: 
   const supabase = serviceClient();
   const { data: order } = await supabase.from('trade_print_orders').select('*').eq('id', id).maybeSingle();
   if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  const { data: lines } = await supabase.from('trade_print_order_lines').select('*').eq('order_id', id).order('size').order('created_at');
-  if (!lines?.length) return NextResponse.json({ error: 'Add some prints first' }, { status: 400 });
-  const info = await designInfo(supabase, lines.map(l => l.image_id));
+  const { data: rows } = await supabase.from('trade_print_order_lines').select('*').eq('order_id', id).order('created_at');
+  if (!rows?.length) return NextResponse.json({ error: 'Add some prints first' }, { status: 400 });
+  const info = await designInfo(supabase, rows.map(l => l.image_id));
+  const lines = sortTradeLines(rows, info);   // size, then dogs/cats, then breed: the file numbers follow this order
 
   const files = [];
   const problems: string[] = [];
