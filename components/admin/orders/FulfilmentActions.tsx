@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Loader2, MoreHorizontal, Printer, Package, Send, Undo2, Truck, Mail, FileText, PlayCircle, RefreshCw } from 'lucide-react';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 import MarkPostedDialog, { type MarkPostedValues } from './MarkPostedDialog';
+import { gelatoPartWaiting } from '@/lib/fulfillment/shared';
 import type { FulfilmentActionRequest, FulfilmentOrder } from '@/lib/product-types';
 
 const adminService = new AdminSupabaseService();
@@ -38,6 +39,16 @@ export default function FulfilmentActions({ order, onUpdated, onError, size = 's
     if (!window.confirm(`Send ${order.order_number} to Gelato? They'll print and post it, and you'll be charged by Gelato. This can't be undone from here.`)) return;
     run({ action: 'send_to_gelato' });
   };
+
+  const sendRestToGelato = () => {
+    if (!window.confirm(`Send the rest of ${order.order_number} to Gelato? They'll make and post those items, and Gelato will charge you. This can't be undone from here.`)) return;
+    run({ action: 'send_to_gelato' });
+  };
+  const printRestHere = () => {
+    if (!window.confirm(`Print the rest of ${order.order_number} yourself? Those items will join this order in To print.`)) return;
+    run({ action: 'use_self_print' });
+  };
+  const restWaiting = gelatoPartWaiting(order);
 
   const primary = (() => {
     switch (stage) {
@@ -73,13 +84,20 @@ export default function FulfilmentActions({ order, onUpdated, onError, size = 's
             {stage === 'posted' && (
               <DropdownMenuItem onSelect={() => run({ action: 'resend_posted_email' })}><Mail className="w-4 h-4 mr-2" />Resend “posted” email</DropdownMenuItem>
             )}
-            {!order.gelato_order_id && stage !== 'posted' && (
+            {stage !== 'posted' && stage !== 'gelato' && (
               <DropdownMenuItem onSelect={() => run({ action: 'rebuild_print_files' })}><RefreshCw className="w-4 h-4 mr-2" />Rebuild print files</DropdownMenuItem>
             )}
             {canUndo && (
               <DropdownMenuItem onSelect={() => run({ action: 'undo' })}><Undo2 className="w-4 h-4 mr-2" />Move back a step</DropdownMenuItem>
             )}
-            {canGelato && (
+            {restWaiting && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={sendRestToGelato}><Send className="w-4 h-4 mr-2" />Send the rest to Gelato</DropdownMenuItem>
+                <DropdownMenuItem onSelect={printRestHere}><Printer className="w-4 h-4 mr-2" />Print the rest here</DropdownMenuItem>
+              </>
+            )}
+            {!restWaiting && canGelato && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={sendToGelato}><Send className="w-4 h-4 mr-2" />Send to Gelato instead</DropdownMenuItem>

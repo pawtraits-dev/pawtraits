@@ -11,10 +11,10 @@ import RoyalMailLabelsDialog from './RoyalMailLabelsDialog';
 import { STAGE_TEXT, type TrackingStage } from '@/lib/shipping/royal-mail/status';
 import { useToast } from '@/components/ui/use-toast';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
-import { STAGE_LABELS, describeOrderItem, itemTitle, itemRef, postedItems } from '@/lib/fulfillment/shared';
+import { STAGE_LABELS, describeOrderItem, itemTitle, itemRef, selfPrintItems, gelatoItems, isSplitOrder, gelatoPartWaiting } from '@/lib/fulfillment/shared';
 import FulfilmentActions from './FulfilmentActions';
 import PrintFileLink from './PrintFileLink';
-import type { FulfilmentMode, FulfilmentOrder, FulfilmentStage } from '@/lib/product-types';
+import type { FulfilmentMode, FulfilmentOrder, FulfilmentStage, Media } from '@/lib/product-types';
 
 const adminService = new AdminSupabaseService();
 
@@ -26,7 +26,7 @@ const TAB_HINT: Partial<Record<FulfilmentStage, string>> = {
   posted: 'Posted in the last 14 days, with the latest Royal Mail tracking (checked automatically).',
   on_hold: 'Held because the amount paid looked wrong. Check the payment in Stripe before releasing.',
   needs_routing: 'Paid before self-print was switched on, or the automatic routing failed. Choose how to fulfil each one.',
-  gelato: 'Sent to Gelato in the last 30 days — they print and post these.',
+  gelato: 'Sent to Gelato in the last 30 days. They print and post these. Split orders also show here for their Gelato part.',
 };
 const BADGE: Record<FulfilmentStage, string> = {
   to_print: 'bg-amber-100 text-amber-800',
@@ -37,6 +37,11 @@ const BADGE: Record<FulfilmentStage, string> = {
   needs_routing: 'bg-orange-100 text-orange-800',
   gelato: 'bg-gray-100 text-gray-700',
 };
+
+/** Does this order belong on the Gelato tab? Split orders sit at their own stage and also show here once the Gelato part is sent. */
+function onGelatoTab(o: FulfilmentOrder): boolean {
+  return o.fulfilment_stage === 'gelato' || (isSplitOrder(o) && !!o.gelato_order_id);
+}
 
 function age(iso: string): string {
   const hours = (Date.now() - new Date(iso).getTime()) / 3_600_000;
@@ -50,6 +55,12 @@ export default function FulfilmentQueue() {
   const { toast } = useToast();
   const [orders, setOrders] = useState<FulfilmentOrder[]>([]);
   const [defaultProvider, setDefaultProvider] = useState<FulfilmentMode>('self_print');
+  const [splitReady, setSplitReady] = useState(false);
+  const [materials, setMaterials] = useState<string[]>([]);
+  const [media, setMedia] = useState<Media[]>([]);
+  const [editingMaterials, setEditingMaterials] = useState(false);
+  const [draftMaterials, setDraftMaterials] = useState<string[]>([]);
+  const [savingMaterials, setSavingMaterials] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<FulfilmentStage>('to_print');
@@ -78,13 +89,19 @@ export default function FulfilmentQueue() {
     setError(null);
     setOrders(result.data.orders);
     setDefaultProvider(result.data.defaultProvider);
+    setSplitReady(!!result.data.splitReady);
+    setMaterials(result.data.selfPrintMaterials || []);
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { adminService.getMedia(true).then(setMedia); }, []);
 
   const counts = useMemo(() => {
     const c: Partial<Record<FulfilmentStage, number>> = {};
-    for (const o of orders) if (o.fulfilment_stage) c[o.fulfilment_stage] = (c[o.fulfilment_stage] || 0) + 1;
+    for (const o of orders) {
+      if (o.fulfilment_stage && o.fulfilment_stage !== 'gelato') c[o.fulfilment_stage] = (c[o.fulfilment_stage] || 0) + 1;
+      if (onGelatoTab(o)) c.gelato = (c.gelato || 0) + 1;
+    }
     return c;
   }, [orders]);
 
@@ -97,7 +114,7 @@ export default function FulfilmentQueue() {
   }, [orders.length]);
 
   const visible = orders
-    .filter(o => o.fulfilment_stage === tab)
+    .filter(o => (tab === 'gelato' ? onGelatoTab(o) : o.fulfilment_stage === tab))
     .sort((a, b) => tab === 'posted' || tab === 'gelato'
       ? new Date(b.shipped_at || b.created_at).getTime() - new Date(a.shipped_at || a.created_at).getTime()
       : new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -117,7 +134,24 @@ export default function FulfilmentQueue() {
     setDefaultProvider(value);
     const result = await adminService.updateAppSetting('default_fulfillment_provider', value);
     if (!result.ok) { setDefaultProvider(previous); fail(result.error); return; }
-    toast({ title: value === 'self_print' ? 'New orders will queue here to self-print' : 'New orders will be sent to Gelato automatically' });
+    toast({ title: value === 'self_print' ? 'New orders will queue here to self-print' : value === 'split' ? 'New orders: chosen materials queue here, the rest go to Gelato' : 'New orders will be sent to Gelato automatically' });
+  };
+
+  const materialName = (slug: string) => media.find(m => m.slug === slug)?.name || slug;
+  // Active materials, plus any saved slug that is not among them
+  const materialChoices = [
+    ...media.map(m => ({ slug: m.slug, name: m.name })),
+    ...materials.filter(slug => !media.some(m => m.slug === slug)).map(slug => ({ slug, name: slug })),
+  ];
+  const startEditMaterials = () => { setDraftMaterials(materials); setEditingMaterials(true); };
+  const saveMaterials = async () => {
+    setSavingMaterials(true);
+    const result = await adminService.updateAppSetting('self_print_materials', draftMaterials);
+    setSavingMaterials(false);
+    if (!result.ok) { fail(result.error); return; }
+    setMaterials(draftMaterials);
+    setEditingMaterials(false);
+    toast({ title: 'Saved' });
   };
 
   const bulkAdvance = async (action: 'mark_printed' | 'mark_packed') => {
@@ -150,6 +184,7 @@ export default function FulfilmentQueue() {
               <SelectContent>
                 <SelectItem value="self_print">Self print (default)</SelectItem>
                 <SelectItem value="gelato">Gelato (automatic)</SelectItem>
+                <SelectItem value="split" disabled={!splitReady}>Split by material</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="ghost" size="sm" onClick={load} disabled={loading} aria-label="Refresh">
@@ -157,6 +192,37 @@ export default function FulfilmentQueue() {
             </Button>
           </div>
         </div>
+        {!splitReady && (
+          <p className="mt-2 text-xs text-gray-500">To use Split by material, run db/migrations/2026-11-20-foamex-self-print-split.sql in Supabase.</p>
+        )}
+        {defaultProvider === 'split' && (
+          <div className="mt-2 space-y-2 text-sm text-gray-700">
+            <div className="flex flex-wrap items-center gap-2">
+              <span>Printed here: {materials.map(materialName).join(', ')}</span>
+              {!editingMaterials && <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={startEditMaterials}>Change</Button>}
+            </div>
+            {editingMaterials && (
+              <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {materialChoices.map(m => (
+                    <label key={m.slug} className="flex items-center gap-2 text-sm text-gray-700">
+                      <input type="checkbox" className="h-4 w-4 accent-purple-600" checked={draftMaterials.includes(m.slug)}
+                        onChange={() => setDraftMaterials(prev => prev.includes(m.slug) ? prev.filter(x => x !== m.slug) : [...prev, m.slug])} />
+                      {m.name}
+                    </label>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" disabled={!draftMaterials.length || savingMaterials} onClick={saveMaterials} className="bg-purple-600 hover:bg-purple-700">
+                    {savingMaterials && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}Save
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={savingMaterials} onClick={() => setEditingMaterials(false)}>Cancel</Button>
+                </div>
+                <p className="text-xs text-gray-500">Lines in these materials come to your print queue. Everything else goes to Gelato.</p>
+              </div>
+            )}
+          </div>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -168,7 +234,7 @@ export default function FulfilmentQueue() {
           <>
             {/* Stage tabs */}
             <div className="flex flex-wrap gap-2" role="tablist">
-              {TABS.filter(s => s !== 'on_hold' && s !== 'needs_routing' && s !== 'gelato' || counts[s]).map(s => (
+              {TABS.filter(s => (s !== 'on_hold' && s !== 'needs_routing' && s !== 'gelato') || counts[s]).map(s => (
                 <button
                   key={s}
                   role="tab"
@@ -242,7 +308,8 @@ export default function FulfilmentQueue() {
             ) : (
               <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
                 {visible.map(order => {
-                  const items = postedItems(order);
+                  const split = isSplitOrder(order);
+                  const items = tab === 'gelato' ? gelatoItems(order) : selfPrintItems(order);
                   return (
                     <li key={order.id} className="flex flex-col gap-3 p-3 md:flex-row md:items-center">
                       <div className="flex items-start gap-3 md:w-64 md:shrink-0">
@@ -264,11 +331,14 @@ export default function FulfilmentQueue() {
                             <img src={item.image_url || '/placeholder.svg'} alt="" className="h-12 w-12 rounded object-cover bg-gray-100" />
                             <div className="min-w-0 flex-1">
                               <div className="text-sm font-medium text-gray-900 truncate">{item.quantity > 1 && <span className="text-purple-700">{item.quantity}× </span>}{itemTitle(item)}</div>
-                              <div className="text-xs text-gray-600">{describeOrderItem(item)} · <span className="font-mono">{itemRef(order, idx)}</span></div>
+                              <div className="text-xs text-gray-600">{describeOrderItem(item)}{tab !== 'gelato' && <> · <span className="font-mono">{itemRef(order, idx)}</span></>}</div>
                             </div>
                             <PrintFileLink item={item} />
                           </div>
                         ))}
+                        {split && tab === 'gelato' && order.fulfilment_stage && <p className="text-xs text-gray-600">Printed here: {STAGE_LABELS[order.fulfilment_stage]}</p>}
+                        {split && tab !== 'gelato' && order.gelato_order_id && <p className="text-xs text-gray-500">Rest of order at Gelato: {order.gelato_status || 'pending'} · {order.gelato_order_id}</p>}
+                        {split && tab !== 'gelato' && gelatoPartWaiting(order) && <p className="text-xs text-red-700">Rest of order not sent to Gelato yet: {order.error_message}</p>}
                         {order.fulfillment_notes && <p className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1">Note: {order.fulfillment_notes}</p>}
                         {order.error_message && (tab === 'on_hold' || tab === 'needs_routing') && <p className="text-xs text-red-700">{order.error_message}</p>}
                         {tab === 'posted' && (

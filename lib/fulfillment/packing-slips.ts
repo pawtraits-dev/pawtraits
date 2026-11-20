@@ -6,7 +6,7 @@
  */
 
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage, PDFImage } from 'pdf-lib';
-import { selfPrintItems, describeOrderItem, itemTitle, itemRef } from './shared';
+import { selfPrintItems, describeOrderItem, itemTitle, itemRef, isSplitOrder } from './shared';
 import { qrMatrix } from '@/lib/qr/render';
 import { referralCopy } from '@/lib/referrals/text';
 import { DEFAULT_REFERRAL_RATES, type ReferralRates } from '@/lib/referrals/rates';
@@ -286,6 +286,10 @@ function drawSlip(pdf: PDFDocument, order: any, regular: PDFFont, bold: PDFFont,
   // --- Items -------------------------------------------------------------------
   y = labelY - mm(14);
   page.drawText('In this parcel', { x: left, y, size: 12, font: bold, color: BLACK });
+  if (isSplitOrder(order)) {
+    const restText = 'The rest of your order is coming separately from our print partner.';
+    page.drawText(fit(regular, restText, 9, right - (left + mm(32))), { x: left + mm(32), y, size: 9, font: regular, color: GREY });
+  }
   y -= mm(4);
   page.drawLine({ start: { x: left, y }, end: { x: right, y }, color: LIGHT, thickness: 1 });
   y -= mm(4);
