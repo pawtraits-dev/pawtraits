@@ -10,7 +10,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { FulfillmentResult } from './base-fulfillment-service';
-import { gelatoProblems, routeOrderItems, safeHttpsUrl, splitStatusFields } from './shared';
+import { gelatoProblems, routeOrderItems, safeHttpsUrl, splitStatusFields, SPLIT_STATUS_OVERWRITABLE } from './shared';
 
 export interface SplitRoutingDeps {
   materials: string[];
@@ -20,6 +20,8 @@ export interface SplitRoutingDeps {
   sendGelato?: (order: any, items: any[]) => Promise<FulfillmentResult>;
   /** default true */
   digitalOk?: boolean;
+  /** why digital failed (recorded in error_message) */
+  digitalError?: string | null;
   /** e.g. { status: 'confirmed' } when releasing */
   extraOrderFields?: Record<string, any>;
 }
@@ -53,6 +55,8 @@ export function splitRoutingFields(input: {
   gelatoOrderId?: string | null;
   error?: string | null;
   digitalOk: boolean;
+  /** why the download part failed; kept in error_message (as the old router path did) */
+  digitalError?: string | null;
 }): Record<string, any> {
   const { selfCount, gelato } = input;
   let fulfillment_status: string =
@@ -62,7 +66,13 @@ export function splitRoutingFields(input: {
     fulfillment_provider: selfCount > 0 ? 'self_print' : gelato === 'sent' ? 'gelato' : null,
     self_print_status: selfCount > 0 ? 'to_print' : null,
     ...(gelato === 'sent' ? { gelato_order_id: input.gelatoOrderId ?? null, gelato_status: 'pending' } : {}),
-    error_message: gelato === 'none' || gelato === 'sent' ? null : (input.error ?? null),
+    error_message: ((): string | null => {
+      const parts = [
+        input.digitalOk ? null : (input.digitalError || 'Download delivery failed'),
+        gelato === 'none' || gelato === 'sent' ? null : (input.error ?? null),
+      ].filter(Boolean) as string[];
+      return parts.length ? parts.join(' | ').slice(0, 1000) : null;
+    })(),
     fulfillment_status,
   };
 }
@@ -103,7 +113,7 @@ export async function applySplitRouting(supabase: SupabaseClient, order: any, it
   // Nothing for Gelato: no line marks needed
   if (gelato.length === 0) {
     await updateOrder(supabase, order.id, {
-      ...splitRoutingFields({ selfCount: selfPrint.length, gelatoCount: 0, gelato: 'none', digitalOk }),
+      ...splitRoutingFields({ selfCount: selfPrint.length, gelatoCount: 0, gelato: 'none', digitalOk, digitalError: deps.digitalError }),
       ...extra,
     });
     if (selfPrint.length) await auditSplit(supabase, order.id, 'self_print', 'pending', `Split: ${selfPrint.length} item(s) to print here`);
@@ -159,7 +169,7 @@ export async function applySplitRouting(supabase: SupabaseClient, order: any, it
   if (error) error = error.slice(0, 1000);
 
   await updateOrder(supabase, order.id, {
-    ...splitRoutingFields({ selfCount: selfPrint.length, gelatoCount: gelato.length, gelato: state, gelatoOrderId, error, digitalOk }),
+    ...splitRoutingFields({ selfCount: selfPrint.length, gelatoCount: gelato.length, gelato: state, gelatoOrderId, error, digitalOk, digitalError: deps.digitalError }),
     ...extra,
   });
 
@@ -188,28 +198,25 @@ export function gelatoStatusForColumn(s: unknown): 'pending' | 'processing' | 's
 }
 
 /**
- * Gelato's raw order status mapped to an orders.status value the rest of the app already uses
- * (the admin order pages and the Stripe webhook). Used for orders that are not split.
+ * The orders columns to write for a Gelato order status on a non-split order (pure).
+ * gelato_status is always written (never moved back from delivered). orders.status is written only when the
+ * mapped value is shipped or delivered and the order is in a state it may overwrite, so reports, referral
+ * checks and cancelled or refunded orders are not disturbed.
  */
-export function gelatoStatusForOrder(s: unknown): string {
-  switch (String(s ?? '').toLowerCase()) {
-    case 'created': case 'passed': return 'confirmed';
-    case 'uploading': return 'processing';
-    case 'in_production': return 'printing';
-    case 'printed': return 'printed';
-    case 'shipped': return 'shipped';
-    case 'in_transit': return 'in_transit';
-    case 'delivered': return 'delivered';
-    case 'failed': return 'fulfillment_error';
-    case 'canceled': case 'cancelled': return 'cancelled';
-    case 'on_hold': return 'on_hold';
-    default: return 'processing';
+export function gelatoWholeOrderStatusFields(dbOrder: any, rawStatus: unknown): Record<string, any> {
+  const incoming = gelatoStatusForColumn(rawStatus);
+  const mapped = dbOrder?.gelato_status === 'delivered' && incoming !== 'delivered' ? 'delivered' : incoming;
+  const fields: Record<string, any> = { gelato_status: mapped };
+  if ((mapped === 'shipped' || mapped === 'delivered') && SPLIT_STATUS_OVERWRITABLE.includes(dbOrder?.status)
+      && !(dbOrder?.status === 'delivered' && mapped === 'shipped')) {
+    fields.status = mapped;
   }
+  return fields;
 }
 
-/** The orders columns to write for a Gelato order status on a non-split order (pure). */
-export function gelatoWholeOrderStatusFields(rawStatus: unknown): { gelato_status: string; status: string } {
-  return { gelato_status: gelatoStatusForColumn(rawStatus), status: gelatoStatusForOrder(rawStatus) };
+/** Tracking arrived for a non-split order: same rules as gelatoWholeOrderStatusFields for a "shipped" status. */
+export function gelatoWholeOrderTrackingStatusFields(dbOrder: any): Record<string, any> {
+  return gelatoWholeOrderStatusFields(dbOrder, 'shipped');
 }
 
 export function gelatoSplitStatusFields(dbOrder: any, rawStatus: unknown): Record<string, any> {

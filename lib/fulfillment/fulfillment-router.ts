@@ -126,15 +126,17 @@ export class FulfillmentRouter {
 
     const results: FulfillmentResult[] = [];
     let digitalOk = true;
+    let digitalError: string | null = null;
     const digital = new DigitalDownloadService();
     const digitalItems = orderItems.filter(i => digital.canFulfill(i));
     if (digitalItems.length) {
       try {
         const r = await digital.fulfill(order, digitalItems);
         results.push(r);
-        if (!r.success) digitalOk = false;
+        if (!r.success) { digitalOk = false; digitalError = r.error ?? null; }
       } catch (error: any) {
         digitalOk = false;
+        digitalError = error?.message ?? null;
         results.push({ success: false, error: error.message, errorDetails: error });
       }
     }
@@ -145,6 +147,7 @@ export class FulfillmentRouter {
       send: true,
       sendGelato: (o, its) => new GelatoFulfillmentService().fulfill(o, its as OrderItem[]),
       digitalOk,
+      digitalError,
     });
 
     if (split.selfPrintIds.length) {

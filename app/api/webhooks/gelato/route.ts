@@ -1,31 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { headers } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import { isSplitOrder } from '@/lib/fulfillment/shared';
-import { gelatoSplitStatusFields, gelatoSplitTrackingFields, gelatoWholeOrderStatusFields } from '@/lib/fulfillment/split-routing';
+import { gelatoSplitStatusFields, gelatoSplitTrackingFields, gelatoWholeOrderStatusFields, gelatoWholeOrderTrackingStatusFields } from '@/lib/fulfillment/split-routing';
+import { validGelatoOrderId, webhookTokenOk } from '@/lib/fulfillment/gelato-webhook';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const gelatoWebhookSecret = process.env.GELATO_WEBHOOK_SECRET!;
 
 export async function POST(request: NextRequest) {
+  // Fail closed: no secret configured means no webhook.
+  const secret = process.env.GELATO_WEBHOOK_SECRET;
+  if (!secret) {
+    console.error('Gelato webhook: GELATO_WEBHOOK_SECRET is not set');
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 });
+  }
+  const provided = request.nextUrl.searchParams.get('token') ?? request.headers.get('x-gelato-webhook-token');
+  if (!webhookTokenOk(provided, secret)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const body = await request.text();
-    const signature = (await headers()).get('x-gelato-signature');
-
-    // NOTE: the signature is read but NOT verified (no verification scheme exists yet)
-    if (gelatoWebhookSecret && signature) {
-      // Implement signature verification based on Gelato's webhook security
-      // This would be similar to Stripe's signature verification
-    }
 
     const event = JSON.parse(body);
     console.log('Gelato webhook event received:', {
       eventType: event.eventType || event.type || event.event_type,
-      orderId: event.orderId || event.order_id,
-      orderReferenceId: event.orderReferenceId || event.order_reference_id,
       timestamp: new Date().toISOString()
     });
+
+    // Only look up a well-formed Gelato order id; anything else is acknowledged and ignored (no retries)
+    if (!validGelatoOrderId(event.orderId)) {
+      return NextResponse.json({ received: true, ignored: true });
+    }
 
     // Initialize Supabase client
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -81,7 +87,8 @@ async function handleOrderStatusUpdated(event: any, supabase: any) {
     const { data: orders, error: findError } = await supabase
       .from('orders')
       .select('*, order_items (*)')
-      .or(`order_number.eq.${orderReferenceId},gelato_order_id.eq.${orderId}`)
+      
+      .eq('gelato_order_id', orderId)
       .limit(1);
 
     if (findError || !orders || orders.length === 0) {
@@ -110,20 +117,18 @@ async function handleOrderStatusUpdated(event: any, supabase: any) {
       return;
     }
 
-    // gelato_status only accepts pending|processing|shipped|delivered|error, so Gelato's raw status is mapped
-    const { gelato_status: newGelatoStatus, status: newStatus } = gelatoWholeOrderStatusFields(order.status);
+    // gelato_status is always recorded; orders.status only moves for shipped/delivered (see gelatoWholeOrderStatusFields)
+    const wholeFields = gelatoWholeOrderStatusFields(dbOrder, order?.status);
 
-    // Update order status in database
     const { error: updateError } = await supabase
       .from('orders')
       .update({
-        gelato_status: newGelatoStatus,
-        status: newStatus,
+        ...wholeFields,
         updated_at: new Date().toISOString(),
         metadata: JSON.stringify({
           ...parseMetadata(dbOrder.metadata),
           last_gelato_update: new Date().toISOString(),
-          gelato_fulfillment_status: order.fulfillmentStatus
+          gelato_fulfillment_status: order?.fulfillmentStatus
         })
       })
       .eq('id', dbOrder.id);
@@ -131,7 +136,7 @@ async function handleOrderStatusUpdated(event: any, supabase: any) {
     if (updateError) {
       console.error('Failed to update order status:', updateError);
     } else {
-      console.log(`✅ Order ${dbOrder.order_number} status updated to: ${newStatus} (Gelato: ${order.status})`);
+      console.log(`Order ${dbOrder.order_number} Gelato status: ${wholeFields.gelato_status}`);
     }
 
     // Send customer notification for significant status changes
@@ -160,7 +165,8 @@ async function handleOrderItemStatusUpdated(event: any, supabase: any) {
     const { data: orders, error: findError } = await supabase
       .from('orders')
       .select('id, metadata')
-      .or(`order_number.eq.${orderReferenceId},gelato_order_id.eq.${orderId}`)
+      
+      .eq('gelato_order_id', orderId)
       .single();
 
     if (findError || !orders) {
@@ -220,7 +226,8 @@ async function handleOrderItemTrackingUpdated(event: any, supabase: any) {
     const { data: orders, error: findError } = await supabase
       .from('orders')
       .select('*, order_items (*)')
-      .or(`order_number.eq.${orderReferenceId},gelato_order_id.eq.${orderId}`)
+      
+      .eq('gelato_order_id', orderId)
       .single();
 
     if (findError || !orders) {
@@ -262,8 +269,7 @@ async function handleOrderItemTrackingUpdated(event: any, supabase: any) {
       tracking_url: orderItem.trackingUrl,
       carrier: orderItem.shipmentMethodName,
       shipped_at: new Date().toISOString(),
-      status: 'shipped',
-      gelato_status: 'shipped',
+      ...gelatoWholeOrderTrackingStatusFields(orders),
       updated_at: new Date().toISOString(),
       metadata: JSON.stringify({
         ...parseMetadata(orders.metadata),
@@ -311,7 +317,8 @@ async function handleOrderDeliveryEstimateUpdated(event: any, supabase: any) {
     const { data: orders, error: findError } = await supabase
       .from('orders')
       .select('id, metadata')
-      .or(`order_number.eq.${orderReferenceId},gelato_order_id.eq.${orderId}`)
+      
+      .eq('gelato_order_id', orderId)
       .single();
 
     if (findError || !orders) {

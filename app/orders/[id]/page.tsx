@@ -218,7 +218,11 @@ export default function OrderDetailPage() {
                   trackingNumber={tracking} trackingUrl={order.tracking_url} checkedAt={order.tracking_checked_at}
                   posted={!!order.shipped_at || order.status === 'shipped' || order.status === 'delivered'} />
               ) : (
-                <p className="text-sm text-gray-600">We're printing and packing this part. We'll email you when it's posted.</p>
+                (order.self_print_status === 'posted' || order.shipped_at) ? (
+                  <p className="text-sm text-gray-600">Posted{order.shipped_at ? ` on ${new Date(order.shipped_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}.</p>
+                ) : (
+                  <p className="text-sm text-gray-600">We're printing and packing this part. We'll email you when it's posted.</p>
+                )
               )}
               {split && (
                 <div className="mt-5 border-t pt-4">
@@ -233,7 +237,7 @@ export default function OrderDetailPage() {
                       )}
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-600">Being made now. Tracking will show here once it has been posted.</p>
+                    <p className="text-sm text-gray-600">{order.gelato_order_id ? 'Being made now.' : 'Being prepared.'} Tracking will show here once it has been posted.</p>
                   )}
                 </div>
               )}

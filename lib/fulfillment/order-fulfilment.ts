@@ -102,7 +102,7 @@ export async function applyFulfilmentAction(supabase: SupabaseClient, orderId: s
         await applySplitRouting(supabase, order, order.order_items || [], {
           materials: deps.materials ?? cleanMaterials(await getSetting('self_print_materials')),
           send: false,
-          extraOrderFields: { status: 'confirmed' },
+          extraOrderFields: order.status === 'on_hold' ? { status: 'confirmed' } : {},
         });
         await audit(supabase, orderId, 'self_print', 'pending', 'Released from hold (split)');
         break;
@@ -355,7 +355,20 @@ export async function getFulfilmentQueue(supabase: SupabaseClient, opts: { poste
     .limit(500);
   if (error) throw new FulfilmentError(error.message, 500);
 
-  const orders = (data || [])
+  // Posted split orders whose Gelato part is still waiting must stay in the queue whatever their age
+  const { data: waitingData, error: waitingError } = await supabase
+    .from('orders')
+    .select(ORDER_SELECT)
+    .eq('payment_status', 'paid')
+    .eq('self_print_status', 'posted')
+    .is('gelato_order_id', null)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (waitingError) throw new FulfilmentError(waitingError.message, 500);
+  const seen = new Set((data || []).map((o: any) => o.id));
+  const waiting = (waitingData || []).filter((o: any) => !seen.has(o.id) && gelatoPartWaiting(o));
+
+  const orders = [...(data || []), ...waiting]
     .map((o: any) => ({ ...o, fulfilment_stage: fulfilmentStage(o) }))
     .filter((o: any) => o.fulfilment_stage)
     // Gelato orders only while in the last 30 days (they look after themselves)

@@ -28,6 +28,7 @@ function fakeDb(tables: Record<string, any[]>, opts: { missing?: string[] } = {}
       eq: (col: string, val: any) => { filters.push(r => r[col] === val); return api; },
       in: (col: string, vals: any[]) => { filters.push(r => vals.includes(r[col])); return api; },
       gte: (col: string, val: any) => { filters.push(r => r[col] >= val); return api; },
+      is: (col: string, val: any) => { filters.push(r => (r[col] ?? null) === val); return api; },
       or: () => api,
       order: () => api,
       limit: () => api,
@@ -536,18 +537,45 @@ const t = async (name: string, fn: () => any) => { await fn(); n++; console.log(
   await t('raw Gelato statuses become values the CHECK allows', () => {
     const allowed = ['pending', 'processing', 'shipped', 'delivered', 'error'];
     for (const raw of ['created', 'uploading', 'passed', 'in_production', 'printed', 'shipped', 'in_transit', 'delivered', 'failed', 'canceled', 'cancelled', 'on_hold', 'something_new', undefined]) {
-      assert.ok(allowed.includes(sr.gelatoWholeOrderStatusFields(raw).gelato_status), String(raw));
+      assert.ok(allowed.includes(sr.gelatoWholeOrderStatusFields({ status: 'confirmed' }, raw).gelato_status), String(raw));
     }
-    assert.equal(sr.gelatoWholeOrderStatusFields('created').gelato_status, 'pending');
-    assert.equal(sr.gelatoWholeOrderStatusFields('canceled').gelato_status, 'error');
+    assert.equal(sr.gelatoWholeOrderStatusFields({ status: 'confirmed' }, 'created').gelato_status, 'pending');
+    assert.equal(sr.gelatoWholeOrderStatusFields({ status: 'confirmed' }, 'canceled').gelato_status, 'error');
   });
-  await t('orders.status only gets values the app already uses', () => {
-    const used = ['confirmed', 'processing', 'printing', 'printed', 'shipped', 'in_transit', 'delivered', 'fulfillment_error', 'cancelled', 'on_hold'];
-    for (const raw of ['created', 'uploading', 'passed', 'in_production', 'printed', 'shipped', 'in_transit', 'delivered', 'failed', 'canceled', 'cancelled', 'on_hold', 'something_new', undefined]) {
-      assert.ok(used.includes(sr.gelatoWholeOrderStatusFields(raw).status), String(raw));
-    }
-    assert.equal(sr.gelatoWholeOrderStatusFields('canceled').status, 'cancelled');
-    assert.equal(sr.gelatoWholeOrderStatusFields('delivered').status, 'delivered');
+  await t('non-split: gelato_status always written, orders.status only for shipped/delivered on an overwritable order', () => {
+    const f = sr.gelatoWholeOrderStatusFields;
+    assert.deepEqual(f({ status: 'cancelled', gelato_status: 'processing' }, 'shipped'), { gelato_status: 'shipped' });
+    assert.deepEqual(f({ status: 'refunded', gelato_status: 'processing' }, 'delivered'), { gelato_status: 'delivered' });
+    assert.deepEqual(f({ status: 'confirmed', gelato_status: 'pending' }, 'in_production'), { gelato_status: 'processing' });
+    assert.deepEqual(f({ status: 'confirmed' }, 'failed'), { gelato_status: 'error' });
+    assert.deepEqual(f({ status: 'processing', gelato_status: 'shipped' }, 'delivered'), { gelato_status: 'delivered', status: 'delivered' });
+    assert.deepEqual(f({ status: 'confirmed' }, 'shipped'), { gelato_status: 'shipped', status: 'shipped' });
+    assert.deepEqual(f({ status: 'delivered', gelato_status: 'delivered' }, 'shipped'), { gelato_status: 'delivered', status: 'delivered' });
+    assert.deepEqual(sr.gelatoWholeOrderTrackingStatusFields({ status: 'cancelled' }), { gelato_status: 'shipped' });
+    assert.deepEqual(sr.gelatoWholeOrderTrackingStatusFields({ status: 'processing', gelato_status: 'delivered' }), { gelato_status: 'delivered', status: 'delivered' });
+  });
+  await t('Gelato webhook token check', async () => {
+    const gw = await import('../lib/fulfillment/gelato-webhook');
+    assert.equal(gw.webhookTokenOk('s3cret', 's3cret'), true);
+    assert.equal(gw.webhookTokenOk('wrong!', 's3cret'), false);
+    assert.equal(gw.webhookTokenOk('short', 's3cret-long'), false);
+    assert.equal(gw.webhookTokenOk('', ''), false);
+    assert.equal(gw.webhookTokenOk('x', ''), false);
+    assert.equal(gw.webhookTokenOk('x', undefined), false);
+    assert.equal(gw.webhookTokenOk(null, 's3cret'), false);
+    assert.equal(gw.webhookTokenOk(undefined, 's3cret'), false);
+    assert.equal(gw.validGelatoOrderId('abc-123_X'), true);
+    assert.equal(gw.validGelatoOrderId('a,b.eq.1'), false);
+    assert.equal(gw.validGelatoOrderId(''), false);
+    assert.equal(gw.validGelatoOrderId('a'.repeat(101)), false);
+    assert.equal(gw.validGelatoOrderId(5), false);
+  });
+  await t('download failure stays in error_message', () => {
+    const r = sr.splitRoutingFields({ selfCount: 1, gelatoCount: 1, gelato: 'sent', gelatoOrderId: 'g1', digitalOk: false, digitalError: 'link failed' });
+    assert.equal(r.error_message, 'link failed');
+    const r2 = sr.splitRoutingFields({ selfCount: 1, gelatoCount: 1, gelato: 'not_sent', error: 'Not sent to Gelato yet', digitalOk: false, digitalError: 'link failed' });
+    assert.equal(r2.error_message, 'link failed | Not sent to Gelato yet');
+    assert.equal(sr.splitRoutingFields({ selfCount: 1, gelatoCount: 0, gelato: 'none', digitalOk: true }).error_message, null);
   });
 
   console.log(`\n${n} checks passed`);

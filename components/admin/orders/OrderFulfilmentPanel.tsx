@@ -78,11 +78,12 @@ export default function OrderFulfilmentPanel({ order: raw, onChanged }: { order:
           <div className="space-y-1 rounded-lg border-2 border-purple-200 bg-purple-50 p-3 text-sm text-gray-800">
             <p>Split order. Lines under Printed here go in your parcel. Lines under At Gelato are made and posted by Gelato.</p>
             {order.gelato_order_id && (
-              <p className="text-xs text-gray-600">
+              <p className={`text-xs ${order.gelato_status === 'error' ? 'text-red-700' : 'text-gray-600'}`}>
                 Gelato order {order.gelato_order_id} · {order.gelato_status || 'pending'}
                 {order.gelato_tracking_code && <> · {gelatoTrackingUrl
                   ? <a className="underline" href={gelatoTrackingUrl} target="_blank" rel="noopener noreferrer">{order.gelato_tracking_code}</a>
                   : order.gelato_tracking_code}</>}
+                {order.gelato_status === 'error' && <> Check this order in Gelato's dashboard.</>}
               </p>
             )}
             {gelatoPartWaiting(order) && <p className="text-xs text-red-700">Not sent to Gelato yet: {order.error_message}</p>}
@@ -175,7 +176,7 @@ export default function OrderFulfilmentPanel({ order: raw, onChanged }: { order:
 
         {gelatoLines.length > 0 && (
           <div className="space-y-2">
-            <h4 className="text-sm font-semibold text-gray-900">At Gelato</h4>
+            <h4 className="text-sm font-semibold text-gray-900">{order.gelato_order_id ? 'At Gelato' : 'Not sent to Gelato yet'}</h4>
             {gelatoLines.map(item => (
               <div key={item.id} className="flex items-center gap-3 rounded-lg border border-gray-100 p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}

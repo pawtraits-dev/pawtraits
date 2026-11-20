@@ -337,7 +337,9 @@ export default function FulfilmentQueue() {
                           </div>
                         ))}
                         {split && tab === 'gelato' && order.fulfilment_stage && <p className="text-xs text-gray-600">Printed here: {STAGE_LABELS[order.fulfilment_stage]}</p>}
-                        {split && tab !== 'gelato' && order.gelato_order_id && <p className="text-xs text-gray-500">Rest of order at Gelato: {order.gelato_status || 'pending'} · {order.gelato_order_id}</p>}
+                        {split && tab !== 'gelato' && order.gelato_order_id && (order.gelato_status === 'error'
+                          ? <p className="text-xs text-red-700">Rest of order at Gelato: error · {order.gelato_order_id}. Check this order in Gelato's dashboard.</p>
+                          : <p className="text-xs text-gray-500">Rest of order at Gelato: {order.gelato_status || 'pending'} · {order.gelato_order_id}</p>)}
                         {split && tab !== 'gelato' && gelatoPartWaiting(order) && <p className="text-xs text-red-700">Rest of order not sent to Gelato yet: {order.error_message}</p>}
                         {order.fulfillment_notes && <p className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1">Note: {order.fulfillment_notes}</p>}
                         {order.error_message && (tab === 'on_hold' || tab === 'needs_routing') && <p className="text-xs text-red-700">{order.error_message}</p>}

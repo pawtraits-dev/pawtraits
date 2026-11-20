@@ -94,7 +94,7 @@ export default function FulfilmentActions({ order, onUpdated, onError, size = 's
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={sendRestToGelato}><Send className="w-4 h-4 mr-2" />Send the rest to Gelato</DropdownMenuItem>
-                <DropdownMenuItem onSelect={printRestHere}><Printer className="w-4 h-4 mr-2" />Print the rest here</DropdownMenuItem>
+                {stage !== 'posted' && <DropdownMenuItem onSelect={printRestHere}><Printer className="w-4 h-4 mr-2" />Print the rest here</DropdownMenuItem>}
               </>
             )}
             {!restWaiting && canGelato && (
