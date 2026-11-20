@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
 import { generatePackingSlips } from '@/lib/fulfillment/packing-slips';
-import { needsPosting } from '@/lib/fulfillment/order-fulfilment';
+import { selfPrintItems } from '@/lib/fulfillment/shared';
 import { getSetting, referralRates } from '@/lib/app-settings';
 import { getReferralDetailsForEmails, siteBaseUrl } from '@/lib/referrals/share';
 
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await serviceClient().from('orders').select('*, order_items (*)').in('id', ids);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   // Keep the order the admin selected them in
-  const orders = ids.map(id => (data || []).find((o: any) => o.id === id)).filter((o: any) => o && needsPosting(o));
+  const orders = ids.map(id => (data || []).find((o: any) => o.id === id)).filter((o: any) => o && selfPrintItems(o).length > 0);
   if (!orders.length) return NextResponse.json({ error: 'None of those orders have prints to post' }, { status: 400 });
 
   // The customer's own referral QR for the parcel (read-only: no codes are made while printing)

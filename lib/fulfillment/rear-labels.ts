@@ -4,7 +4,7 @@
  * own referral QR ("Give 10%, get 10%"). Drawn by generatePrintLabels (lib/stock/print-labels.ts) on the
  * same A4 21-up sheet as the stall-stock labels.
  */
-import { postedItems, describeOrderItem, itemTitle, itemRef } from './shared';
+import { selfPrintItems, describeOrderItem, itemTitle, itemRef } from './shared';
 import { referralCopy, SITE_URL } from '@/lib/referrals/text';
 import type { ReferralRates } from '@/lib/referrals/rates';
 import type { PrintLabel } from '@/lib/stock/print-labels';
@@ -70,8 +70,8 @@ export function buildRearLabels(
   const thumbKeys = new Map<string, string>();
   for (const order of orders) {
     const referral = referrals?.get(order.id) ?? null;
-    // Same list and index as the packing slip, so the ref matches the slip and the print file
-    postedItems(order).forEach((item: any, index: number) => {
+    // Same list (the lines we print) and index as the packing slip, so the ref matches the slip and the print file
+    selfPrintItems(order).forEach((item: any, index: number) => {
       const publicId = extras.publicIds?.get(item.id) ?? null;
       if (publicId) thumbKeys.set(publicId, publicId);
       const label: PrintLabel = {

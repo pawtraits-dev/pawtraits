@@ -7,8 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
-import { needsPosting } from '@/lib/fulfillment/order-fulfilment';
-import { postedItems } from '@/lib/fulfillment/shared';
+import { selfPrintItems } from '@/lib/fulfillment/shared';
 import { buildRearLabels } from '@/lib/fulfillment/rear-labels';
 import { generatePrintLabels } from '@/lib/stock/print-labels';
 import { resolveOrderImage } from '@/lib/orders/order-image';
@@ -44,7 +43,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await db.from('orders').select('*, order_items (*)').in('id', ids);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   // Keep the order the admin selected them in
-  const orders = ids.map(id => (data || []).find((o: any) => o.id === id)).filter((o: any) => o && needsPosting(o));
+  const orders = ids.map(id => (data || []).find((o: any) => o.id === id)).filter((o: any) => o && selfPrintItems(o).length > 0);
   if (!orders.length) return NextResponse.json({ error: 'None of those orders have prints to post' }, { status: 400 });
 
   // The customer's own referral code (read-only: no codes are made while printing)
@@ -57,7 +56,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Pet names (custom images only) and picture public ids, one lookup per distinct image
-  const items = (orders as any[]).flatMap(o => postedItems(o));
+  const items = (orders as any[]).flatMap(o => selfPrintItems(o));
   const imageIds = Array.from(new Set(items.map(i => String(i.image_id || '')).filter(Boolean)));
   const uuidIds = imageIds.filter(i => UUID.test(i));   // order_items.image_id is text; custom image ids are uuids
   const petById = new Map<string, string | null>();
