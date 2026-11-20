@@ -14,7 +14,7 @@ import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { STAGE_LABELS, describeOrderItem, itemTitle, itemRef, postedItems } from '@/lib/fulfillment/shared';
 import FulfilmentActions from './FulfilmentActions';
 import PrintFileLink from './PrintFileLink';
-import type { FulfilmentOrder, FulfilmentProvider, FulfilmentStage } from '@/lib/product-types';
+import type { FulfilmentMode, FulfilmentOrder, FulfilmentStage } from '@/lib/product-types';
 
 const adminService = new AdminSupabaseService();
 
@@ -49,7 +49,7 @@ function age(iso: string): string {
 export default function FulfilmentQueue() {
   const { toast } = useToast();
   const [orders, setOrders] = useState<FulfilmentOrder[]>([]);
-  const [defaultProvider, setDefaultProvider] = useState<FulfilmentProvider>('self_print');
+  const [defaultProvider, setDefaultProvider] = useState<FulfilmentMode>('self_print');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<FulfilmentStage>('to_print');
@@ -112,7 +112,7 @@ export default function FulfilmentQueue() {
   };
   const fail = (message: string) => toast({ title: 'Couldn’t update the order', description: message, variant: 'destructive' });
 
-  const changeDefault = async (value: FulfilmentProvider) => {
+  const changeDefault = async (value: FulfilmentMode) => {
     const previous = defaultProvider;
     setDefaultProvider(value);
     const result = await adminService.updateAppSetting('default_fulfillment_provider', value);
@@ -145,7 +145,7 @@ export default function FulfilmentQueue() {
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto">
             <span className="text-sm text-gray-600 whitespace-nowrap">New orders go to</span>
-            <Select value={defaultProvider} onValueChange={v => changeDefault(v as FulfilmentProvider)}>
+            <Select value={defaultProvider} onValueChange={v => changeDefault(v as FulfilmentMode)}>
               <SelectTrigger className="flex-1 sm:w-52 sm:flex-none" aria-label="Default fulfilment"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="self_print">Self print (default)</SelectItem>

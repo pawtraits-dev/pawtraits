@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { isSplitOrder } from '@/lib/fulfillment/shared';
+import { gelatoSplitStatusFields, gelatoSplitTrackingFields } from '@/lib/fulfillment/split-routing';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -18,8 +20,6 @@ export async function POST(request: NextRequest) {
     }
 
     const event = JSON.parse(body);
-    console.log('Gelato webhook raw payload:', body);
-    console.log('Gelato webhook parsed event:', event);
     console.log('Gelato webhook event received:', {
       eventType: event.eventType || event.type || event.event_type,
       orderId: event.orderId || event.order_id,
@@ -80,7 +80,7 @@ async function handleOrderStatusUpdated(event: any, supabase: any) {
     // Find our order using orderReferenceId (our order_number) or gelato_order_id
     const { data: orders, error: findError } = await supabase
       .from('orders')
-      .select('*')
+      .select('*, order_items (*)')
       .or(`order_number.eq.${orderReferenceId},gelato_order_id.eq.${orderId}`)
       .limit(1);
 
@@ -90,6 +90,26 @@ async function handleOrderStatusUpdated(event: any, supabase: any) {
     }
 
     const dbOrder = orders[0];
+
+    // Split order: Gelato only reports on its own part. Record that and leave our parcel's fields alone.
+    if (isSplitOrder(dbOrder)) {
+      const { error: splitError } = await supabase
+        .from('orders')
+        .update({
+          ...gelatoSplitStatusFields(dbOrder, order?.status),
+          updated_at: new Date().toISOString(),
+          metadata: JSON.stringify({
+            ...parseMetadata(dbOrder.metadata),
+            last_gelato_update: new Date().toISOString(),
+            gelato_fulfillment_status: order?.fulfillmentStatus
+          })
+        })
+        .eq('id', dbOrder.id);
+      if (splitError) console.error('Failed to update split order status:', splitError);
+      else console.log(`✅ Split order ${dbOrder.order_number}: Gelato part is ${order?.status}`);
+      return;
+    }
+
     const newStatus = mapGelatoStatusToDbStatus(order.status);
 
     // Update order status in database
@@ -198,12 +218,40 @@ async function handleOrderItemTrackingUpdated(event: any, supabase: any) {
     // Find and update the order with tracking information
     const { data: orders, error: findError } = await supabase
       .from('orders')
-      .select('*')
+      .select('*, order_items (*)')
       .or(`order_number.eq.${orderReferenceId},gelato_order_id.eq.${orderId}`)
       .single();
 
     if (findError || !orders) {
       console.error('Order not found for tracking update:', { orderReferenceId, orderId });
+      return;
+    }
+
+    // Split order: the Gelato parcel's tracking goes in its own columns; our Royal Mail fields stay untouched
+    if (isSplitOrder(orders)) {
+      const nowIso = new Date().toISOString();
+      const fields: Record<string, any> = {
+        ...gelatoSplitTrackingFields(orders, orderItem, nowIso),
+        updated_at: nowIso,
+        metadata: JSON.stringify({
+          ...parseMetadata(orders.metadata),
+          tracking_info: {
+            tracking_code: orderItem?.trackingCode,
+            tracking_url: orderItem?.trackingUrl,
+            shipment_method: orderItem?.shipmentMethodName,
+            fulfillment_country: orderItem?.fulfillmentCountry,
+            facility_id: orderItem?.fulfillmentFacilityId,
+            shipped_at: nowIso
+          }
+        })
+      };
+      let { error: splitError } = await supabase.from('orders').update(fields).eq('id', orders.id);
+      if (splitError && /gelato_tracking|gelato_shipped_at/.test(splitError.message || '')) {
+        const { gelato_tracking_code, gelato_tracking_url, gelato_shipped_at, ...rest } = fields;
+        ({ error: splitError } = await supabase.from('orders').update(rest).eq('id', orders.id));
+      }
+      if (splitError) console.error('Failed to update split order tracking:', splitError);
+      else console.log(`✅ Split order ${orders.order_number}: Gelato tracking recorded`);
       return;
     }
 
@@ -293,6 +341,14 @@ async function handleOrderDeliveryEstimateUpdated(event: any, supabase: any) {
   }
 }
 
+// Metadata is jsonb on some rows and a JSON string on older ones
+function parseMetadata(m: any): Record<string, any> {
+  if (typeof m === 'string') {
+    try { const v = JSON.parse(m); return v && typeof v === 'object' ? v : {}; } catch { return {}; }
+  }
+  return m && typeof m === 'object' ? m : {};
+}
+
 // Map Gelato status to our database status
 function mapGelatoStatusToDbStatus(gelatoStatus: string): string {
   const statusMap: Record<string, string> = {
@@ -321,7 +377,7 @@ function shouldNotifyCustomer(gelatoStatus: string): boolean {
 // Send order status notification to customer
 async function sendOrderStatusNotification(order: any, gelatoStatus: string, supabase: any) {
   try {
-    console.log(`📧 Would send ${gelatoStatus} notification to ${order.customer_email} for order ${order.order_number}`);
+    console.log(`📧 Would send ${gelatoStatus} notification for order ${order.order_number}`);
     
     // TODO: Implement email notification service
     // This would integrate with SendGrid, AWS SES, or similar service
@@ -334,7 +390,7 @@ async function sendOrderStatusNotification(order: any, gelatoStatus: string, sup
 // Send shipping notification with tracking info
 async function sendShippingNotification(order: any, orderItem: any, supabase: any) {
   try {
-    console.log(`📦 Would send shipping notification to ${order.customer_email}:`, {
+    console.log(`📦 Would send shipping notification:`, {
       order_number: order.order_number,
       tracking_code: orderItem.trackingCode,
       tracking_url: orderItem.trackingUrl,

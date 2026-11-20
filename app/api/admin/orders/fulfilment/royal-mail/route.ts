@@ -11,7 +11,7 @@ import { getSetting } from '@/lib/app-settings';
 import { clickAndDropConfigured } from '@/lib/shipping/royal-mail/click-and-drop';
 import { trackingConfigured } from '@/lib/shipping/royal-mail/tracking-api';
 import { makeLabels, planShipment } from '@/lib/shipping/royal-mail/server';
-import { needsPosting } from '@/lib/fulfillment/order-fulfilment';
+import { selfPrintItems } from '@/lib/fulfillment/shared';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     connected: { clickAndDrop: clickAndDropConfigured(), tracking: trackingConfigured() },
     settings,
-    plans: ids.map(id => (data ?? []).find((o: any) => o.id === id)).filter((o: any) => o && needsPosting(o)).map((o: any) => ({
+    plans: ids.map(id => (data ?? []).find((o: any) => o.id === id)).filter((o: any) => o && selfPrintItems(o).length > 0).map((o: any) => ({
       ...planShipment(o, settings),
       name: `${o.shipping_first_name || ''} ${o.shipping_last_name || ''}`.trim(),
       postcode: (o.shipping_postcode || '').toUpperCase(), country: o.shipping_country,

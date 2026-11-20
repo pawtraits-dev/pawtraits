@@ -17,7 +17,9 @@ import type { Order, OrderItem } from '@/lib/types';
 import { DigitalDownloadService } from './digital-download-service';
 import { GelatoFulfillmentService } from './gelato-fulfillment-service';
 import { SelfPrintFulfillmentService } from './self-print-fulfillment-service';
-import { getSetting, type FulfillmentProvider } from '@/lib/app-settings';
+import { getSetting, type FulfillmentMode } from '@/lib/app-settings';
+import { cleanMaterials, cleanMode, postedItems } from './shared';
+import { applySplitRouting, splitColumnsReady } from './split-routing';
 import type { FulfillmentService, FulfillmentResult } from './base-fulfillment-service';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -26,13 +28,13 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 export class FulfillmentRouter {
   private services: FulfillmentService[] = [];
   private supabase: ReturnType<typeof createClient>;
-  private providerOverride?: FulfillmentProvider;
+  private providerOverride?: FulfillmentMode;
 
   /**
    * @param provider who makes the posted prints. Defaults to the admin setting
    *   `default_fulfillment_provider` (self_print unless changed in /admin/orders).
    */
-  constructor(provider?: FulfillmentProvider) {
+  constructor(provider?: FulfillmentMode) {
     this.providerOverride = provider;
 
     this.supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -48,7 +50,12 @@ export class FulfillmentRouter {
     console.log('📦 [Fulfillment Router] Order items:', orderItems.length);
 
     try {
-      const provider = this.providerOverride ?? await getSetting('default_fulfillment_provider');
+      const mode = cleanMode(this.providerOverride ?? await getSetting('default_fulfillment_provider'));
+      if (mode === 'split' && postedItems({ ...order, order_items: orderItems }).length > 0) {
+        if (await splitColumnsReady(this.supabase)) return await this.fulfillSplit(order, orderItems);
+        console.warn('[Fulfillment Router] Split mode needs db/migrations/2026-11-20-foamex-self-print-split.sql: order queued to self-print');
+      }
+      const provider = mode === 'gelato' ? 'gelato' : 'self_print';
       this.services = [
         new DigitalDownloadService(),
         provider === 'gelato' ? new GelatoFulfillmentService() : new SelfPrintFulfillmentService(),
@@ -106,6 +113,49 @@ export class FulfillmentRouter {
         errorDetails: error
       }];
     }
+  }
+
+  /**
+   * Split by material: foamex lines go to the self-print queue, everything else to Gelato.
+   * Downloads are fulfilled as always. The order is updated by applySplitRouting, not updateOrderWithResults.
+   */
+  private async fulfillSplit(order: Order, orderItems: OrderItem[]): Promise<FulfillmentResult[]> {
+    const fulfillmentType = this.determineFulfillmentType(orderItems);
+    console.log('📦 [Fulfillment Router] Fulfillment type:', fulfillmentType, '(split)');
+    await this.updateOrderFulfillmentType(order.id, fulfillmentType);
+
+    const results: FulfillmentResult[] = [];
+    let digitalOk = true;
+    const digital = new DigitalDownloadService();
+    const digitalItems = orderItems.filter(i => digital.canFulfill(i));
+    if (digitalItems.length) {
+      try {
+        const r = await digital.fulfill(order, digitalItems);
+        results.push(r);
+        if (!r.success) digitalOk = false;
+      } catch (error: any) {
+        digitalOk = false;
+        results.push({ success: false, error: error.message, errorDetails: error });
+      }
+    }
+
+    const materials = cleanMaterials(await getSetting('self_print_materials'));
+    const split = await applySplitRouting(this.supabase, order, orderItems, {
+      materials,
+      send: true,
+      sendGelato: (o, its) => new GelatoFulfillmentService().fulfill(o, its as OrderItem[]),
+      digitalOk,
+    });
+
+    if (split.selfPrintIds.length) {
+      results.push({ success: true, trackingInfo: { provider: 'self_print', queuedItems: split.selfPrintIds.length } as any });
+    }
+    if (split.gelato === 'sent') {
+      results.push({ success: true, fulfillmentId: split.gelatoOrderId ?? undefined, trackingInfo: { provider: 'gelato', providerOrderId: split.gelatoOrderId } as any });
+    } else if (split.gelato !== 'none') {
+      results.push({ success: false, error: split.error ?? 'Gelato part not sent' });
+    }
+    return results;
   }
 
   /**

@@ -11,7 +11,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSetting, type RoyalMailSettings } from '@/lib/app-settings';
-import { postedItems, royalMailTrackingUrl, itemTitle } from '@/lib/fulfillment/shared';
+import { selfPrintItems, isSplitOrder, splitStatusFields, royalMailTrackingUrl, itemTitle } from '@/lib/fulfillment/shared';
 import { countryCode } from '@/lib/fulfillment/packing-slips';
 import { shippingZoneFor } from '@/lib/shipping/rates';
 import { heroImage } from '@/lib/messaging/order-email';
@@ -38,7 +38,7 @@ export interface ShipmentPlan { orderId: string; orderNumber: string; format: Fo
 
 /** The parcel for an order (the admin can change it before making the label) */
 export function planShipment(order: any, s: RoyalMailSettings): ShipmentPlan {
-  const items = postedItems(order);
+  const items = selfPrintItems(order);
   const prints = items.reduce((n: number, i: any) => n + (i.quantity || 1), 0);
   const ds = items.map(dims);
   const long = Math.max(0, ...ds.map(d => d.long)), short = Math.max(0, ...ds.map(d => d.short));
@@ -58,7 +58,7 @@ export function planShipment(order: any, s: RoyalMailSettings): ShipmentPlan {
 }
 
 function cdOrder(order: any, plan: { format: Format; grams: number; serviceCode: string }): CDCreateOrder {
-  const items = postedItems(order);
+  const items = selfPrintItems(order);
   const country = countryCode(order.shipping_country) || 'GB';
   const overseas = country !== 'GB';
   const per = Math.max(1, Math.round(plan.grams / Math.max(1, items.reduce((n: number, i: any) => n + (i.quantity || 1), 0))));
@@ -118,7 +118,7 @@ export async function makeLabels(supabase: SupabaseClient, requests: { orderId: 
   for (const r of requests) {
     const order = (orders ?? []).find((o: any) => o.id === r.orderId);
     if (!order) { results.push({ orderId: r.orderId, orderNumber: '?', ok: false, error: 'Order not found' }); continue; }
-    if (!postedItems(order).length) { results.push({ orderId: order.id, orderNumber: order.order_number, ok: false, error: 'Nothing to post' }); continue; }
+    if (!selfPrintItems(order).length) { results.push({ orderId: order.id, orderNumber: order.order_number, ok: false, error: 'Nothing to post' }); continue; }
     if (order.rm_order_identifier) { identifiers.set(order.id, Number(order.rm_order_identifier)); continue; }
     if (!(order.shipping_address_line_1 || order.shipping_address) || !order.shipping_city) { results.push({ orderId: order.id, orderNumber: order.order_number, ok: false, error: 'No delivery address' }); continue; }
     const plan = { ...planShipment(order, s), ...(r.format ? { format: r.format } : {}), ...(r.grams ? { grams: Math.round(r.grams) } : {}), ...(r.serviceCode !== undefined ? { serviceCode: r.serviceCode } : {}) };
@@ -206,7 +206,7 @@ async function notifyStage(supabase: SupabaseClient, order: any, stage: Tracking
       tracking_number: order.tracking_number || '',
       tracking_url: order.tracking_url || (order.tracking_number ? royalMailTrackingUrl(order.tracking_number) : ''),
       order_url: `${baseUrl}/orders/${order.id}`,
-      hero_image_url: heroImage(order.order_items ?? []).url,
+      hero_image_url: heroImage(isSplitOrder(order) ? selfPrintItems(order) : order.order_items ?? []).url,
     },
     priority: 'high',
   } as any);
@@ -248,7 +248,10 @@ export async function refreshTracking(supabase: SupabaseClient, orderId: string)
   if (e2) throw new Error(e2.message);
   if (stage === 'delivered' && order.status !== 'delivered') {
     // Not every database allows 'delivered' as an order status: ignore if it doesn't
-    await supabase.from('orders').update({ status: 'delivered', fulfillment_status: 'delivered' }).eq('id', orderId).then(() => null, () => null);
+    const deliveredFields = isSplitOrder(order)
+      ? splitStatusFields({ ...order, delivered_at: order.delivered_at || t.deliveredAt || now })
+      : { status: 'delivered', fulfillment_status: 'delivered' };
+    if (Object.keys(deliveredFields).length) await supabase.from('orders').update(deliveredFields).eq('id', orderId).then(() => null, () => null);
   }
 
   // First scan and it was never marked posted (label made, posted later): mark it now

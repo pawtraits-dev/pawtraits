@@ -6,7 +6,7 @@
  */
 
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage, PDFImage } from 'pdf-lib';
-import { postedItems, describeOrderItem, itemTitle, itemRef } from './shared';
+import { selfPrintItems, describeOrderItem, itemTitle, itemRef } from './shared';
 import { qrMatrix } from '@/lib/qr/render';
 import { referralCopy } from '@/lib/referrals/text';
 import { DEFAULT_REFERRAL_RATES, type ReferralRates } from '@/lib/referrals/rates';
@@ -178,7 +178,7 @@ export async function generatePackingSlips(orders: any[], opts: PackingSlipOptio
   // Thumbnails (one fetch per distinct image)
   const images = new Map<string, PDFImage | null>();
   const urls = new Set<string>();
-  for (const o of orders) for (const i of postedItems(o)) { const u = thumbUrl(i.image_url); if (u) urls.add(u); }
+  for (const o of orders) for (const i of selfPrintItems(o)) { const u = thumbUrl(i.image_url); if (u) urls.add(u); }
   await Promise.all(Array.from(urls).map(async u => {
     const bytes = await fetchImage(u);
     if (!bytes) return images.set(u, null);
@@ -204,7 +204,7 @@ function drawPickSummary(pdf: PDFDocument, orders: any[], regular: PDFFont, bold
 
   // Blanks needed by product
   const byProduct = new Map<string, number>();
-  for (const o of orders) for (const i of postedItems(o)) {
+  for (const o of orders) for (const i of selfPrintItems(o)) {
     const key = describeOrderItem(i);
     byProduct.set(key, (byProduct.get(key) || 0) + (i.quantity || 1));
   }
@@ -226,7 +226,7 @@ function drawPickSummary(pdf: PDFDocument, orders: any[], regular: PDFFont, bold
   page.drawText('Qty', { x: cols[4], y, size: 8, font: bold, color: GREY });
   y -= mm(5);
   for (const o of orders) {
-    postedItems(o).forEach((item, idx) => {
+    selfPrintItems(o).forEach((item, idx) => {
       if (y < mm(20)) return; // one page summary; the per-order slips have everything
       checkbox(page, cols[0], y - 1, mm(3.5));
       page.drawText(safe(itemRef(o, idx)), { x: cols[1], y, size: 9, font: bold, color: BLACK });
@@ -294,7 +294,7 @@ function drawSlip(pdf: PDFDocument, order: any, regular: PDFFont, bold: PDFFont,
   // With the referral panel the footer message moves up 22 mm; four items still fit (the fourth ends at about 65 mm)
   const referral = opts.referrals?.get(order.id) ?? null;
   const itemsFloor = referral ? mm(64) : mm(40);
-  const items = postedItems(order);
+  const items = selfPrintItems(order);
   items.forEach((item, idx) => {
     if (y - rowH < itemsFloor) return; // keep space for the footer; very large orders continue on the pick list
     const top = y;
@@ -367,7 +367,7 @@ function csvCell(v: unknown): string {
 
 export function clickAndDropCsv(orders: any[]): string {
   const rows = orders.map(order => {
-    const items = postedItems(order);
+    const items = selfPrintItems(order);
     const contents = items.map(i => `${i.quantity || 1} x ${describeOrderItem(i)} print`).join('; ');
     const itemCount = items.reduce((n, i) => n + (i.quantity || 1), 0);
     return [
