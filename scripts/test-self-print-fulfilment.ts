@@ -190,6 +190,17 @@ const t = async (name: string, fn: () => any) => { await fn(); n++; console.log(
     fs.writeFileSync(process.env.SLIP_OUT || '/tmp/packing-slips-test.pdf', bytes);
   });
 
+  await t('packing slips PDF: a split order gets one page and does not throw', async () => {
+    const o = { ...order('12', { gelato_order_id: 'G-12' }), order_items: [
+      print('s1', '12', { fulfillment_provider: 'self_print', product_data: { product_type: 'physical_print', size_name: 'Medium', width_cm: 20, height_cm: 30, medium: { name: 'Foamex', slug: 'foamex' } } }),
+      print('s2', '12', { fulfillment_provider: 'gelato', product_data: { product_type: 'physical_print', medium: { name: 'Mug', slug: 'mug' } } }),
+    ] };
+    assert.equal(sh.isSplitOrder(o), true);
+    const { PDFDocument } = require('pdf-lib');
+    const doc = await PDFDocument.load(await generatePackingSlips([o], { returnAddress: 'Pawtraits, 1 Example Street, London NW6 1AA' }));
+    assert.equal(doc.getPageCount(), 1);
+  });
+
   // ================= split by material =================
   const line = (id: string, orderId: string, slug: string, extra: any = {}, pd: any = {}) => print(id, orderId, {
     product_data: { product_type: 'physical_print', size_name: 'Medium', width_cm: 20, height_cm: 30, medium: { name: slug, slug }, gelato_sku: 'g-' + slug, ...pd },
@@ -519,6 +530,24 @@ const t = async (name: string, fn: () => any) => { await fn(); n++; console.log(
     assert.equal(f.gelato_tracking_code, 'T1'); assert.equal(f.gelato_tracking_url, 'https://track.example/T1'); assert.equal(f.gelato_status, 'shipped');
     assert.equal(sr.gelatoSplitTrackingFields({ status: 'confirmed' }, { trackingUrl: 'javascript:alert(1)' }, 'n').gelato_tracking_url, null);
     assert.equal(sr.gelatoSplitTrackingFields({ status: 'cancelled' }, {}, 'n').status, undefined);
+  });
+
+  console.log('Gelato webhook: whole-order statuses the database accepts');
+  await t('raw Gelato statuses become values the CHECK allows', () => {
+    const allowed = ['pending', 'processing', 'shipped', 'delivered', 'error'];
+    for (const raw of ['created', 'uploading', 'passed', 'in_production', 'printed', 'shipped', 'in_transit', 'delivered', 'failed', 'canceled', 'cancelled', 'on_hold', 'something_new', undefined]) {
+      assert.ok(allowed.includes(sr.gelatoWholeOrderStatusFields(raw).gelato_status), String(raw));
+    }
+    assert.equal(sr.gelatoWholeOrderStatusFields('created').gelato_status, 'pending');
+    assert.equal(sr.gelatoWholeOrderStatusFields('canceled').gelato_status, 'error');
+  });
+  await t('orders.status only gets values the app already uses', () => {
+    const used = ['confirmed', 'processing', 'printing', 'printed', 'shipped', 'in_transit', 'delivered', 'fulfillment_error', 'cancelled', 'on_hold'];
+    for (const raw of ['created', 'uploading', 'passed', 'in_production', 'printed', 'shipped', 'in_transit', 'delivered', 'failed', 'canceled', 'cancelled', 'on_hold', 'something_new', undefined]) {
+      assert.ok(used.includes(sr.gelatoWholeOrderStatusFields(raw).status), String(raw));
+    }
+    assert.equal(sr.gelatoWholeOrderStatusFields('canceled').status, 'cancelled');
+    assert.equal(sr.gelatoWholeOrderStatusFields('delivered').status, 'delivered');
   });
 
   console.log(`\n${n} checks passed`);

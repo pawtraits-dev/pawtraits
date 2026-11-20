@@ -187,6 +187,31 @@ export function gelatoStatusForColumn(s: unknown): 'pending' | 'processing' | 's
   }
 }
 
+/**
+ * Gelato's raw order status mapped to an orders.status value the rest of the app already uses
+ * (the admin order pages and the Stripe webhook). Used for orders that are not split.
+ */
+export function gelatoStatusForOrder(s: unknown): string {
+  switch (String(s ?? '').toLowerCase()) {
+    case 'created': case 'passed': return 'confirmed';
+    case 'uploading': return 'processing';
+    case 'in_production': return 'printing';
+    case 'printed': return 'printed';
+    case 'shipped': return 'shipped';
+    case 'in_transit': return 'in_transit';
+    case 'delivered': return 'delivered';
+    case 'failed': return 'fulfillment_error';
+    case 'canceled': case 'cancelled': return 'cancelled';
+    case 'on_hold': return 'on_hold';
+    default: return 'processing';
+  }
+}
+
+/** The orders columns to write for a Gelato order status on a non-split order (pure). */
+export function gelatoWholeOrderStatusFields(rawStatus: unknown): { gelato_status: string; status: string } {
+  return { gelato_status: gelatoStatusForColumn(rawStatus), status: gelatoStatusForOrder(rawStatus) };
+}
+
 export function gelatoSplitStatusFields(dbOrder: any, rawStatus: unknown): Record<string, any> {
   const mapped = gelatoStatusForColumn(rawStatus);
   return {

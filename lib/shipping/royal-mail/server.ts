@@ -250,7 +250,7 @@ export async function refreshTracking(supabase: SupabaseClient, orderId: string)
     // Not every database allows 'delivered' as an order status: ignore if it doesn't
     const deliveredFields = isSplitOrder(order)
       ? splitStatusFields({ ...order, delivered_at: order.delivered_at || t.deliveredAt || now })
-      : { status: 'delivered', fulfillment_status: 'delivered' };
+      : { status: 'delivered', fulfillment_status: 'fulfilled' };
     if (Object.keys(deliveredFields).length) await supabase.from('orders').update(deliveredFields).eq('id', orderId).then(() => null, () => null);
   }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import { isSplitOrder } from '@/lib/fulfillment/shared';
-import { gelatoSplitStatusFields, gelatoSplitTrackingFields } from '@/lib/fulfillment/split-routing';
+import { gelatoSplitStatusFields, gelatoSplitTrackingFields, gelatoWholeOrderStatusFields } from '@/lib/fulfillment/split-routing';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -11,9 +11,9 @@ const gelatoWebhookSecret = process.env.GELATO_WEBHOOK_SECRET!;
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
-    const signature = headers().get('x-gelato-signature');
+    const signature = (await headers()).get('x-gelato-signature');
 
-    // Verify webhook signature (if Gelato provides one)
+    // NOTE: the signature is read but NOT verified (no verification scheme exists yet)
     if (gelatoWebhookSecret && signature) {
       // Implement signature verification based on Gelato's webhook security
       // This would be similar to Stripe's signature verification
@@ -110,17 +110,18 @@ async function handleOrderStatusUpdated(event: any, supabase: any) {
       return;
     }
 
-    const newStatus = mapGelatoStatusToDbStatus(order.status);
+    // gelato_status only accepts pending|processing|shipped|delivered|error, so Gelato's raw status is mapped
+    const { gelato_status: newGelatoStatus, status: newStatus } = gelatoWholeOrderStatusFields(order.status);
 
     // Update order status in database
     const { error: updateError } = await supabase
       .from('orders')
       .update({
-        gelato_status: order.status,
+        gelato_status: newGelatoStatus,
         status: newStatus,
         updated_at: new Date().toISOString(),
         metadata: JSON.stringify({
-          ...JSON.parse(dbOrder.metadata || '{}'),
+          ...parseMetadata(dbOrder.metadata),
           last_gelato_update: new Date().toISOString(),
           gelato_fulfillment_status: order.fulfillmentStatus
         })
@@ -259,13 +260,13 @@ async function handleOrderItemTrackingUpdated(event: any, supabase: any) {
     const trackingData = {
       tracking_code: orderItem.trackingCode,
       tracking_url: orderItem.trackingUrl,
-      carrier_name: orderItem.shipmentMethodName,
+      carrier: orderItem.shipmentMethodName,
       shipped_at: new Date().toISOString(),
       status: 'shipped',
       gelato_status: 'shipped',
       updated_at: new Date().toISOString(),
       metadata: JSON.stringify({
-        ...JSON.parse(orders.metadata || '{}'),
+        ...parseMetadata(orders.metadata),
         tracking_info: {
           tracking_code: orderItem.trackingCode,
           tracking_url: orderItem.trackingUrl,
@@ -347,25 +348,6 @@ function parseMetadata(m: any): Record<string, any> {
     try { const v = JSON.parse(m); return v && typeof v === 'object' ? v : {}; } catch { return {}; }
   }
   return m && typeof m === 'object' ? m : {};
-}
-
-// Map Gelato status to our database status
-function mapGelatoStatusToDbStatus(gelatoStatus: string): string {
-  const statusMap: Record<string, string> = {
-    'created': 'confirmed',
-    'uploading': 'processing',
-    'passed': 'confirmed',
-    'in_production': 'printing',
-    'printed': 'printed',
-    'shipped': 'shipped',
-    'in_transit': 'in_transit',
-    'delivered': 'delivered',
-    'failed': 'fulfillment_error',
-    'canceled': 'cancelled',
-    'on_hold': 'on_hold'
-  };
-  
-  return statusMap[gelatoStatus] || 'processing';
 }
 
 // Determine if customer should be notified for this status change
