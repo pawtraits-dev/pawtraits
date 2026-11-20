@@ -59,6 +59,10 @@ const rates = { friendPct: 15, referrerPct: 5 };
   eq(sizeCodeOf('FOAM-PRINT-S'), 'S', 'S');
   eq(sizeCodeOf('MUG-11OZ'), '', 'unknown');
   eq(sizeCodeOf(null), '', 'null product id');
+  // Real order lines: product_id is the product's uuid, product_data is the products row
+  eq(sizeCodeOf({ product_id: '6f1c2a3b-0000-4000-8000-000000000000', product_data: { size_code: 'm', sku: 'FOAM-PRINT-M' } }), 'M', 'size_code from product_data');
+  eq(sizeCodeOf({ product_id: '6f1c2a3b-0000-4000-8000-000000000000', product_data: JSON.stringify({ sku: 'ART-PAPER-XL' }) }), 'XL', 'sku from JSON-string product_data');
+  eq(sizeCodeOf({ product_id: '6f1c2a3b-0000-4000-8000-000000000000', product_data: { sku: 'MUG-11OZ' } }), '', 'uuid product, no size');
   eq(sizeTextOf(item('a')), '20×30 cm', 'object product_data');
   eq(sizeTextOf(item('a', { product_data: JSON.stringify({ width_cm: 30, height_cm: 40 }) })), '30×40 cm', 'JSON string product_data');
   const bare = item('a', { product_data: { product_type: 'physical_print', medium: { name: 'Foamex' }, size_name: 'Medium' } });

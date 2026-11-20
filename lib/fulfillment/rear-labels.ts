@@ -27,10 +27,24 @@ function asObject(v: any): any {
   try { return JSON.parse(v) ?? {}; } catch { return {}; }
 }
 
-/** "FOAM-PRINT-M" → "M"; anything else → "" */
-export function sizeCodeOf(productId: unknown): string {
-  const last = String(productId ?? '').split('-').pop()?.trim().toUpperCase() ?? '';
-  return SIZE_CODES.includes(last) ? last : '';
+/**
+ * The size letter for the label: the product's own size_code (order_items.product_data is the products row,
+ * so real orders carry it there; order_items.product_id is the product's uuid), else the last part of its
+ * sku ("FOAM-PRINT-M" → "M"), else the last part of a code passed directly. Anything else → "".
+ */
+export function sizeCodeOf(itemOrCode: unknown): string {
+  const pick = (v: unknown) => {
+    const last = String(v ?? '').split('-').pop()?.trim().toUpperCase() ?? '';
+    return SIZE_CODES.includes(last) ? last : '';
+  };
+  if (itemOrCode && typeof itemOrCode === 'object') {
+    const item = itemOrCode as any;
+    const p = asObject(item.product_data);
+    const own = String(p.size_code ?? '').trim().toUpperCase();
+    if (SIZE_CODES.includes(own)) return own;
+    return pick(p.sku) || pick(item.product_id);
+  }
+  return pick(itemOrCode);
 }
 
 /** "20×30 cm" from the product data, else the packing slip's description */
@@ -63,7 +77,7 @@ export function buildRearLabels(
       const label: PrintLabel = {
         title: itemTitle(item),
         kicker: kickerFor(extras.petNames?.get(item.id)),
-        sizeCode: sizeCodeOf(item.product_id),
+        sizeCode: sizeCodeOf(item),
         sizeText: sizeTextOf(item),
         ref: itemRef(order, index),
         qrUrl: referral ? referral.shareUrl : SITE_URL,
