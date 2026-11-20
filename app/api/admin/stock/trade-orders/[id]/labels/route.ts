@@ -1,7 +1,7 @@
 /**
  * POST /api/admin/stock/trade-orders/[id]/labels → PDF of print labels (A4, 21 per sheet,
  * 70 × 38.14 mm, 21 per A4, 15 mm strips top and bottom, no gaps): one label per print in the order, in the same order as the
- * print files. body: { locationCode?: string, startPosition?: 1–21, showGuides?: boolean, cta?: string,
+ * print files (size, then dogs before cats, then breed). body: { locationCode?: string, startPosition?: 1–21, showGuides?: boolean, cta?: string,
  *   perPrint?: 1 | 2 }  (2, the default: a front and a back label for each print, side by side)
  * The QR is the stall sticker link for the design and size (and the stall, when given).
  */
@@ -10,7 +10,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
 import { buildStickerUrl, getShortLinkBase, normaliseLocationCode, STICKER_SIZES, type StickerSize } from '@/lib/qr/sticker-url';
 import { generatePrintLabels, type PrintLabel } from '@/lib/stock/print-labels';
-import { designInfo, isTradeSize, linePrint, sourcePx, TRADE_SIZES } from '@/lib/stock/trade-prints';
+import { designInfo, isTradeSize, linePrint, sortTradeLines, sourcePx, TRADE_SIZES } from '@/lib/stock/trade-prints';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -44,14 +44,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { data: order } = await supabase.from('trade_print_orders').select('id, ref').eq('id', id).maybeSingle();
   if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   // Same order as the print files
-  const { data: lines } = await supabase.from('trade_print_order_lines').select('*').eq('order_id', id).order('size').order('created_at');
-  if (!lines?.length) return NextResponse.json({ error: 'Add some prints first' }, { status: 400 });
+  const { data: rows } = await supabase.from('trade_print_order_lines').select('*').eq('order_id', id).order('created_at');
+  if (!rows?.length) return NextResponse.json({ error: 'Add some prints first' }, { status: 400 });
 
-  const ids = Array.from(new Set(lines.map(l => l.image_id)));
+  const ids = Array.from(new Set(rows.map(l => l.image_id)));
   const [info, { data: refs }] = await Promise.all([
     designInfo(supabase, ids),
     supabase.from('image_catalog').select('id, stock_ref').in('id', ids),
   ]);
+  const lines = sortTradeLines(rows, info);   // same order as the print files: size, dogs/cats, breed
   const refOf = new Map((refs ?? []).map(r => [r.id, r.stock_ref as number]));
   const thumbs = new Map<string, Uint8Array>();
   await Promise.all(ids.map(async i => { const b = await thumbnail(info.get(i)?.publicId ?? null); if (b) thumbs.set(i, b); }));
