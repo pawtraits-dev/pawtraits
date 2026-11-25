@@ -59,8 +59,12 @@ export async function PATCH(request: NextRequest) {
   if (body.location_type && !TYPES.includes(body.location_type)) {
     return NextResponse.json({ error: 'Invalid location type' }, { status: 400 });
   }
+  if ('name' in body && !(typeof body.name === 'string' && body.name.trim())) {
+    return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+  }
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  for (const k of EDITABLE) if (k in body) updates[k] = body[k];
+  for (const k of EDITABLE) if (k in body) updates[k] = typeof body[k] === 'string' ? body[k].trim() || null : body[k];
+  if ('name' in updates) updates.name = String(body.name).trim();
 
   const { data, error } = await serviceClient().from('stock_locations').update(updates).eq('id', body.id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
