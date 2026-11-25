@@ -2,7 +2,7 @@
  * Rear labels for customer prints (pure: no database, no network). One small label per unit we post,
  * stuck on the back of the print: which Pawtrait it is, the pet's name when known, and the customer's
  * own referral QR ("Give 10%, get 10%"). Drawn by generatePrintLabels (lib/stock/print-labels.ts) on the
- * same A4 21-up sheet as the stall-stock labels.
+ * same CL2163 sheet (63.5 × 38.1 mm, 21 up, black ink) as the stall-stock labels.
  */
 import { selfPrintItems, describeOrderItem, itemTitle, itemRef } from './shared';
 import { referralCopy, SITE_URL } from '@/lib/referrals/text';
@@ -14,6 +14,8 @@ export interface RearLabelReferral { code: string; shareUrl: string }
 export interface RearLabelExtras {
   /** order_items.id → the customer's pet name (null/absent when unknown) */
   petNames?: Map<string, string | null> | null;
+  /** order_items.id → the pet's breed name (null/absent when unknown; the label then shows the title) */
+  breeds?: Map<string, string | null> | null;
   /** order_items.id → resolved Cloudinary public id (null/absent when none) */
   publicIds?: Map<string, string | null> | null;
 }
@@ -76,12 +78,14 @@ export function buildRearLabels(
       if (publicId) thumbKeys.set(publicId, publicId);
       const label: PrintLabel = {
         title: itemTitle(item),
+        breed: extras.breeds?.get(item.id) ?? null,
         kicker: kickerFor(extras.petNames?.get(item.id)),
         sizeCode: sizeCodeOf(item),
         sizeText: sizeTextOf(item),
         ref: itemRef(order, index),
         qrUrl: referral ? referral.shareUrl : SITE_URL,
         cta: referral ? `${referralCopy(rates).heading}. Scan to share, or give a friend code ${referral.code}` : FALLBACK_CTA,
+        ctaMaxLines: 2,
         thumbnailKey: publicId,
       };
       const n = Math.max(1, Math.floor(Number(item.quantity) || 1));

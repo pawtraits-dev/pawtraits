@@ -1,14 +1,14 @@
 /**
  * Checks for rear labels (lib/fulfillment/rear-labels.ts) and the label sheet drawing (lib/stock/print-labels.ts).
  * No network, no database. Run: npx tsx scripts/test-rear-labels.ts
- * Also writes Claude outputs/rear-labels-sample.pdf when run with --sample.
+ * With --sample, also writes tmp-sample.pdf (a 6-label sheet with guides, from the mock-up) for a visual check.
  */
 export {};
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { buildRearLabels, sizeCodeOf, sizeTextOf } = require('../lib/fulfillment/rear-labels');
 const { itemRef, describeOrderItem } = require('../lib/fulfillment/shared');
-const { generatePrintLabels } = require('../lib/stock/print-labels');
+const { generatePrintLabels, CL2163 } = require('../lib/stock/print-labels');
 const { SITE_URL } = require('../lib/referrals/text');
 
 let passed = 0;
@@ -89,6 +89,23 @@ const rates = { friendPct: 15, referrerPct: 5 };
   eq(none.cta, 'Scan to put your own pet in a Pawtrait', 'fallback CTA');
 }
 
+// breed
+{
+  const o = { id: 'o', order_number: 'PW-9', order_items: [item('a'), item('b')] };
+  const r = buildRearLabels([o], null, rates, { breeds: new Map([['a', 'Cocker Spaniel']]) }).labels;
+  eq(r[0].breed, 'Cocker Spaniel', 'breed passed through');
+  eq(r[1].breed, null, 'missing breed is null (the label then shows the title)');
+  eq(r[1].title, 'Game Day Glory', 'title kept for the fallback');
+  eq(buildRearLabels([o], null, rates).labels[0].breed, null, 'no breed map');
+  eq(r[0].ctaMaxLines, 2, 'rear labels may wrap to two lines');
+}
+
+// sheet
+{
+  eq([CL2163.labelWidthMm, CL2163.labelHeightMm, CL2163.marginTopMm, CL2163.marginLeftMm, CL2163.gapXMm, CL2163.gapYMm, CL2163.cornerRadiusMm, CL2163.columns, CL2163.rows],
+    [63.5, 38.1, 15.15, 7.75, 2, 0, 1.5, 3, 7], 'CL2163 measurements');
+}
+
 // thumbnails
 {
   const o = { id: 'o', order_number: 'PW-9', order_items: [item('a'), item('b')] };
@@ -107,17 +124,30 @@ const rates = { friendPct: 15, referrerPct: 5 };
   ok(a.length > 1000 && Buffer.from(a.slice(0, 5)).toString() === '%PDF-', 'rear labels PDF');
   const stall = await generatePrintLabels([{ title: 'Game Day Glory', sizeCode: 'M', sizeText: '20×30 cm', qrUrl: 'https://pawtraits.pics/S/1M' }]);
   ok(stall.length > 1000, 'stall-style label PDF');
+  const noBreed = await generatePrintLabels([{ title: 'Game Day Glory', breed: '', sizeCode: '', sizeText: '20×30 cm', qrUrl: 'https://pawtraits.pics/S/1M' }]);
+  ok(noBreed.length > 1000, 'no breed and no size code still draws');
+  const withBreed = await generatePrintLabels([{ title: 'T', breed: 'Cavalier King Charles Spaniel', kicker: 'MADE FOR SIR WIGGLESWORTH', sizeCode: 'XL', sizeText: '40×60 cm', qrUrl: 'https://pawtraits.pics/S/1', cta: 'Scan to purchase, or Pawsonalise with your own pet' }], { showGuides: true });
+  ok(withBreed.length > 1000, 'long breed, long kicker, XL, guides');
   const empty = await generatePrintLabels([]);
   ok(empty.length > 500, 'empty sheet');
   if (process.argv.includes('--sample')) {
+    const stallCta = 'Scan to purchase, or Pawsonalise with your own pet';
+    const share = (c: string) => `Give 10%, get 10%. Scan to share, or give a friend code ${c}`;
+    const rearCta = (c: string) => ({ cta: share(c), ctaMaxLines: 2 });
+    const mk = (n: number) => { try { return new Uint8Array(fs.readFileSync(`/tmp/thumb${n}.jpg`)); } catch { return null; } };
+    const thumbnails = new Map<string, Uint8Array>();
+    [0, 1, 2].forEach(n => { const b = mk(n); if (b) thumbnails.set(`t${n}`, b); });
+    const t = (n: number) => (thumbnails.has(`t${n}`) ? `t${n}` : null);
     const sample = [
-      { ...rear[0] },
-      { title: 'Game Day Glory', kicker: 'PAWTRAITS', sizeCode: 'M', sizeText: '20×30 cm', ref: 'PW-1235-1', qrUrl: 'https://pawtraits.pics', cta: 'Scan to put your own pet in a Pawtrait' },
-      { title: 'Sir Barksalot of the Royal Garden Party and Tea', kicker: 'MADE FOR MR WHISKERS', sizeCode: 'L', sizeText: '30×40 cm', ref: 'PW-1236-3', qrUrl: 'https://pawtraits.pics/c/WHISKERS', cta: 'Give 10%, get 10%. Scan to share, or give a friend code WHISKERS' },
-      { title: 'Cosmic Corgi', kicker: 'MADE FOR DAISY', sizeCode: 'XL', sizeText: '40×60 cm', ref: 'PW-1237-1', qrUrl: 'https://pawtraits.pics/c/DAISY22', cta: 'Give 10%, get 10%. Scan to share, or give a friend code DAISY22' },
+      { title: 'x', breed: 'Labrador Retriever', kicker: 'PAWTRAITS', sizeCode: 'M', sizeText: '20×30 cm', qrUrl: 'https://pawtraits.pics/S/1123M/CAMDEN', thumbnailKey: t(0) },
+      { title: 'x', breed: 'Cavalier King Charles Spaniel', kicker: 'PAWTRAITS', sizeCode: 'XL', sizeText: '40×60 cm', qrUrl: 'https://pawtraits.pics/S/1187', thumbnailKey: t(2) },
+      { title: 'x', breed: 'British Shorthair', kicker: 'PAWTRAITS', sizeCode: 'S', sizeText: '15×20 cm', qrUrl: 'https://pawtraits.pics/S/1204S/CAMDEN', thumbnailKey: t(1) },
+      { title: 'x', breed: 'Cocker Spaniel', kicker: 'MADE FOR BISCUIT', sizeCode: 'M', sizeText: '20×30 cm', ref: 'PW-1234-1', qrUrl: 'https://pawtraits.pics/c/STEVK8M2PQ7X', ...rearCta('STEVK8M2PQ7X'), thumbnailKey: t(2) },
+      { title: 'x', breed: 'Maine Coon', kicker: 'PAWTRAITS', sizeCode: 'S', sizeText: '15×20 cm', ref: 'PW-1235-1', qrUrl: 'https://pawtraits.pics', cta: 'Scan to put your own pet in a Pawtrait', ctaMaxLines: 2, thumbnailKey: t(1) },
+      { title: 'x', breed: 'Staffordshire Bull Terrier', kicker: 'MADE FOR SIR WIGGLESWORTH', sizeCode: 'L', sizeText: '30×40 cm', ref: 'PW-1236-2', qrUrl: 'https://pawtraits.pics/c/SIRW3K9ZP2QA', ...rearCta('SIRW3K9ZP2QA'), thumbnailKey: t(0) },
     ];
-    fs.mkdirSync('Claude outputs', { recursive: true });
-    fs.writeFileSync('Claude outputs/rear-labels-sample.pdf', await generatePrintLabels(sample, { showGuides: true }));
+    // the first three are stall labels: the default call to action, one line
+    fs.writeFileSync('tmp-sample.pdf', await generatePrintLabels(sample, { showGuides: true, cta: stallCta, thumbnails }));
   }
   console.log(`rear-labels: ${passed} passed`);
 })().catch(e => { console.error(e); process.exit(1); });
