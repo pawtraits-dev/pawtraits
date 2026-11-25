@@ -1,6 +1,6 @@
 /** Run: npx tsx scripts/test-browse-params.ts — unit tests for lib/catalog/browse-params.ts (URL -> filters -> designs query) */
 import {
-  browseApiParamsFromKey, browseGridKey, browseGridVisible, browseStateFromGetter, browseStateFromRecord, browseUrlFor,
+  browseApiParamsFromKey, browseGridKey, browseGridVisible, browseStateFromGetter, browseStateFromRecord, browseUrlFor, breedBrowseHref,
 } from '../lib/catalog/browse-params';
 
 let failed = 0;
@@ -60,6 +60,12 @@ eq('url: type=all is dropped', browseUrlFor(state('type=all')), '/browse');
 eq('api: empty key is page 1 of everything', browseApiParamsFromKey('', 1, 24), { page: 1, limit: 24, breed: null, theme: null, animal: null, search: null, breedName: null });
 eq('api: full key', browseApiParamsFromKey(`breed=${B}&theme=${T}&animal=cat&search=x&breedName=lab`, 2, 24), { page: 2, limit: 24, breed: B, theme: T, animal: 'cat', search: 'x', breedName: 'lab' });
 eq('api: encoded text survives the round trip', browseApiParamsFromKey(browseGridKey(state(`breed=${B}&search=caf%C3%A9%20%26%20co`)), 1, 24).search, 'café & co');
+
+// One-click "all designs of this breed" link from the design page
+eq('breed link: dog', breedBrowseHref(B, 'dog'), `/browse?type=dogs&breed=${B}`);
+eq('breed link: cat', breedBrowseHref(B, 'cat'), `/browse?type=cats&breed=${B}`);
+eq('breed link: unknown animal defaults to dogs', breedBrowseHref(B, null), `/browse?type=dogs&breed=${B}`);
+eq('breed link: opens the breed grid', browseGridVisible(state(breedBrowseHref(B, 'cat').split('?')[1])), true);
 
 console.log(failed ? `\n${failed} FAILED` : '\nAll passed');
 process.exit(failed ? 1 : 0);

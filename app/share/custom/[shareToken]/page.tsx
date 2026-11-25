@@ -143,7 +143,7 @@ export default async function SharedPortraitPage({ params }: Props) {
             <Link href="/browse" className="mt-3 flex h-12 w-full items-center justify-center rounded-xl border-2 border-purple-200 font-semibold text-purple-800 hover:border-purple-400">
               Browse all designs
             </Link>
-            <p className="mt-3 text-center text-sm text-gray-500">Printed on rigid Foamex and sent tracked, or as an instant download.</p>
+            <p className="mt-3 text-center text-sm text-gray-500">Printed on eco-friendly recycled Foamex and sent tracked, or as an instant download.</p>
           </section>
 
           <QuizPromo source="shared-portrait" />

@@ -104,3 +104,8 @@ export function browseApiParamsFromKey(key: string, page = 1, limit = BROWSE_PAG
     breedName: qs.get('breedName'),
   };
 }
+
+/** One-click link to every design of a breed: /browse?type=dogs|cats&breed=<id> (dogs when the animal is unknown) */
+export function breedBrowseHref(breedId: string, animalType?: 'dog' | 'cat' | string | null): string {
+  return browseUrlFor({ tab: animalType === 'cat' ? 'cats' : 'dogs', breed: breedId, theme: '', search: '' });
+}
