@@ -12,11 +12,12 @@ import { designTitle } from '@/lib/text/plain';
 import { PetsBadge } from '@/components/collections/DesignGrid';
 import { collectionHref } from '@/lib/collections/href';
 import { mergeMoreLikeThis, needsFallback } from '@/lib/catalog/more-like-this';
+import { breedBrowseHref } from '@/lib/catalog/browse-params';
 
 interface Item { id: string; description?: string; public_url?: string; image_url?: string; subject_count?: number }
 
-export default function MoreLikeThis({ imageId, breedId, collection, tag, max = 4 }: {
-  imageId: string; breedId?: string | null; collection?: { path: string; name: string } | null; tag?: string | null; max?: number;
+export default function MoreLikeThis({ imageId, breedId, breedName, animalType, collection, tag, max = 4 }: {
+  imageId: string; breedId?: string | null; breedName?: string | null; animalType?: string | null; collection?: { path: string; name: string } | null; tag?: string | null; max?: number;
 }) {
   const [items, setItems] = useState<Item[] | null>(null);
 
@@ -47,13 +48,19 @@ export default function MoreLikeThis({ imageId, breedId, collection, tag, max = 
     return () => { cancelled = true; };
   }, [imageId, breedId, collection?.path, tag, max]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!items || items.length === 0) return null;
+  // One click to every design of this breed, else the collection, else everything
+  const seeAll = breedId && breedName
+    ? { href: breedBrowseHref(breedId, animalType), label: `All ${breedName} designs` }
+    : collection ? { href: collectionHref(collection.path), label: `More ${collection.name}` } : { href: '/browse', label: 'See all' };
+  const seeAllLink = <Link href={seeAll.href} className="text-sm font-semibold text-purple-700">{seeAll.label}</Link>;
+
+  if (!items || items.length === 0) return breedId && breedName ? <p className="mt-8 text-center">{seeAllLink}</p> : null;
 
   return (
     <section aria-labelledby="more-heading" className="mt-8">
       <div className="mb-3 flex items-baseline justify-between">
         <h2 id="more-heading" className="text-lg font-bold text-gray-900">More like this</h2>
-        <Link href={collection ? collectionHref(collection.path) : '/browse'} className="text-sm font-semibold text-purple-700">{collection ? `More ${collection.name}` : 'See all'}</Link>
+        {seeAllLink}
       </div>
       <div className="grid grid-cols-2 gap-x-3 gap-y-5">
         {items.map(img => (

@@ -172,7 +172,7 @@ function HomePageContent({ hero }: { hero: FeedItem | null }) {
           {[
             ['Pick a design', 'Royal Pawtraits, black-tie evenings, birthday chaos and more.'],
             ['Add a photo of your pet', 'Face on, good light. Your free preview is ready in about a minute.'],
-            ['We print and post it', 'Printed on rigid Foamex and sent tracked, with a bonus digital copy.'],
+            ['We print and post it', 'Printed on eco-friendly recycled Foamex and sent tracked, with a bonus digital copy.'],
           ].map(([t, d], i) => (
             <li key={t} className="flex items-start gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-100 font-bold text-purple-800">{i + 1}</span>

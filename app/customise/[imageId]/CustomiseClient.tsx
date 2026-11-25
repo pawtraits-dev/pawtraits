@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { breedBrowseHref } from '@/lib/catalog/browse-params';
 import { ArrowLeft, ArrowLeftRight, Camera, ImagePlus, Sparkles, ShoppingBag, Share2, RotateCcw, Check, X, ChevronDown } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import UserAwareNavigation from '@/components/UserAwareNavigation';
@@ -56,7 +57,7 @@ interface CatalogImage {
   imageUrl: string;
   theme?: { id?: string; name: string; displayName?: string };
   style?: { name: string; displayName?: string };
-  breed?: { id?: string; name: string; displayName?: string };
+  breed?: { id?: string; name: string; displayName?: string; animalType?: 'dog' | 'cat' | null };
   format?: { id: string; name: string; aspectRatio: string };
   isMultiSubject?: boolean;
   subjectCount?: number;
@@ -543,7 +544,7 @@ export default function CustomiseClient({ initialData = null, initialQuery = {},
   const title = designTitle(catalogImage.description, 'Pawtraits design');
   // Description without its bold title line, as plain text
   const aboutText = plainText((catalogImage.description || '').replace(/\*\*(.+?)\*\*/, '').trim());
-  const moreLikeThis = <MoreLikeThis imageId={catalogImage.id} breedId={catalogImage.breed?.id} collection={chips?.collections[0] ?? null} tag={chips?.tags[0] ?? null} />;
+  const moreLikeThis = <MoreLikeThis imageId={catalogImage.id} breedId={catalogImage.breed?.id} breedName={breedName ?? null} animalType={catalogImage.breed?.animalType ?? null} collection={chips?.collections[0] ?? null} tag={chips?.tags[0] ?? null} />;
   const putPetBlock = (
     <>
             <section className="mt-5 rounded-2xl border border-purple-200 bg-purple-50 p-4">
@@ -630,7 +631,11 @@ export default function CustomiseClient({ initialData = null, initialQuery = {},
         {step === 'choose' && (
           <>
             <div className="mt-4">
-              {breedName && <p className="text-sm text-gray-600">{breedName}</p>}
+              {breedName && (catalogImage.breed?.id
+                ? <Link href={breedBrowseHref(catalogImage.breed.id, catalogImage.breed.animalType)} aria-label={`See all ${breedName} designs`} className="text-sm text-gray-600 underline-offset-2 hover:text-purple-700 hover:underline">
+                    {breedName} <span className="font-semibold text-purple-700">· See all ›</span>
+                  </Link>
+                : <p className="text-sm text-gray-600">{breedName}</p>)}
               <h1 className="mt-0.5 text-[1.7rem] font-bold leading-tight text-gray-900" style={lifeSavers}>
                 {fromQr ? 'Love this one?' : title}
               </h1>
