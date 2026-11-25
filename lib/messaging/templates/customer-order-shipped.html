@@ -2,6 +2,7 @@
 <tr><td class="pt-pad" style="padding:4px 32px 0;font-family:Arial,Helvetica,sans-serif;">
   {{> heading text=(concat "It’s on its way, " customer_name "!")}}
   <p style="margin:0;font-size:16px;line-height:1.55;color:#374151;">Your Pawtrait {{#if is_self_print}}was printed, packed by hand and posted{{else}}has been shipped{{/if}} on {{shipped_date}}.</p>
+  {{#if other_parcel}}<p style="margin:10px 0 0;font-size:16px;line-height:1.55;color:#374151;">The rest of your order is being made by our print partner and will arrive in a separate parcel.</p>{{/if}}
 </td></tr>
 {{> portrait src=hero_image_url alt="Your Pawtrait"}}
 <tr><td class="pt-pad" style="padding:18px 32px 0;">

@@ -1,5 +1,6 @@
 import { serviceClient } from '@/lib/qr/server';
 import { cleanPct } from '@/lib/referrals/rates';
+import { DEFAULT_SELF_PRINT_MATERIALS } from '@/lib/fulfillment/shared';
 
 /**
  * Admin-controlled settings stored in public.app_settings (key → jsonb).
@@ -12,7 +13,9 @@ export const SETTING_DEFAULTS = {
   stall_online_discount_pct: 0,
   welcome_gift_enabled: true,
   /** Where new paid orders with posted prints go */
-  default_fulfillment_provider: 'self_print' as FulfillmentProvider,
+  default_fulfillment_provider: 'self_print' as FulfillmentMode,
+  /** Split mode: materials (media slugs) printed here; everything else goes to Gelato */
+  self_print_materials: DEFAULT_SELF_PRINT_MATERIALS as string[],
   /** Printed small under the address label on packing slips ("If undelivered return to: …") */
   return_address: '' as string,
   /** Social loop (Admin → Social): website "recent creations" feed */
@@ -64,6 +67,7 @@ export interface RoyalMailSettings {
   packaging_grams: number; print_grams_per_100cm2: number; large_letter_max_prints: number;
 }
 export type FulfillmentProvider = 'self_print' | 'gelato';
+export type FulfillmentMode = FulfillmentProvider | 'split';
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 export type SettingValue<K extends SettingKey> = (typeof SETTING_DEFAULTS)[K];
 
@@ -119,7 +123,9 @@ export function validateSetting(key: string, value: unknown): string | null {
     case 'stall_online_discount_pct':
       return typeof value === 'number' && value >= 0 && value <= 100 ? null : 'Must be 0–100';
     case 'default_fulfillment_provider':
-      return value === 'self_print' || value === 'gelato' ? null : 'Must be "self_print" or "gelato"';
+      return value === 'self_print' || value === 'gelato' || value === 'split' ? null : 'Must be "self_print", "gelato" or "split"';
+    case 'self_print_materials':
+      return Array.isArray(value) && value.length >= 1 && value.length <= 20 && value.every(v => typeof v === 'string' && /^[a-z0-9][a-z0-9-]{0,59}$/.test(v)) ? null : 'Choose at least one material (up to 20)';
     case 'mug_mockup_photos':
       return value && typeof value === 'object' && !Array.isArray(value) ? null : 'Must be an object';
     case 'social_hero_item_id':

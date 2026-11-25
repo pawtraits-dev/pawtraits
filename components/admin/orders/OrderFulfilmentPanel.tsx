@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Check, ExternalLink, FileText, Printer, Send, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
-import { SELF_PRINT_STEPS, STAGE_LABELS, describeOrderItem, fulfilmentStage, itemRef, itemTitle, postedItems } from '@/lib/fulfillment/shared';
+import { SELF_PRINT_STEPS, STAGE_LABELS, describeOrderItem, fulfilmentStage, gelatoItems, gelatoPartWaiting, isSplitOrder, itemRef, itemTitle, safeHttpsUrl, selfPrintItems } from '@/lib/fulfillment/shared';
 import FulfilmentActions from './FulfilmentActions';
 import PrintFileLink from './PrintFileLink';
 import type { FulfilmentOrder } from '@/lib/product-types';
@@ -33,7 +33,10 @@ export default function OrderFulfilmentPanel({ order: raw, onChanged }: { order:
 
   if (!stage) return null; // nothing to post
 
-  const items = postedItems(order);
+  const items = selfPrintItems(order);
+  const gelatoLines = gelatoItems(order);
+  const split = isSplitOrder(order);
+  const gelatoTrackingUrl = safeHttpsUrl(order.gelato_tracking_url);
   const isGelato = stage === 'gelato';
   const isSelfPrint = order.fulfillment_provider === 'self_print' && !isGelato;
   const stepIdx = isSelfPrint && order.self_print_status ? SELF_PRINT_STEPS.indexOf(order.self_print_status) : -1;
@@ -71,6 +74,21 @@ export default function OrderFulfilmentPanel({ order: raw, onChanged }: { order:
       </CardHeader>
       <CardContent className="space-y-5">
         {/* Provider choice */}
+        {split ? (
+          <div className="space-y-1 rounded-lg border-2 border-purple-200 bg-purple-50 p-3 text-sm text-gray-800">
+            <p>Split order. Lines under Printed here go in your parcel. Lines under At Gelato are made and posted by Gelato.</p>
+            {order.gelato_order_id && (
+              <p className={`text-xs ${order.gelato_status === 'error' ? 'text-red-700' : 'text-gray-600'}`}>
+                Gelato order {order.gelato_order_id} · {order.gelato_status || 'pending'}
+                {order.gelato_tracking_code && <> · {gelatoTrackingUrl
+                  ? <a className="underline" href={gelatoTrackingUrl} target="_blank" rel="noopener noreferrer">{order.gelato_tracking_code}</a>
+                  : order.gelato_tracking_code}</>}
+                {order.gelato_status === 'error' && <> Check this order in Gelato's dashboard.</>}
+              </p>
+            )}
+            {gelatoPartWaiting(order) && <p className="text-xs text-red-700">Not sent to Gelato yet: {order.error_message}</p>}
+          </div>
+        ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           <button
             type="button"
@@ -97,6 +115,7 @@ export default function OrderFulfilmentPanel({ order: raw, onChanged }: { order:
             <p className="mt-1 text-xs text-gray-600">{isGelato ? `Order ${order.gelato_order_id} · ${order.gelato_status || 'pending'}` : 'Send the print file to Gelato to print and post.'}</p>
           </button>
         </div>
+        )}
 
         {stage === 'on_hold' && (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">On hold: {order.error_message || 'check this order before fulfilling'}. Choosing a method releases it.</p>
@@ -133,9 +152,10 @@ export default function OrderFulfilmentPanel({ order: raw, onChanged }: { order:
         )}
 
         {/* Print files */}
+        {items.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-900">To print</h4>
+            <h4 className="text-sm font-semibold text-gray-900">{split ? 'Printed here' : 'To print'}</h4>
             <Button variant="outline" size="sm" onClick={() => window.open(adminService.getPackingSlipsUrl([order.id]), '_blank')}>
               <FileText className="w-4 h-4 mr-1.5" />Packing slip
             </Button>
@@ -152,6 +172,23 @@ export default function OrderFulfilmentPanel({ order: raw, onChanged }: { order:
             </div>
           ))}
         </div>
+        )}
+
+        {gelatoLines.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold text-gray-900">{order.gelato_order_id ? 'At Gelato' : 'Not sent to Gelato yet'}</h4>
+            {gelatoLines.map(item => (
+              <div key={item.id} className="flex items-center gap-3 rounded-lg border border-gray-100 p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={item.image_url || '/placeholder.svg'} alt="" className="h-14 w-14 rounded object-cover bg-gray-100" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-gray-900 truncate">{item.quantity > 1 && <span className="text-purple-700">{item.quantity}× </span>}{itemTitle(item)}</div>
+                  <div className="text-xs text-gray-600">{describeOrderItem(item)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Notes (shown on the packing slip) */}
         <div className="space-y-2">

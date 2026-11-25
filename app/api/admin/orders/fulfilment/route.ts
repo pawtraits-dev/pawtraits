@@ -1,11 +1,13 @@
 /**
  * Fulfilment queue for /admin/orders.
- * GET → { orders, counts, defaultProvider, returnAddress }
+ * GET → { orders, counts, defaultProvider, selfPrintMaterials, splitReady, returnAddress }
  */
 import { NextResponse } from 'next/server';
 import { requireAdmin, serviceClient } from '@/lib/qr/server';
 import { getFulfilmentQueue, FulfilmentError } from '@/lib/fulfillment/order-fulfilment';
 import { getSetting } from '@/lib/app-settings';
+import { cleanMaterials, cleanMode } from '@/lib/fulfillment/shared';
+import { splitColumnsReady } from '@/lib/fulfillment/split-routing';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,12 +15,20 @@ export async function GET() {
   const denied = await requireAdmin();
   if (denied) return denied;
   try {
-    const [queue, defaultProvider, returnAddress] = await Promise.all([
+    const [queue, defaultProvider, selfPrintMaterials, splitReady, returnAddress] = await Promise.all([
       getFulfilmentQueue(serviceClient()),
       getSetting('default_fulfillment_provider'),
+      getSetting('self_print_materials'),
+      splitColumnsReady(serviceClient()),
       getSetting('return_address'),
     ]);
-    return NextResponse.json({ ...queue, defaultProvider, returnAddress });
+    return NextResponse.json({
+      ...queue,
+      defaultProvider: cleanMode(defaultProvider),
+      selfPrintMaterials: cleanMaterials(selfPrintMaterials),
+      splitReady,
+      returnAddress,
+    });
   } catch (e: any) {
     const status = e instanceof FulfilmentError ? e.status : 500;
     const message = /self_print_status|fulfillment_provider/.test(e?.message || '')

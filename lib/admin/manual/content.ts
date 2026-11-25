@@ -784,8 +784,10 @@ export const GUIDES: Guide[] = [
         body: [
           'Foam prints are made through the UK trade printer and you post them. Mugs, phone cases, art paper, framed and acrylic orders go through Gelato, who print and post them.',
           'The **Gelato** tab lists orders sent to Gelato in the last 30 days. You do not print or post those. You only watch for errors.',
-          'The selector **New orders go to** at the top of the card sets where new print orders go: **Self print (default)** or **Gelato (automatic)**. Leave it alone. It is the owner\'s setting.',
+          'The selector **New orders go to** at the top of the card sets where new print orders go: **Self print (default)**, **Gelato (automatic)** or **Split by material**. With **Split by material**, the materials listed under **Printed here** come to you and everything else goes to Gelato. Leave it alone. It is the owner\'s setting.',
           'If an order is in To print but should go to Gelato, ask the owner. They can use **Send to Gelato instead** in the order\'s **More actions** menu. Gelato charges for it and it cannot be undone from here.',
+          'A split order has items in both places. Print, pack and post only the items shown in the queue. Gelato makes and posts the rest in its own parcel, and the order also appears in the **Gelato** tab.',
+          'If a split order shows red text saying the rest was not sent to Gelato, tell the owner. They can use **Send the rest to Gelato** or **Print the rest here** in the order\'s **More actions** menu.',
         ],
       },
       {
@@ -1514,6 +1516,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   { term: 'Batch', meaning: 'A group of items done together: a variation batch (many pictures made at once), or a set of orders you print or label together.' },
   { term: 'Print file', meaning: 'The full-size file for one item on an order. Open it from the order, and send it to the printer.' },
   { term: 'Fulfilment', meaning: 'Getting an order to the customer: printing, packing and posting it, or sending it to Gelato.' },
+  { term: 'Split order', meaning: 'An order where you print and post some items and Gelato makes and posts the rest. The customer gets two parcels.' },
   { term: 'Gelato', meaning: 'The print-on-demand company that makes and posts mugs, phone cases, art paper, framed and acrylic orders.' },
   { term: 'Click & Drop', meaning: 'Royal Mail\'s online posting tool. The admin sends orders to it to make labels.' },
   { term: 'Guest', meaning: 'A customer who has not made an account. They can still make a preview and buy.' },

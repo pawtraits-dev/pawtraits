@@ -11,6 +11,7 @@ import { extractDescriptionTitle } from '@/lib/utils';
 import ItemDownload from '@/components/orders/ItemDownload';
 import ShareReferral from '@/components/referrals/ShareReferral';
 import TrackingTimeline from '@/components/orders/TrackingTimeline';
+import { isSplitOrder, isPostedPrintItem, itemProvider, safeHttpsUrl } from '@/lib/fulfillment/shared';
 import type { TrackingEvent, TrackingStage } from '@/lib/shipping/royal-mail/status';
 
 // 🏗️ ORDER DETAIL PAGE — data via /api/shop/orders/[id] (signed-in owner, partner or admin)
@@ -26,6 +27,7 @@ interface OrderItem {
   unit_price: number;   // pence
   total_price: number;  // pence
   product_data?: any;
+  fulfillment_provider?: string | null;
   download?: OrderDownload | null;
 }
 interface Order {
@@ -60,6 +62,11 @@ interface Order {
   tracking_checked_at?: string | null;
   shipped_at?: string | null;
   self_print_status?: string | null;
+  fulfillment_provider?: string | null;
+  gelato_order_id?: string | null;
+  gelato_status?: string | null;
+  gelato_tracking_code?: string | null;
+  gelato_tracking_url?: string | null;
   order_items: OrderItem[];
   downloads?: OrderDownload[];
 }
@@ -150,6 +157,10 @@ export default function OrderDetailPage() {
   ].filter(Boolean) as string[];
   const hasPhysical = order.order_items?.some((i) => (i.product_data?.product_type ?? 'physical_print') !== 'digital_download');
   const tracking = order.tracking_code || order.tracking_number;
+  const split = isSplitOrder(order);
+  const showTracking = !!(order.tracking_status || (tracking && /royal mail/i.test(order.carrier || '')));
+  const gelatoTrackingUrl = safeHttpsUrl(order.gelato_tracking_url);
+  const gelatoOnItsWay = !!order.gelato_tracking_code || order.gelato_status === 'shipped' || order.gelato_status === 'delivered';
   const statusLabel = order.status.charAt(0).toUpperCase() + order.status.slice(1);
 
   return (
@@ -196,13 +207,40 @@ export default function OrderDetailPage() {
           </CardContent>
         </Card>
 
-        {hasPhysical && (order.tracking_status || (tracking && /royal mail/i.test(order.carrier || ''))) && (
+        {hasPhysical && (split || showTracking) && (
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Truck className="w-5 h-5 text-purple-600" />Delivery</CardTitle></CardHeader>
             <CardContent>
-              <TrackingTimeline stage={order.tracking_status ?? null} statusText={order.tracking_status_text} events={order.tracking_events}
-                trackingNumber={tracking} trackingUrl={order.tracking_url} checkedAt={order.tracking_checked_at}
-                posted={!!order.shipped_at || order.status === 'shipped' || order.status === 'delivered'} />
+              {split && <p className="mb-4 text-sm text-gray-700">Your order is coming in two parcels.</p>}
+              {split && <h3 className="mb-2 text-sm font-semibold text-gray-900">Posted by us</h3>}
+              {showTracking ? (
+                <TrackingTimeline stage={order.tracking_status ?? null} statusText={order.tracking_status_text} events={order.tracking_events}
+                  trackingNumber={tracking} trackingUrl={order.tracking_url} checkedAt={order.tracking_checked_at}
+                  posted={!!order.shipped_at || order.status === 'shipped' || order.status === 'delivered'} />
+              ) : (
+                (order.self_print_status === 'posted' || order.shipped_at) ? (
+                  <p className="text-sm text-gray-600">Posted{order.shipped_at ? ` on ${new Date(order.shipped_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}.</p>
+                ) : (
+                  <p className="text-sm text-gray-600">We're printing and packing this part. We'll email you when it's posted.</p>
+                )
+              )}
+              {split && (
+                <div className="mt-5 border-t pt-4">
+                  <h3 className="mb-2 text-sm font-semibold text-gray-900">From our print partner</h3>
+                  {gelatoOnItsWay ? (
+                    <div className="space-y-1 text-sm text-gray-600">
+                      <p>On its way.</p>
+                      {order.gelato_tracking_code && (
+                        <p>Tracking: {gelatoTrackingUrl
+                          ? <a className="text-purple-700 underline" href={gelatoTrackingUrl} target="_blank" rel="noopener noreferrer">{order.gelato_tracking_code}</a>
+                          : order.gelato_tracking_code}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-600">{order.gelato_order_id ? 'Being made now.' : 'Being prepared.'} Tracking will show here once it has been posted.</p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -219,6 +257,9 @@ export default function OrderDetailPage() {
                     <h3 className="text-sm font-medium text-gray-900">{extractDescriptionTitle(item.image_title) || item.image_title}</h3>
                     <p className="text-sm font-medium text-purple-700">{productDescriptionService.getProductDescription(item.product_id, productDetails)}</p>
                     <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                    {split && isPostedPrintItem(item) && (
+                      <p className="text-xs text-gray-500">{itemProvider(order, item) === 'gelato' ? 'Sent by our print partner' : 'Posted by us'}</p>
+                    )}
                     <ItemDownload download={item.download} />
                   </div>
                   <div className="text-right text-sm">

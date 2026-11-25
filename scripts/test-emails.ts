@@ -89,6 +89,12 @@ common('posted', html, ['It’s on its way, Sarah!', 'printed, packed by hand an
 html = renderTemplate(T('customer-order-shipped.html'), { ...base, shipped_date: 'Thursday 1 October', has_tracking: false, tracking_url: '', carrier_name: 'Royal Mail', shipping_method: '2nd Class', estimated_delivery_date: shipped, shipping_city: 'Derby', shipping_postcode: 'DE1', is_self_print: true });
 common('posted-untracked', html, ['View your order']);
 ok('posted-untracked no tracking', !html.includes('Tracking number'));
+{
+  const parcelData = { ...base, shipped_date: 'Thursday 1 October', has_tracking: false, tracking_url: '', carrier_name: 'Royal Mail', shipping_method: 'Tracked 48', estimated_delivery_date: shipped, shipping_city: 'Derby', shipping_postcode: 'DE1', is_self_print: true };
+  const sentence = 'The rest of your order is being made by our print partner';
+  ok('posted split: other parcel sentence', renderTemplate(T('customer-order-shipped.html'), { ...parcelData, other_parcel: true }).includes(sentence));
+  ok('posted not split: no other parcel sentence', !renderTemplate(T('customer-order-shipped.html'), { ...parcelData, other_parcel: false }).includes(sentence));
+}
 
 
 // "Email me this preview" (rendered exactly as lib/previews/server.ts does)

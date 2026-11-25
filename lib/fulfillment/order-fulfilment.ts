@@ -11,8 +11,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { GelatoFulfillmentService } from './gelato-fulfillment-service';
 import { countryName, deliveryFor, deliveryWindow, heroImage } from '@/lib/messaging/order-email';
-import { postedItems, needsPosting, fulfilmentStage, POSTAGE_SERVICES, SELF_PRINT_STEPS, STAGE_LABELS, royalMailTrackingUrl } from './shared';
-import type { FulfilmentStage, SelfPrintStatus, PostageServiceId } from '@/lib/product-types';
+import {
+  postedItems, needsPosting, fulfilmentStage, POSTAGE_SERVICES, SELF_PRINT_STEPS, STAGE_LABELS, royalMailTrackingUrl,
+  cleanMaterials, cleanMode, gelatoItems, gelatoPartWaiting, gelatoProblems, isSplitOrder, selfPrintItems, splitStatusFields,
+} from './shared';
+import { applySplitRouting, splitColumnsReady } from './split-routing';
+import { getSetting } from '@/lib/app-settings';
+import type { FulfillmentResult } from './base-fulfillment-service';
+import type { FulfilmentMode, FulfilmentStage, SelfPrintStatus, PostageServiceId } from '@/lib/product-types';
 
 export { postedItems, needsPosting, fulfilmentStage, POSTAGE_SERVICES };
 import { sendMessage } from '@/lib/messaging/message-service';
@@ -59,7 +65,14 @@ const auditStatus: Record<SelfPrintStatus, string> = { to_print: 'pending', prin
 /**
  * Apply one admin action to an order and return the updated order.
  */
-export async function applyFulfilmentAction(supabase: SupabaseClient, orderId: string, input: FulfilmentAction) {
+export interface FulfilmentDeps {
+  /** Where new orders go; read from the setting when absent (only needed for "release") */
+  mode?: FulfilmentMode;
+  materials?: string[];
+  sendGelato?: (order: any, items: any[]) => Promise<FulfillmentResult>;
+}
+
+export async function applyFulfilmentAction(supabase: SupabaseClient, orderId: string, input: FulfilmentAction, deps: FulfilmentDeps = {}) {
   const order = await loadOrder(supabase, orderId);
   const now = new Date().toISOString();
   const stage = fulfilmentStage(order);
@@ -81,13 +94,35 @@ export async function applyFulfilmentAction(supabase: SupabaseClient, orderId: s
         throw new FulfilmentError('Order is not on hold.');
       }
       if (stage === 'posted') throw new FulfilmentError('Order has already been posted.');
+      // Split mode: mark each line by material instead of queueing everything here. Never sends to Gelato.
+      if (input.action === 'release'
+        && (deps.mode ?? cleanMode(await getSetting('default_fulfillment_provider'))) === 'split'
+        && !order.gelato_order_id
+        && await splitColumnsReady(supabase)) {
+        await applySplitRouting(supabase, order, order.order_items || [], {
+          materials: deps.materials ?? cleanMaterials(await getSetting('self_print_materials')),
+          send: false,
+          extraOrderFields: order.status === 'on_hold' ? { status: 'confirmed' } : {},
+        });
+        await audit(supabase, orderId, 'self_print', 'pending', 'Released from hold (split)');
+        break;
+      }
+      // Lines marked for Gelato that has not been sent yet come back to the print queue
+      const moved = postedItems(order).filter((i: any) => i.fulfillment_provider === 'gelato');
+      if (moved.length) {
+        const { error: markError } = await supabase.from('order_items').update({ fulfillment_provider: 'self_print' }).in('id', moved.map((i: any) => i.id));
+        if (markError && !/fulfillment_provider/.test(markError.message || '')) throw new FulfilmentError(markError.message, 500);
+      }
+      const reopen = moved.length > 0 && order.fulfillment_provider === 'self_print' && ['printed', 'packed'].includes(order.self_print_status);
       await update(supabase, orderId, {
         fulfillment_provider: 'self_print',
-        self_print_status: order.self_print_status && order.fulfillment_provider === 'self_print' ? order.self_print_status : 'to_print',
+        self_print_status: reopen ? 'to_print' : order.self_print_status && order.fulfillment_provider === 'self_print' ? order.self_print_status : 'to_print',
+        ...(reopen ? { printed_at: null, packed_at: null } : {}),
         fulfillment_status: 'processing',
         ...(order.status === 'on_hold' ? { status: 'confirmed', error_message: null } : {}),
+        ...(moved.length ? { error_message: null } : {}),
       });
-      await audit(supabase, orderId, 'self_print', 'pending', order.status === 'on_hold' ? 'Released from hold to self-print' : 'Queued to self-print');
+      await audit(supabase, orderId, 'self_print', 'pending', order.status === 'on_hold' ? 'Released from hold to self-print' : moved.length ? 'Queued the rest to self-print' : 'Queued to self-print');
       break;
     }
 
@@ -129,8 +164,9 @@ export async function applyFulfilmentAction(supabase: SupabaseClient, orderId: s
         tracking_code: trackingCode || null,
         tracking_number: trackingCode || null,
         tracking_url: trackingUrl || null,
-        status: 'shipped',
-        fulfillment_status: 'fulfilled',
+        ...(isSplitOrder(order)
+          ? splitStatusFields({ ...order, self_print_status: 'posted' })
+          : { status: 'shipped', fulfillment_status: 'fulfilled' }),
       });
       await audit(supabase, orderId, 'self_print', 'fulfilled', `Posted via ${carrierLabel}${trackingCode ? ` (${trackingCode})` : ''}`, { carrier: carrierLabel, trackingCode, trackingUrl });
       if (input.notify !== false) {
@@ -140,9 +176,10 @@ export async function applyFulfilmentAction(supabase: SupabaseClient, orderId: s
     }
 
     case 'rebuild_print_files': {
-      if (order.gelato_order_id) throw new FulfilmentError('Already at Gelato — its files were sent with the order.', 409);
+      const rebuildItems = [...selfPrintItems(order), ...(order.gelato_order_id ? [] : gelatoItems(order))];
+      if (!rebuildItems.length) throw new FulfilmentError('Already at Gelato — its files were sent with the order.', 409);
       let rebuilt = 0;
-      for (const item of postedItems(order)) {
+      for (const item of rebuildItems) {
         const img = await resolveOrderImage(supabase, item.image_id);
         if (!img) continue;
         const productData = typeof item.product_data === 'string' ? JSON.parse(item.product_data) : item.product_data;
@@ -180,7 +217,9 @@ export async function applyFulfilmentAction(supabase: SupabaseClient, orderId: s
       const back = SELF_PRINT_STEPS[idx - 1];
       await update(supabase, orderId, {
         self_print_status: back,
-        ...(order.self_print_status === 'posted' ? { shipped_at: null, status: 'confirmed', fulfillment_status: 'processing' } : {}),
+        ...(order.self_print_status === 'posted'
+          ? { shipped_at: null, ...(isSplitOrder(order) ? splitStatusFields({ ...order, self_print_status: back }) : { status: 'confirmed', fulfillment_status: 'processing' }) }
+          : {}),
         ...(order.self_print_status === 'packed' ? { packed_at: null } : {}),
         ...(order.self_print_status === 'printed' ? { printed_at: null } : {}),
       });
@@ -190,14 +229,31 @@ export async function applyFulfilmentAction(supabase: SupabaseClient, orderId: s
 
     case 'send_to_gelato': {
       if (order.gelato_order_id) throw new FulfilmentError('Already sent to Gelato.', 409);
-      if (stage === 'posted') throw new FulfilmentError('Order has already been posted.', 409);
-      const items = postedItems(order);
-      const gelato = new GelatoFulfillmentService();
-      const result = await gelato.fulfill(order, items);
+      // A split order whose Gelato part is still waiting can be sent even after our part was posted
+      const waiting = gelatoPartWaiting(order);
+      if (stage === 'posted' && !waiting) throw new FulfilmentError('Order has already been posted.', 409);
+      const items = waiting ? gelatoItems(order) : postedItems(order);
+      const problems = gelatoProblems(items);
+      if (problems.length) throw new FulfilmentError(`Not sent to Gelato: ${problems.join('; ')}`, 400);
+      const sendGelato = deps.sendGelato ?? ((o: any, its: any[]) => new GelatoFulfillmentService().fulfill(o, its));
+      const result = await sendGelato(order, items);
       if (!result.success || !result.fulfillmentId) {
         await update(supabase, orderId, { error_message: `Gelato: ${result.error || 'order not created'}`.slice(0, 1000) });
         await audit(supabase, orderId, 'gelato', 'failed', result.error || 'Gelato order not created');
         throw new FulfilmentError(`Gelato didn't accept the order: ${result.error || 'unknown error'}`, 502);
+      }
+      // Mark the lines that went (ignored while the split migration has not been run)
+      const { error: markError } = await supabase.from('order_items').update({ fulfillment_provider: 'gelato' }).in('id', items.map((i: any) => i.id));
+      if (markError && !/fulfillment_provider/.test(markError.message || '')) console.warn('Could not mark lines as sent to Gelato (non-critical)');
+      if (waiting) {
+        await update(supabase, orderId, {
+          gelato_order_id: result.fulfillmentId,
+          gelato_status: 'pending',
+          error_message: null,
+          ...splitStatusFields({ ...order, gelato_status: 'pending' }),
+        });
+        await audit(supabase, orderId, 'gelato', 'processing', `Sent the rest to Gelato (${result.fulfillmentId})`, { gelatoOrderId: result.fulfillmentId });
+        break;
       }
       await update(supabase, orderId, {
         fulfillment_provider: 'gelato',
@@ -239,7 +295,7 @@ export async function sendPostedEmail(supabase: SupabaseClient, orderId: string,
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawtraits.pics';
   const service = POSTAGE_SERVICES.find(s => s.label === order.carrier);
   const { data: profile } = await supabase.from('user_profiles').select('id').eq('email', order.customer_email).maybeSingle();
-  const itemCount = postedItems(order).reduce((n: number, i: any) => n + (i.quantity || 1), 0);
+  const itemCount = selfPrintItems(order).reduce((n: number, i: any) => n + (i.quantity || 1), 0);
   const trackingCode = order.tracking_code || order.tracking_number || '';
 
   const referralBlock = await referralEmailVars(supabase, order.customer_email, baseUrl);
@@ -261,7 +317,7 @@ export async function sendPostedEmail(supabase: SupabaseClient, orderId: string,
       shipping_method: service ? service.label.replace(/^Royal Mail /, '') : '',
       estimated_delivery_date: deliveryWindow(new Date(order.shipped_at || Date.now()), eta || service?.eta || deliveryFor(order.shipping_country).days)
         ?? `Usually ${eta || service?.eta || '2–3 working days'}`,
-      hero_image_url: heroImage(order.order_items ?? []).url,
+      hero_image_url: heroImage(isSplitOrder(order) ? selfPrintItems(order) : order.order_items ?? []).url,
       shipping_country_name: countryName(order.shipping_country),
       item_count: itemCount,
       shipping_city: order.shipping_city,
@@ -269,6 +325,7 @@ export async function sendPostedEmail(supabase: SupabaseClient, orderId: string,
       shipping_country: order.shipping_country,
       order_url: `${baseUrl}/orders/${order.id}`,
       is_self_print: order.fulfillment_provider !== 'gelato',
+      other_parcel: isSplitOrder(order),
       ...(referralBlock?.vars ?? {}),
     },
     priority: 'high',
@@ -298,7 +355,20 @@ export async function getFulfilmentQueue(supabase: SupabaseClient, opts: { poste
     .limit(500);
   if (error) throw new FulfilmentError(error.message, 500);
 
-  const orders = (data || [])
+  // Posted split orders whose Gelato part is still waiting must stay in the queue whatever their age
+  const { data: waitingData, error: waitingError } = await supabase
+    .from('orders')
+    .select(ORDER_SELECT)
+    .eq('payment_status', 'paid')
+    .eq('self_print_status', 'posted')
+    .is('gelato_order_id', null)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (waitingError) throw new FulfilmentError(waitingError.message, 500);
+  const seen = new Set((data || []).map((o: any) => o.id));
+  const waiting = (waitingData || []).filter((o: any) => !seen.has(o.id) && gelatoPartWaiting(o));
+
+  const orders = [...(data || []), ...waiting]
     .map((o: any) => ({ ...o, fulfilment_stage: fulfilmentStage(o) }))
     .filter((o: any) => o.fulfilment_stage)
     // Gelato orders only while in the last 30 days (they look after themselves)

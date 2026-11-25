@@ -451,6 +451,7 @@ export type AppSettingsMap = Record<string, { value: any; description: string | 
 // ===== ORDER FULFILMENT (self-print default, optional Gelato) =====
 
 export type FulfilmentProvider = 'self_print' | 'gelato';
+export type FulfilmentMode = FulfilmentProvider | 'split';
 export type SelfPrintStatus = 'to_print' | 'printed' | 'packed' | 'posted';
 export type FulfilmentStage = 'on_hold' | 'needs_routing' | SelfPrintStatus | 'gelato';
 export type PostageServiceId = 'rm_tracked_48' | 'rm_tracked_24' | 'rm_2nd' | 'rm_1st' | 'rm_special' | 'other';
@@ -464,6 +465,8 @@ export interface FulfilmentOrderItem {
   /** Same crop as print_image_url plus 1.5 mm bleed, for self-printing onto pre-cut blanks */
   self_print_file_url?: string | null;
   print_file_meta?: PrintFileMeta | null;
+  /** Split mode: who makes this line. null/absent = follows the order (orders made before the split) */
+  fulfillment_provider?: FulfilmentProvider | null;
   quantity: number;
   unit_price: number | null;
   product_data: any;
@@ -521,6 +524,9 @@ export interface FulfilmentOrder {
   fulfillment_notes?: string | null;
   gelato_order_id?: string | null;
   gelato_status?: string | null;
+  gelato_tracking_code?: string | null;
+  gelato_tracking_url?: string | null;
+  gelato_shipped_at?: string | null;
   error_message?: string | null;
   /** Royal Mail (2026-11-09 migration): Click & Drop order and tracking */
   rm_order_identifier?: number | null;
@@ -536,7 +542,9 @@ export interface FulfilmentOrder {
 export interface FulfilmentQueue {
   orders: FulfilmentOrder[];
   counts: Partial<Record<FulfilmentStage, number>>;
-  defaultProvider: FulfilmentProvider;
+  defaultProvider: FulfilmentMode;
+  selfPrintMaterials: string[];
+  splitReady: boolean;
   returnAddress: string;
 }
 

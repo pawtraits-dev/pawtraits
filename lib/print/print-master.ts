@@ -16,6 +16,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
 import { GEMINI_IMAGE_MODELS, GEMINI_IMAGE_SIZES, geminiImageConfig, ratioOfImage } from '@/lib/gemini-models';
 import { generateWithUsage, type UsageContext } from '@/lib/ai/usage';
+import { isOpenForPrintFiles } from '@/lib/fulfillment/shared';
 
 export const PRINT_MASTER_PROMPT = [
   'Recreate this exact image at a higher resolution for a large fine-art print.',
@@ -154,7 +155,7 @@ async function openOrderItems(supabase: SupabaseClient, imageId: string) {
     .from('order_items')
     .select('*, orders!inner(id, gelato_order_id, self_print_status, status)')
     .eq('image_id', imageId);
-  return (data || []).filter((i: any) => !i.orders?.gelato_order_id && !['printed', 'packed', 'posted'].includes(i.orders?.self_print_status));
+  return (data || []).filter((i: any) => isOpenForPrintFiles(i.orders, i));
 }
 
 async function markOrderItems(supabase: SupabaseClient, imageId: string, state: 'failed') {

@@ -39,6 +39,14 @@ const rates = { friendPct: 15, referrerPct: 5 };
   eq(refs[0], itemRef(mixed, 0), 'first ref is itemRef index 0');
 }
 
+// split order: labels only for the lines we print ourselves
+{
+  const split = { id: 'o5', order_number: 'PW-5', gelato_order_id: 'G1', order_items: [item('f', { quantity: 2, fulfillment_provider: 'self_print' }), item('m', { fulfillment_provider: 'gelato' })] };
+  const { labels } = buildRearLabels([split], null, rates);
+  eq(labels.length, 2, 'split order: two labels for the foamex, none for the Gelato line');
+  eq(labels.map((l: any) => l.ref), ['PW-5-1', 'PW-5-1'], 'split order: refs follow our own lines');
+}
+
 // pet name
 {
   const o = { id: 'o', order_number: 'PW-9', order_items: [item('a')] };
