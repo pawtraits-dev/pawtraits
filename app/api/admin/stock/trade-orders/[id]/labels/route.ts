@@ -1,6 +1,6 @@
 /**
- * POST /api/admin/stock/trade-orders/[id]/labels → PDF of print labels (A4, 21 per sheet,
- * 70 × 38.14 mm, 21 per A4, 15 mm strips top and bottom, no gaps): one label per print in the order, in the same order as the
+ * POST /api/admin/stock/trade-orders/[id]/labels → PDF of print labels (CL2163: A4, 21 per sheet,
+ * 63.5 × 38.1 mm, black ink): one label per print in the order, in the same order as the
  * print files (size, then dogs before cats, then breed). body: { locationCode?: string, startPosition?: 1–21, showGuides?: boolean, cta?: string,
  *   perPrint?: 1 | 2 }  (2, the default: a front and a back label for each print, side by side)
  * The QR is the stall sticker link for the design and size (and the stall, when given).
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Stall links know S / M / L; an XL links to the design without a size
     const linkSize = (STICKER_SIZES as string[]).includes(size) ? (size as StickerSize) : null;
     const qrUrl = buildStickerUrl({ stockRef: refOf.get(l.image_id)!, size: linkSize, locationCode }, base);
-    for (let n = 0; n < l.quantity * perPrint; n++) labels.push({ title: d?.title ?? 'Pawtraits', sizeCode: size, sizeText, qrUrl, thumbnailKey: thumbs.has(l.image_id) ? l.image_id : null });
+    for (let n = 0; n < l.quantity * perPrint; n++) labels.push({ title: d?.title ?? 'Pawtraits', breed: d?.breed ?? null, sizeCode: size, sizeText, qrUrl, thumbnailKey: thumbs.has(l.image_id) ? l.image_id : null });
   }
   if (labels.length > MAX_LABELS) return NextResponse.json({ error: `Too many labels (${labels.length}); max ${MAX_LABELS}` }, { status: 400 });
 

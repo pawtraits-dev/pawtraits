@@ -1,7 +1,7 @@
 /**
  * Rear labels PDF: GET ?ids=<orderId>,<orderId>…&start=<1–21>&guides=1
- * One small label per print we post (A4, 21 per sheet, same sheet as the stall-stock labels), to stick on the
- * back: the Pawtrait, the pet's name when known, and the customer's own referral QR. Read-only: no referral
+ * One small label per print we post (CL2163: 63.5 × 38.1 mm, 21 per A4 sheet, same sheet as the stall-stock labels), to stick on the
+ * back: the breed, the pet's name when known, and the customer's own referral QR. Read-only: no referral
  * codes are created while printing.
  */
 import { NextRequest, NextResponse } from 'next/server';
@@ -55,27 +55,43 @@ export async function GET(request: NextRequest) {
     if (d) referrals.set(o.id, { code: d.code, shareUrl: d.shareUrl });
   }
 
-  // Pet names (custom images only) and picture public ids, one lookup per distinct image
+  // Pet names and breeds (custom images), breeds (catalogue images) and picture public ids: one lookup per kind
   const items = (orders as any[]).flatMap(o => selfPrintItems(o));
   const imageIds = Array.from(new Set(items.map(i => String(i.image_id || '')).filter(Boolean)));
-  const uuidIds = imageIds.filter(i => UUID.test(i));   // order_items.image_id is text; custom image ids are uuids
+  const uuidIds = imageIds.filter(i => UUID.test(i));   // order_items.image_id is text; custom and catalogue image ids are uuids
   const petById = new Map<string, string | null>();
+  const breedIdById = new Map<string, string>();
   if (uuidIds.length) {
-    const { data: custom } = await db.from('customer_custom_images').select('id, pet_name').in('id', uuidIds);
-    for (const c of custom ?? []) petById.set(c.id, c.pet_name ?? null);
+    const [{ data: custom }, { data: catalogue }] = await Promise.all([
+      db.from('customer_custom_images').select('id, pet_name, pet_breed_id').in('id', uuidIds),
+      db.from('image_catalog').select('id, breed_id').in('id', uuidIds),
+    ]);
+    for (const c of catalogue ?? []) if (c.breed_id) breedIdById.set(c.id, c.breed_id);
+    for (const c of custom ?? []) {
+      petById.set(c.id, c.pet_name ?? null);
+      if (c.pet_breed_id) breedIdById.set(c.id, c.pet_breed_id);
+    }
+  }
+  const breedNameById = new Map<string, string>();
+  const breedIds = Array.from(new Set(Array.from(breedIdById.values())));
+  if (breedIds.length) {
+    const { data: breedRows } = await db.from('breeds').select('id, name').in('id', breedIds);
+    for (const b of breedRows ?? []) breedNameById.set(b.id, b.name);
   }
   const publicById = new Map<string, string | null>();
   await Promise.all(imageIds.map(async id => {
     try { publicById.set(id, (await resolveOrderImage(db, id))?.cloudinaryPublicId ?? null); } catch { publicById.set(id, null); }
   }));
   const petNames = new Map<string, string | null>();
+  const breeds = new Map<string, string | null>();
   const publicIds = new Map<string, string | null>();
   for (const i of items) {
     petNames.set(i.id, petById.get(String(i.image_id)) ?? null);
+    breeds.set(i.id, breedNameById.get(breedIdById.get(String(i.image_id)) ?? '') ?? null);
     publicIds.set(i.id, publicById.get(String(i.image_id)) ?? null);
   }
 
-  const { labels, thumbKeys } = buildRearLabels(orders, referrals, await referralRates(), { petNames, publicIds });
+  const { labels, thumbKeys } = buildRearLabels(orders, referrals, await referralRates(), { petNames, breeds, publicIds });
   if (labels.length > MAX_LABELS) return NextResponse.json({ error: `Too many labels (${labels.length}); max ${MAX_LABELS}` }, { status: 400 });
 
   const thumbnails = new Map<string, Uint8Array>();
