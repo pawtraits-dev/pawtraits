@@ -8,7 +8,7 @@
  *  - Custom portraits: digital download + all print options for the format.
  *  - "Checkout now" or "Add to basket & keep shopping" (multiple purchases).
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Download, Truck, ShoppingBag, X, Hand } from 'lucide-react';
 import { useHybridCart } from '@/lib/hybrid-cart-context';
@@ -20,6 +20,7 @@ import { orientedSize } from '@/lib/products/shape-family';
 import { shippingSummary } from '@/lib/shipping/rates';
 import { framedProductAllowed } from '@/lib/frames/rules';
 import { framedPrintShape } from '@/lib/frames/print';
+import { STALL_OPTION, defaultSelection, gbp, isFoamRow, isStallOfferUsable, madeToOrderRows, selectionLine } from '@/lib/customise/buy-options';
 
 export interface BuyTarget {
   kind: 'catalog' | 'custom';
@@ -51,18 +52,16 @@ interface ProductRow {
   pricing: { id: string; sale_price: number; discount_price?: number | null; is_on_sale?: boolean; currency_code: string; currency_symbol: string; product_id: string; country_code: string };
 }
 
-const STALL_OPTION = '__stall__';
 /** Foamex (the stall's prints): open by default, and what a scanned size matches */
-const isFoam = (p: ProductRow) => /foam/i.test(p.media_name || p.medium?.name || '');
+const isFoam = (p: ProductRow) => isFoamRow(p);
 const pence = (p: ProductRow['pricing']) => (p.is_on_sale && p.discount_price ? p.discount_price : p.sale_price);
-const gbp = (v?: number) => (v === undefined ? '' : `£${(v / 100).toFixed(v % 100 === 0 ? 0 : 2)}`);
 
 /** Brand-voice line for each Foamex size (shown under the size name) */
 const SIZE_LINES: Record<string, string> = { S: 'Sweet and petite', M: 'Just right', L: 'Large and in charge', XL: 'Make a statement' };
 /** The 11oz mug Gelato prints (shown instead of the wrap's print size) */
 const MUG_SIZE = 'Height 96 mm · base diameter 80 mm';
 
-export default function BuyOptionsSheet({ open, onClose, target, stallOffer, scannedSize, inline = false }: {
+export default function BuyOptionsSheet({ open, onClose, target, stallOffer, scannedSize, inline = false, stallSlots }: {
   open: boolean;
   onClose: () => void;
   target: BuyTarget;
@@ -70,6 +69,12 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
   scannedSize?: string | null;
   /** Render as a section of the page (design page) instead of a bottom sheet */
   inline?: boolean;
+  /**
+   * Design page opened from a stall sticker (inline only): the sheet lays the page out buy-first,
+   * with one selection shared by both pairs of buttons. `middle` sits between the top buttons and
+   * "Other sizes"; `footer` follows the lower buttons and is given the "UV-printed ..." line.
+   */
+  stallSlots?: { middle: ReactNode; footer: (info: { buyNote: string }) => ReactNode };
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -87,7 +92,9 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
   }, [open, target.imageUrl]);
   const [busy, setBusy] = useState<'checkout' | 'basket' | null>(null);
 
-  const stallAvailable = target.kind === 'catalog' && !!stallOffer?.available && !!stallOffer.size && !!stallOffer.pricePence;
+  const stallAvailable = isStallOfferUsable(target.kind, stallOffer);
+  // Set once the customer ticks or unticks anything: after that the defaults never overwrite their choice
+  const touched = useRef(false);
 
   useEffect(() => {
     if (!open || products || !target.formatId) return;
@@ -97,25 +104,24 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
         // A framed card is a print or a download, never a mug or phone case (lib/frames/rules.ts)
         const rows = target.frame ? all.filter(framedProductAllowed) : target.physicalOnly ? all.filter(p => p.product_type !== 'digital_download') : all;
         setProducts(rows);
-        // sensible default: the print in their hand, else the download for a custom portrait
-        const digital = rows.find(p => p.product_type === 'digital_download');
-        // The default is a Foamex print (what's on the stall), never the same size in every material
-        const prints = rows.filter(p => p.product_type !== 'digital_download');
-        const size = scannedSize || 'M';
-        const medium = prints.find(p => isFoam(p) && p.size_code === size) ?? prints.find(p => p.size_code === size);
-        if (stallAvailable) setSelected(new Set([STALL_OPTION]));
-        else if (target.kind === 'custom' && digital && !target.frame) setSelected(new Set([digital.id]));
-        else if (inline && medium) setSelected(new Set([medium.id]));
-        else if (inline && digital && !rows.some(p => p.product_type !== 'digital_download')) setSelected(new Set([digital.id]));
-        else if (target.physicalOnly && rows.length === 1) setSelected(new Set([rows[0].id]));
+        if (!touched.current) setSelected(new Set(defaultSelection({
+          rows, stallAvailable, kind: target.kind, frame: !!target.frame, physicalOnly: !!target.physicalOnly, inline, scannedSize,
+        })));
       })
       .catch(e => setLoadError(e.message));
   }, [open, products, target.formatId, target.kind, target.physicalOnly, target.frame, stallAvailable]);
 
+  // The stall offer arrives from its own request, usually after the prices have loaded and been given
+  // their default (the same-size print). The print in the customer's hand must win as soon as it is known.
+  useEffect(() => {
+    if (stallAvailable && !touched.current) setSelected(new Set([STALL_OPTION]));
+  }, [stallAvailable]);
+
   const digital = (products ?? []).filter(p => p.product_type === 'digital_download');
-  const printsByMedium = useMemo(() => (products ?? [])
-    .filter(p => p.product_type !== 'digital_download')
-    .reduce<Record<string, ProductRow[]>>((acc, p) => { (acc[p.media_name || p.medium?.name || 'Prints'] ||= []).push(p); return acc; }, {}), [products]);
+  const stallLayout = inline && stallAvailable && !!stallSlots;
+  // Made to order: when the print in hand is shown, its own size in foamex is not offered again
+  const printsByMedium = useMemo(() => madeToOrderRows((products ?? []).filter(p => p.product_type !== 'digital_download'), stallAvailable, stallOffer?.size)
+    .reduce<Record<string, ProductRow[]>>((acc, p) => { (acc[p.media_name || p.medium?.name || 'Prints'] ||= []).push(p); return acc; }, {}), [products, stallAvailable, stallOffer?.size]);
 
   // Each material folds away (a design has a dozen-plus print options); Foamex starts open, and
   // so does any material holding something already ticked, or the only one there is
@@ -154,7 +160,8 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anyPrintSelected]);
 
-  const toggle = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggle = (id: string) => { touched.current = true; toggleSel(id); };
+  const toggleSel = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   async function add(then: 'checkout' | 'basket') {
     if (!selected.size) return;
@@ -204,17 +211,24 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
     return <ShapeThumb src={framedSrc || target.imageUrl} {...size} fitted={!!framedSrc} />;
   };
 
+  // What the buttons will buy, in words
+  const selectedLabels = [
+    ...(selected.has(STALL_OPTION) && stallAvailable ? [`The print in your hand · ${SIZE_NAMES[stallOffer!.size!]}`] : []),
+    ...(products ?? []).filter(p => selected.has(p.id) && !(anyPrintSelected && digitalIds.has(p.id)))
+      .map(p => p.product_type === 'digital_download' ? 'Digital download' : `${p.size_name || p.name} · ${p.media_name || p.medium?.name || 'print'}`),
+  ];
+
   const sections = (
     <>
           {stallAvailable && (
             <section>
-              <p className="mb-2 flex items-center gap-1 text-sm font-semibold text-gray-800"><Hand className="h-4 w-4" /> Take it home now{stallOffer!.locationName ? ` · ${stallOffer!.locationName}` : ''}</p>
+              {!stallLayout && <p className="mb-2 flex items-center gap-1 text-sm font-semibold text-gray-800"><Hand className="h-4 w-4" /> Take it home now{stallOffer!.locationName ? ` · ${stallOffer!.locationName}` : ''}</p>}
               <Option
                 checked={selected.has(STALL_OPTION)} onClick={() => toggle(STALL_OPTION)} highlight
                 disabled={alreadyHasStallLine}
                 badge="The print in your hand"
                 title={`${SIZE_NAMES[stallOffer!.size!]} print — ready now`}
-                subtitle={alreadyHasStallLine ? 'Already in your basket' : 'Pay on your phone and take it with you'}
+                subtitle={alreadyHasStallLine ? 'Already in your basket' : `Pay on your phone and take it with you${stallLayout && stallOffer!.locationName ? ` · ${stallOffer!.locationName}` : ''}`}
                 perk={alreadyHasStallLine ? undefined : 'Includes bonus digital copy'}
                 price={gbp(stallOffer!.pricePence)}
                 wasPrice={stallOffer!.discountPct ? gbp(stallOffer!.listPricePence) : undefined}
@@ -250,7 +264,7 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
               )}
               {open && <div className="space-y-2">
                 {rows.map(p => {
-                  const sameSize = !!scannedSize && p.size_code === scannedSize && isFoam(p);
+                  const sameSize = !stallAvailable && !!scannedSize && p.size_code === scannedSize && isFoam(p);
                   // Mugs: say what the mug is, not the print area (20×9.6 cm is the wrap, not the mug)
                   const mug = /mug/i.test(medium);
                   if (mug) {
@@ -264,11 +278,11 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
                   }
                   return (
                     <Option key={p.id} checked={selected.has(p.id)} onClick={() => toggle(p.id)}
-                      highlight={sameSize && !stallAvailable}
+                      highlight={sameSize}
                       thumb={orientation && p.width_cm && p.height_cm ? thumbFor(p) : undefined}
                       badge={p.size_code === 'M' && isFoam(p) && !stallAvailable && !sameSize ? 'Most popular' : undefined}
                       title={`${p.size_name || p.name}${p.width_cm ? ` · ${orientedSize(p, orientation)}` : ''}`}
-                      subtitle={sameSize ? (stallAvailable ? 'Same size as the one in your hand, made fresh and delivered' : 'Same size as the print you scanned') : (SIZE_LINES[p.size_code || ''] || p.media_description)}
+                      subtitle={sameSize ? 'Same size as the print you scanned' : (SIZE_LINES[p.size_code || ''] || p.media_description)}
                       perk="Includes bonus digital copy"
                       price={gbp(pence(p.pricing))} />
                   );
@@ -315,10 +329,35 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
     </>
   );
 
+  const selectedLine = (
+    <p className="mb-2 text-sm font-medium text-gray-800" aria-live="polite">{selectionLine(selectedLabels, total)}</p>
+  );
+
   const hasPrints = stallAvailable || Object.keys(printsByMedium).length > 0;
   const mediaNames = Object.keys(printsByMedium);
   const offersFoamex = stallAvailable || mediaNames.some(m => /foam/i.test(m));
   const mugOnly = !stallAvailable && mediaNames.length > 0 && mediaNames.every(m => /mug/i.test(m));
+
+  if (stallLayout) {
+    const buyNote = 'UV-printed on rigid Foamex, ready to lean or hang.';
+    return (
+      <>
+        <section aria-label="Buy this print" className="mt-5">
+          {selectedLine}
+          <div className="space-y-2">{actions}</div>
+        </section>
+        {stallSlots!.middle}
+        <section aria-labelledby="buy-heading" className="mt-8">
+          <h2 id="buy-heading" className="mb-3 text-lg font-bold text-gray-900">Other sizes</h2>
+          <div className="space-y-5">{sections}</div>
+          <div className="mt-4">{selectedLine}</div>
+          <div className="space-y-2">{actions}</div>
+          {hasPrints && <p className="mt-3 text-center text-xs text-gray-500">Tracked delivery per order: {shippingSummary()}</p>}
+        </section>
+        {stallSlots!.footer({ buyNote })}
+      </>
+    );
+  }
 
   if (inline) {
     return (
