@@ -653,7 +653,7 @@ export default function CustomiseClient({ initialData = null, initialQuery = {},
 
             {stallOffer?.available && (
               <p className="mt-2 text-sm text-purple-800">
-                At the stall? Pay on your phone and take this {SIZE_LABEL[stallOffer.size || 'M'].toLowerCase()} print home now —
+                Pay on your phone and take this {SIZE_LABEL[stallOffer.size || 'M'].toLowerCase()} print home now —
                 no queue for the card reader, and a bonus digital copy too.
               </p>
             )}
