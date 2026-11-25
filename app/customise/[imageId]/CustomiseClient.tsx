@@ -25,6 +25,7 @@ import { useHybridCart } from '@/lib/hybrid-cart-context';
 import { preparePetPhoto } from '@/lib/client/resize-photo';
 import { track } from '@/lib/tracking/events';
 import BuyOptionsSheet, { type BuyTarget } from '@/components/customise/BuyOptionsSheet';
+import { isStallOfferUsable } from '@/lib/customise/buy-options';
 import { customPortraitTitle } from '@/lib/cart/items';
 import { extractDescriptionTitle } from '@/lib/utils';
 import { designTitle, plainText } from '@/lib/text/plain';
@@ -502,6 +503,8 @@ export default function CustomiseClient({ initialData = null, initialQuery = {},
         frame: catalogImage.frame?.on ? { thumbs: catalogImage.frame.thumbs } : null,
       };
 
+  // Design page opened from a stall sticker: buy first (print in hand ticked), then the pet, other sizes, about, more like this
+  const stallFlow = !!buyTarget && !(catalogImage?.frame?.on && !withFrame) && isStallOfferUsable(buyTarget.kind, stallOffer);
   // ---- render ----
   if (loading) {
     return (
@@ -540,6 +543,31 @@ export default function CustomiseClient({ initialData = null, initialQuery = {},
   const title = designTitle(catalogImage.description, 'Pawtraits design');
   // Description without its bold title line, as plain text
   const aboutText = plainText((catalogImage.description || '').replace(/\*\*(.+?)\*\*/, '').trim());
+  const moreLikeThis = <MoreLikeThis imageId={catalogImage.id} breedId={catalogImage.breed?.id} collection={chips?.collections[0] ?? null} tag={chips?.tags[0] ?? null} />;
+  const putPetBlock = (
+    <>
+            <section className="mt-5 rounded-2xl border border-purple-200 bg-purple-50 p-4">
+              {subjectCount > 1 ? (
+                <>
+                  <h2 className="text-lg font-bold text-gray-900">Put {subjectCount === 2 ? 'two' : subjectCount} pets in this picture</h2>
+                  <p className="mt-0.5 text-sm text-gray-600">Add a photo of each pet (yours, a friend’s, a family pet) and Pawcasso paints them in, cats or dogs, any breed. Then choose a size.</p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-lg font-bold text-gray-900">Put your pet in this picture</h2>
+                  <p className="mt-0.5 text-sm text-gray-600">Add a photo and Pawcasso paints your pet in, cat or dog, any breed. Then choose a size.</p>
+                </>
+              )}
+              <button onClick={startCustomise}
+                className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-purple-600 text-lg font-semibold text-white shadow-sm active:scale-[0.99] transition">
+                <Camera className="h-5 w-5" /> {subjectCount > 1 ? 'Add the pets’ photos' : <>Add my pet&apos;s photo</>}
+              </button>
+              <p className="mt-2 text-center text-xs text-gray-500">Free preview in about a minute · no sign-up</p>
+            </section>
+
+            <DesignQuizLink imageId={catalogImage.id} themeName={themeName} />
+    </>
+  );
 
   async function shareDesign() {
     const url = `${window.location.origin}/customise/${imageId}`;
@@ -606,7 +634,7 @@ export default function CustomiseClient({ initialData = null, initialQuery = {},
               <h1 className="mt-0.5 text-[1.7rem] font-bold leading-tight text-gray-900" style={lifeSavers}>
                 {fromQr ? 'Love this one?' : title}
               </h1>
-              <DesignChips data={chips} />
+              {!stallFlow && <DesignChips data={chips} />}
             </div>
 
             {catalogImage.frame && (
@@ -625,36 +653,31 @@ export default function CustomiseClient({ initialData = null, initialQuery = {},
               </p>
             )}
 
-            <section className="mt-5 rounded-2xl border border-purple-200 bg-purple-50 p-4">
-              {subjectCount > 1 ? (
-                <>
-                  <h2 className="text-lg font-bold text-gray-900">Put {subjectCount === 2 ? 'two' : subjectCount} pets in this picture</h2>
-                  <p className="mt-0.5 text-sm text-gray-600">Add a photo of each pet (yours, a friend’s, a family pet) and Pawcasso paints them in, cats or dogs, any breed. Then choose a size.</p>
-                </>
-              ) : (
-                <>
-                  <h2 className="text-lg font-bold text-gray-900">Put your pet in this picture</h2>
-                  <p className="mt-0.5 text-sm text-gray-600">Add a photo and Pawcasso paints your pet in, cat or dog, any breed. Then choose a size.</p>
-                </>
-              )}
-              <button onClick={startCustomise}
-                className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-purple-600 text-lg font-semibold text-white shadow-sm active:scale-[0.99] transition">
-                <Camera className="h-5 w-5" /> {subjectCount > 1 ? 'Add the pets’ photos' : <>Add my pet&apos;s photo</>}
-              </button>
-              <p className="mt-2 text-center text-xs text-gray-500">Free preview in about a minute · no sign-up</p>
-            </section>
-
-            <DesignQuizLink imageId={catalogImage.id} themeName={themeName} />
+            {!stallFlow && putPetBlock}
 
             {buyTarget && !(catalogImage.frame?.on && !withFrame) && (
               <BuyOptionsSheet inline open onClose={() => {}} target={buyTarget}
-                stallOffer={stallOffer} scannedSize={scannedSize} />
+                stallOffer={stallOffer} scannedSize={scannedSize}
+                stallSlots={stallFlow ? {
+                  middle: putPetBlock,
+                  footer: ({ buyNote }) => (
+                    <>
+                      <section aria-labelledby="about-heading" className="mt-8 border-t border-gray-200 pt-4">
+                        <h2 id="about-heading" className="text-lg font-bold text-gray-900">About this design</h2>
+                        <DesignChips data={chips} />
+                        <p className="mt-3 text-sm text-gray-600">{buyNote}</p>
+                        {aboutText && <p className="mt-2 text-sm leading-relaxed text-gray-600">{aboutText}</p>}
+                      </section>
+                      {moreLikeThis}
+                    </>
+                  ),
+                } : undefined} />
             )}
             {catalogImage.frame?.on && !withFrame && (
               <p className="mt-4 rounded-2xl bg-gray-100 p-4 text-sm text-gray-800">The design as it stands is sold framed. To have it without the frame, add your pet&apos;s photo above: we paint your own picture, and then you choose a size.</p>
             )}
 
-            {aboutText && (
+            {!stallFlow && aboutText && (
               <details className="mt-8 border-y border-gray-200">
                 <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between font-semibold text-gray-900">
                   About this design <ChevronDown className="h-5 w-5 text-gray-500" />
@@ -663,7 +686,7 @@ export default function CustomiseClient({ initialData = null, initialQuery = {},
               </details>
             )}
 
-            <MoreLikeThis imageId={catalogImage.id} breedId={catalogImage.breed?.id} collection={chips?.collections[0] ?? null} tag={chips?.tags[0] ?? null} />
+            {!stallFlow && moreLikeThis}
 
             <div className="h-24 md:hidden" aria-hidden />
             <BasketDock />

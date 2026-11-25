@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * "More like this" on the design page: same breed first, then the design's (most specific)
- * collection, then designs sharing its first tag.
- * Data: /api/images (by breed), /api/public/collection, /api/public/search?tag=.
+ * "More like this" on the design page: other versions of the same design, then the same breed,
+ * then (only if still short) the design's most specific collection and designs sharing its first tag.
+ * Data: /api/public/designs/[id]/related, /api/public/collection, /api/public/search?tag=.
  */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -11,6 +11,7 @@ import { CatalogImage } from '@/components/CloudinaryImageDisplay';
 import { designTitle } from '@/lib/text/plain';
 import { PetsBadge } from '@/components/collections/DesignGrid';
 import { collectionHref } from '@/lib/collections/href';
+import { mergeMoreLikeThis, needsFallback } from '@/lib/catalog/more-like-this';
 
 interface Item { id: string; description?: string; public_url?: string; image_url?: string; subject_count?: number }
 
@@ -22,23 +23,25 @@ export default function MoreLikeThis({ imageId, breedId, collection, tag, max = 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const seen = new Set<string>([imageId]);
-      const out: Item[] = [];
-      const sources: (() => Promise<Item[]>)[] = [];
       const get = async (url: string) => { const r = await fetch(url); return r.ok ? r.json() : null; };
-      if (breedId) sources.push(async () => ((await get(`/api/images?public=true&limit=12&breed_id=${breedId}`))?.images || []) as Item[]);
-      if (collection) sources.push(async () => ((await get(`/api/public/collection?path=${encodeURIComponent(collection.path)}`))?.designs || [])
-        .map((d: any) => ({ id: d.id, description: d.description, public_url: d.publicUrl, subject_count: d.pets })));
-      if (tag) sources.push(async () => ((await get(`/api/public/search?tag=${encodeURIComponent(tag)}`))?.designs || []) as Item[]);
-      for (const load of sources) {
-        if (out.length >= max) break;
+      const lists: Item[][] = [];
+      const count = () => mergeMoreLikeThis(lists, imageId, max).length;
+      // 1 and 2: other versions of this design, then the same breed (one server lookup)
+      try {
+        const rel = await get(`/api/public/designs/${imageId}/related`);
+        lists.push((rel?.versions || []) as Item[], (rel?.breed || []) as Item[]);
+      } catch { /* optional section */ }
+      // 3: only if still short, the collection, then the first tag
+      if (needsFallback(count(), max) && collection) {
         try {
-          for (const img of await load()) {
-            if (out.length >= max) break;
-            if (!seen.has(img.id)) { seen.add(img.id); out.push(img); }
-          }
+          lists.push(((await get(`/api/public/collection?path=${encodeURIComponent(collection.path)}`))?.designs || [])
+            .map((d: any) => ({ id: d.id, description: d.description, public_url: d.publicUrl, subject_count: d.pets })));
         } catch { /* optional section */ }
       }
+      if (needsFallback(count(), max) && tag) {
+        try { lists.push(((await get(`/api/public/search?tag=${encodeURIComponent(tag)}`))?.designs || []) as Item[]); } catch { /* optional section */ }
+      }
+      const out = mergeMoreLikeThis(lists, imageId, max);
       if (!cancelled) setItems(out);
     })();
     return () => { cancelled = true; };
