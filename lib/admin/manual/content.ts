@@ -1521,7 +1521,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   { term: 'Gelato', meaning: 'The print-on-demand company that makes and posts mugs, phone cases, art paper, framed and acrylic orders.' },
   { term: 'Click & Drop', meaning: 'Royal Mail\'s online posting tool. The admin sends orders to it to make labels.' },
   { term: 'Guest', meaning: 'A customer who has not made an account. They can still make a preview and buy.' },
-  { term: 'Pay on your phone', meaning: 'At a stall, a shopper scans a sticker, pays on their own phone, and shows a green PAID screen.' },
+  { term: 'Pay on your phone', meaning: 'At a stall, a shopper scans a sticker, pays on their own phone, and shows a green PAID screen. Before handing the prints over, check the stock refs and sizes on that screen match the prints in their hand.' },
   { term: 'Bonus digital copy', meaning: 'The free digital download that comes with every physical print bought on the site.' },
   { term: 'Subscribed / soft opt-in', meaning: 'Subscribed means agreed to hear from us. A buyer is subscribed unless they choose "No thanks"; that is the soft opt-in. Unsubscribed people are never re-subscribed by buying.' },
   { term: 'On hold', meaning: 'An order paused because the amount paid looked wrong. The owner checks it in Stripe first.' },
