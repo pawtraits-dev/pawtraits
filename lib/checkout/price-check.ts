@@ -33,7 +33,7 @@ export const PARTNER_REFERRAL_DISCOUNT_RATE = 0.10;
 export interface PriceCheckFigures {
   /** What the browser asks to charge, in pence */
   amount: number;
-  /** Catalogue price of the goods (including stall prints), in pence */
+  /** Catalogue price of the goods (including stall prints, less the stall multi-buy saving), in pence */
   goodsFloor: number;
   /** Delivery that must be included, in pence */
   shipping: number;
@@ -41,6 +41,15 @@ export interface PriceCheckFigures {
   discountRate: number;
   /** Verified reward credit that may be redeemed, in pence */
   rewardsAllowed: number;
+}
+
+/**
+ * The goods floor: catalogue price of the goods plus the verified stall prints, less the stall multi-buy saving.
+ * The saving can never take more than the stall prints cost (lib/stall/multibuy.ts).
+ */
+export function goodsFloorPence(catalogue: number, stallTotal: number, stallMultibuy: number): number {
+  const saving = Math.min(Math.max(0, stallMultibuy || 0), Math.max(0, stallTotal));
+  return catalogue + stallTotal - saving;
 }
 
 /** Pure comparison, kept separate so it can be tested without a database. */
@@ -71,6 +80,8 @@ export interface PriceCheckRequest {
   orderType: string;
   /** Total of stall prints, already verified against the stall offer, in pence */
   stallTotal: number;
+  /** Stall multi-buy saving the server worked out from the settings (lib/stall/multibuy.ts), in pence; taken off before any other discount */
+  stallMultibuy?: number;
 }
 
 export interface PriceCheckResult {
@@ -151,7 +162,7 @@ export async function runPriceCheck(body: PriceCheckRequest): Promise<PriceCheck
     const currency = (body.currency || 'gbp').toUpperCase();
 
     // 1. Catalogue price of the goods
-    let floor = body.stallTotal;
+    let catalogueFloor = 0;
     let missingPrice = false;
     let needsShipping = false;
     if (catalogueItems.length) {
@@ -175,7 +186,7 @@ export async function runPriceCheck(body: PriceCheckRequest): Promise<PriceCheck
         for (const i of catalogueItems) {
           const m = min.get(i.productId);
           if (m === undefined) { missingPrice = true; continue; }
-          floor += m * i.quantity;
+          catalogueFloor += m * i.quantity;
         }
         // Anything that is not a digital download has to be posted
         // (same rule as itemNeedsShipping in lib/cart/items.ts; if the lookup fails, delivery is not insisted on)
@@ -183,6 +194,8 @@ export async function runPriceCheck(body: PriceCheckRequest): Promise<PriceCheck
         if (products) needsShipping = products.some((p: any) => itemNeedsShipping({ productId: p.id, product: p }));
       }
     }
+
+    const floor = goodsFloorPence(catalogueFloor, body.stallTotal, body.stallMultibuy || 0);
 
     // 2. Delivery: the server's flat rate for the country where it has one
     let shipping = 0;

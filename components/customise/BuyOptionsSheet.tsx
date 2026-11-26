@@ -20,6 +20,9 @@ import { orientedSize } from '@/lib/products/shape-family';
 import { shippingSummary } from '@/lib/shipping/rates';
 import { framedProductAllowed } from '@/lib/frames/rules';
 import { framedPrintShape } from '@/lib/frames/print';
+import { basketStallSummary, marginalMultibuySaving, multibuyMessage } from '@/lib/stall/multibuy';
+import { useMultibuyTiers } from '@/lib/stall/use-multibuy';
+import MultibuyNote from '@/components/stall/MultibuyNote';
 import { STALL_OPTION, defaultSelection, gbp, isFoamRow, isStallOfferUsable, madeToOrderRows, selectionLine } from '@/lib/customise/buy-options';
 
 export interface BuyTarget {
@@ -79,6 +82,7 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
   const router = useRouter();
   const { toast } = useToast();
   const { items, addToCart } = useHybridCart();
+  const multibuyTiers = useMultibuyTiers();
   const [products, setProducts] = useState<ProductRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -140,9 +144,17 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
 
   const alreadyHasStallLine = items.some(i => isStallProductId(i.productId) && i.imageId === target.imageId);
 
+  // Stall multi-buy: a stall print not yet in the basket joins the ones already there, so the saving it earns comes off the total shown
+  const basketStall = basketStallSummary(items as any);
+  const addsStallLine = selected.has(STALL_OPTION) && stallAvailable && !alreadyHasStallLine;
+  const stallCountAfter = basketStall.count + (addsStallLine ? 1 : 0);
+  const multibuyNote = basketStall.count + (addsStallLine ? 1 : 0) > 0 && selected.has(STALL_OPTION) && stallAvailable
+    ? multibuyMessage(stallCountAfter, multibuyTiers, basketStall.subtotalPence + (addsStallLine ? stallOffer!.pricePence! : 0)) : null;
+
   const total = (() => {
     let t = 0;
     if (selected.has(STALL_OPTION) && stallAvailable) t += stallOffer!.pricePence!;
+    if (addsStallLine) t -= marginalMultibuySaving(basketStall.count, basketStall.subtotalPence, stallOffer!.pricePence!, multibuyTiers);
     for (const p of products ?? []) if (selected.has(p.id)) t += pence(p.pricing);
     return t;
   })();
@@ -168,7 +180,9 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
     setBusy(then);
     try {
       const tracked: any[] = [];
+      let stallAdded = false;
       if (selected.has(STALL_OPTION) && stallAvailable && !alreadyHasStallLine) {
+        stallAdded = true;
         const { product, pricing } = buildStallCartProduct(stallOffer!.size!, stallOffer!.pricePence!);
         await addToCart({ productId: product.id, imageId: target.imageId, imageUrl: target.imageUrl, imageTitle: target.title, product: product as any, pricing: pricing as any, quantity: 1 } as any);
         tracked.push({ id: target.catalogImageId, name: target.title, variant: `stall_${stallOffer!.size}`, price: stallOffer!.pricePence! / 100 });
@@ -193,7 +207,7 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
         if (!inline) setSelected(new Set());
         toast({
           title: 'Added to your basket 🛍️',
-          description: stallAvailable ? 'Scan another print or keep browsing — check out whenever you’re ready.' : 'Keep browsing — your basket is in the top bar.',
+          description: stallAvailable ? (multibuyMessage(basketStall.count + (stallAdded ? 1 : 0), multibuyTiers, basketStall.subtotalPence + (stallAdded ? stallOffer!.pricePence! : 0)) ?? 'Scan another print or keep browsing — check out whenever you’re ready.') : 'Keep browsing — your basket is in the top bar.',
         });
       }
     } catch (e: any) {
@@ -332,6 +346,7 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
   const selectedLine = (
     <p className="mb-2 text-sm font-medium text-gray-800" aria-live="polite">{selectionLine(selectedLabels, total)}</p>
   );
+  const multibuyBlock = <MultibuyNote message={multibuyNote} className="mb-2" />;
 
   const hasPrints = stallAvailable || Object.keys(printsByMedium).length > 0;
   const mediaNames = Object.keys(printsByMedium);
@@ -344,6 +359,7 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
       <>
         <section aria-label="Buy this print" className="mt-5">
           {selectedLine}
+          {multibuyBlock}
           <div className="space-y-2">{actions}</div>
         </section>
         {stallSlots!.middle}

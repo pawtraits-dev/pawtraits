@@ -279,6 +279,8 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
         stripePaymentIntentId: paymentIntent.id,
         stripeChargeId: paymentIntent.latest_charge,
         referralCode: metadata.referralCode,
+        // Stall multi-buy saving in pence (the server's own figure, set at payment). Kept here, not in discount_amount, which marks a referral discount as used.
+        ...(parseInt(metadata.stallMultibuy || '0') > 0 ? { stallMultibuy: parseInt(metadata.stallMultibuy) } : {}),
         // A referral code the server could not check at payment time (shown to the admin on the order)
         ...(metadata.referralUnconfirmed ? { referralUnconfirmed: metadata.referralUnconfirmed, referralUnconfirmedDiscount: metadata.referralUnconfirmedDiscount } : {}),
         paymentMethod: paymentIntent.payment_method_types[0] || 'card',
@@ -1914,6 +1916,8 @@ async function sendOrderConfirmationEmail(
     // Format monetary values
     const subtotal = `£${(order.subtotal_amount / 100).toFixed(2)}`;
     const discountAmount = order.discount_amount ? `£${(order.discount_amount / 100).toFixed(2)}` : null;
+    const multibuyPence = parseInt(metadata?.stallMultibuy || '0');
+    const multibuySaving = multibuyPence > 0 ? `£${(multibuyPence / 100).toFixed(2)}` : null;
     const creditApplied = order.credit_applied ? `£${(order.credit_applied / 100).toFixed(2)}` : null;
     const shippingAmount = `£${(order.shipping_amount / 100).toFixed(2)}`;
     const totalAmount = `£${(order.total_amount / 100).toFixed(2)}`;
@@ -2018,6 +2022,7 @@ async function sendOrderConfirmationEmail(
         order_id: order.id,
         subtotal,
         discount_amount: discountAmount,
+        multibuy_saving: multibuySaving,
         referral_code: order.referral_code || null,
         credit_applied: creditApplied,
         shipping_amount: shippingAmount,

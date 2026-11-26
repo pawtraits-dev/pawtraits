@@ -29,6 +29,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { AdminSupabaseService } from '@/lib/admin-supabase';
 import { productDescriptionService } from '@/lib/product-utils';
+import { orderMultibuyPence } from '@/lib/stall/multibuy';
 import { unconfirmedReferral, unconfirmedReferralNote } from '@/lib/referrals/unconfirmed';
 import OrderFulfilmentPanel from '@/components/admin/orders/OrderFulfilmentPanel';
 
@@ -537,6 +538,12 @@ export default function AdminOrderDetailPage() {
                   <span className="text-gray-600">Subtotal:</span>
                   <span>{formatPrice(order.subtotal_amount, order.currency)}</span>
                 </div>
+                {orderMultibuyPence(order.metadata) > 0 && (
+                  <div className="flex justify-between text-green-700">
+                    <span>Multi-buy saving:</span>
+                    <span>&minus;{formatPrice(orderMultibuyPence(order.metadata), order.currency)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping:</span>
                   <span>{formatPrice(order.shipping_amount, order.currency)}</span>

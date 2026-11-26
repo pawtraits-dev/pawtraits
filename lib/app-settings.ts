@@ -1,6 +1,7 @@
 import { serviceClient } from '@/lib/qr/server';
 import { cleanPct } from '@/lib/referrals/rates';
 import { DEFAULT_SELF_PRINT_MATERIALS } from '@/lib/fulfillment/shared';
+import { DEFAULT_MULTIBUY_PENCE, parseMultibuyTiers, validateMultibuyPence, type MultibuyTier } from '@/lib/stall/multibuy';
 
 /**
  * Admin-controlled settings stored in public.app_settings (key → jsonb).
@@ -11,6 +12,8 @@ export const SETTING_DEFAULTS = {
   guest_preview_ip_daily_limit: 200,
   stall_prices_pence: { S: 2000, M: 3000, L: 4000, XL: 5000 } as Record<'S' | 'M' | 'L', number> & { XL?: number },
   stall_online_discount_pct: 0,
+  /** Stall multi-buy: number of stall prints in one basket → TOTAL saving in pence ({} = off). Admin → Guest & Stall Settings. */
+  stall_multibuy_pence: DEFAULT_MULTIBUY_PENCE as Record<string, number>,
   welcome_gift_enabled: true,
   /** Where new paid orders with posted prints go */
   default_fulfillment_provider: 'self_print' as FulfillmentMode,
@@ -96,6 +99,23 @@ export async function referralRates(): Promise<{ friendPct: number; referrerPct:
   return { friendPct: cleanPct(friendPct, SETTING_DEFAULTS.referral_friend_discount_pct), referrerPct: cleanPct(referrerPct, SETTING_DEFAULTS.referral_referrer_credit_pct) };
 }
 
+/** Pure: what a read of the multi-buy row means. No row = the default amounts; a failed read = off (never switch a saving back on by accident). */
+export function multibuyTiersFromRead(read: { data: { value: unknown } | null; error: unknown }): MultibuyTier[] {
+  if (read.error) return [];
+  return parseMultibuyTiers(read.data ? read.data.value : undefined);
+}
+
+/** The stall multi-buy tiers for the server and the public route. Unlike getSetting, a read error means off. */
+export async function getStallMultibuyTiers(): Promise<MultibuyTier[]> {
+  try {
+    const { data, error } = await serviceClient().from('app_settings').select('value').eq('key', 'stall_multibuy_pence').maybeSingle();
+    return multibuyTiersFromRead({ data, error });
+  } catch (e) {
+    console.warn('app_settings read failed for stall_multibuy_pence, multi-buy off', e);
+    return [];
+  }
+}
+
 export async function getAllSettings(): Promise<Record<string, { value: unknown; description: string | null; updated_at: string | null }>> {
   const { data, error } = await serviceClient().from('app_settings').select('key, value, description, updated_at');
   if (error) throw error;
@@ -122,6 +142,8 @@ export function validateSetting(key: string, value: unknown): string | null {
       return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 10000 ? null : 'Must be a whole number 0–10000';
     case 'stall_online_discount_pct':
       return typeof value === 'number' && value >= 0 && value <= 100 ? null : 'Must be 0–100';
+    case 'stall_multibuy_pence':
+      return validateMultibuyPence(value);
     case 'default_fulfillment_provider':
       return value === 'self_print' || value === 'gelato' || value === 'split' ? null : 'Must be "self_print", "gelato" or "split"';
     case 'self_print_materials':

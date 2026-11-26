@@ -23,6 +23,8 @@ import { CountryProvider, useCountryPricing } from '@/lib/country-context'
 import { Elements } from '@stripe/react-stripe-js'
 import { track } from '@/lib/tracking/events'
 import { describeCartItem, itemNeedsShipping, isStallProductId, includesFreeDigital } from '@/lib/cart/items'
+import { useStallMultibuy } from '@/lib/stall/use-multibuy'
+import MultibuyNote from '@/components/stall/MultibuyNote'
 import { getStripe } from '@/lib/stripe-client'
 import StripePaymentForm from '@/components/StripePaymentForm'
 import ExpressCheckout, { type ExpressPayer, type ShippingQuote } from '@/components/checkout/ExpressCheckout'
@@ -107,6 +109,8 @@ function CheckoutPageContent() {
   // When Apple Pay / Google Pay is available it's the main path; the card form opens on request
   const [cardFormOpen, setCardFormOpen] = useState(false)
   const { items, totalItems, totalPrice, clearCart } = useHybridCart()
+  // Stall multi-buy saving: the same functions and settings the server uses at payment (lib/stall/multibuy.ts)
+  const multibuy = useStallMultibuy(items, { refetchOnMount: true })
   const router = useRouter()
   const { userProfile, loading: userLoading } = useUserRouting()
   const isGuest = !userLoading && !userProfile
@@ -257,14 +261,14 @@ function CheckoutPageContent() {
       setReferralValidation(null)
       setReferralNotice(null)
     }
-  }, [referralCode, shippingData.email, totalPrice])
+  }, [referralCode, shippingData.email, totalPrice, multibuy.savingPence])
 
   const validateReferralCode = async () => {
     if (!referralCode || !shippingData.email) return
 
     setValidatingReferral(true)
     try {
-      const subtotalInPounds = totalPrice / 100; // Convert subtotal from pence to pounds
+      const subtotalInPounds = (totalPrice - multibuy.savingPence) / 100; // Goods after the multi-buy saving, in pounds: the referral percentage is taken from this, as on the server
       const response = await fetch('/api/referrals/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -309,6 +313,7 @@ function CheckoutPageContent() {
   }
 
   const subtotal = totalPrice / 100; // Convert from pence to pounds
+  const multibuySaving = multibuy.savingPence / 100; // stall multi-buy saving, pounds (taken off before any other discount)
   // Flat tracked delivery by country: shown (and totalled) as soon as a country is known
   const deliveryQuote = !isDigitalOnly ? (selectedShippingOption || shippingQuoteFor(shippingData.country)) : null;
   const shipping = deliveryQuote ? (deliveryQuote.price / 100) : 0;
@@ -319,7 +324,7 @@ function CheckoutPageContent() {
 
   if (userProfile?.user_type === 'partner') {
     // Partner orders get 20% discount, no commission
-    discount = subtotal * 0.20;
+    discount = (subtotal - multibuySaving) * 0.20;
     discountType = 'Partner discount (20%)';
   } else if (referralValidation?.valid && referralValidation?.discount?.eligible) {
     // A signed-in new customer using a friend's code gets the "Friend's discount" (first order only; the server checks again at payment)
@@ -336,7 +341,7 @@ function CheckoutPageContent() {
   // Calculate reward redemption (only for customers, not partners)
   let rewardRedemption = 0;
   if (applyRewards && availableRewards > 0 && userProfile?.user_type === 'customer') {
-    const maxRedeemable = Math.min(availableRewards, totalPrice); // Can't redeem more than order total
+    const maxRedeemable = Math.min(availableRewards, totalPrice - multibuy.savingPence); // Can't redeem more than order total
     rewardRedemption = maxRedeemable / 100; // Convert pence to pounds
     console.log('✅ Reward redemption applied:', {
       rewardRedemption,
@@ -351,7 +356,7 @@ function CheckoutPageContent() {
     });
   }
 
-  const total = subtotal - discount - rewardRedemption + shipping;
+  const total = subtotal - multibuySaving - discount - rewardRedemption + shipping;
 
   console.log('💰 Order total calculation:', {
     subtotal,
@@ -542,7 +547,7 @@ function CheckoutPageContent() {
   }
 
   // Goods total after discounts/rewards, before delivery (pence)
-  const goodsTotalPence = Math.round((subtotal - discount - rewardRedemption) * 100)
+  const goodsTotalPence = Math.round((subtotal - multibuySaving - discount - rewardRedemption) * 100)
   // Express is always offered. A guest's referral discount needs their email checking first, so until
   // it's confirmed the wallet charges full price and we point them to the form to claim the discount.
   const showExpress = items.length > 0 && goodsTotalPence >= 50
@@ -595,6 +600,7 @@ function CheckoutPageContent() {
         printSpecs: item.printSpecs
       })),
       referralCode: referralCode || undefined,
+      stallMultibuy: multibuy.savingPence > 0 ? multibuy.savingPence : undefined, // what this page took off; the server works out its own
       discountAmount: discount > 0 ? Math.round(discount * 100) : undefined,
       discountType: discountType || undefined,
       referralDiscount: referralValidation?.valid && referralValidation?.discount?.eligible
@@ -1221,6 +1227,13 @@ page: ${typeof window !== 'undefined' ? window.location.host : ''}`}
                   <span className="text-gray-600">Subtotal</span>
                   <span className="font-medium">£{orderSummary.subtotal.toFixed(2)}</span>
                 </div>
+                {multibuySaving > 0 && (
+                  <div className="flex justify-between text-green-700">
+                    <span>Multi-buy saving</span>
+                    <span className="font-medium">&minus;£{multibuySaving.toFixed(2)}</span>
+                  </div>
+                )}
+                <MultibuyNote message={multibuy.message} />
                 {/* Downloads only: nothing to post, so no delivery line at all */}
                 {!isDigitalOnly && (
                   <div className="flex justify-between">

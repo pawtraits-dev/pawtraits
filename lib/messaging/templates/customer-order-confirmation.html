@@ -33,6 +33,7 @@
     </tr>
     {{/each}}
     {{#if show_delivery}}<tr><td style="padding:6px 0;color:#4b5563;">Delivery{{#if delivery_service}} &middot; {{delivery_service}}{{/if}}</td><td style="padding:6px 0;text-align:right;color:#4b5563;">{{shipping_amount}}</td></tr>{{/if}}
+    {{#if multibuy_saving}}<tr><td style="padding:6px 0;color:#15803d;">Multi-buy saving</td><td style="padding:6px 0;text-align:right;color:#15803d;">&minus;{{multibuy_saving}}</td></tr>{{/if}}
     {{#if discount_amount}}<tr><td style="padding:6px 0;color:#15803d;">Discount{{#if referral_code}} ({{referral_code}}){{/if}}</td><td style="padding:6px 0;text-align:right;color:#15803d;">&minus;{{discount_amount}}</td></tr>{{/if}}
     {{#if credit_applied}}<tr><td style="padding:6px 0;color:#15803d;">Credit used</td><td style="padding:6px 0;text-align:right;color:#15803d;">&minus;{{credit_applied}}</td></tr>{{/if}}
     <tr><td style="padding:10px 0 0;border-top:2px solid #111827;font-weight:bold;font-size:17px;">Paid</td><td style="padding:10px 0 0;border-top:2px solid #111827;text-align:right;font-weight:bold;font-size:17px;">{{total_amount}}</td></tr>

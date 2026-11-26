@@ -18,6 +18,8 @@ import { CountryProvider } from '@/lib/country-context'
 import { shippingSummary } from '@/lib/shipping/rates'
 import { useReferralRates } from '@/lib/referrals/use-rates';
 import { formatPct } from '@/lib/referrals/rates';
+import { useStallMultibuy } from '@/lib/stall/use-multibuy';
+import MultibuyNote from '@/components/stall/MultibuyNote';
 
 const lifeSavers = { fontFamily: 'var(--font-life-savers), cursive' }
 
@@ -25,6 +27,7 @@ function ShoppingCartPageContent() {
   const rates = useReferralRates()
   const { items, totalItems, totalPrice, updateQuantity, removeFromCart, isGuest, basketNotice, clearBasketNotice } = useHybridCart();
   const { continueShoppingRoute, userProfile } = useUserRouting();
+  const multibuy = useStallMultibuy(items);
   const [referralCode, setReferralCode] = useState("")
   const [referralValidation, setReferralValidation] = useState<any>(null)
   const [userEmail, setUserEmail] = useState("")
@@ -69,7 +72,7 @@ function ShoppingCartPageContent() {
     } else {
       setReferralValidation(null)
     }
-  }, [referralCode, userEmail, totalPrice])
+  }, [referralCode, userEmail, totalPrice, multibuy.savingPence])
 
   const validateReferralCode = async () => {
     if (!referralCode || !userEmail) return
@@ -81,7 +84,7 @@ function ShoppingCartPageContent() {
         body: JSON.stringify({
           referralCode: referralCode,
           customerEmail: userEmail,
-          orderTotal: totalPrice / 100 // Convert to pounds
+          orderTotal: (totalPrice - multibuy.savingPence) / 100 // Convert to pounds; the referral percentage is taken after the multi-buy saving, as the server does
         })
       })
 
@@ -110,8 +113,9 @@ function ShoppingCartPageContent() {
   const discount = referralValidation?.valid && referralValidation?.discount?.eligible
     ? referralValidation.discount.amount / 100
     : 0;
-  // Cart total is subtotal minus discount (shipping calculated at checkout)
-  const total = subtotal - discount;
+  const multibuySaving = multibuy.savingPence / 100;
+  // Cart total is subtotal minus the multi-buy saving minus discount (shipping calculated at checkout)
+  const total = subtotal - multibuySaving - discount;
 
   if (items.length === 0) {
     return (
@@ -276,6 +280,13 @@ function ShoppingCartPageContent() {
                   <span className="font-medium">£{subtotal.toFixed(2)}</span>
                 </div>
                 
+                {multibuySaving > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Multi-buy saving</span>
+                    <span className="font-medium">-£{multibuySaving.toFixed(2)}</span>
+                  </div>
+                )}
+
                 {/* Referral Discount Section - Only show if discount is eligible */}
                 {referralCode && referralValidation?.valid && referralValidation?.discount?.eligible && (
                   <div className="space-y-2">
@@ -290,6 +301,8 @@ function ShoppingCartPageContent() {
                   </div>
                 )}
                 
+                <MultibuyNote message={multibuy.message} />
+
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
