@@ -299,6 +299,7 @@ export const ROUTINES: Routine[] = [
           'Open **Guest & Stall Settings**.',
           'Check **Previews per device per 24 hours** is not set so low that shoppers get stuck.',
           'Check the **Ready-made print prices** are the ones you want today. For the real prices see Pricing Management.',
+          'Check the **Multi-buy saving (stall prints)** amounts: what comes off when a shopper pays for two, or three or more, stall prints in one basket. Set both to 0 to switch it off.',
           'Check **Free digital download with every print bought on the website** is ticked, if you want it.',
           'Change nothing you are unsure about. Press the **Save** button next to any setting you change.',
         ],

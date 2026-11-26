@@ -162,6 +162,12 @@ ok('only credit-earned has the lead-in', !renderTemplate(T('customer-order-shipp
 }
 ok('friend code on the receipt does not trigger the block', !renderTemplate(T('customer-order-confirmation.html'), cases[3][2]).includes('Give 10%, get 10%') && renderTemplate(T('customer-order-confirmation.html'), cases[3][2]).includes('FRIEND99'));
 {
+  // Stall multi-buy saving: a line on the receipt only when there was one
+  const mb = renderTemplate(T('customer-order-confirmation.html'), orderVars([stallItem], { is_collected: true, stall_name: 'Old Spitalfields Market', show_delivery: false, multibuy_saving: '£5.00' }));
+  ok('receipt shows the multi-buy saving', mb.includes('Multi-buy saving') && mb.includes('&minus;£5.00'));
+  ok('receipt without a saving has no multi-buy line', !renderTemplate(T('customer-order-confirmation.html'), cases[1][2]).includes('Multi-buy saving'));
+}
+{
   // Escaping: names and codes with markup never come out raw
   const evil = renderTemplate(T('customer-order-shipped.html'), { ...cases[5][2], customer_name: '<b>Sarah</b>', ...REF, share_code: '<i>X</i>', share_short: '<u>y</u>' });
   ok('referral block escapes', !evil.includes('<b>Sarah</b>') && !evil.includes('<i>X</i>') && !evil.includes('<u>y</u>') && evil.includes('&lt;i&gt;X'));

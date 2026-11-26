@@ -84,6 +84,25 @@ export default function GuestAndStallSettingsPage() {
             </div>
             <Button className="mt-2" disabled={saving === 'stall_prices_pence'} onClick={() => save('stall_prices_pence', draft.stall_prices_pence)}>Save prices</Button>
           </div>
+          <div>
+            <span className="font-medium">Multi-buy saving (stall prints)</span>
+            <p className="text-xs text-gray-500">The total taken off when one shopper pays for several stall prints in one basket. Only prints taken home from the stall count. Set both to 0 to switch it off.</p>
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              {([['2', '2 prints: save £'], ['3', '3 or more prints: save £']] as const).map(([k, label]) => (
+                <label key={k}>
+                  <span className="text-xs text-gray-500">{label}</span>
+                  <Input type="number" step="0.01" min={0}
+                    value={draft.stall_multibuy_pence?.[k] !== undefined ? pounds(draft.stall_multibuy_pence[k]) : ''}
+                    onChange={e => setDraft({ ...draft, stall_multibuy_pence: { ...draft.stall_multibuy_pence, [k]: Math.round(parseFloat(e.target.value || '0') * 100) } })} />
+                </label>
+              ))}
+            </div>
+            <Button className="mt-2" disabled={saving === 'stall_multibuy_pence'} onClick={() => {
+              const v = draft.stall_multibuy_pence || {};
+              const next = { '2': Number(v['2']) || 0, '3': Number(v['3']) || 0 };
+              save('stall_multibuy_pence', next['2'] === 0 && next['3'] === 0 ? {} : next);
+            }}>Save multi-buy saving</Button>
+          </div>
           <div className="flex items-end gap-3">
             <label className="flex-1">
               <span className="font-medium">Discount for paying online at the stall (%)</span>

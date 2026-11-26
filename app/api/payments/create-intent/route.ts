@@ -9,6 +9,8 @@ import { metaClientFromRequest } from '@/lib/tracking/meta-request';
 import { serviceClient } from '@/lib/qr/server';
 import { isStallProductId, stallSizeFromProductId } from '@/lib/cart/items';
 import { getStallOffer } from '@/lib/stall/offer';
+import { parseMultibuyTiers, stallMultibuySaving } from '@/lib/stall/multibuy';
+import { getSetting } from '@/lib/app-settings';
 import { runPriceCheck, invalidCartLine } from '@/lib/checkout/price-check';
 import { framedLineProblem } from '@/lib/frames/server';
 
@@ -52,6 +54,7 @@ interface CreatePaymentIntentRequest {
   }>;
   referralCode?: string;
   referralDiscount?: number; // Discount amount in pence
+  stallMultibuy?: number; // Stall multi-buy saving the browser took off, in pence (only used to decide what is recorded; the charge is checked against the server's own figure)
   rewardRedemption?: number; // Reward amount redeemed in pence
   // Shipping option data
   shippingOption?: {
@@ -273,6 +276,8 @@ export async function POST(request: NextRequest) {
     if (stallItems.length) metadata.salesChannel = 'stall_online_payment';
     // Verified above: each stall line is quantity 1 at the stall offer price
     const stallTotal = stallItems.reduce((sum, i) => sum + i.unitPrice, 0);
+    // Multi-buy saving on the stall prints: the server's own figure from the setting (the browser's is never trusted)
+    const stallMultibuy = stallMultibuySaving(stallItems.length, stallTotal, parseMultibuyTiers(await getSetting('stall_multibuy_pence')));
 
     if (body.customerPhone) metadata.customerPhone = String(body.customerPhone).slice(0, 30);
     if (body.marketingOptIn) metadata.marketingOptIn = 'true';
@@ -294,9 +299,14 @@ export async function POST(request: NextRequest) {
       rewardRedemption: body.rewardRedemption,
       orderType,
       stallTotal,
+      stallMultibuy,
     });
     const enforcePriceCheck = process.env.PRICE_CHECK_MODE !== 'log';
     metadata.priceCheck = priceCheck.status;
+    // Record the multi-buy saving only as far as the browser took it off (an old page that did not apply it paid more): the server's figure, capped at the browser's
+    const stallMultibuyRecorded = Math.min(stallMultibuy, Math.max(0, Math.round(Number(body.stallMultibuy) || 0)));
+    if (stallMultibuyRecorded > 0) metadata.stallMultibuy = String(stallMultibuyRecorded);
+    else delete metadata.stallMultibuy;
     // Record only a referral the server confirmed AND the browser actually applied: the server's own figure, capped
     // at what the browser took off (lib/commissions/credit-balance.ts). The amount charged is not changed here.
     const referralRecorded = orderType === 'customer' && body.referralCode
