@@ -6,7 +6,9 @@
 import assert from 'node:assert/strict';
 import { stallMultibuySaving as save, nextMultibuyStep as next, parseMultibuyTiers as parse, validateMultibuyPence as validate, multibuyMessage as msg, marginalMultibuySaving as marginal, basketStallSummary as basket, DEFAULT_MULTIBUY_PENCE } from '../lib/stall/multibuy';
 import { evaluatePriceCheck as evalCheck, goodsFloorPence } from '../lib/checkout/price-check';
-import { SETTING_DEFAULTS, validateSetting } from '../lib/app-settings';
+import { SETTING_DEFAULTS, validateSetting, multibuyTiersFromRead } from '../lib/app-settings';
+import { resolveStallSize } from '../lib/stall/offer';
+import { orderMultibuyPence } from '../lib/stall/multibuy';
 
 let n = 0;
 const eq = (a: unknown, b: unknown, m: string) => { assert.deepEqual(a, b, m); n++; };
@@ -95,5 +97,37 @@ eq(st(4450, { discountRate: 0.10 }), 'low', '£5 under that is low');
 eq(st(5400, { discountRate: 0.10 }), 'ok', 'skipping the saving but taking the referral is still not low');
 eq(st(4500, { discountRate: 0.10, rewardsAllowed: 450 }), 'ok', 'then credit comes off last');
 eq(st(5500, { goodsFloor: 5500, shipping: 395 }), 'low', 'skipping delivery is still caught');
+
+// Upper limit: £50
+eq(validate({ '2': 5000, '3': 5000 }), null, '£50 is allowed');
+ok(/£50/.test(validate({ '2': 5001 }) || ''), 'above £50 refused with a clear message');
+ok(validate({ '2': 500, '3': 150000 }) !== null, 'typing pence for pounds is refused');
+
+// Note amounts use the capped saving
+eq(msg(2, T, 300), "You're saving £3. Add a third print and save £15 in total. Scan the sticker on the back of it.", 'note: capped saving at 2 prints');
+eq(msg(3, T, 1000), "Multi-buy: you're saving £10.", 'note: capped saving at 3 prints');
+eq(msg(3, T, 99999), "Multi-buy: you're saving £15.", 'note: uncapped when the prints cost more');
+
+// Settings read: no row = default, error = off
+eq(multibuyTiersFromRead({ data: null, error: null }), T, 'no row = default tiers');
+eq(multibuyTiersFromRead({ data: { value: {} }, error: null }), [], 'row {} = off');
+eq(multibuyTiersFromRead({ data: null, error: new Error('down') }), [], 'read error = off, not default');
+eq(multibuyTiersFromRead({ data: { value: { '2': 700 } }, error: null }), [{ count: 2, savingPence: 700 }], 'row value used');
+
+// Basket line sizes: each line is priced at its own size; an unpriced size is refused, never re-priced
+const priced = ['S', 'M', 'L'] as const;
+eq(resolveStallSize('S', [...priced], 'L', true), 'S', 'strict: own size S despite last scan L');
+eq(resolveStallSize('L', [...priced], 'S', true), 'L', 'strict: own size L');
+eq(resolveStallSize('XL', [...priced], 'M', true), null, 'strict: XL with no price refused');
+eq(resolveStallSize(null, [...priced], 'L', true), null, 'strict: no size refused');
+eq(resolveStallSize('XL', [...priced], 'L', false), 'L', 'browsing: falls back to the scanned size');
+eq(resolveStallSize(null, [...priced], null, false), 'M', 'browsing: falls back to M');
+
+// Admin order view
+eq(orderMultibuyPence('{"stallMultibuy":500}'), 500, 'order metadata as JSON string');
+eq(orderMultibuyPence({ stallMultibuy: 1500 }), 1500, 'order metadata as object');
+eq(orderMultibuyPence('{}'), 0, 'none');
+eq(orderMultibuyPence('not json'), 0, 'bad json');
+eq(orderMultibuyPence(null), 0, 'null');
 
 console.log(`test-stall-multibuy: ${n} passed`);

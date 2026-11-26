@@ -9,6 +9,9 @@
  */
 import { isStallProductId } from '@/lib/cart/items';
 
+/** Most one basket may save: a guard against a slip when typing pounds as pence. */
+export const MAX_MULTIBUY_PENCE = 5000;
+
 export interface MultibuyTier { count: number; savingPence: number }
 
 /** The shipped amounts: 2 prints save £5, 3 or more save £15 in total. Used when the setting has no row. */
@@ -21,6 +24,7 @@ export function validateMultibuyPence(raw: unknown): string | null {
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     if (!/^\d+$/.test(k) || Number(k) < 2) return `"${k}": the number of prints must be a whole number from 2`;
     if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) return `${k} prints: the saving must be whole pence, 0 or more`;
+    if (v > MAX_MULTIBUY_PENCE) return `${k} prints: the saving can be at most £${MAX_MULTIBUY_PENCE / 100} (check it is in pounds, not pence)`;
     rows.push([Number(k), v]);
   }
   rows.sort((a, b) => a[0] - b[0]);
@@ -87,14 +91,25 @@ const pounds = (p: number) => `£${(p / 100).toFixed(p % 100 === 0 ? 0 : 2)}`;
 const ORDINALS: Record<number, string> = { 3: 'third', 4: 'fourth', 5: 'fifth', 6: 'sixth', 7: 'seventh', 8: 'eighth', 9: 'ninth', 10: 'tenth' };
 
 /** The calm note under the basket, checkout summary and buy sheet; null when there is nothing to say. */
-export function multibuyMessage(stallLineCount: number, tiers: MultibuyTier[]): string | null {
+export function multibuyMessage(stallLineCount: number, tiers: MultibuyTier[], stallSubtotalPence: number = Infinity): string | null {
   const n = Math.floor(stallLineCount);
   if (!(n >= 1)) return null;
-  const saving = tierSaving(n, tiers);
+  // The saving actually given (capped at what the prints cost), not the raw tier
+  const saving = Number.isFinite(stallSubtotalPence) ? stallMultibuySaving(n, stallSubtotalPence, tiers) : tierSaving(n, tiers);
   const step = nextMultibuyStep(n, tiers);
   const scan = 'Scan the sticker on the back of it.';
   if (step && saving === 0) return `Add another print from the stall and save ${pounds(step.totalSavingAfter)}. ${scan}`;
   if (step) return `You're saving ${pounds(saving)}. Add ${n + 1 in ORDINALS ? `a ${ORDINALS[n + 1]}` : 'another'} print and save ${pounds(step.totalSavingAfter)} in total. ${scan}`;
   if (saving > 0) return `Multi-buy: you're saving ${pounds(saving)}.`;
   return null;
+}
+
+/** The multi-buy saving recorded on an order (orders.metadata may be an object or a JSON string), in pence; 0 when none. */
+export function orderMultibuyPence(metadata: unknown): number {
+  let m: any = metadata;
+  for (let i = 0; i < 2 && typeof m === 'string'; i++) {
+    try { m = JSON.parse(m); } catch { return 0; }
+  }
+  const v = Number(m && typeof m === 'object' ? m.stallMultibuy : 0);
+  return Number.isFinite(v) && v > 0 ? Math.round(v) : 0;
 }

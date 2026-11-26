@@ -1,7 +1,7 @@
 import { serviceClient } from '@/lib/qr/server';
 import { cleanPct } from '@/lib/referrals/rates';
 import { DEFAULT_SELF_PRINT_MATERIALS } from '@/lib/fulfillment/shared';
-import { DEFAULT_MULTIBUY_PENCE, validateMultibuyPence } from '@/lib/stall/multibuy';
+import { DEFAULT_MULTIBUY_PENCE, parseMultibuyTiers, validateMultibuyPence, type MultibuyTier } from '@/lib/stall/multibuy';
 
 /**
  * Admin-controlled settings stored in public.app_settings (key → jsonb).
@@ -97,6 +97,23 @@ export async function referralRates(): Promise<{ friendPct: number; referrerPct:
   const [friendPct, referrerPct] = await Promise.all([getSetting('referral_friend_discount_pct'), getSetting('referral_referrer_credit_pct')]);
   // Stored values can be strings or out of range: read them the same way the charge and the wording do
   return { friendPct: cleanPct(friendPct, SETTING_DEFAULTS.referral_friend_discount_pct), referrerPct: cleanPct(referrerPct, SETTING_DEFAULTS.referral_referrer_credit_pct) };
+}
+
+/** Pure: what a read of the multi-buy row means. No row = the default amounts; a failed read = off (never switch a saving back on by accident). */
+export function multibuyTiersFromRead(read: { data: { value: unknown } | null; error: unknown }): MultibuyTier[] {
+  if (read.error) return [];
+  return parseMultibuyTiers(read.data ? read.data.value : undefined);
+}
+
+/** The stall multi-buy tiers for the server and the public route. Unlike getSetting, a read error means off. */
+export async function getStallMultibuyTiers(): Promise<MultibuyTier[]> {
+  try {
+    const { data, error } = await serviceClient().from('app_settings').select('value').eq('key', 'stall_multibuy_pence').maybeSingle();
+    return multibuyTiersFromRead({ data, error });
+  } catch (e) {
+    console.warn('app_settings read failed for stall_multibuy_pence, multi-buy off', e);
+    return [];
+  }
 }
 
 export async function getAllSettings(): Promise<Record<string, { value: unknown; description: string | null; updated_at: string | null }>> {

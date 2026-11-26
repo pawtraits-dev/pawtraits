@@ -9,8 +9,8 @@ import { metaClientFromRequest } from '@/lib/tracking/meta-request';
 import { serviceClient } from '@/lib/qr/server';
 import { isStallProductId, stallSizeFromProductId } from '@/lib/cart/items';
 import { getStallOffer } from '@/lib/stall/offer';
-import { parseMultibuyTiers, stallMultibuySaving } from '@/lib/stall/multibuy';
-import { getSetting } from '@/lib/app-settings';
+import { stallMultibuySaving } from '@/lib/stall/multibuy';
+import { getStallMultibuyTiers } from '@/lib/app-settings';
 import { runPriceCheck, invalidCartLine } from '@/lib/checkout/price-check';
 import { framedLineProblem } from '@/lib/frames/server';
 
@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
     // admin-set stall price (never the browser's price)
     const stallItems = (body.cartItems || []).filter(i => isStallProductId(i.productId));
     for (const item of stallItems) {
-      const offer = await getStallOffer(request, item.imageId, null);
+      const offer = await getStallOffer(request, item.imageId, stallSizeFromProductId(item.productId), { strictSize: true });
       if (!offer.available) {
         return NextResponse.json({ error: 'Take-home prints can only be paid for at the stall, after scanning the sticker on the back. Please remove it from your basket to continue.', code: 'STALL_ITEM_UNAVAILABLE' }, { status: 400 });
       }
@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
     // Verified above: each stall line is quantity 1 at the stall offer price
     const stallTotal = stallItems.reduce((sum, i) => sum + i.unitPrice, 0);
     // Multi-buy saving on the stall prints: the server's own figure from the setting (the browser's is never trusted)
-    const stallMultibuy = stallMultibuySaving(stallItems.length, stallTotal, parseMultibuyTiers(await getSetting('stall_multibuy_pence')));
+    const stallMultibuy = stallMultibuySaving(stallItems.length, stallTotal, await getStallMultibuyTiers());
 
     if (body.customerPhone) metadata.customerPhone = String(body.customerPhone).slice(0, 30);
     if (body.marketingOptIn) metadata.marketingOptIn = 'true';

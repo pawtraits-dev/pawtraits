@@ -110,7 +110,7 @@ function CheckoutPageContent() {
   const [cardFormOpen, setCardFormOpen] = useState(false)
   const { items, totalItems, totalPrice, clearCart } = useHybridCart()
   // Stall multi-buy saving: the same functions and settings the server uses at payment (lib/stall/multibuy.ts)
-  const multibuy = useStallMultibuy(items)
+  const multibuy = useStallMultibuy(items, { refetchOnMount: true })
   const router = useRouter()
   const { userProfile, loading: userLoading } = useUserRouting()
   const isGuest = !userLoading && !userProfile

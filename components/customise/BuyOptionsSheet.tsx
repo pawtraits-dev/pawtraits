@@ -149,7 +149,7 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
   const addsStallLine = selected.has(STALL_OPTION) && stallAvailable && !alreadyHasStallLine;
   const stallCountAfter = basketStall.count + (addsStallLine ? 1 : 0);
   const multibuyNote = basketStall.count + (addsStallLine ? 1 : 0) > 0 && selected.has(STALL_OPTION) && stallAvailable
-    ? multibuyMessage(stallCountAfter, multibuyTiers) : null;
+    ? multibuyMessage(stallCountAfter, multibuyTiers, basketStall.subtotalPence + (addsStallLine ? stallOffer!.pricePence! : 0)) : null;
 
   const total = (() => {
     let t = 0;
@@ -207,7 +207,7 @@ export default function BuyOptionsSheet({ open, onClose, target, stallOffer, sca
         if (!inline) setSelected(new Set());
         toast({
           title: 'Added to your basket 🛍️',
-          description: stallAvailable ? (multibuyMessage(basketStall.count + (stallAdded ? 1 : 0), multibuyTiers) ?? 'Scan another print or keep browsing — check out whenever you’re ready.') : 'Keep browsing — your basket is in the top bar.',
+          description: stallAvailable ? (multibuyMessage(basketStall.count + (stallAdded ? 1 : 0), multibuyTiers, basketStall.subtotalPence + (stallAdded ? stallOffer!.pricePence! : 0)) ?? 'Scan another print or keep browsing — check out whenever you’re ready.') : 'Keep browsing — your basket is in the top bar.',
         });
       }
     } catch (e: any) {
