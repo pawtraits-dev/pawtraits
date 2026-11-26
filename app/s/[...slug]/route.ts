@@ -12,6 +12,7 @@ import {
   QR_ATTRIBUTION_COOKIE, VISITOR_COOKIE, ATTRIBUTION_MAX_AGE_S, VISITOR_MAX_AGE_S,
   encodeAttribution, validVisitorId, newVisitorId, hashIp, isBotUserAgent,
 } from '@/lib/qr/attribution';
+import { STALL_SCAN_COOKIE, STALL_SCAN_MAX_AGE_S, addStallScan, decodeStallScans, encodeStallScans } from '@/lib/stall/scanned';
 import { serviceClient } from '@/lib/qr/server';
 
 export const dynamic = 'force-dynamic';
@@ -121,6 +122,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       encodeAttribution({ scanId, imageId, locationId, size: parsed.size, ts: Date.now() }),
       { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: ATTRIBUTION_MAX_AGE_S }
     );
+  }
+
+  // Stall prints scanned (a list, so several can go in one basket). Only a located scan of a real image counts.
+  try {
+    if (!isBot && imageId && locationId) {
+      const now = Date.now();
+      const list = addStallScan(
+        decodeStallScans(request.cookies.get(STALL_SCAN_COOKIE)?.value, now),
+        { imageId, size: parsed.size, locationId, ts: now }, now);
+      response.cookies.set(STALL_SCAN_COOKIE, encodeStallScans(list), {
+        httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: STALL_SCAN_MAX_AGE_S,
+      });
+    }
+  } catch (error) {
+    console.error('QR scan: stall cookie failed', error);
   }
 
   return response;
