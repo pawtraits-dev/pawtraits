@@ -28,8 +28,19 @@ function secret(): string {
   return s;
 }
 
-function sign(payload: string): string {
+export function sign(payload: string): string {
   return createHmac('sha256', secret()).update(payload).digest('base64url');
+}
+
+/** Returns the payload of a `payload.signature` value if the signature is ours, else null. */
+export function verifySigned(value?: string | null): string | null {
+  if (!value) return null;
+  const [payload, sig] = value.split('.');
+  if (!payload || !sig) return null;
+  const a = Buffer.from(sig);
+  const b = Buffer.from(sign(payload));
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  return payload;
 }
 
 export function encodeAttribution(a: QrAttribution): string {

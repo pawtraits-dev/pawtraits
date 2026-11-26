@@ -1,13 +1,13 @@
 import type { NextRequest } from 'next/server';
 import { QR_ATTRIBUTION_COOKIE, decodeAttribution } from '@/lib/qr/attribution';
+import { STALL_SCAN_COOKIE, STALL_SCAN_FRESH_HOURS, resolveScannedEntry } from '@/lib/stall/scanned';
 import { getSetting } from '@/lib/app-settings';
 import { serviceClient } from '@/lib/qr/server';
 
 export type StallSize = 'S' | 'M' | 'L' | 'XL';
 export const STALL_SIZES: StallSize[] = ['S', 'M', 'L', 'XL'];
 
-/** A stall "take it home now" offer is only shown to someone who scanned a located sticker recently. */
-export const STALL_SCAN_FRESH_HOURS = 12;
+export { STALL_SCAN_FRESH_HOURS };
 
 export interface StallOffer {
   available: boolean;
@@ -36,14 +36,18 @@ export function resolveStallSize(requested: string | null | undefined, pricedSiz
 }
 
 export async function getStallOffer(request: NextRequest, imageId: string, requestedSize?: string | null, opts: { strictSize?: boolean } = {}): Promise<StallOffer> {
+  // Only a print whose sticker this shopper scanned (pt_stall); the last scan in pt_qr still gives the scanId
   const attr = decodeAttribution(request.cookies.get(QR_ATTRIBUTION_COOKIE)?.value);
-  if (!attr?.locationId) return { available: false, reason: 'no_stall_scan' };
-  if (Date.now() - attr.ts > STALL_SCAN_FRESH_HOURS * 3600_000) return { available: false, reason: 'scan_too_old' };
+  const strict = !!opts.strictSize;
+  const scan = resolveScannedEntry({
+    cookieValue: request.cookies.get(STALL_SCAN_COOKIE)?.value, attr, imageId, requestedSize, strict, now: Date.now(),
+  });
+  if (!scan) return { available: false, reason: 'not_scanned' };
 
   const supabase = serviceClient();
   const { data: loc } = await supabase
     .from('stock_locations').select('id, code, name, location_type, is_active, at_market_discount_pct')
-    .eq('id', attr.locationId).maybeSingle();
+    .eq('id', scan.locationId).maybeSingle();
   if (!loc?.is_active || !['stall', 'partner', 'other'].includes(loc.location_type)) return { available: false, reason: 'location_inactive' };
 
   const { data: image } = await supabase.from('image_catalog').select('id, is_public').eq('id', imageId).maybeSingle();
@@ -51,14 +55,14 @@ export async function getStallOffer(request: NextRequest, imageId: string, reque
 
   const [prices, onlinePct] = await Promise.all([getSetting('stall_prices_pence'), getSetting('stall_online_discount_pct')]);
   const sizes = STALL_SIZES.filter(s => Number((prices as any)[s]) > 0);
-  const size = resolveStallSize(requestedSize, sizes, attr.size, !!opts.strictSize);
+  const size = resolveStallSize(strict ? requestedSize : (scan.size ?? requestedSize), sizes, scan.size, strict);
   if (!size) return { available: false, reason: 'size_not_priced' };
   const discountPct = Math.max(Number(onlinePct) || 0, Number(loc.at_market_discount_pct) || 0);
   const listPricePence = Number((prices as Record<string, number>)[size]) || prices.M;
   const pricePence = Math.round(listPricePence * (1 - discountPct / 100));
 
   return {
-    available: true, locationId: loc.id, locationCode: loc.code, locationName: loc.name, scanId: attr.scanId,
+    available: true, locationId: loc.id, locationCode: loc.code, locationName: loc.name, scanId: attr?.scanId,
     size, listPricePence, pricePence, discountPct, prices,
   };
 }
