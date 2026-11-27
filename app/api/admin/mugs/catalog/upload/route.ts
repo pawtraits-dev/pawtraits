@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { requireAdmin } from '@/lib/qr/server';
+import { SAMPLE_PHOTO_FOLDER } from '@/lib/mugs/sample';
 
 if (!cloudinary.config().cloud_name) {
   cloudinary.config({
@@ -13,7 +14,7 @@ if (!cloudinary.config().cloud_name) {
 export const dynamic = 'force-dynamic';
 
 // POST /api/admin/mugs/catalog/upload
-// Body: FormData with 'file' field (JPEG, PNG, or WebP)
+// Body: FormData with 'file' field (JPEG, PNG, or WebP), and optional 'folder=samples' (photos for sample print files)
 // Returns: { url, public_id }
 export async function POST(request: NextRequest) {
   const denied = await requireAdmin();
@@ -34,16 +35,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const toSamples = formData.get('folder') === 'samples';
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const base64 = buffer.toString('base64');
     const dataUrl = `data:${file.type};base64,${base64}`;
 
     const result = await cloudinary.uploader.upload(dataUrl, {
-      folder: 'pawtraits/mugs/catalog',
+      folder: toSamples ? SAMPLE_PHOTO_FOLDER : 'pawtraits/mugs/catalog',
       resource_type: 'image',
       type: 'upload',
-      tags: ['mug-catalog'],
+      tags: toSamples ? ['mug-sample-photo'] : ['mug-catalog'],
       overwrite: false,
     });
 

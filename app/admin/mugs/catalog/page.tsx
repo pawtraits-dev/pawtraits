@@ -43,6 +43,36 @@ function generateSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
+async function compressImageIfNeeded(file: File): Promise<File> {
+  const MAX_BYTES = 4 * 1024 * 1024; // 4MB — Vercel limit is 4.5MB
+  if (file.size <= MAX_BYTES) return file;
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      const scale = Math.sqrt(MAX_BYTES / file.size);
+      canvas.width = Math.floor(img.width * scale);
+      canvas.height = Math.floor(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('Canvas not supported')); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { reject(new Error('Compression failed')); return; }
+          resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+        },
+        'image/jpeg',
+        0.8
+      );
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 export default function MugCatalogAdminPage() {
   const [entries, setEntries] = useState<MugCatalogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,36 +175,6 @@ export default function MugCatalogAdminPage() {
   async function toggleActive(entry: MugCatalogEntry) {
     await adminService.updateMugCatalogEntry({ id: entry.id, is_active: !entry.is_active });
     await loadEntries();
-  }
-
-  async function compressImageIfNeeded(file: File): Promise<File> {
-    const MAX_BYTES = 4 * 1024 * 1024; // 4MB — Vercel limit is 4.5MB
-    if (file.size <= MAX_BYTES) return file;
-
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        const canvas = document.createElement('canvas');
-        const scale = Math.sqrt(MAX_BYTES / file.size);
-        canvas.width = Math.floor(img.width * scale);
-        canvas.height = Math.floor(img.height * scale);
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { reject(new Error('Canvas not supported')); return; }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) { reject(new Error('Compression failed')); return; }
-            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
-          },
-          'image/jpeg',
-          0.8
-        );
-      };
-      img.onerror = reject;
-      img.src = url;
-    });
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -512,6 +512,99 @@ export default function MugCatalogAdminPage() {
 
 type PreviewData = { colours: { slug: string; name: string; hex: string }[]; colour: string; name: string; flat: string; mockups: { pet?: string; text?: string } };
 
+
+type SampleResult = { id: number; colour: string; name: string; mode: 'reference' | 'photo'; printFileUrl: string; flatPreviewUrl: string; paintedUrl?: string; width: number; height: number };
+
+/** Print files for Gelato samples: the design's own picture, or a pet painted from an uploaded photo */
+function SamplePrintSection({ entry, colours, defaultColour }: { entry: MugCatalogEntry; colours: { slug: string; name: string; hex: string }[]; defaultColour: string }) {
+  const [colour, setColour] = useState(defaultColour);
+  const [name, setName] = useState('Daisy');
+  const [mode, setMode] = useState<'reference' | 'photo'>('reference');
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [results, setResults] = useState<SampleResult[]>([]);
+  const [copied, setCopied] = useState<number | null>(null);
+
+  async function make() {
+    setError(null);
+    if (!name.trim()) { setError('Enter a name for the mug (up to 20 characters)'); return; }
+    if (mode === 'photo' && !photo) { setError('Choose a photo first'); return; }
+    setBusy(true);
+    try {
+      let photoPublicId: string | undefined;
+      if (mode === 'photo' && photo) {
+        const fd = new FormData();
+        fd.append('file', await compressImageIfNeeded(photo));
+        fd.append('folder', 'samples');
+        const up = await fetch('/api/admin/mugs/catalog/upload', { method: 'POST', body: fd });
+        const upData = await up.json().catch(() => ({}));
+        if (!up.ok) throw new Error(upData.error || 'Upload failed');
+        photoPublicId = upData.public_id;
+      }
+      const res = await fetch(`/api/admin/mugs/catalog/${entry.id}/sample`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, colour, name: name.trim(), photo_public_id: photoPublicId }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || 'Could not make the sample print file');
+      setResults((r) => [{ id: Date.now(), colour, name: name.trim(), mode, ...d }, ...r]);
+    } catch (e: any) {
+      setError(e.message || 'Could not make the sample print file');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copy(r: SampleResult) {
+    try { await navigator.clipboard.writeText(r.printFileUrl); setCopied(r.id); setTimeout(() => setCopied(null), 2000); }
+    catch { setError('Could not copy the link; use Download print file instead'); }
+  }
+
+  return (
+    <section className="border-t pt-4 space-y-3">
+      <h3 className="font-semibold text-gray-900">Sample print file</h3>
+      <p className="text-xs text-gray-500">For Gelato samples only. Nothing is ordered or charged here. Painting a photo uses one AI picture.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-gray-600 mr-1">Colour</span>
+        {colours.map((c) => (
+          <button key={c.slug} type="button" onClick={() => setColour(c.slug)} title={c.name}
+            className={`w-8 h-8 rounded-full border-2 ${colour === c.slug ? 'border-purple-600 ring-2 ring-purple-200' : 'border-gray-200'}`}
+            style={{ backgroundColor: `#${c.hex}` }} />
+        ))}
+      </div>
+      <label className="block text-sm text-gray-600">Name on the mug
+        <Input value={name} maxLength={20} onChange={(e) => setName(e.target.value)} className="mt-1 max-w-xs" />
+      </label>
+      <div className="space-y-1 text-sm">
+        <label className="flex items-center gap-2"><input type="radio" name="sample-mode" checked={mode === 'reference'} onChange={() => setMode('reference')} />Use the design&apos;s picture</label>
+        <label className="flex items-center gap-2"><input type="radio" name="sample-mode" checked={mode === 'photo'} onChange={() => setMode('photo')} />Paint a pet from a photo</label>
+        {mode === 'photo' && <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} className="block text-sm mt-1" />}
+      </div>
+      <Button onClick={make} disabled={busy}>{busy ? (mode === 'photo' ? 'Painting… (up to a minute)' : 'Making…') : 'Make sample print file'}</Button>
+      {error && <p className="text-sm text-red-700">{error}</p>}
+      {results.map((r) => (
+        <div key={r.id} className="border rounded-lg p-3 space-y-2">
+          <p className="text-xs text-gray-500">{r.name} · {colours.find((c) => c.slug === r.colour)?.name ?? r.colour} · {r.mode === 'photo' ? 'painted from a photo' : 'design picture'} · {r.width} × {r.height} px</p>
+          <div className="flex flex-wrap gap-3 items-start">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={r.flatPreviewUrl} alt="Sample wrap preview" className="w-full sm:w-2/3 rounded border bg-gray-50" />
+            {r.paintedUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={r.paintedUrl} alt="Painted picture" className="w-32 rounded border bg-gray-50" />
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => window.open(r.printFileUrl, '_blank', 'noopener')}>Download print file</Button>
+            <Button size="sm" variant="outline" onClick={() => copy(r)}>{copied === r.id ? 'Copied' : 'Copy link'}</Button>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 /** Pet side, text side and the flat wrap for a design, using the name "Daisy" */
 function MugPreviewModal({ entry, onClose }: { entry: MugCatalogEntry; onClose: () => void }) {
   const [colour, setColour] = useState<string | null>(null);
@@ -576,6 +669,7 @@ function MugPreviewModal({ entry, onClose }: { entry: MugCatalogEntry; onClose: 
               </figure>
             </div>
           )}
+          {data && <SamplePrintSection entry={entry} colours={data.colours} defaultColour={current ?? data.colour} />}
           <details className="text-sm text-gray-600">
             <summary className="cursor-pointer text-gray-500">Text used</summary>
             <div className="mt-2 border-l-4 border-purple-600 pl-4">
