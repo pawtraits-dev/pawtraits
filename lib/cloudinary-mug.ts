@@ -11,6 +11,7 @@
 
 import { v2 as cloudinary } from 'cloudinary';
 import type { MugColour, MugCatalogEntry } from './product-types';
+import { mugWrapText, textBlockHeight, type MugWrapText } from './mugs/wrap-text';
 
 // Configure Cloudinary (idempotent)
 if (!cloudinary.config().cloud_name) {
@@ -74,6 +75,8 @@ export const MUG_LAYOUT = {
   DESCRIPTION_Y: 420,
   DESCRIPTION_MAX_WIDTH: 1000,
   DESCRIPTION_COLOUR: '555555',
+  // Right panel — closing line (an emphasised last paragraph of the description), bold, dark
+  TAGLINE_COLOUR: '2D2926',
 
   // Preview scale
   PREVIEW_WIDTH: 1181,
@@ -84,27 +87,34 @@ export interface MugCompositeParams {
   petName: string;
   mugColour: MugColour;
   catalogEntry: MugCatalogEntry;
+  /** The words for the text side; worked out from the description when not given */
+  text?: MugWrapText;
 }
 
 /**
- * Right panel text block (heading, sub-heading, description) centred vertically. Cloudinary can't
- * measure text, so the description's height is estimated from its length (~52 characters a line).
+ * Right panel text block (heading, sub-heading, description, closing line) centred vertically.
+ * Cloudinary can't measure text, so heights are estimated from the text length (lib/mugs/wrap-text.ts).
  */
-function rightPanelTops(description: string) {
-  const lines = Math.max(1, Math.ceil(description.length / 52));
-  const descHeight = lines * Math.round(MUG_LAYOUT.DESCRIPTION_FONT_SIZE * 1.35);
-  const subOffset = MUG_LAYOUT.SUBHEADING_Y - MUG_LAYOUT.HEADING_Y;      // heading → sub-heading
-  const descOffset = MUG_LAYOUT.DESCRIPTION_Y - MUG_LAYOUT.HEADING_Y;    // heading → description
-  const block = descOffset + descHeight;
+function rightPanelTops(text: MugWrapText) {
+  const lh = Math.round(text.fontSize * 1.35);
+  const bodyHeight = textBlockHeight(text.body, null, text.fontSize);
+  const block = (MUG_LAYOUT.DESCRIPTION_Y - MUG_LAYOUT.HEADING_Y) + textBlockHeight(text.body, text.tagline, text.fontSize);
   const top = Math.max(60, Math.round((MUG_LAYOUT.CANVAS_HEIGHT - block) / 2));
-  return { heading: top, sub: top + subOffset, description: top + descOffset };
+  const description = top + (MUG_LAYOUT.DESCRIPTION_Y - MUG_LAYOUT.HEADING_Y);
+  return {
+    heading: top,
+    sub: top + (MUG_LAYOUT.SUBHEADING_Y - MUG_LAYOUT.HEADING_Y),
+    description,
+    tagline: description + (text.body ? bodyHeight + Math.round(text.fontSize * 0.8) : 0),
+    lineHeight: lh,
+  };
 }
 
 function buildTransformationChain(params: MugCompositeParams): object[] {
   const { personalisedImagePublicId, petName, mugColour, catalogEntry } = params;
   const colourHex = mugColour.overlay_hex;
-  const description = catalogEntry.description_short || catalogEntry.description;
-  const tops = rightPanelTops(description);
+  const text = params.text ?? mugWrapText(catalogEntry.description, catalogEntry.description_short);
+  const tops = rightPanelTops(text);
 
   // Cloudinary requires forward slashes and URL-encoded special chars in overlay public IDs
   const escapedPetImageId = personalisedImagePublicId.replace(/\//g, ':');
@@ -128,7 +138,7 @@ function buildTransformationChain(params: MugCompositeParams): object[] {
       overlay: {
         font_family: MUG_LAYOUT.PET_NAME_FONT_FAMILY,
         font_size: MUG_LAYOUT.PET_NAME_FONT_SIZE,
-        font_weight: 'normal',
+        font_weight: 'bold',
         text_align: 'center',
         text: petName,
       },
@@ -188,14 +198,14 @@ function buildTransformationChain(params: MugCompositeParams): object[] {
       crop: 'fit',
     },
 
-    // RIGHT: description body — Montserrat Regular, always grey
-    {
+    // RIGHT: description body — Montserrat Regular, always grey (the whole description, sized to fit)
+    ...(text.body ? [{
       overlay: {
         font_family: MUG_LAYOUT.HEADING_FONT_FAMILY,
-        font_size: MUG_LAYOUT.DESCRIPTION_FONT_SIZE,
+        font_size: text.fontSize,
         font_weight: 'normal',
         text_align: 'center',
-        text: description,
+        text: text.body,
       },
       color: `rgb:${MUG_LAYOUT.DESCRIPTION_COLOUR}`,
       gravity: 'north',
@@ -203,8 +213,23 @@ function buildTransformationChain(params: MugCompositeParams): object[] {
       y: tops.description,
       width: MUG_LAYOUT.DESCRIPTION_MAX_WIDTH,
       crop: 'fit',
-    },
-
+    }] : []),
+    // RIGHT: closing line (e.g. "Life is never boring with an Aries dog in charge") — Montserrat Bold, dark
+    ...(text.tagline ? [{
+      overlay: {
+        font_family: MUG_LAYOUT.HEADING_FONT_FAMILY,
+        font_size: text.fontSize,
+        font_weight: 'bold',
+        text_align: 'center',
+        text: text.tagline,
+      },
+      color: `rgb:${MUG_LAYOUT.TAGLINE_COLOUR}`,
+      gravity: 'north',
+      x: MUG_LAYOUT.DESCRIPTION_X,
+      y: tops.tagline,
+      width: MUG_LAYOUT.DESCRIPTION_MAX_WIDTH,
+      crop: 'fit',
+    }] : []),
     // OUTPUT quality
     { quality: 95, fetch_format: 'jpg' },
   ];

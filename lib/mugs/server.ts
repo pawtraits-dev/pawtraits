@@ -10,6 +10,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildMugPreviewUrl, buildMugPrintUrl, type MugCompositeParams } from '@/lib/cloudinary-mug';
 import { plainText, snippet } from '@/lib/text/plain';
+import { mugWrapText } from '@/lib/mugs/wrap-text';
 import type { MugCatalogEntry, MugColour } from '@/lib/product-types';
 
 function configure() {
@@ -18,7 +19,10 @@ function configure() {
   }
 }
 
-/** Composite inputs with the catalogue text cleaned up (no markdown, a length that fits the wrap) */
+/**
+ * Composite inputs with the catalogue text cleaned up (no markdown). The text side carries the whole
+ * description, with an emphasised closing line in bold, sized to fit (lib/mugs/wrap-text.ts).
+ */
 export function compositeParams(personalisedImagePublicId: string, petName: string, colour: MugColour, entry: MugCatalogEntry): MugCompositeParams {
   return {
     personalisedImagePublicId,
@@ -29,6 +33,7 @@ export function compositeParams(personalisedImagePublicId: string, petName: stri
       sub_heading: plainText(entry.sub_heading),
       description_short: plainText(entry.description_short) || snippet(entry.description, 240),
     },
+    text: mugWrapText(entry.description, entry.description_short),
   };
 }
 
