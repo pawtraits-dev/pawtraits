@@ -55,4 +55,10 @@ t('very long text is shortened at the smallest size, tagline kept', () => {
   assert.equal(r.tagline, 'Kept close');
   assert.ok(textBlockHeight(r.body, r.tagline, r.fontSize) <= MUG_TEXT_ROOM);
 });
+t('painted picture: near-white becomes the canvas white', () => {
+  const { buildMugPrintUrl } = require('../lib/cloudinary-mug');
+  const url = decodeURIComponent(buildMugPrintUrl({ personalisedImagePublicId: 'pawtraits/x/pet', petName: 'Daisy', mugColour: { overlay_hex: 'E8B931' }, catalogEntry: { name: 'Aries', sub_heading: 'The Adventurer', description: 'Body.' } }));
+  const layer = url.split('/').find((p: string) => p.includes('l_pawtraits:x:pet')) || '';
+  assert.ok(layer.includes('e_make_transparent:12') && layer.includes('co_white'), layer);
+});
 console.log(`mug-wrap-text: ${passed} passed`);

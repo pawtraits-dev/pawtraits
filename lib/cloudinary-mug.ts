@@ -32,6 +32,8 @@ export const MUG_LAYOUT = {
   CANVAS_WIDTH: 2362,
   CANVAS_HEIGHT: 1134,
   CANVAS_PUBLIC_ID: 'pawtraits/mugs/white_canvas_2362x1134',
+  // How close to white (in %) a pixel of the painted picture must be to become the canvas's pure white
+  WHITE_TOLERANCE: 12,
 
   // Left panel — personalised pet image, centred in the panel (gravity north, x offset from canvas centre)
   PET_IMAGE_WIDTH: 1020,
@@ -120,12 +122,16 @@ function buildTransformationChain(params: MugCompositeParams): object[] {
   const escapedPetImageId = personalisedImagePublicId.replace(/\//g, ':');
 
   return [
-    // LEFT: personalised pet image, centred over the name
+    // LEFT: personalised pet image, centred over the name. Gemini's "white" background often comes
+    // back off-white or pale grey, which shows as a box on the white mug; near-white pixels are made
+    // transparent so the canvas's pure white shows through (white fur sits on white, so is unaffected).
     {
       overlay: escapedPetImageId,
       width: MUG_LAYOUT.PET_IMAGE_WIDTH,
       height: MUG_LAYOUT.PET_IMAGE_HEIGHT,
       crop: 'fit',
+      effect: `make_transparent:${MUG_LAYOUT.WHITE_TOLERANCE}`,
+      color: 'white',
       gravity: 'north',
       x: MUG_LAYOUT.PET_IMAGE_X,
       y: MUG_LAYOUT.PET_IMAGE_Y,
