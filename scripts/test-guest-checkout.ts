@@ -2,6 +2,7 @@
  * Unit checks for guest checkout helpers.
  * Run: NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:1 SUPABASE_SERVICE_ROLE_KEY=x npx tsx scripts/test-guest-checkout.ts
  */
+export {};   // a module, so its names do not clash with other test scripts
 const assert = require('node:assert/strict');
 const { parseConsent, serialiseConsent } = require('../lib/tracking/consent');
 const { validateSetting } = require('../lib/app-settings');
