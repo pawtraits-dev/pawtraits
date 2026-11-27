@@ -11,7 +11,7 @@
 
 import { v2 as cloudinary } from 'cloudinary';
 import type { MugColour, MugCatalogEntry } from './product-types';
-import { mugWrapText, textBlockHeight, type MugWrapText } from './mugs/wrap-text';
+import { mugWrapText, textBlockLayout, type MugWrapText } from './mugs/wrap-text';
 
 // Configure Cloudinary (idempotent)
 if (!cloudinary.config().cloud_name) {
@@ -32,6 +32,8 @@ export const MUG_LAYOUT = {
   CANVAS_WIDTH: 2362,
   CANVAS_HEIGHT: 1134,
   CANVAS_PUBLIC_ID: 'pawtraits/mugs/white_canvas_2362x1134',
+  // How close to white (in %) a pixel of the painted picture must be to become the canvas's pure white
+  WHITE_TOLERANCE: 12,
 
   // Left panel — personalised pet image, centred in the panel (gravity north, x offset from canvas centre)
   PET_IMAGE_WIDTH: 1020,
@@ -75,7 +77,7 @@ export const MUG_LAYOUT = {
   DESCRIPTION_Y: 420,
   DESCRIPTION_MAX_WIDTH: 1000,
   DESCRIPTION_COLOUR: '555555',
-  // Right panel — closing line (an emphasised last paragraph of the description), bold, dark
+  // Right panel — opening line (an emphasised first line of the description), bold, dark
   TAGLINE_COLOUR: '2D2926',
 
   // Preview scale
@@ -92,22 +94,18 @@ export interface MugCompositeParams {
 }
 
 /**
- * Right panel text block (heading, sub-heading, description, closing line) centred vertically.
- * Cloudinary can't measure text, so heights are estimated from the text length (lib/mugs/wrap-text.ts).
+ * Right panel text block (heading, sub-heading, opening line, description, closing line) centred
+ * vertically. Cloudinary can't measure text, so heights are estimated (lib/mugs/wrap-text.ts).
  */
 function rightPanelTops(text: MugWrapText) {
-  const lh = Math.round(text.fontSize * 1.35);
-  const bodyHeight = textBlockHeight(text.body, null, text.fontSize);
-  const block = (MUG_LAYOUT.DESCRIPTION_Y - MUG_LAYOUT.HEADING_Y) + textBlockHeight(text.body, text.tagline, text.fontSize);
-  const top = Math.max(60, Math.round((MUG_LAYOUT.CANVAS_HEIGHT - block) / 2));
-  const description = top + (MUG_LAYOUT.DESCRIPTION_Y - MUG_LAYOUT.HEADING_Y);
-  return {
-    heading: top,
-    sub: top + (MUG_LAYOUT.SUBHEADING_Y - MUG_LAYOUT.HEADING_Y),
-    description,
-    tagline: description + (text.body ? bodyHeight + Math.round(text.fontSize * 0.8) : 0),
-    lineHeight: lh,
-  };
+  const l = textBlockLayout(text, text.fontSize);
+  const headerH = MUG_LAYOUT.DESCRIPTION_Y - MUG_LAYOUT.HEADING_Y;
+  const top = Math.max(60, Math.round((MUG_LAYOUT.CANVAS_HEIGHT - (headerH + l.total)) / 2));
+  let y = top + headerH;
+  const lead = y; if (l.leadH) y += l.leadH + l.gap;
+  const description = y; if (l.bodyH) y += l.bodyH + l.gap;
+  const tagline = y;
+  return { heading: top, sub: top + (MUG_LAYOUT.SUBHEADING_Y - MUG_LAYOUT.HEADING_Y), lead, description, tagline };
 }
 
 function buildTransformationChain(params: MugCompositeParams): object[] {
@@ -120,12 +118,16 @@ function buildTransformationChain(params: MugCompositeParams): object[] {
   const escapedPetImageId = personalisedImagePublicId.replace(/\//g, ':');
 
   return [
-    // LEFT: personalised pet image, centred over the name
+    // LEFT: personalised pet image, centred over the name. Gemini's "white" background often comes
+    // back off-white or pale grey, which shows as a box on the white mug; near-white pixels are made
+    // transparent so the canvas's pure white shows through (white fur sits on white, so is unaffected).
     {
       overlay: escapedPetImageId,
       width: MUG_LAYOUT.PET_IMAGE_WIDTH,
       height: MUG_LAYOUT.PET_IMAGE_HEIGHT,
       crop: 'fit',
+      effect: `make_transparent:${MUG_LAYOUT.WHITE_TOLERANCE}`,
+      color: 'white',
       gravity: 'north',
       x: MUG_LAYOUT.PET_IMAGE_X,
       y: MUG_LAYOUT.PET_IMAGE_Y,
@@ -198,6 +200,22 @@ function buildTransformationChain(params: MugCompositeParams): object[] {
       crop: 'fit',
     },
 
+    // RIGHT: opening line (e.g. "The Pisces dog feels everything") — Montserrat Bold, dark
+    ...(text.lead ? [{
+      overlay: {
+        font_family: MUG_LAYOUT.HEADING_FONT_FAMILY,
+        font_size: text.fontSize,
+        font_weight: 'bold',
+        text_align: 'center',
+        text: text.lead,
+      },
+      color: `rgb:${MUG_LAYOUT.TAGLINE_COLOUR}`,
+      gravity: 'north',
+      x: MUG_LAYOUT.DESCRIPTION_X,
+      y: tops.lead,
+      width: MUG_LAYOUT.DESCRIPTION_MAX_WIDTH,
+      crop: 'fit',
+    }] : []),
     // RIGHT: description body — Montserrat Regular, always grey (the whole description, sized to fit)
     ...(text.body ? [{
       overlay: {
@@ -214,7 +232,7 @@ function buildTransformationChain(params: MugCompositeParams): object[] {
       width: MUG_LAYOUT.DESCRIPTION_MAX_WIDTH,
       crop: 'fit',
     }] : []),
-    // RIGHT: closing line (e.g. "Life is never boring with an Aries dog in charge") — Montserrat Bold, dark
+    // RIGHT: closing line (e.g. "Life is never boring with an Aries dog in charge") — Montserrat Bold, in the mug's highlight colour (as the sign and the pet's name)
     ...(text.tagline ? [{
       overlay: {
         font_family: MUG_LAYOUT.HEADING_FONT_FAMILY,
@@ -223,7 +241,7 @@ function buildTransformationChain(params: MugCompositeParams): object[] {
         text_align: 'center',
         text: text.tagline,
       },
-      color: `rgb:${MUG_LAYOUT.TAGLINE_COLOUR}`,
+      color: `#${colourHex}`,
       gravity: 'north',
       x: MUG_LAYOUT.DESCRIPTION_X,
       y: tops.tagline,
