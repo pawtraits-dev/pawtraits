@@ -9,6 +9,7 @@ export const FEATURES: Record<string, string> = {
   'team-version': 'Team versions',
   'print-master': '4K print masters',
   mug: 'Mugs',
+  mug_sample: 'Mug sample (admin)',
   'quiz-image': 'Quiz pictures',
   'size-test': 'Size tests (admin)',
   'consistency-test': 'Consistency tests (admin)',

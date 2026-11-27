@@ -1050,6 +1050,7 @@ export const GUIDES: Guide[] = [
         heading: 'Mugs and phone cases',
         body: [
           'Mugs: **Mug Catalog** holds the zodiac and breed mugs; **Mug Generations** shows what customers have made. Leave the setup to the owner.',
+          'To get a print file for a Gelato sample, press the eye on a design in **Mug Catalog**, then use **Sample print file**: pick a colour and name, choose the design\'s picture or a photo, press **Make sample print file**, then **Download print file** or **Copy link**. Painting a photo uses one AI picture.',
           'Phone cases are not on sale yet. **Phone Cases** shows the models and the case art. Leave it to the owner.',
         ],
         links: [P.mugCatalog, P.mugGenerations, P.phoneCases],
