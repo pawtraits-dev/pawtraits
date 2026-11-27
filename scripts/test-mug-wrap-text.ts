@@ -1,6 +1,6 @@
 /** Mug wrap text: full description, emphasised closing line in bold, sized to fit. Run: npx tsx scripts/test-mug-wrap-text.ts */
 import assert from 'node:assert/strict';
-import { splitTagline, mugWrapText, textBlockHeight, MUG_TEXT_ROOM, MUG_BODY_SIZES } from '../lib/mugs/wrap-text';
+import { splitTagline, splitDescription, mugWrapText, textBlockHeight, textBlockLayout, MUG_TEXT_ROOM, MUG_BODY_SIZES } from '../lib/mugs/wrap-text';
 
 export {};
 let passed = 0;
@@ -60,5 +60,37 @@ t('painted picture: near-white becomes the canvas white', () => {
   const url = decodeURIComponent(buildMugPrintUrl({ personalisedImagePublicId: 'pawtraits/x/pet', petName: 'Daisy', mugColour: { overlay_hex: 'E8B931' }, catalogEntry: { name: 'Aries', sub_heading: 'The Adventurer', description: 'Body.' } }));
   const layer = url.split('/').find((p: string) => p.includes('l_pawtraits:x:pet')) || '';
   assert.ok(layer.includes('e_make_transparent:12') && layer.includes('co_white'), layer);
+});
+const PISCES = "**The Pisces dog feels everything**\n The sense your joy, your stress, and your very soul. Psychic comfort provider, professional mood-detector, and devoted emotional companion. They live in a beautiful haze of love and snacks and don't entirely understand where they end and you begin. \n\n*Sensitive, gentle, and absolutely irreplaceable.*";
+t('pisces: bold opening line, body, closing line all separate', () => {
+  const r = mugWrapText(PISCES, null);
+  assert.equal(r.lead, 'The Pisces dog feels everything');
+  assert.ok(r.body.startsWith('The sense your joy'));
+  assert.ok(r.body.endsWith('where they end and you begin.'));
+  assert.equal(r.tagline, 'Sensitive, gentle, and absolutely irreplaceable.');
+  assert.ok(textBlockLayout(r, r.fontSize).total <= MUG_TEXT_ROOM);
+});
+t('opening line only, no closing line', () => {
+  assert.deepEqual(splitDescription('*Opening*\nBody one.\nBody two.'), { lead: 'Opening', body: 'Body one. Body two.', tagline: null });
+});
+t('closing line takes priority when there are only two lines', () => {
+  assert.deepEqual(splitDescription('**Bold one**\n*Italic two*'), { lead: null, body: 'Bold one', tagline: 'Italic two' });
+});
+t('inline emphasis inside a sentence is printed plain', () => {
+  assert.equal(splitDescription('A **very** good dog.\n\n*Close*').body, 'A very good dog.');
+});
+t('wrap: opening line bold and dark, closing line bold in the highlight colour, in that order', () => {
+  const { buildMugPrintUrl } = require('../lib/cloudinary-mug');
+  const url = decodeURIComponent(buildMugPrintUrl({ personalisedImagePublicId: 'pawtraits/x/pet', petName: 'Daisy', mugColour: { overlay_hex: 'E8B931' },
+    catalogEntry: { name: 'Pisces', sub_heading: 'The Dreamer', description: PISCES } }));
+  const parts = url.split('/');
+  const lead = parts.find((p: string) => p.includes(':The Pisces dog feels everything')) || '';
+  const body = parts.find((p: string) => p.includes(':The sense your joy')) || '';
+  const close = parts.find((p: string) => p.includes(':Sensitive')) || '';
+  assert.ok(lead.includes('_bold_') && lead.includes('co_rgb:2D2926'), lead);
+  assert.ok(!body.includes('_bold_') && body.includes('co_rgb:555555'), body);
+  assert.ok(close.includes('_bold_') && /co_rgb:E8B931/i.test(close), close);
+  const y = (p: string) => Number((p.match(/y_(\d+)/) || [])[1]);
+  assert.ok(y(lead) < y(body) && y(body) < y(close));
 });
 console.log(`mug-wrap-text: ${passed} passed`);
